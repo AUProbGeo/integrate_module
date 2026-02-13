@@ -3341,8 +3341,9 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     >>> # Force log scale
     >>> plot_prior_stats('prior.h5', Mkey='M1', use_log=True)
     """
+    import matplotlib.pyplot as plt
     from matplotlib.colors import LogNorm
-    
+
     f_prior = h5py.File(f_prior_h5,'r')
 
     # If Mkey is not set, plot for all M* keys in prior and return
