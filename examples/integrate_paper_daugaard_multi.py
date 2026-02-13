@@ -34,12 +34,12 @@ hardcopy=True
 # ## Download the data DAUGAARD data including non-trivial prior data realizations
 
 # %%
-cmap, clim = ig.get_colormap_and_limits*('resistivity')
+cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
 inflateNoise = 2   # 1,2, 4
 useLogData = False
-N_use = 1000000
+N_use = 10000
 N_use_org= N_use
 #N_use = 100000
 #N_use = 100000
