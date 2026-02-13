@@ -3389,6 +3389,11 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     N, Nm = M.shape
     clim,cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
 
+    # Convert string colormap name to actual colormap object
+    if isinstance(cmap, str):
+        import matplotlib.pyplot as plt
+        cmap = plt.get_cmap(cmap)
+
     is_discrete = f_prior['/%s'%Mkey].attrs['is_discrete']
 
     # Determine whether to use log scale
