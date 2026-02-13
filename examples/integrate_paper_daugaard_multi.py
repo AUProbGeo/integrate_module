@@ -30,27 +30,21 @@ import h5py
 from integrate.integrate_io import copy_prior
 hardcopy=True
 
-
 # %% [markdown]
 # ## Download the data DAUGAARD data including non-trivial prior data realizations
 
 # %%
 cmap, clim = ig.get_colormap_and_limits('resistivity')
-<<<<<<< HEAD
-useMergedPrior=True # Fails if not true
-useGenericPrior=False
-=======
 useMergedPrior=True
 useGenericPrior=True
->>>>>>> 7041f11eb082a8ee61756ed587dd2dc3230644e4
 inflateNoise = 2   # 1,2, 4
 useLogData = False
 N_use = 10000
 N_use_org= N_use
-
+#N_use = 100000
 #N_use = 100000
 
-doEffectSize = False
+doEffectSize = True
 doTbase = True
 doPlotAll=True
 doTestInversion = False
@@ -151,7 +145,6 @@ if inflateNoise != 1:
 ig.plot_data(f_data_h5, useLog = 0, hardcopy= hardcopy)
 plt.show()
 
-
 # %%
 X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
 
@@ -246,7 +239,6 @@ f_prior_data_h5_list.append(f_prior_standard_h5)
 
 if useLogData == True:
     f_prior_log_data_h5  = 'd_valley_log.h5'
-
     ig.copy_hdf5_file(f_prior_data_h5_list[0], f_prior_log_data_h5, showInfo=2)
     D,id =  ig.load_prior_data(f_prior_data_h5_list[0])
     Dlog = np.log10(D[0])
