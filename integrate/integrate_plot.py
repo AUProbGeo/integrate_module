@@ -3297,17 +3297,23 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
 
     Notes
     -----
-    For continuous parameters, creates a 1x2 subplot layout with custom width ratios:
-    - Left (narrow): Histogram (log10 or linear) with horizontal orientation
-    - Right (wide, 2x wider): Realizations plot with corresponding normalization
+    Creates a 1x3 subplot layout with custom width ratios:
+
+    **For continuous parameters:**
+    - Left (narrow, width 1): Histogram (log10 or linear) with horizontal orientation
+    - Middle (medium, width 1.5): Statistics vs depth showing Mean (red line),
+      Median (blue line), and ±1 Std (gray shading)
+    - Right (wide, width 2): Realizations plot with corresponding normalization
       (LogNorm for log scale, linear for linear scale)
 
-    For discrete parameters, creates similar layout but with:
-    - Left (narrow): Class distribution histogram with class names (always linear)
-    - Right (wide): Categorical realizations with class names and colors (always linear)
+    **For discrete parameters:**
+    - Left (narrow, width 1): Class distribution histogram with class names (always linear)
+    - Middle (medium, width 2): Probability of each class vs depth (separate line per class)
+    - Right (wide, width 3): Categorical realizations with class names and colors
 
-    The `use_log` parameter controls scaling for BOTH subplots:
+    The `use_log` parameter controls scaling for histogram and realizations:
     - Histogram: log10(values) vs linear values on y-axis
+    - Middle panel: Uses same scale as histogram (log/linear x-axis)
     - Realizations: LogNorm vs linear colormap normalization
 
     **Automatic Scale Selection (when use_log=None):**
@@ -3321,8 +3327,8 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     Multi-dimensional parameters show spatial patterns, while single parameters
     show temporal variation.
 
-    The layout uses matplotlib GridSpec with width_ratios=[1, 2] to make the
-    realizations subplot wider than the histogram subplot.
+    The layout uses matplotlib GridSpec with width_ratios=[1, 1.5, 2] for continuous
+    and [1, 2, 3] for discrete parameters.
 
     Examples
     --------
@@ -3413,10 +3419,10 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     if not is_discrete:
         # CONTINUOUS
 
-        # Create figure with GridSpec for custom layout (left narrow, right wide)
-        fig = plt.figure(figsize=(14, 6))
+        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
+        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2], figure=fig)
+        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
 
         # Left subplot: Histogram (log or linear)
         ax_left = fig.add_subplot(gs[0])
@@ -3447,8 +3453,63 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         ax_left.set_xlabel('Counts')
         ax_left.grid()
 
+        # Middle subplot: Statistics vs depth (Mean, Median, Std)
+        ax_middle = fig.add_subplot(gs[1])
+
+        if Nm > 1:
+            # Compute statistics across all realizations
+            M_mean = np.mean(M, axis=0)
+            M_median = np.median(M, axis=0)
+            # Compute 95% confidence interval (2.5th and 97.5th percentiles)
+            M_p2_5 = np.percentile(M, 2.5, axis=0)
+            M_p97_5 = np.percentile(M, 97.5, axis=0)
+
+            ax_middle.invert_yaxis()
+
+            if use_log_scale:
+                # Plot in log space
+                ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
+                ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
+                # Shade 95% confidence interval (p2.5 to p97.5)
+                ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
+                                       alpha=0.3, color='gray', label='95% CI')
+                ax_middle.set_xscale('log')
+                ax_middle.set_xlabel(name)
+            else:
+                # Plot in linear space
+                ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
+                ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
+                # Shade 95% confidence interval (p2.5 to p97.5)
+                ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
+                                       alpha=0.3, color='gray', label='95% CI')
+                ax_middle.set_xlabel(name)
+
+            # Set x-axis limits to match colorbar in realizations panel
+            if clim is not None and len(clim) == 2:
+                ax_middle.set_xlim(clim[0], clim[1])
+
+            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.grid(True, alpha=0.3)
+            ax_middle.legend(loc='best', fontsize=8)
+        else:
+            # For single parameter, show time series statistics
+            M_mean = np.mean(M)
+            M_median = np.median(M)
+            # Compute 95% confidence interval
+            M_p2_5 = np.percentile(M, 2.5)
+            M_p97_5 = np.percentile(M, 97.5)
+
+            ax_middle.axhline(M_mean, color='r', linewidth=2, label='Mean')
+            ax_middle.axhline(M_median, color='b', linewidth=2, label='Median')
+            ax_middle.axhspan(M_p2_5, M_p97_5,
+                            alpha=0.3, color='gray', label='95% CI')
+            ax_middle.set_ylabel(name)
+            ax_middle.set_xlabel('Statistics')
+            ax_middle.legend(loc='best', fontsize=8)
+            ax_middle.grid(True, alpha=0.3)
+
         # Right subplot: Realizations (wider)
-        ax_right = fig.add_subplot(gs[1])
+        ax_right = fig.add_subplot(gs[2])
 
         X,Y = np.meshgrid(np.arange(1,nr+1),z)
         ax_right.invert_yaxis()
@@ -3491,10 +3552,10 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
             class_name = []
         n_class = len(class_name)
 
-        # Create figure with GridSpec for custom layout (left narrow, right wide)
-        fig = plt.figure(figsize=(14, 6))
+        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
+        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 2, width_ratios=[1, 3], figure=fig)
+        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
 
         # Left subplot: Histogram (for discrete, we can show class distribution)
         ax_left = fig.add_subplot(gs[0])
@@ -3507,8 +3568,74 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         ax_left.set_yticklabels(class_name)
         ax_left.grid()
 
+        # Middle subplot: Mode and class probabilities vs depth
+        ax_middle = fig.add_subplot(gs[1])
+
+        if Nm > 1:
+            # Compute mode and class probabilities at each depth
+            from scipy import stats
+            import matplotlib.cm as cm
+
+            # Compute mode (most frequent class) at each depth
+            M_mode = np.zeros(Nm)
+            for i in range(Nm):
+                mode_result = stats.mode(M[:, i], keepdims=True)
+                M_mode[i] = mode_result[0][0]
+
+            # Compute probability of each class at each depth
+            P_class = np.zeros((Nm, n_class))
+            for i in range(Nm):
+                for c in range(n_class):
+                    class_val = class_id[c]
+                    P_class[i, c] = np.sum(M[:, i] == class_val) / N
+
+            ax_middle.invert_yaxis()
+
+            # Get colors from the colormap to match realizations panel
+            # Map class values to colormap
+            norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
+
+            # Plot probability of each class with matching colors
+            for c in range(n_class):
+                class_val = class_id[c]
+                # Get color from colormap at the class value position
+                color = cmap(norm(class_val))
+                ax_middle.plot(P_class[:, c], z, linewidth=2, label=class_name[c], color=color)
+
+            # Use clim to set x-axis limits if available, otherwise use [0, 1]
+            if clim is not None and len(clim) == 2:
+                # clim represents class value range, not probability
+                # For probability, we still use [0, 1]
+                ax_middle.set_xlim([0, 1])
+            else:
+                ax_middle.set_xlim([0, 1])
+
+            ax_middle.set_xlabel('Probability')
+            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.grid(True, alpha=0.3)
+            ax_middle.legend(loc='best', fontsize=8)
+        else:
+            # For single parameter, show class probabilities as bar chart
+            import matplotlib.cm as cm
+
+            class_counts = np.zeros(n_class)
+            for c in range(n_class):
+                class_val = class_id[c]
+                class_counts[c] = np.sum(M == class_val) / N
+
+            # Get colors from the colormap to match realizations panel
+            norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
+            colors = [cmap(norm(class_id[c])) for c in range(n_class)]
+
+            ax_middle.barh(np.arange(n_class) + 1, class_counts, color=colors)
+            ax_middle.set_yticks(np.arange(n_class) + 1)
+            ax_middle.set_yticklabels(class_name)
+            ax_middle.set_xlabel('Probability')
+            ax_middle.set_xlim([0, 1])
+            ax_middle.grid(True, alpha=0.3)
+
         # Right subplot: Realizations (wider)
-        ax_right = fig.add_subplot(gs[1])
+        ax_right = fig.add_subplot(gs[2])
 
         X,Y = np.meshgrid(np.arange(1,nr+1),z)
         ax_right.invert_yaxis()
@@ -3583,21 +3710,31 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
 
     Notes
     -----
-    Creates a 1x2 subplot layout similar to plot_prior_stats:
-    - Left (narrow): Histogram of posterior samples for selected data point
-    - Right (wide, 2x wider): Realizations plot showing accepted samples
+    Creates a 1x3 subplot layout with custom width ratios:
+
+    **For continuous parameters:**
+    - Left (narrow, width 1): Histogram of posterior samples for selected data point
+    - Middle (medium, width 1.5): Posterior statistics vs depth showing Mean (red line),
+      Median (blue line), and ±1 Std (gray shading). Uses pre-computed statistics from
+      posterior file when available, otherwise computes from realizations.
+    - Right (wide, width 2): Realizations plot showing accepted samples
+
+    **For discrete parameters:**
+    - Left (narrow, width 1): Class distribution histogram for posterior samples
+    - Middle (medium, width 2): Probability of each class vs depth for posterior
+      (separate line per class)
+    - Right (wide, width 3): Categorical realizations with class names and colors
 
     The function reads i_use[i_plot, :] to get accepted sample indices from the
     posterior file, then retrieves corresponding realizations from the referenced
-    prior file. Pre-computed statistics (Mean, Median, Std) are overlaid as
-    reference lines on the plots.
+    prior file.
 
     For continuous parameters, the histogram shows either log10(values) or linear
     values, and the realizations use corresponding LogNorm or linear colormap
     normalization.
 
-    For discrete parameters, shows class distribution histogram and categorical
-    realizations with class names and colors (always linear scale).
+    The layout uses matplotlib GridSpec with width_ratios=[1, 1.5, 2] for continuous
+    and [1, 2, 3] for discrete parameters.
 
     Examples
     --------
@@ -3699,12 +3836,16 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
     # Update nr if it is larger than the number of accepted samples
     nr_actual = np.min([nr, n_accepted])
     if showInfo > 0:
-        print('plot_post_stats: Using %d realizations out of %d accepted' % (nr_actual, n_accepted))
+        print('plot_post_stats: Using %d realizations for display out of %d accepted' % (nr_actual, n_accepted))
 
-    # Load posterior realizations from prior file using i_accepted indices
+    # Load ALL posterior realizations from prior file for statistics computation
     M_prior_all = f_prior[Mkey][:]
-    M = M_prior_all[i_accepted[:nr_actual], :]
-    N, Nm = M.shape
+    M_all = M_prior_all[i_accepted, :]  # All accepted samples for statistics
+    N_all, Nm = M_all.shape
+
+    # Load subset for realizations display (right panel only)
+    M_display = M_prior_all[i_accepted[:nr_actual], :]
+    N_display = nr_actual
 
     # Get color limits and colormap
     clim, cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
@@ -3735,7 +3876,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             use_log_scale = False
         else:
             # For continuous parameters, check if data spans many orders of magnitude
-            M_positive = M[M > 0]  # Only consider positive values
+            M_positive = M_all[M_all > 0]  # Only consider positive values
             if len(M_positive) > 0:
                 data_min = np.min(M_positive)
                 data_max = np.max(M_positive)
@@ -3755,17 +3896,17 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
     if not is_discrete:
         # CONTINUOUS
 
-        # Create figure with GridSpec for custom layout (left narrow, right wide)
-        fig = plt.figure(figsize=(14, 6))
+        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
+        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2], figure=fig)
+        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
 
-        # Left subplot: Histogram (log or linear)
+        # Left subplot: Histogram (log or linear) - uses ALL accepted samples
         ax_left = fig.add_subplot(gs[0])
 
         if use_log_scale:
-            # Log10 histogram
-            M_hist = M.flatten()
+            # Log10 histogram from ALL accepted samples
+            M_hist = M_all.flatten()
             M_hist = M_hist[M_hist > 0]  # Remove zeros and negative values
             if len(M_hist) > 0:
                 m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
@@ -3792,8 +3933,8 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                 if len(median_pos) > 0:
                     ax_left.axhline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
         else:
-            # Linear histogram
-            M_hist = M.flatten()
+            # Linear histogram from ALL accepted samples
+            M_hist = M_all.flatten()
             m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
             ax_left.set_ylabel(name)
 
@@ -3809,27 +3950,92 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         if stat_mean is not None or stat_median is not None:
             ax_left.legend(loc='best', fontsize=8)
 
-        # Right subplot: Realizations (wider)
-        ax_right = fig.add_subplot(gs[1])
+        # Middle subplot: Statistics vs depth - computed from ALL accepted samples
+        ax_middle = fig.add_subplot(gs[1])
+
+        if Nm > 1:
+            # Use pre-computed statistics if available, otherwise compute from ALL realizations
+            if stat_mean is not None and stat_median is not None:
+                M_mean = stat_mean
+                M_median = stat_median
+            else:
+                M_mean = np.mean(M_all, axis=0)
+                M_median = np.median(M_all, axis=0)
+
+            # Compute 95% confidence interval from ALL realizations (p2.5 and p97.5)
+            M_p2_5 = np.percentile(M_all, 2.5, axis=0)
+            M_p97_5 = np.percentile(M_all, 97.5, axis=0)
+
+            ax_middle.invert_yaxis()
+
+            if use_log_scale:
+                # Plot in log space
+                ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
+                ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
+                # Shade 95% confidence interval (p2.5 to p97.5)
+                ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
+                                       alpha=0.3, color='gray', label='95% CI')
+                ax_middle.set_xscale('log')
+                ax_middle.set_xlabel(name)
+            else:
+                # Plot in linear space
+                ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
+                ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
+                # Shade 95% confidence interval (p2.5 to p97.5)
+                ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
+                                       alpha=0.3, color='gray', label='95% CI')
+                ax_middle.set_xlabel(name)
+
+            # Set x-axis limits to match colorbar in realizations panel
+            if clim is not None and len(clim) == 2:
+                ax_middle.set_xlim(clim[0], clim[1])
+
+            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.grid(True, alpha=0.3)
+            ax_middle.legend(loc='best', fontsize=8)
+        else:
+            # For single parameter, show time series statistics from ALL samples
+            if stat_mean is not None and stat_median is not None:
+                M_mean_val = np.mean(stat_mean)
+                M_median_val = np.median(stat_median)
+            else:
+                M_mean_val = np.mean(M_all)
+                M_median_val = np.median(M_all)
+
+            # Compute 95% confidence interval from ALL samples
+            M_p2_5 = np.percentile(M_all, 2.5)
+            M_p97_5 = np.percentile(M_all, 97.5)
+
+            ax_middle.axhline(M_mean_val, color='r', linewidth=2, label='Mean')
+            ax_middle.axhline(M_median_val, color='b', linewidth=2, label='Median')
+            ax_middle.axhspan(M_p2_5, M_p97_5,
+                            alpha=0.3, color='gray', label='95% CI')
+            ax_middle.set_ylabel(name)
+            ax_middle.set_xlabel('Statistics')
+            ax_middle.legend(loc='best', fontsize=8)
+            ax_middle.grid(True, alpha=0.3)
+
+        # Right subplot: Realizations (wider) - displays only nr_actual for visualization
+        ax_right = fig.add_subplot(gs[2])
 
         X, Y = np.meshgrid(np.arange(1, nr_actual + 1), z)
         ax_right.invert_yaxis()
         if Nm > 1:
             # Apply log or linear normalization based on use_log_scale
             if use_log_scale:
-                m2 = ax_right.pcolor(X, Y, M[0:nr_actual, :].T,
+                m2 = ax_right.pcolor(X, Y, M_display[:, :].T,
                                      cmap=cmap,
                                      shading='auto',
                                      norm=LogNorm())
             else:
-                m2 = ax_right.pcolor(X, Y, M[0:nr_actual, :].T,
+                m2 = ax_right.pcolor(X, Y, M_display[:, :].T,
                                      cmap=cmap,
                                      shading='auto')
             # set clim to clim
             m2.set_clim(clim[0], clim[1])
             fig.colorbar(m2, ax=ax_right, label=Mkey[1::])
         else:
-            m2 = ax_right.plot(np.arange(1, nr_actual + 1), M[0:nr_actual, :].flatten())
+            m2 = ax_right.plot(np.arange(1, nr_actual + 1), M_display[:, :].flatten())
             ax_right.set_xlim(1, nr_actual)
 
         ax_right.set_xlabel('Realization #')
@@ -3854,29 +4060,95 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             class_name = []
         n_class = len(class_name)
 
-        # Create figure with GridSpec for custom layout (left narrow, right wide)
-        fig = plt.figure(figsize=(14, 6))
+        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
+        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 2, width_ratios=[1, 3], figure=fig)
+        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
 
-        # Left subplot: Histogram (for discrete, we show class distribution)
+        # Left subplot: Histogram (for discrete, we show class distribution) - uses ALL samples
         ax_left = fig.add_subplot(gs[0])
 
-        # Create histogram with class boundaries
-        m1 = ax_left.hist(M.flatten(), bins=np.arange(0.5, n_class + 1.5, 1), orientation='horizontal')
+        # Create histogram with class boundaries from ALL accepted samples
+        m1 = ax_left.hist(M_all.flatten(), bins=np.arange(0.5, n_class + 1.5, 1), orientation='horizontal')
         ax_left.set_ylabel(name)
         ax_left.set_xlabel('Counts')
         ax_left.set_yticks(np.arange(n_class) + 1)
         ax_left.set_yticklabels(class_name)
         ax_left.grid()
 
-        # Right subplot: Realizations (wider)
-        ax_right = fig.add_subplot(gs[1])
+        # Middle subplot: Mode and class probabilities vs depth - computed from ALL samples
+        ax_middle = fig.add_subplot(gs[1])
+
+        if Nm > 1:
+            # Compute mode and class probabilities at each depth from ALL samples
+            from scipy import stats
+            import matplotlib.cm as cm
+
+            # Compute mode (most frequent class) at each depth
+            M_mode = np.zeros(Nm)
+            for i in range(Nm):
+                mode_result = stats.mode(M_all[:, i], keepdims=True)
+                M_mode[i] = mode_result[0][0]
+
+            # Compute probability of each class at each depth from ALL samples
+            P_class = np.zeros((Nm, n_class))
+            for i in range(Nm):
+                for c in range(n_class):
+                    class_val = class_id[c]
+                    P_class[i, c] = np.sum(M_all[:, i] == class_val) / N_all
+
+            ax_middle.invert_yaxis()
+
+            # Get colors from the colormap to match realizations panel
+            # Map class values to colormap
+            norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
+
+            # Plot probability of each class with matching colors
+            for c in range(n_class):
+                class_val = class_id[c]
+                # Get color from colormap at the class value position
+                color = cmap(norm(class_val))
+                ax_middle.plot(P_class[:, c], z, linewidth=2, label=class_name[c], color=color)
+
+            # Use clim to set x-axis limits if available, otherwise use [0, 1]
+            if clim is not None and len(clim) == 2:
+                # clim represents class value range, not probability
+                # For probability, we still use [0, 1]
+                ax_middle.set_xlim([0, 1])
+            else:
+                ax_middle.set_xlim([0, 1])
+
+            ax_middle.set_xlabel('Probability')
+            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.grid(True, alpha=0.3)
+            ax_middle.legend(loc='best', fontsize=8)
+        else:
+            # For single parameter, show class probabilities as bar chart from ALL samples
+            import matplotlib.cm as cm
+
+            class_counts = np.zeros(n_class)
+            for c in range(n_class):
+                class_val = class_id[c]
+                class_counts[c] = np.sum(M_all == class_val) / N_all
+
+            # Get colors from the colormap to match realizations panel
+            norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
+            colors = [cmap(norm(class_id[c])) for c in range(n_class)]
+
+            ax_middle.barh(np.arange(n_class) + 1, class_counts, color=colors)
+            ax_middle.set_yticks(np.arange(n_class) + 1)
+            ax_middle.set_yticklabels(class_name)
+            ax_middle.set_xlabel('Probability')
+            ax_middle.set_xlim([0, 1])
+            ax_middle.grid(True, alpha=0.3)
+
+        # Right subplot: Realizations (wider) - displays only nr_actual for visualization
+        ax_right = fig.add_subplot(gs[2])
 
         X, Y = np.meshgrid(np.arange(1, nr_actual + 1), z)
         ax_right.invert_yaxis()
         if Nm > 1:
-            m2 = ax_right.pcolor(X, Y, M[0:nr_actual, :].T,
+            m2 = ax_right.pcolor(X, Y, M_display[:, :].T,
                                  cmap=cmap,
                                  shading='auto')
             # set clim to clim
@@ -3886,7 +4158,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             cbar1.set_ticklabels(class_name)
             cbar1.ax.invert_yaxis()
         else:
-            m2 = ax_right.plot(np.arange(1, nr_actual + 1), M[0:nr_actual, :].flatten())
+            m2 = ax_right.plot(np.arange(1, nr_actual + 1), M_display[:, :].flatten())
             ax_right.set_xlim(1, nr_actual)
 
         ax_right.set_xlabel('Realization #')
