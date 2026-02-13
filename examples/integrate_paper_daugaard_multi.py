@@ -512,9 +512,10 @@ if doPlotAll:
     
     #f_post_h5_all_list = f_post_h5_T_list
 
-
     for i_post in range(len(f_post_h5_all_list)):
         f_post_h5 = f_post_h5_all_list[i_post]
+        with h5py.File(f_post_h5,'r') as f:
+            f_prior_h5 = f.attrs['f5_prior']
 
         ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy)
 
@@ -560,6 +561,12 @@ if doPlotAll:
                 ig.plot_feature_2d(f_post_h5,im=3, key='Mode', uselog=1, cmap='jet', hardcopy=hardcopy)
             except:
                 pass
+
+            # %%
+            ig.plot_prior_stats(f_prior_data_h5_list[i_prior])
+            ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
+            ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
+            
 
 # %%
 if doPlotAll:
