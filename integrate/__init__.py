@@ -89,6 +89,7 @@ from integrate.integrate_plot import plot_data
 from integrate.integrate_plot import plot_data_prior_post
 from integrate.integrate_plot import plot_data_prior
 from integrate.integrate_plot import plot_prior_stats
+from integrate.integrate_plot import plot_post_stats
 from integrate.integrate_plot import plot_feature_2d
 from integrate.integrate_plot import plot_posterior_cumulative_thickness
 from integrate.integrate_plot import h5_get_clim_cmap
