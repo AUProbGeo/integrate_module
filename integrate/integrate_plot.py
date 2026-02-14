@@ -859,17 +859,18 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         i2=i1+1
     
     if (pl=='all') or (pl=='T'):
-        plt.figure(1, figsize=(wx,wy))
-        plt.scatter(X[i1:i2],Y[i1:i2],c=np.log10(T[i1:i2]),cmap='jet',**kwargs)            
+        fig = plt.figure(1, figsize=(wx,wy))
+        plt.clf()  # Clear the figure to avoid warnings
+        plt.scatter(X[i1:i2],Y[i1:i2],c=np.log10(T[i1:i2]),cmap='jet',**kwargs)
         plt.grid()
         plt.xlabel('X')
         plt.ylabel('Y')
-        plt.clim(np.log10(clim))      
+        plt.clim(np.log10(clim))
         plt.colorbar(label='log10(T)')
         plt.title('Temperature')
         plt.axis('equal')
         if hardcopy:
-            # get filename without extension        
+            # get filename without extension
             f_png = '%s_%d_%d_T.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
             plt.savefig(f_png)
             plt.show()
@@ -886,8 +887,9 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         #if 'vmax' not in kwargs:
         #    kwargs['vmax'] = EV_max
         #print('EV_min=%f, EV_max=%f' % (EV_min, EV_max))
-        plt.figure(2, figsize=(wx,wy))
-        plt.scatter(X[i1:i2],Y[i1:i2],c=EV[i1:i2],cmap=cmap_ev, vmin=clim[0], vmax=clim[1], **kwargs)            
+        fig = plt.figure(2, figsize=(wx,wy))
+        plt.clf()  # Clear the figure to avoid warnings
+        plt.scatter(X[i1:i2],Y[i1:i2],c=EV[i1:i2],cmap=cmap_ev, vmin=clim[0], vmax=clim[1], **kwargs)
         plt.grid()
         plt.xlabel('X')
         plt.ylabel('Y')
@@ -900,15 +902,16 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             plt.savefig(f_png)
             plt.show()
     if (pl=='all') or (pl=='ND'):
-        # 
+        #
         f_data = h5py.File(f_data_h5,'r')
         ndata,ns = f_data['/%s' % 'D1']['d_obs'].shape
         # find number of nan values on d_obs
         non_nan = np.sum(~np.isnan(f_data['/%s' % 'D1']['d_obs']), axis=1)
         #print(non_nan)
 
-        plt.figure(3, figsize=(wx, wy))
-        plt.scatter(X[i1:i2],Y[i1:i2],c=non_nan[i1:i2],cmap='jet', **kwargs)            
+        fig = plt.figure(3, figsize=(wx, wy))
+        plt.clf()  # Clear the figure to avoid warnings
+        plt.scatter(X[i1:i2],Y[i1:i2],c=non_nan[i1:i2],cmap='jet', **kwargs)
         plt.grid()
         plt.xlabel('X')
         plt.ylabel('Y')
@@ -954,7 +957,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             # Use standard normalization with fixed limits
             norm = Normalize(vmin=CHI2_min, vmax=CHI2_max)
 
-            plt.figure(4, figsize=(wx, wy))
+            fig = plt.figure(4, figsize=(wx, wy))
+            plt.clf()  # Clear the figure to avoid warnings
             plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=CHI2_plot[i1:i2],
                                 cmap=custom_cmap, norm=norm, **kwargs)
@@ -983,7 +987,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             if N_UNIQUE_max is None:
                 N_UNIQUE_max = np.nanmax(N_UNIQUE[i1:i2])
 
-            plt.figure(5, figsize=(wx, wy))
+            fig = plt.figure(5, figsize=(wx, wy))
+            plt.clf()  # Clear the figure to avoid warnings
             plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE[i1:i2],
                                 cmap='viridis', vmin=N_UNIQUE_min, vmax=N_UNIQUE_max, **kwargs)
