@@ -1368,6 +1368,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         - ['stats']: Only temperature and log-likelihood
         - Any combination of the above (e.g., ['mode', 'stats'])
         Accepted panel names: 'mode', 'entropy', 'stats', 'temperature', 't'
+
+        Note: The stats panel optionally shows the number of unique realizations
+        when show_n_unique=True is passed in kwargs
     **kwargs : dict
         Additional keyword arguments:
         - alpha : float, transparency scaling factor based on entropy (0.0 to 1.0).
@@ -1380,6 +1383,8 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         - hardcopy : bool, save plot as PNG file (default False)
         - txt : str, additional text for filename
         - showInfo : int, level of debug output (0=none, >0=verbose)
+        - show_n_unique : bool, if True, adds a plot of the number of unique realizations
+          in the stats panel. Uses the same y-axis as temperature (default False)
         - clim : list, color scale limits for discrete classes
 
     Returns
@@ -1439,6 +1444,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     alpha = kwargs.get('alpha', 0.0)  # Transparency scaling factor (0.0 to 1.0)
     entropy_min = kwargs.get('entropy_min', None)  # Will set default after loading Entropy
     entropy_max = kwargs.get('entropy_max', None)  # Will set default after loading Entropy
+    show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
 
     # Default to showing all panels
     if panels is None:
@@ -1506,6 +1512,19 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             CHI2=f_post['/CHI2'][:]
         except:
             CHI2=None
+
+        # Load N_UNIQUE (number of unique realizations per location)
+        if show_n_unique:
+            try:
+                n_unique = f_post['/N_UNIQUE'][:]
+            except:
+                if showInfo > 0:
+                    print("Warning: Could not load N_UNIQUE from file. show_n_unique will be disabled.")
+                    print("Run integrate_posterior_stats() first to compute N_UNIQUE.")
+                show_n_unique = False
+                n_unique = None
+        else:
+            n_unique = None
 
     # Set defaults for entropy_min and entropy_max if not provided
     if entropy_min is None:
@@ -1776,7 +1795,17 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     if show_stats:
         im4 = ax[2].semilogy(x_axis_values,T[ii], 'k.', label='T')
         ax[2].set_xlim(x_axis_values.min(), x_axis_values.max())
-        ax[2].set_ylim(0.99, 200)
+
+        # Plot number of unique realizations if requested
+        if show_n_unique and n_unique is not None:
+            ax[2].semilogy(x_axis_values, n_unique[ii], 'b.', label='N_unique', markersize=4)
+            # Set y-limits to accommodate both T and n_unique
+            y_min = 0.99
+            y_max = max(200, np.nanmax(n_unique[ii]) * 1.2)
+            ax[2].set_ylim(y_min, y_max)
+        else:
+            ax[2].set_ylim(0.99, 200)
+
         ax[2].set_ylabel('Temperature', color='k')
         ax[2].tick_params(axis='y', labelcolor='k')
 
@@ -1896,6 +1925,8 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         - std_max : float, maximum standard deviation value for uncertainty-based transparency normalization.
           Values above std_max render with maximum transparency (alpha=1-alpha_value). Works with alpha parameter.
           Default is 0.6*np.nanmax(Std)
+        - show_n_unique : bool, if True, adds a plot of the number of unique realizations
+          in the stats panel. Uses the same y-axis as temperature (default False)
 
     Returns
     -------
@@ -1956,6 +1987,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     key = kwargs.get('key','Median')
     txt = kwargs.get('txt','')
     showInfo = kwargs.get('showInfo', 0)
+    show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
 
     # Default to showing all panels
     if panels is None:
@@ -2031,6 +2063,19 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             CHI2=f_post['/CHI2'][:]
         except:
             CHI2=None
+
+        # Load N_UNIQUE (number of unique realizations per location)
+        if show_n_unique:
+            try:
+                n_unique = f_post['/N_UNIQUE'][:]
+            except:
+                if showInfo > 0:
+                    print("Warning: Could not load N_UNIQUE from file. show_n_unique will be disabled.")
+                    print("Run integrate_posterior_stats() first to compute N_UNIQUE.")
+                show_n_unique = False
+                n_unique = None
+        else:
+            n_unique = None
 
     # Compute alpha matrix 'A' for transparency based on uncertainty
     # Normalize Std to [0, 1] range based on its own min/max values
@@ -2342,7 +2387,17 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     if show_stats:
         im4 = ax[2].semilogy(x_axis_values,T[ii], 'k.', label='T')
         ax[2].set_xlim(x_axis_values.min(), x_axis_values.max())
-        ax[2].set_ylim(0.99, 200)
+
+        # Plot number of unique realizations if requested
+        if show_n_unique and n_unique is not None:
+            ax[2].semilogy(x_axis_values, n_unique[ii], 'b.', label='N_unique', markersize=4)
+            # Set y-limits to accommodate both T and n_unique
+            y_min = 0.99
+            y_max = max(200, np.nanmax(n_unique[ii]) * 1.2)
+            ax[2].set_ylim(y_min, y_max)
+        else:
+            ax[2].set_ylim(0.99, 200)
+
         ax[2].set_ylabel('Temperature', color='k')
         ax[2].tick_params(axis='y', labelcolor='k')
 

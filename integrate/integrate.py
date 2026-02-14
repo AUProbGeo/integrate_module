@@ -308,7 +308,9 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     This function computes various statistics for datasets in an HDF5 file based
     on the posterior samples. The statistics include mean, median, standard
     deviation for continuous datasets, and mode, entropy, and class probabilities
-    for discrete datasets. The computed statistics are stored in the same HDF5 file.
+    for discrete datasets. Additionally, it computes the number of unique realizations
+    (N_UNIQUE) used at each data location. The computed statistics are stored in the
+    same HDF5 file.
 
     Parameters
     ----------
@@ -413,6 +415,25 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
         # Validate ip_range
         if np.any(ip_range < 0) or np.any(ip_range >= nsounding):
             raise ValueError(f"ip_range contains indices outside valid range [0, {nsounding-1}]")
+
+    # Compute number of unique realizations for each data location
+    if showInfo > 0:
+        print('Computing number of unique realizations (N_UNIQUE)')
+
+    N_UNIQUE = np.full(nsounding, np.nan)
+    for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='N_UNIQUE', leave=False):
+        N_UNIQUE[iid] = len(np.unique(i_use[iid, :]))
+
+    # Save N_UNIQUE to the HDF5 file
+    with h5py.File(f_post_h5, 'a') as f_post:
+        if '/N_UNIQUE' not in f_post:
+            if showInfo > 0:
+                print('Creating /N_UNIQUE in %s' % f_post_h5)
+            f_post.create_dataset('/N_UNIQUE', data=N_UNIQUE)
+        else:
+            if showInfo > 0:
+                print('Updating /N_UNIQUE in %s' % f_post_h5)
+            f_post['/N_UNIQUE'][:] = N_UNIQUE
 
     # Process each dataset in f_prior_h5
     with h5py.File(f_prior_h5, 'r') as f_prior, h5py.File(f_post_h5, 'a') as f_post:
