@@ -770,13 +770,14 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         Minimum temperature value for color scale normalization (default is 1).
     T_max : int, optional
         Maximum temperature value for color scale normalization (default is 100).
-    pl : {'all', 'T', 'EV', 'ND', 'CHI2'}, optional
+    pl : {'all', 'T', 'EV', 'ND', 'CHI2', 'N_UNIQUE'}, optional
         Type of plot to generate (default is 'all'):
         - 'all': plot all available types
         - 'T': temperature field only
         - 'EV': evidence field only
         - 'ND': number of data points only
         - 'CHI2': reduced chi-squared (goodness of fit) only
+        - 'N_UNIQUE': number of unique realizations per location
     hardcopy : bool, optional
         Save plots as PNG files with descriptive names (default is False).
     **kwargs : dict
@@ -784,6 +785,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         - s : int, marker size (default is 1)
         - CHI2_min : float, minimum CHI2 color scale value (default is 0)
         - CHI2_max : float, maximum CHI2 color scale value (default is 5)
+        - N_UNIQUE_min : float, minimum N_UNIQUE color scale value (default is auto)
+        - N_UNIQUE_max : float, maximum N_UNIQUE color scale value (default is auto)
         - Other matplotlib scatter parameters
 
     Returns
@@ -799,11 +802,17 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
 
     CHI2 color scale is fixed to [0, 5] by default for consistent comparison
     across different datasets. Values can be overridden via kwargs.
+
+    N_UNIQUE shows the number of unique realizations accepted at each location.
+    This indicates the diversity of accepted models. If N_UNIQUE is not available,
+    run integrate_posterior_stats() first to compute it.
     """
 
     s=kwargs.setdefault('s', 1)
     CHI2_min = kwargs.get('CHI2_min', 0)
     CHI2_max = kwargs.get('CHI2_max', 5)
+    N_UNIQUE_min = kwargs.get('N_UNIQUE_min', None)
+    N_UNIQUE_max = kwargs.get('N_UNIQUE_max', None)
 
     with h5py.File(f_post_h5,'r') as f_post:
         f_prior_h5 = f_post['/'].attrs['f5_prior']
@@ -829,11 +838,16 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             EV_mul=f_post['/EV_mul'][:]
         except:
             EV_mu=[]
-            
+
         try:
             CHI2=f_post['/CHI2'][:]
         except:
             CHI2=None
+
+        try:
+            N_UNIQUE=f_post['/N_UNIQUE'][:]
+        except:
+            N_UNIQUE=None
 
     nd = X.shape[0]
     if i1<1: 
@@ -959,6 +973,34 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
                 plt.show()
         else:
             print('CHI2 data not found in %s' % f_post_h5)
+
+    if (pl=='all') or (pl=='N_UNIQUE'):
+        if N_UNIQUE is not None:
+            # Plot number of unique realizations per location
+            # Determine color scale limits
+            if N_UNIQUE_min is None:
+                N_UNIQUE_min = np.nanmin(N_UNIQUE[i1:i2])
+            if N_UNIQUE_max is None:
+                N_UNIQUE_max = np.nanmax(N_UNIQUE[i1:i2])
+
+            plt.figure(5, figsize=(wx, wy))
+            plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
+            scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE[i1:i2],
+                                cmap='viridis', vmin=N_UNIQUE_min, vmax=N_UNIQUE_max, **kwargs)
+            plt.grid()
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.colorbar(scatter, label='Number of Unique Realizations')
+            plt.title('N_UNIQUE (Number of Unique Realizations)')
+            plt.axis('equal')
+            if hardcopy:
+                # get filename without extension
+                f_png = '%s_%d_%d_N_UNIQUE.png' % (os.path.splitext(f_post_h5)[0], i1, i2)
+                plt.savefig(f_png)
+                print('Saved: %s' % f_png)
+                plt.show()
+        else:
+            print('N_UNIQUE data not found in %s. Run integrate_posterior_stats() first.' % f_post_h5)
 
     return
 
