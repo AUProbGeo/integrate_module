@@ -860,7 +860,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     
     if (pl=='all') or (pl=='T'):
         fig = plt.figure(1, figsize=(wx,wy))
-        plt.clf()  # Clear the figure to avoid warnings
+        fig.clf()  # Clear the figure to avoid warnings
         plt.scatter(X[i1:i2],Y[i1:i2],c=np.log10(T[i1:i2]),cmap='jet',**kwargs)
         plt.grid()
         plt.xlabel('X')
@@ -873,7 +873,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             # get filename without extension
             f_png = '%s_%d_%d_T.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
             plt.savefig(f_png)
-            plt.show()
+        plt.show()
 
     if (pl=='all') or (pl=='EV'):
         # get the 99% percentile of EV values
@@ -888,7 +888,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         #    kwargs['vmax'] = EV_max
         #print('EV_min=%f, EV_max=%f' % (EV_min, EV_max))
         fig = plt.figure(2, figsize=(wx,wy))
-        plt.clf()  # Clear the figure to avoid warnings
+        fig.clf()  # Clear the figure to avoid warnings
         plt.scatter(X[i1:i2],Y[i1:i2],c=EV[i1:i2],cmap=cmap_ev, vmin=clim[0], vmax=clim[1], **kwargs)
         plt.grid()
         plt.xlabel('X')
@@ -900,7 +900,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             # get filename without extension
             f_png = '%s_%d_%d_EV.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
             plt.savefig(f_png)
-            plt.show()
+        plt.show()
     if (pl=='all') or (pl=='ND'):
         #
         f_data = h5py.File(f_data_h5,'r')
@@ -910,7 +910,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         #print(non_nan)
 
         fig = plt.figure(3, figsize=(wx, wy))
-        plt.clf()  # Clear the figure to avoid warnings
+        fig.clf()  # Clear the figure to avoid warnings
         plt.scatter(X[i1:i2],Y[i1:i2],c=non_nan[i1:i2],cmap='jet', **kwargs)
         plt.grid()
         plt.xlabel('X')
@@ -922,7 +922,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             # get filename without extension
             f_png = '%s_%d_%d_ND.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
             plt.savefig(f_png)
-            plt.show()
+        plt.show()
             
     if (pl=='all') or (pl=='CHI2'):
         if CHI2 is not None:
@@ -958,7 +958,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             norm = Normalize(vmin=CHI2_min, vmax=CHI2_max)
 
             fig = plt.figure(4, figsize=(wx, wy))
-            plt.clf()  # Clear the figure to avoid warnings
+            fig.clf()  # Clear the figure to avoid warnings
             plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=CHI2_plot[i1:i2],
                                 cmap=custom_cmap, norm=norm, **kwargs)
@@ -974,7 +974,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
                 #plt.savefig(f_png, dpi=dpi, bbox_inches='tight')
                 plt.savefig(f_png)
                 print('Saved: %s' % f_png)
-                plt.show()
+            plt.show()
         else:
             print('CHI2 data not found in %s' % f_post_h5)
 
@@ -988,7 +988,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
                 N_UNIQUE_max = np.nanmax(N_UNIQUE[i1:i2])
 
             fig = plt.figure(5, figsize=(wx, wy))
-            plt.clf()  # Clear the figure to avoid warnings
+            fig.clf()  # Clear the figure to avoid warnings
             plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE[i1:i2],
                                 cmap='viridis', vmin=N_UNIQUE_min, vmax=N_UNIQUE_max, **kwargs)
@@ -1003,7 +1003,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
                 f_png = '%s_%d_%d_N_UNIQUE.png' % (os.path.splitext(f_post_h5)[0], i1, i2)
                 plt.savefig(f_png)
                 print('Saved: %s' % f_png)
-                plt.show()
+            plt.show()
         else:
             print('N_UNIQUE data not found in %s. Run integrate_posterior_stats() first.' % f_post_h5)
 
