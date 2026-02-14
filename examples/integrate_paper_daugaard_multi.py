@@ -37,7 +37,7 @@ hardcopy=True
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
-inflateNoise = 1   # 1,2, 4
+inflateNoise = 2   # 1,2, 4
 useLogData = False
 N_use = 1000000
 N_use_org= N_use
@@ -292,7 +292,7 @@ for i_prior in range(len(f_prior_data_h5_list)):
   
     # Get filename without extension
     fileparts = os.path.splitext(f_prior_data_h5)
-    f_post_h5 = 'post_%s_Nuse%d_inflateNoise%d.h5' % (fileparts[0], N_use,inflateNoise)
+    f_post_h5 = 'post_%s_Nuse%d_inflateNoise%d_main.h5' % (fileparts[0], N_use,inflateNoise)
 
     f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
                                     f_data_h5, 
@@ -395,7 +395,7 @@ plt.savefig('DAUGAARD_Pvalley_compare_N%d_No%d_aT%d_l%d.png' % (N_use,inflateNoi
 
 
 # %%
-plLevel = 1    
+plLevel = 2    
 for i_post in range(len(f_post_h5_list)):
     f_post_h5 = f_post_h5_list[i_post]
 
@@ -410,12 +410,18 @@ for i_post in range(len(f_post_h5_list)):
         ig.plot_data_prior_post(f_post_h5, i_plot=100, hardcopy=hardcopy)
 
         ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
+        ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
 
 
         ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Mean', uselog=1, s=10,hardcopy=hardcopy)
         plt.show()
         ig.plot_feature_2d(f_post_h5,im=2,iz=15, key='Mode', uselog=0, s=10,hardcopy=hardcopy)
         plt.show()
+
+        # Plot prior and post model parameter stats
+        ig.plot_prior_stats(f_prior_data_h5_list[i_prior])
+        ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
+        ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
 
     try:
         ig.plot_feature_2d(f_post_h5,im=3, key='Mode', uselog=1, s=10, cmap='jet', hardcopy=hardcopy)
@@ -562,7 +568,7 @@ if doPlotAll:
             except:
                 pass
 
-            # %%
+            # Plot prior and post model parameter stats
             ig.plot_prior_stats(f_prior_data_h5_list[i_prior])
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
