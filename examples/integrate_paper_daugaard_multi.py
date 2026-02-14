@@ -419,7 +419,6 @@ for i_post in range(len(f_post_h5_list)):
         plt.show()
 
         # Plot prior and post model parameter stats
-        ig.plot_prior_stats(f_prior_data_h5_list[i_prior])
         ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
         ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
 
