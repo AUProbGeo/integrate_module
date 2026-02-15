@@ -519,6 +519,7 @@ if doPlotAll:
 
     for i_post in range(len(f_post_h5_all_list)):
         f_post_h5 = f_post_h5_all_list[i_post]
+        
         with h5py.File(f_post_h5,'r') as f:
             f_prior_h5 = f.attrs['f5_prior']
 
@@ -608,8 +609,14 @@ if doTest:
 
         # Compute 2D KDE for background
         from scipy.stats import gaussian_kde
-        #%%
-        if len(T_clean) > 100:  # Need sufficient data for KDE
+
+        # Check if data has sufficient variance for KDE
+        CHI2_std = np.std(CHI2_clean) if len(CHI2_clean) > 0 else 0
+        log_T_std = np.std(np.log10(T_clean)) if len(T_clean) > 0 else 0
+        has_variance = (CHI2_std > 1e-10) and (log_T_std > 1e-10)
+
+        # Only compute KDE if we have enough data points and variance
+        if len(T_clean) > 100 and has_variance:
             # Use log(T) for KDE computation since we're plotting with log scale
             log_T_clean = np.log10(T_clean)
 
@@ -635,31 +642,58 @@ if doTest:
                 contour = plt.contourf(CHI2_mesh, T_mesh, density, levels=15, cmap='hot_r')
 
                 # Overlay scatter plot
-                scatter = plt.scatter(CHI2[::10], T[::10], alpha=0.9, s=.01, c=N_UNIQUE, cmap='viridis')
+                plt.plot(CHI2[::10], T[::10], 'k.', alpha=1, markersize=1)
 
                 # Use log on the yaxis
                 plt.yscale('log')
+                plt.xscale('log')
                 plt.xlabel('CHI2')
                 plt.ylabel('T')
-                plt.colorbar(scatter, label='N_UNIQUE')
+                plt.colorbar(contour, label='Density')
                 plt.grid(alpha=0.3)
-                # Plt a black line at x=1 along the y axis
+                # Plot a black line at x=1 along the y axis
                 plt.axvline(x=1, color='k', linestyle='--', linewidth=1)
                 # set axis to 0,5, 1, 20
-                plt.xlim(0, 5)
+                plt.xlim(0, 15)
                 plt.ylim(1, 101)
                 plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
                 plt.show()
-            except Exception as e:
-                print(f"Could not compute KDE for {fname} due to error: {e}")
+            except np.linalg.LinAlgError:
+                print(f"Warning: KDE failed for {fname} (singular covariance matrix - insufficient variance in data)")
+                # Fallback to simple scatter
+                plt.figure(figsize=(4, 4))
+                plt.plot(CHI2[::10], T[::10], 'k.', alpha=1, markersize=1)
+                plt.yscale('log')
+                plt.xscale('log')
+                plt.xlabel('CHI2')
+                plt.ylabel('T')
+                plt.grid(alpha=0.3)
+                plt.axvline(x=1, color='k', linestyle='--', linewidth=1)
+                plt.xlim(0, 15)
+                plt.ylim(1, 101)
+                plt.title('Scatter (KDE unavailable)')
+                plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
+                plt.show()
         else:
-            # Fallback to regular scatter plot if insufficient data
+            # Fallback to regular scatter plot if insufficient data or variance
+            if len(T_clean) <= 100:
+                reason = f"insufficient samples (n={len(T_clean)})"
+            else:
+                reason = "insufficient variance in data"
+
+            print(f"Warning: Skipping KDE for {fname} ({reason})")
+
             plt.figure(figsize=(4, 4))
-            plt.scatter(CHI2, T, alpha=0.5, s=.1, c=N_UNIQUE, cmap='viridis')
+            plt.plot(CHI2[::10], T[::10], 'k.', alpha=1, markersize=1)
             plt.yscale('log')
+            plt.xscale('log')
             plt.xlabel('CHI2')
             plt.ylabel('T')
-            plt.grid()
+            plt.grid(alpha=0.3)
+            plt.axvline(x=1, color='k', linestyle='--', linewidth=1)
+            plt.xlim(0, 15)
+            plt.ylim(1, 101)
+            plt.title(f'Scatter (KDE: {reason})')
             plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
             plt.show()
 

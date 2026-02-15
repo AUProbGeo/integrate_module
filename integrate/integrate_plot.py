@@ -783,6 +783,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     **kwargs : dict
         Additional keyword arguments:
         - s : int, marker size (default is 1)
+        - plot_data_locations : bool, plot black background dots at all data locations (default is False)
         - CHI2_min : float, minimum CHI2 color scale value (default is 0)
         - CHI2_max : float, maximum CHI2 color scale value (default is 5)
         - N_UNIQUE_min : float, minimum N_UNIQUE color scale value (default is auto)
@@ -809,6 +810,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     """
 
     s=kwargs.setdefault('s', 1)
+    plot_data_locations = kwargs.pop('plot_data_locations', False)
     CHI2_min = kwargs.pop('CHI2_min', 0)
     CHI2_max = kwargs.pop('CHI2_max', 5)
     N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
@@ -861,6 +863,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     if (pl=='all') or (pl=='T'):
         fig = plt.figure(1, figsize=(wx,wy))
         fig.clf()  # Clear the figure to avoid warnings
+        if plot_data_locations:
+            plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
         plt.scatter(X[i1:i2],Y[i1:i2],c=np.log10(T[i1:i2]),cmap='jet',**kwargs)
         plt.grid()
         plt.xlabel('X')
@@ -889,6 +893,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         #print('EV_min=%f, EV_max=%f' % (EV_min, EV_max))
         fig = plt.figure(2, figsize=(wx,wy))
         fig.clf()  # Clear the figure to avoid warnings
+        if plot_data_locations:
+            plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
         plt.scatter(X[i1:i2],Y[i1:i2],c=EV[i1:i2],cmap=cmap_ev, vmin=clim[0], vmax=clim[1], **kwargs)
         plt.grid()
         plt.xlabel('X')
@@ -911,6 +917,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
 
         fig = plt.figure(3, figsize=(wx, wy))
         fig.clf()  # Clear the figure to avoid warnings
+        if plot_data_locations:
+            plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
         plt.scatter(X[i1:i2],Y[i1:i2],c=non_nan[i1:i2],cmap='jet', **kwargs)
         plt.grid()
         plt.xlabel('X')
@@ -959,7 +967,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
 
             fig = plt.figure(4, figsize=(wx, wy))
             fig.clf()  # Clear the figure to avoid warnings
-            plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
+            if plot_data_locations:
+                plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=CHI2_plot[i1:i2],
                                 cmap=custom_cmap, norm=norm, **kwargs)
             plt.grid()
@@ -1002,7 +1011,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
 
             fig = plt.figure(5, figsize=(wx, wy))
             fig.clf()  # Clear the figure to avoid warnings
-            plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
+            if plot_data_locations:
+                plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE_log[i1:i2],
                                 cmap=cmap_n_unique, vmin=N_UNIQUE_min_log, vmax=N_UNIQUE_max_log, **kwargs)
             plt.grid()
