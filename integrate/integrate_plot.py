@@ -3958,6 +3958,10 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
     # Get color limits and colormap
     clim, cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
 
+    # Convert string colormap name to actual colormap object
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+
     # Check if discrete
     is_discrete = f_prior['/%s' % Mkey].attrs['is_discrete']
 
