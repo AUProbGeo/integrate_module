@@ -549,7 +549,7 @@ if doPlotAll:
             ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='EV', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='ND', hardcopy=hardcopy)
-            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy)
+            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=0, N_UNIQUE_max=nr)
 
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' )
             plt.show()
@@ -572,6 +572,91 @@ if doPlotAll:
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
             
+
+# %% TEST 
+doTest=True
+if doTest:
+    for i_post in range(len(f_post_h5_all_list)):
+        f_post_h5 = f_post_h5_all_list[i_post]
+
+        # fname is ifle name wihtout extension
+        fname = os.path.splitext(os.path.basename(f_post_h5))[0]
+        ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=1000)
+
+        # MAKE A SCATTER PLOT OF f_post:/T versus f_post:/CHI2 with KDE background
+        with h5py.File(f_post_h5,'r') as f:
+            T = f['/T'][:]
+            CHI2 = f['/CHI2'][:]
+            N_UNIQUE = f['/N_UNIQUE'][:]
+
+        # Handle case where CHI2 might be 2D (multiple data types)
+        if len(CHI2.shape) == 2:
+            # If multiple data types, sum across them for visualization
+            CHI2 = np.nansum(CHI2, axis=1)
+
+        # Flatten arrays to ensure 1D
+        T = T.flatten()
+        CHI2 = CHI2.flatten()
+        N_UNIQUE = N_UNIQUE.flatten()
+
+        # Remove NaN values for KDE computation
+        mask = ~(np.isnan(T) | np.isnan(CHI2))
+        T_clean = T[mask]
+        CHI2_clean = CHI2[mask]
+        N_UNIQUE_clean = N_UNIQUE[mask]
+
+        #%%
+        # Compute 2D KDE for background
+        from scipy.stats import gaussian_kde
+
+        if len(T_clean) > 100:  # Need sufficient data for KDE
+            # Use log(T) for KDE computation since we're plotting with log scale
+            log_T_clean = np.log10(T_clean)
+
+            # Create KDE
+            values = np.vstack([CHI2_clean, log_T_clean])
+            kernel = gaussian_kde(values)
+
+            # Create grid for evaluation
+            CHI2_grid = np.linspace(np.nanmin(CHI2_clean), np.nanmax(CHI2_clean), 100)
+            log_T_grid = np.linspace(np.nanmin(log_T_clean), np.nanmax(log_T_clean), 100)
+            CHI2_mesh, log_T_mesh = np.meshgrid(CHI2_grid, log_T_grid)
+            positions = np.vstack([CHI2_mesh.ravel(), log_T_mesh.ravel()])
+            density = kernel(positions).reshape(CHI2_mesh.shape)
+
+            # Convert log_T back to linear scale for plotting
+            T_mesh = 10**log_T_mesh
+
+            # Plot
+            plt.figure(figsize=(4, 4))
+
+            # Plot KDE as filled contours in background
+            contour = plt.contourf(CHI2_mesh, T_mesh, density, levels=15, cmap='Greys', alpha=0.5)
+
+            # Overlay scatter plot
+            scatter = plt.scatter(CHI2, T, alpha=0.6, s=1, c=N_UNIQUE, cmap='viridis')
+
+            # Use log on the yaxis
+            plt.yscale('log')
+            plt.xlabel('CHI2')
+            plt.ylabel('T')
+            plt.colorbar(scatter, label='N_UNIQUE')
+            plt.grid(alpha=0.3)
+            plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
+            plt.show()
+        else:
+            # Fallback to regular scatter plot if insufficient data
+            plt.figure(figsize=(4, 4))
+            plt.scatter(CHI2, T, alpha=0.5, s=.1, c=N_UNIQUE, cmap='viridis')
+            plt.yscale('log')
+            plt.xlabel('CHI2')
+            plt.ylabel('T')
+            plt.grid()
+            plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
+            plt.show()
+
+
+
 
 # %%
 if doPlotAll:

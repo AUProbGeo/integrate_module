@@ -809,10 +809,10 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     """
 
     s=kwargs.setdefault('s', 1)
-    CHI2_min = kwargs.get('CHI2_min', 0)
-    CHI2_max = kwargs.get('CHI2_max', 5)
-    N_UNIQUE_min = kwargs.get('N_UNIQUE_min', None)
-    N_UNIQUE_max = kwargs.get('N_UNIQUE_max', None)
+    CHI2_min = kwargs.pop('CHI2_min', 0)
+    CHI2_max = kwargs.pop('CHI2_max', 5)
+    N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
+    N_UNIQUE_max = kwargs.pop('N_UNIQUE_max', None)
 
     with h5py.File(f_post_h5,'r') as f_post:
         f_prior_h5 = f_post['/'].attrs['f5_prior']
@@ -980,23 +980,36 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
 
     if (pl=='all') or (pl=='N_UNIQUE'):
         if N_UNIQUE is not None:
-            # Plot number of unique realizations per location
-            # Determine color scale limits
+            # Plot number of unique realizations per location (log scale)
+            # Determine color scale limits in linear space first
             if N_UNIQUE_min is None:
                 N_UNIQUE_min = np.nanmin(N_UNIQUE[i1:i2])
+                if N_UNIQUE_min <= 0:
+                    N_UNIQUE_min = 1  # Default to 1 for log scale
             if N_UNIQUE_max is None:
                 N_UNIQUE_max = np.nanmax(N_UNIQUE[i1:i2])
+
+            # Clip N_UNIQUE to min value to avoid log(0)
+            N_UNIQUE_clipped = np.maximum(N_UNIQUE, N_UNIQUE_min)
+
+            # Apply log10 transformation directly (no +1 needed since we clipped)
+            N_UNIQUE_log = np.log10(N_UNIQUE_clipped)
+            N_UNIQUE_min_log = np.log10(N_UNIQUE_min)
+            N_UNIQUE_max_log = np.log10(N_UNIQUE_max)
+
+            # Use evidence colormap (magma) for better visualization of low/high values
+            cmap_n_unique, _ = get_colormap_and_limits(cmap_type='evidence', custom_clim=[N_UNIQUE_min_log, N_UNIQUE_max_log])
 
             fig = plt.figure(5, figsize=(wx, wy))
             fig.clf()  # Clear the figure to avoid warnings
             plt.plot(X[i1:i2], Y[i1:i2], color='lightgray', zorder=-1, marker='.', linestyle='None', markersize=2*s)  # Background points in light gray
-            scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE[i1:i2],
-                                cmap='viridis', vmin=N_UNIQUE_min, vmax=N_UNIQUE_max, **kwargs)
+            scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE_log[i1:i2],
+                                cmap=cmap_n_unique, vmin=N_UNIQUE_min_log, vmax=N_UNIQUE_max_log, **kwargs)
             plt.grid()
             plt.xlabel('X')
             plt.ylabel('Y')
-            plt.colorbar(scatter, label='Number of Unique Realizations')
-            plt.title('N_UNIQUE (Number of Unique Realizations)')
+            plt.colorbar(scatter, label='log10(N_UNIQUE)')
+            plt.title('N_UNIQUE (Number of Unique Realizations, log scale)')
             plt.axis('equal')
             if hardcopy:
                 # get filename without extension
