@@ -549,8 +549,8 @@ if doPlotAll:
             ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='EV', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='ND', hardcopy=hardcopy)
+            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy)
 
-            
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' )
             plt.show()
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median' )
@@ -568,7 +568,7 @@ if doPlotAll:
                 pass
 
             # Plot prior and post model parameter stats
-            ig.plot_prior_stats(f_prior_data_h5_list[i_prior])
+            ig.plot_prior_stats(f_prior_h5)
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
             
