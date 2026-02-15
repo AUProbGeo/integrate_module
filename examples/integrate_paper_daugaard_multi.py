@@ -577,11 +577,12 @@ if doPlotAll:
 doTest=True
 if doTest:
     for i_post in range(len(f_post_h5_all_list)):
+    #for i_post in range(1):
         f_post_h5 = f_post_h5_all_list[i_post]
 
         # fname is ifle name wihtout extension
         fname = os.path.splitext(os.path.basename(f_post_h5))[0]
-        ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=1000)
+        #ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=1000)
 
         # MAKE A SCATTER PLOT OF f_post:/T versus f_post:/CHI2 with KDE background
         with h5py.File(f_post_h5,'r') as f:
@@ -605,45 +606,52 @@ if doTest:
         CHI2_clean = CHI2[mask]
         N_UNIQUE_clean = N_UNIQUE[mask]
 
-        #%%
         # Compute 2D KDE for background
         from scipy.stats import gaussian_kde
-
+        #%%
         if len(T_clean) > 100:  # Need sufficient data for KDE
             # Use log(T) for KDE computation since we're plotting with log scale
             log_T_clean = np.log10(T_clean)
 
             # Create KDE
             values = np.vstack([CHI2_clean, log_T_clean])
-            kernel = gaussian_kde(values)
+            try:
+                kernel = gaussian_kde(values)
 
-            # Create grid for evaluation
-            CHI2_grid = np.linspace(np.nanmin(CHI2_clean), np.nanmax(CHI2_clean), 100)
-            log_T_grid = np.linspace(np.nanmin(log_T_clean), np.nanmax(log_T_clean), 100)
-            CHI2_mesh, log_T_mesh = np.meshgrid(CHI2_grid, log_T_grid)
-            positions = np.vstack([CHI2_mesh.ravel(), log_T_mesh.ravel()])
-            density = kernel(positions).reshape(CHI2_mesh.shape)
+                # Create grid for evaluation
+                CHI2_grid = np.linspace(np.nanmin(CHI2_clean), np.nanmax(CHI2_clean), 100)
+                log_T_grid = np.linspace(np.nanmin(log_T_clean), np.nanmax(log_T_clean), 100)
+                CHI2_mesh, log_T_mesh = np.meshgrid(CHI2_grid, log_T_grid)
+                positions = np.vstack([CHI2_mesh.ravel(), log_T_mesh.ravel()])
+                density = kernel(positions).reshape(CHI2_mesh.shape)
 
-            # Convert log_T back to linear scale for plotting
-            T_mesh = 10**log_T_mesh
+                # Convert log_T back to linear scale for plotting
+                T_mesh = 10**log_T_mesh
 
-            # Plot
-            plt.figure(figsize=(4, 4))
+                # Plot
+                plt.figure(figsize=(4, 4))
 
-            # Plot KDE as filled contours in background
-            contour = plt.contourf(CHI2_mesh, T_mesh, density, levels=15, cmap='Greys', alpha=0.5)
+                # Plot KDE as filled contours in background
+                contour = plt.contourf(CHI2_mesh, T_mesh, density, levels=15, cmap='hot_r')
 
-            # Overlay scatter plot
-            scatter = plt.scatter(CHI2, T, alpha=0.6, s=1, c=N_UNIQUE, cmap='viridis')
+                # Overlay scatter plot
+                scatter = plt.scatter(CHI2[::10], T[::10], alpha=0.9, s=.01, c=N_UNIQUE, cmap='viridis')
 
-            # Use log on the yaxis
-            plt.yscale('log')
-            plt.xlabel('CHI2')
-            plt.ylabel('T')
-            plt.colorbar(scatter, label='N_UNIQUE')
-            plt.grid(alpha=0.3)
-            plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
-            plt.show()
+                # Use log on the yaxis
+                plt.yscale('log')
+                plt.xlabel('CHI2')
+                plt.ylabel('T')
+                plt.colorbar(scatter, label='N_UNIQUE')
+                plt.grid(alpha=0.3)
+                # Plt a black line at x=1 along the y axis
+                plt.axvline(x=1, color='k', linestyle='--', linewidth=1)
+                # set axis to 0,5, 1, 20
+                plt.xlim(0, 5)
+                plt.ylim(1, 101)
+                plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
+                plt.show()
+            except Exception as e:
+                print(f"Could not compute KDE for {fname} due to error: {e}")
         else:
             # Fallback to regular scatter plot if insufficient data
             plt.figure(figsize=(4, 4))
