@@ -30,6 +30,7 @@ from integrate.integrate import prior_model_workbench_direct
 from integrate.integrate import posterior_cumulative_thickness
 #from integrate.integrate import integrate_rejection_multi  
 from integrate.integrate import use_parallel
+from integrate.integrate import kl_divergence
 from integrate.integrate import entropy
 from integrate.integrate import class_id_to_idx
 from integrate.integrate import is_notebook

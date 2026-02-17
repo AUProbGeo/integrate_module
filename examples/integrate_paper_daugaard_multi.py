@@ -36,10 +36,10 @@ hardcopy=True
 # %%
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
-useGenericPrior=True
-inflateNoise = 1   # 1,2, 4
+useGenericPrior=False
+inflateNoise = 4   # 1,2, 4
 useLogData = False
-N_use = 1000000
+N_use = 100000
 N_use_org= N_use
 #N_use = 100000
 #N_use = 100000
@@ -400,7 +400,9 @@ for i_post in range(len(f_post_h5_list)):
     f_post_h5 = f_post_h5_list[i_post]
 
     if plLevel>0:
-        ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy)
+        #ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy)
+        ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy, im=1, alpha=.9, std_min = 0.6, std_max=0.63)
+        ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy, im=2, alpha=.8, entropy_min = 0.5)
         
     if plLevel>1:
 

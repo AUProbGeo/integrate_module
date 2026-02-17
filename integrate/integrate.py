@@ -303,35 +303,61 @@ def integrate_update_prior_attributes(f_prior_h5, **kwargs):
 
 def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     """
-    Compute posterior statistics for datasets in an HDF5 file.
+    Compute posterior statistics for all model parameters in a POST HDF5 file.
 
-    This function computes various statistics for datasets in an HDF5 file based
-    on the posterior samples. The statistics include mean, median, standard
-    deviation for continuous datasets, and mode, entropy, and class probabilities
-    for discrete datasets. Additionally, it computes the number of unique realizations
-    (N_UNIQUE) used at each data location. The computed statistics are stored in the
-    same HDF5 file.
+    Reads posterior sample indices (i_use) and the corresponding prior model
+    realizations, then computes per-location statistics and writes them back
+    into the same POST.h5 file.
 
     Parameters
     ----------
     f_post_h5 : str, optional
-        The path to the HDF5 file to process. Default is 'POST.h5'.
+        Path to the POST HDF5 file. Default is 'POST.h5'.
     ip_range : array-like or None, optional
-        List of data point indices to compute statistics for. If None or empty,
-        computes statistics for all data points. Data points not in ip_range
-        will have NaN values in the output. Default is None.
+        Indices of data locations to process. If None, all locations are processed.
+        Locations not in ip_range receive NaN values. Default is None.
     **kwargs : dict
-        Additional keyword arguments:
-
         showInfo : int, optional
-            Level of verbosity for output. 0=quiet, 1=progress bars.
-            Default is 0.
+            Verbosity level. 0 = silent, 1 = progress bars. Default is 0.
         usePrior : bool, optional
-            Flag indicating whether to use the prior samples instead of i_use indices.
-            Default is False.
+            If True, use randomly drawn prior samples instead of i_use indices
+            (useful for computing prior statistics as a baseline). Default is False.
         updateGeometryFromData : bool, optional
-            Whether to copy geometry (UTMX, UTMY, LINE, ELEVATION) from data file.
-            Default is True.
+            Copy UTMX, UTMY, LINE, ELEVATION from the DATA.h5 file into POST.h5
+            if not already present. Default is True.
+        computeKL_continuous : bool, optional
+            Compute KL divergence D_KL(posterior || prior) for continuous model
+            parameters using log10-space histograms (50 bins). Result is in bits
+            (log base 2). Default is False.
+        computeKL_discrete : bool, optional
+            Compute KL divergence D_KL(posterior || prior) for discrete model
+            parameters. Normalised to [0, 1] using log_base = number of classes
+            (0 = posterior equals prior, 1 = completely certain). Default is False.
+
+    Writes to POST.h5
+    -----------------
+    Always written:
+
+    - ``/N_UNIQUE``  [Np]  Number of unique prior realizations used per location.
+    - ``/UTMX``, ``/UTMY``, ``/LINE``, ``/ELEVATION``  [Np]
+      Geometry copied from DATA.h5 (if ``updateGeometryFromData=True``).
+
+    For each **continuous** model parameter ``/Mx``:
+
+    - ``/Mx/Mean``     [Np, Nm]  Arithmetic mean of posterior realizations.
+    - ``/Mx/LogMean``  [Np, Nm]  Geometric mean (exp of mean of log values).
+    - ``/Mx/Median``   [Np, Nm]  Median of posterior realizations.
+    - ``/Mx/Std``      [Np, Nm]  Standard deviation of log10(posterior).
+    - ``/Mx/KL``       [Np, Nm]  KL divergence in bits. Only written when
+      ``computeKL_continuous=True``.
+
+    For each **discrete** model parameter ``/Mx``:
+
+    - ``/Mx/Mode``     [Np, Nm]  Most probable class at each location/depth.
+    - ``/Mx/Entropy``  [Np, Nm]  Shannon entropy normalised by log(n_classes).
+    - ``/Mx/P``        [Np, Nclass, Nm]  Posterior probability of each class.
+    - ``/Mx/KL``       [Np, Nm]  KL divergence normalised to [0, 1]. Only written
+      when ``computeKL_discrete=True``.
 
     Returns
     -------
@@ -350,8 +376,9 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
         disableTqdm=False
     usePrior = kwargs.get('usePrior', False)
     updateGeometryFromData = kwargs.get('updateGeometryFromData', True)
+    computeKL_continuous = kwargs.get('computeKL_continuous', False)
+    computeKL_discrete = kwargs.get('computeKL_discrete', False)
 
-    #f_post_h5='DJURSLAND_P01_N0100000_NB-13_NR03_POST_Nu50000_aT1.h5'
     # Check if f_prior_h5 attribute exists in the HDF5 file
     with h5py.File(f_post_h5, 'r') as f:
         if 'f5_prior' in f.attrs:
@@ -438,7 +465,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     # Process each dataset in f_prior_h5
     with h5py.File(f_prior_h5, 'r') as f_prior, h5py.File(f_post_h5, 'a') as f_post:
         for name, dataset in f_prior.items():
-                
+            
             if name.upper().startswith('M') and 'is_discrete' in dataset.attrs and dataset.attrs['is_discrete'] == 0:
                 if showInfo>2:
                     print('%s: CONTINUOUS' % name)
@@ -452,12 +479,31 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 M_mean = np.full((nsounding, nm), np.nan)
                 M_std = np.full((nsounding, nm), np.nan)
                 M_median = np.full((nsounding, nm), np.nan)
+                if computeKL_continuous:
+                    M_KL = np.full((nsounding, nm), np.nan)
 
                 # Load all prior data into memory
                 M_all = dataset[:]
 
                 useSequential = True
                 if useSequential:
+
+                    # Precompute log10 prior histograms once — prior is fixed across all soundings.
+                    # Using histograms (O(n)) instead of KDE (O(n²)) for speed.
+                    # Log10 bins are appropriate for log-normally distributed continuous parameters.
+                    if computeKL_continuous:
+                        n_bins_kl = 50
+                        idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
+                        M_prior_kl = np.log10(np.maximum(M_all[idx_kl, :], 1e-10))
+                        kl_bins = []
+                        kl_prior_hist = []
+                        for _i in range(nm):
+                            col = M_prior_kl[:, _i]
+                            bins = np.linspace(col.min(), col.max(), n_bins_kl + 1)
+                            h, _ = np.histogram(col, bins=bins)
+                            h = (h + 1e-10) / (h.sum() + n_bins_kl * 1e-10)
+                            kl_bins.append(bins)
+                            kl_prior_hist.append(h)
 
                     # Sequential processing - simple, fast, memory-efficient
                     for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='%s-continuous' % name, leave=False):
@@ -469,6 +515,12 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         M_median[iid,:] = np.median(m_post, axis=0)
                         with np.errstate(invalid='ignore', divide='ignore'):
                             M_std[iid,:] = np.std(np.log10(np.maximum(m_post, 1e-10)), axis=0)
+                        if computeKL_continuous:
+                            m_post_log = np.log10(np.maximum(m_post, 1e-10))
+                            for _i in range(nm):
+                                h_q, _ = np.histogram(m_post_log[:, _i], bins=kl_bins[_i])
+                                h_q = (h_q + 1e-10) / (h_q.sum() + n_bins_kl * 1e-10)
+                                M_KL[iid, _i] = np.sum(h_q * np.log2(h_q / kl_prior_hist[_i]))
                 elif a==1:
 
                     # NEW Experimental METHOD
@@ -534,6 +586,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 f_post['/%s/%s' % (name,'Mean')][:] = M_mean
                 f_post['/%s/%s' % (name,'Median')][:] = M_median
                 f_post['/%s/%s' % (name,'Std')][:] = M_std
+                if computeKL_continuous:
+                    dset = '/%s/KL' % name
+                    if dset not in f_post:
+                        f_post.create_dataset(dset, (nsounding, nm))
+                    f_post[dset][:] = M_KL
 
             elif name.upper().startswith('M') and 'is_discrete' in dataset.attrs and dataset.attrs['is_discrete'] == 1:
                 if showInfo>2:
@@ -545,6 +602,12 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 class_id = f_prior[name].attrs['class_id']
                 n_classes = len(class_id)
 
+                # Determine log_base for KL: use n_classes from class_name if available
+                if 'class_name' in f_prior[name].attrs:
+                    log_base_kl = len(f_prior[name].attrs['class_name'])
+                else:
+                    log_base_kl = n_classes if n_classes > 1 else 2
+
                 if showInfo>1:
                     print('%s: DISCRETE, N_classes =%d' % (name,n_classes))
 
@@ -552,6 +615,8 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 M_mode = np.full((nsounding, nm), np.nan)
                 M_entropy = np.full((nsounding, nm), np.nan)
                 M_P = np.full((nsounding, n_classes, nm), np.nan)
+                if computeKL_discrete:
+                    M_KL = np.full((nsounding, nm), np.nan)
 
                 # Create datasets in h5 file
                 for stat in ['Mode', 'Entropy']:
@@ -561,7 +626,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                             if (showInfo>0):
                                 print('Creating %s in %s' % (dset,f_post_h5 ))
                             f_post.create_dataset(dset, (nsounding,nm))
-                for stat in ['Mode', 'P']:
+                for stat in ['P']:
                     if stat not in f_post:
                         dset = '/%s/%s' % (name,stat)
                         if dset not in f_post:
@@ -571,6 +636,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
 
                 # Load all prior data into memory
                 M_all = dataset[:]
+
+                # Subsample prior once for KL (prior is fixed across soundings)
+                if computeKL_discrete:
+                    idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
+                    M_prior_kl = M_all[idx_kl, :]
 
                 # Sequential processing - simple, fast, memory-efficient
                 for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='%s-discrete' % name, leave=False):
@@ -588,10 +658,17 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
 
                     # Compute entropy
                     M_entropy[iid,:] = sp.stats.entropy(n_count, base=n_classes)
+                    if computeKL_discrete:
+                        M_KL[iid, :] = kl_divergence(m_post, M_prior_kl, is_discrete=True, log_base=log_base_kl)
 
                 f_post['/%s/%s' % (name,'Mode')][:] = M_mode
                 f_post['/%s/%s' % (name,'Entropy')][:] = M_entropy
                 f_post['/%s/%s' % (name,'P')][:] = M_P
+                if computeKL_discrete:
+                    dset = '/%s/KL' % name
+                    if dset not in f_post:
+                        f_post.create_dataset(dset, (nsounding, nm))
+                    f_post[dset][:] = M_KL
 
 
             else: 
@@ -2559,6 +2636,73 @@ def comb_cprob(pA, pAgB, pAgC, tau=1.0):
     pAgBC = 1 / (1 + b * (c / a) ** tau)
     
     return pAgBC
+
+def kl_divergence(prior_sample, posterior_sample, is_discrete=False, log_base=None):
+    """
+    Compute KL divergence D_KL(posterior || prior) for one or multiple parameters.
+
+    Parameters
+    ----------
+    prior_sample : array, shape (n_realizations,) or (n_realizations, n_params)
+    posterior_sample : array, shape (n_realizations,) or (n_realizations, n_params)
+        If 2D, KL is computed per column and a 1D array of size n_params is returned.
+    is_discrete : bool, optional
+        If True, treat the parameter as discrete. Default is False.
+    log_base : int, float, or None
+        Base of the logarithm. None uses natural log (nats).
+        For discrete parameters, passing log_base=N (number of classes)
+        normalizes the result to [0, 1], where 1 means complete certainty.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        KL divergence value(s).
+    """
+    from scipy.stats import gaussian_kde
+
+    prior_sample = np.asarray(prior_sample)
+    posterior_sample = np.asarray(posterior_sample)
+
+    if prior_sample.ndim == 2:
+        return np.array([
+            kl_divergence(prior_sample[:, i], posterior_sample[:, i],
+                                 is_discrete=is_discrete, log_base=log_base)
+            for i in range(prior_sample.shape[1])
+        ])
+
+    # Change-of-base divisor: ln(base). If None, divisor=1 (natural log).
+    log_divisor = np.log(log_base) if log_base is not None else 1.0
+
+    if is_discrete:
+        # 1. Get unique values and counts (empirical distribution)
+        all_vals = np.unique(np.concatenate([prior_sample, posterior_sample]))
+        p = np.array([np.sum(prior_sample == v) for v in all_vals])
+        q = np.array([np.sum(posterior_sample == v) for v in all_vals])
+
+        # 2. Add small smoothing to avoid zero probabilities
+        p = (p + 1e-10) / (np.sum(p) + len(all_vals) * 1e-10)
+        q = (q + 1e-10) / (np.sum(q) + len(all_vals) * 1e-10)
+
+        # 3. Discrete KL: D_KL(posterior || prior) = Σ q·log(q/p)
+        return np.sum(p * np.log(p / q)) / log_divisor
+    else:
+        # Continuous KL using KDE
+        kde_p = gaussian_kde(prior_sample)
+        kde_q = gaussian_kde(posterior_sample)
+
+        # Evaluate on a grid
+        grid = np.linspace(min(prior_sample.min(), posterior_sample.min()),
+                           max(prior_sample.max(), posterior_sample.max()), 1000)
+        p_vals = kde_p(grid)
+        q_vals = kde_q(grid)
+
+        # Normalize to ensure they are valid PDFs
+        p_vals /= p_vals.sum()
+        q_vals /= q_vals.sum()
+
+        # Numerical integration: D_KL(posterior || prior) = Σ q·log(q/p)
+        return np.sum(p_vals * np.log(p_vals / (q_vals + 1e-10))) / log_divisor
+
 
 def entropy(P, base = None):
     """
