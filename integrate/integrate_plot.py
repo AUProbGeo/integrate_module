@@ -195,8 +195,8 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
         clim = [0.1, 2600]
 
     elif cmap_type == 'entropy':
-        # Grayscale for uncertainty/entropy
-        colors = ['white', 'gray', 'black']
+        # White-black-red colormap for uncertainty/entropy visualization
+        colors = ['white', 'black', 'red']
         cmap = LinearSegmentedColormap.from_list('entropy', colors, N=256)
         clim = [0, 1]
 
@@ -1456,6 +1456,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         - show_n_unique : bool, if True, adds a plot of the number of unique realizations
           in the stats panel. Uses the same y-axis as temperature (default False)
         - clim : list, color scale limits for discrete classes
+        - plot_kl : bool, if True, plot KL divergence instead of entropy in the entropy
+          panel. KL is only plotted if the ``/Mx/KL`` dataset exists in the posterior
+          HDF5 file; otherwise entropy is plotted as fallback (default False)
 
     Returns
     -------
@@ -1515,6 +1518,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     entropy_min = kwargs.get('entropy_min', None)  # Will set default after loading Entropy
     entropy_max = kwargs.get('entropy_max', None)  # Will set default after loading Entropy
     show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
+    plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of entropy
 
     # Default to showing all panels
     if panels is None:
@@ -1595,6 +1599,16 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
                 n_unique = None
         else:
             n_unique = None
+
+        # Load KL divergence if requested
+        KL = None
+        if plot_kl:
+            if Mstr+'/KL' in f_post:
+                KL = f_post[Mstr+'/KL'][:].T
+            else:
+                if showInfo > 0:
+                    print(f"Warning: KL divergence not found in {f_post_h5} for {Mstr}. Plotting entropy instead.")
+                plot_kl = False
 
     # Set defaults for entropy_min and entropy_max if not provided
     if entropy_min is None:
@@ -1839,21 +1853,33 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         cbar1.ax.invert_yaxis()
         ax[0].set_ylabel('Elevation (m)')
 
-    # ENTROPY panel (ax[1]) - only if requested
+    # ENTROPY / KL panel (ax[1]) - only if requested
     if show_entropy:
         import matplotlib
-        entropy_data = Entropy[:,ii]
-        if gap_alpha is not None:
-            # Use masked array to hide transparent regions
-            entropy_data = np.ma.masked_where(gap_alpha == 0.0, entropy_data)
-
-        im2 = ax[1].pcolormesh(DDc, ZZc, entropy_data,
-                cmap=matplotlib.colors.LinearSegmentedColormap.from_list("", ["white", "black", "red"]),
-                shading='auto')
-        im2.set_clim(0,1)
-        ax[1].set_title('Entropy')
-        ax[1].set_ylabel('Elevation (m)')
-        fig.colorbar(im2, ax=ax[1], label='Entropy')
+        if plot_kl and KL is not None:
+            panel_data = KL[:,ii]
+            if gap_alpha is not None:
+                panel_data = np.ma.masked_where(gap_alpha == 0.0, panel_data)
+            kl_cmap, _ = get_colormap_and_limits('entropy')
+            im2 = ax[1].pcolormesh(DDc, ZZc, panel_data,
+                    cmap=kl_cmap,
+                    vmin=0, vmax=1,
+                    shading='auto')
+            ax[1].set_title('KL Divergence')
+            ax[1].set_ylabel('Elevation (m)')
+            fig.colorbar(im2, ax=ax[1], label='KL Divergence (normalised)')
+        else:
+            entropy_data = Entropy[:,ii]
+            if gap_alpha is not None:
+                entropy_data = np.ma.masked_where(gap_alpha == 0.0, entropy_data)
+            entropy_cmap, _ = get_colormap_and_limits('entropy')
+            im2 = ax[1].pcolormesh(DDc, ZZc, entropy_data,
+                    cmap=entropy_cmap,
+                    shading='auto')
+            im2.set_clim(0,1)
+            ax[1].set_title('Entropy')
+            ax[1].set_ylabel('Elevation (m)')
+            fig.colorbar(im2, ax=ax[1], label='Entropy')
 
     ## Remove x-tick labels from non-bottom panels
     if show_mode:
@@ -1997,6 +2023,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
           Default is 0.6*np.nanmax(Std)
         - show_n_unique : bool, if True, adds a plot of the number of unique realizations
           in the stats panel. Uses the same y-axis as temperature (default False)
+        - plot_kl : bool, if True, plot KL divergence instead of standard deviation in
+          the std panel. KL is only plotted if the ``/Mx/KL`` dataset exists in the
+          posterior HDF5 file; otherwise Std is plotted as fallback (default False)
 
     Returns
     -------
@@ -2007,7 +2036,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     -----
     The plot structure uses 3 subplots:
     - ax[0]: Mean or median values (for multi-layer) or line plot with confidence bounds (for single parameter)
-    - ax[1]: Standard deviation (for multi-layer, hidden for single parameter)
+    - ax[1]: Standard deviation or KL divergence (for multi-layer, hidden for single parameter)
     - ax[2]: Temperature and evidence curves
 
     For multi-layer models (nm > 1):
@@ -2058,6 +2087,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     txt = kwargs.get('txt','')
     showInfo = kwargs.get('showInfo', 0)
     show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
+    plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of Std
 
     # Default to showing all panels
     if panels is None:
@@ -2146,6 +2176,16 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
                 n_unique = None
         else:
             n_unique = None
+
+        # Load KL divergence if requested
+        KL = None
+        if plot_kl:
+            if Mstr+'/KL' in f_post:
+                KL = f_post[Mstr+'/KL'][:].T
+            else:
+                if showInfo > 0:
+                    print(f"Warning: KL divergence not found in {f_post_h5} for {Mstr}. Plotting Std instead.")
+                plot_kl = False
 
     # Compute alpha matrix 'A' for transparency based on uncertainty
     # Normalize Std to [0, 1] range based on its own min/max values
@@ -2412,20 +2452,34 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
 
     if show_std and nm>1:
         isp=1
-        # STD
         import matplotlib
-        std_data = Std[:,ii]
-        if gap_alpha is not None:
-            # Use masked array to hide gap regions completely
-            std_data = np.ma.masked_where(gap_alpha == 0.0, std_data)
-
-        im3 = ax[isp].pcolormesh(DDc, ZZc, std_data,
-                    cmap=matplotlib.colors.LinearSegmentedColormap.from_list("", ["white", "black", "red"]),
-                    shading='auto')
-        im3.set_clim(0,1)
-        ax[isp].set_title('Std %s' % name)
-        ax[isp].set_ylabel('Elevation (m)')
-        fig.colorbar(im3, ax=ax[isp], label='Standard deviation (Ohm.m)')
+        if plot_kl and KL is not None:
+            # KL DIVERGENCE
+            kl_data = KL[:,ii]
+            if gap_alpha is not None:
+                kl_data = np.ma.masked_where(gap_alpha == 0.0, kl_data)
+            vmax_kl = np.nanpercentile(kl_data, 99)
+            kl_cmap, _ = get_colormap_and_limits('entropy')
+            im3 = ax[isp].pcolormesh(DDc, ZZc, kl_data,
+                        cmap=kl_cmap,
+                        vmin=0, vmax=vmax_kl,
+                        shading='auto')
+            ax[isp].set_title('KL Divergence %s' % name)
+            ax[isp].set_ylabel('Elevation (m)')
+            fig.colorbar(im3, ax=ax[isp], label='KL Divergence (bits)')
+        else:
+            # STD
+            std_data = Std[:,ii]
+            if gap_alpha is not None:
+                std_data = np.ma.masked_where(gap_alpha == 0.0, std_data)
+            std_cmap, _ = get_colormap_and_limits('entropy')
+            im3 = ax[isp].pcolormesh(DDc, ZZc, std_data,
+                        cmap=std_cmap,
+                        shading='auto')
+            im3.set_clim(0,1)
+            ax[isp].set_title('Std %s' % name)
+            ax[isp].set_ylabel('Elevation (m)')
+            fig.colorbar(im3, ax=ax[isp], label='Standard deviation (Ohm.m)')
 
     # Handle single parameter case (nm <= 1)
     if show_value and nm<=1:

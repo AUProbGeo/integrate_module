@@ -325,6 +325,10 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
         updateGeometryFromData : bool, optional
             Copy UTMX, UTMY, LINE, ELEVATION from the DATA.h5 file into POST.h5
             if not already present. Default is True.
+        computeKL : bool, optional
+            Shorthand to enable KL divergence computation for all parameter types.
+            If True, both ``computeKL_continuous`` and ``computeKL_discrete`` are
+            set to True. Default is False.
         computeKL_continuous : bool, optional
             Compute KL divergence D_KL(posterior || prior) for continuous model
             parameters using log10-space histograms (50 bins). Result is in bits
@@ -376,8 +380,9 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
         disableTqdm=False
     usePrior = kwargs.get('usePrior', False)
     updateGeometryFromData = kwargs.get('updateGeometryFromData', True)
-    computeKL_continuous = kwargs.get('computeKL_continuous', False)
-    computeKL_discrete = kwargs.get('computeKL_discrete', False)
+    computeKL = kwargs.get('computeKL', False)
+    computeKL_continuous = kwargs.get('computeKL_continuous', False) or computeKL
+    computeKL_discrete = kwargs.get('computeKL_discrete', False) or computeKL
 
     # Check if f_prior_h5 attribute exists in the HDF5 file
     with h5py.File(f_post_h5, 'r') as f:
