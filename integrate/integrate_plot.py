@@ -1606,8 +1606,8 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             if Mstr+'/KL' in f_post:
                 KL = f_post[Mstr+'/KL'][:].T
             else:
-                if showInfo > 0:
-                    print(f"Warning: KL divergence not found in {f_post_h5} for {Mstr}. Plotting entropy instead.")
+                print(f"Warning: KL divergence not found in {f_post_h5} for {Mstr}. "
+                      f"Run integrate_posterior_stats(..., computeKL=True) first. Plotting entropy instead.")
                 plot_kl = False
 
     # Set defaults for entropy_min and entropy_max if not provided
@@ -2183,8 +2183,8 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             if Mstr+'/KL' in f_post:
                 KL = f_post[Mstr+'/KL'][:].T
             else:
-                if showInfo > 0:
-                    print(f"Warning: KL divergence not found in {f_post_h5} for {Mstr}. Plotting Std instead.")
+                print(f"Warning: KL divergence not found in {f_post_h5} for {Mstr}. "
+                      f"Run integrate_posterior_stats(..., computeKL=True) first. Plotting Std instead.")
                 plot_kl = False
 
     # Compute alpha matrix 'A' for transparency based on uncertainty
