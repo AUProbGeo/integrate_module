@@ -48,6 +48,12 @@ Synthetic Case
 .. nbgallery::
    notebooks/integrate_synthetic_case.ipynb
 
+Plotting
+================
+
+.. nbgallery::    
+   notebooks/integrate_profiles.ipynb
+
 Other
 =====
 
