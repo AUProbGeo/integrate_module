@@ -37,7 +37,7 @@ hardcopy=True
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
-inflateNoise = 1   # 1,2, 4
+inflateNoise = 4   # 1,2, 4
 useLogData = False
 N_use = 1000000
 N_use_org= N_use
@@ -519,7 +519,7 @@ if doPlotAll:
 
     for i_post in range(len(f_post_h5_all_list)):
         f_post_h5 = f_post_h5_all_list[i_post]
-        
+        #%%
         with h5py.File(f_post_h5,'r') as f:
             f_prior_h5 = f.attrs['f5_prior']
 
@@ -546,11 +546,11 @@ if doPlotAll:
             ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_2, hardcopy=hardcopy, title='b) P2')
     
         if plLevel>1:
-            ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
+            ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy, plot_data_locations=True)
             ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='EV', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='ND', hardcopy=hardcopy)
-            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=0, N_UNIQUE_max=nr)
+            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=nr, plot_data_locations=True)
 
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' )
             plt.show()
