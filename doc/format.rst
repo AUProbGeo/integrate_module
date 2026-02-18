@@ -366,120 +366,149 @@ LOG: Well log conditioning, method='log'
 POST.h5
 =======
 
-At the very minimum POST.h5 needs to contain the index (in PRIOR.h5) of realizations from the posterior
+At the very minimum POST.h5 needs to contain the index (in PRIOR.h5) of realizations from the posterior.
+Statistics are written by :func:`integrate.integrate_posterior_stats`.
 
-.. list-table:: Data and attributes in POST.h5
-   :widths: 10 10 5 5 70 
+``Np``: Number of data locations.
+
+``Nr``: Number of posterior realizations per location.
+
+``Nm``: Number of model parameters (e.g. depth layers) for a given model type.
+
+``Nclass``: Number of discrete classes for a given model type.
+
+.. list-table:: Core data and attributes in POST.h5
+   :widths: 15 10 5 5 55
    :header-rows: 1
 
-   * - Dataset     
+   * - Dataset
      - Format
-     - attribute
+     - Attribute
      - Mandatory
-     - Description     
+     - Description
    * - /i_use
-     - [N,Nr]
-     - 
+     - [Np, Nr]
+     -
      - *
-     - Index of posterior realizations for each data 
+     - Indices (into PRIOR.h5) of posterior realizations for each data location.
    * - /T
-     -  [N,1]
-     - 
+     - [Np, 1]
+     -
      - *
-     - The annealing temperature used for inversion
+     - Annealing temperature used during inversion.
    * - /EV
-     -  [N,1]
-     - 
+     - [Np, 1]
+     -
      - *
-     - Evidence
+     - Log-evidence at each data location.
    * - /f5_data
-     - F [string]
+     - string
      - *
      - *
-     - Filename of HDF5 data file.
+     - Filename of the DATA HDF5 file.
    * - /f5_prior
-     - F [string]
+     - string
      - *
      - *
-     - Filename of HDF5 PRIOR file.
+     - Filename of the PRIOR HDF5 file.
    * - /CHI2
-     - [N,Nd]
+     - [Np, Nd]
      - float
      -
-     - Reduced chi-squared (χ²/ν) goodness-of-fit metric for each data type. Values near 1.0 indicate good fit, >1 indicates underfit, <1 indicates overfit. For joint inversion of multiple datasets, size is [N,number_of_datasets].
-
-
-
-
+     - Reduced chi-squared (χ²/ν) goodness-of-fit metric per data type. Values near 1 indicate good fit; >1 underfit; <1 overfit.
+   * - /N_UNIQUE
+     - [Np]
+     -
+     -
+     - Number of unique prior realizations used at each data location. Written by :func:`integrate.integrate_posterior_stats`.
+   * - /UTMX
+     - [Np]
+     -
+     -
+     - X-coordinate, copied from DATA.h5 (written when ``updateGeometryFromData=True``).
+   * - /UTMY
+     - [Np]
+     -
+     -
+     - Y-coordinate, copied from DATA.h5.
+   * - /ELEVATION
+     - [Np]
+     -
+     -
+     - Elevation, copied from DATA.h5.
+   * - /LINE
+     - [Np]
+     -
+     -
+     - Line number, copied from DATA.h5.
 
 
 Continuous parameters
 ---------------------
 
-For continuous model parameters the following generic posterior statistics are computed
+Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
+:func:`integrate.integrate_posterior_stats`.
 
-.. list-table:: Data and attributes for continuous parameters in POST.h5
-   :widths: 10 10 5 5 70 
+.. list-table:: Statistics for continuous model parameters in POST.h5
+   :widths: 15 10 10 65
    :header-rows: 1
 
-   * - Dataset     
+   * - Dataset
      - Format
-     - attribute
-     - Mandatory
-     - Description     
-   * - /M1/Mean
-     - [N,Nm]
-     - 
-     - 
-     - Point-wise mean of the posterior
-   * - /M1/Median
-     - [N,Nm]
-     - 
-     - 
-     - Point-wise median of the posterior
-   * - /M1/Std
-     - [N,Nm]
-     - 
-     - 
-     - Point-wise standard deviation of the posterior
-
-
-
+     - Written
+     - Description
+   * - /Mx/Mean
+     - [Np, Nm]
+     - always
+     - Arithmetic mean of the posterior realizations at each location and depth.
+   * - /Mx/LogMean
+     - [Np, Nm]
+     - always
+     - Geometric mean: exp(mean(log(values))). Appropriate for log-normally distributed parameters such as resistivity.
+   * - /Mx/Median
+     - [Np, Nm]
+     - always
+     - Median of the posterior realizations.
+   * - /Mx/Std
+     - [Np, Nm]
+     - always
+     - Standard deviation of log10(posterior). Measures spread on the logarithmic scale.
+   * - /Mx/KL
+     - [Np, Nm]
+     - ``computeKL_continuous=True``
+     - KL divergence D_KL(posterior ∥ prior) in bits (log base 2), estimated from log10-space histograms (50 bins). No fixed upper bound for continuous parameters.
 
 
 Discrete parameters
 -------------------
 
+Written for each discrete model parameter ``/Mx`` (``is_discrete=1``) by
+:func:`integrate.integrate_posterior_stats`.
 
-For discrete model parameters the following generic posterior statistics are computed
-
-
-.. list-table:: Data and attributes for discrete parameters in POST.h5
-   :widths: 10 10 5 5 70 
+.. list-table:: Statistics for discrete model parameters in POST.h5
+   :widths: 15 10 10 65
    :header-rows: 1
 
-   * - Dataset     
+   * - Dataset
      - Format
-     - attribute
-     - Mandatory
-     - Description     
-   * - /M1/Mode
-     - [N,Nm]
-     - 
-     - 
-     - Point-wise mode of the posterior
-   * - /M1/Entropy
-     - [N,Nm]
-     - 
-     - 
-     - Point-wise entropy of the posterior
-   * - /M1/P
-     - [N,Nclass,Nm]
-     - 
-     - 
-     - Pointwise posterior probability of each class.
-     
-
+     - Written
+     - Description
+   * - /Mx/Mode
+     - [Np, Nm]
+     - always
+     - Most probable class (class_id value) at each location and depth.
+   * - /Mx/Entropy
+     - [Np, Nm]
+     - always
+     - Shannon entropy of the posterior class probabilities, normalised by log(Nclass). Range [0, 1]: 0 = certain, 1 = maximally uncertain.
+   * - /Mx/P
+     - [Np, Nclass, Nm]
+     - always
+     - Posterior probability of each class at each location and depth.
+   * - /Mx/KL
+     - [Np, Nm]
+     - ``computeKL_discrete=True``
+     - KL divergence D_KL(posterior ∥ prior) normalised to [0, 1] using log_base = Nclass (read from ``class_name`` attribute if available, otherwise from ``class_id``). 0 = posterior equals prior; 1 = completely certain about one class.
 
 
 Compression in HDF5 files

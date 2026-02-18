@@ -41,9 +41,10 @@ def main():
             "Home",
             "Data Analysis",
             "Prior Model Generation",
-            "Forward Modeling", 
+            "Forward Modeling",
             "Rejection Sampling",
-            "Visualization & Plotting"
+            "Visualization & Plotting",
+            "Query Tool",
         ]
     )
     
@@ -62,7 +63,8 @@ def main():
         - ⚡ **Forward Modeling**: Electromagnetic forward modeling with GA-AEM integration
         - 🎯 **Rejection Sampling**: Bayesian inversion using temperature-controlled rejection sampling  
         - 📈 **Visualization**: Comprehensive plotting tools for analysis and results interpretation
-        
+        - 🔍 **Query Tool**: Compute per-data-point probabilities for user-defined geological features
+
         ### Getting Started:
         1. Use the sidebar to navigate between modules
         2. Start with **Data Analysis** to inspect existing HDF5 files
@@ -120,6 +122,13 @@ def main():
             run_plot_app()
         except ImportError:
             st.error("ig_plot.py module not found. Please ensure all modules are properly installed.")
+
+    elif page == "Query Tool":
+        try:
+            from ig_query import run_query_app
+            run_query_app()
+        except ImportError:
+            st.error("ig_query.py module not found. Please ensure all modules are properly installed.")
 
 if __name__ == "__main__":
     main()
