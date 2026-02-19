@@ -6,7 +6,15 @@
 #
 # The core function `query(f_post_h5, query)` takes a posterior HDF5
 # file and a query definition (dict or JSON file path) and returns an array of
+
 # probabilities – one value per data location.
+# %%
+try:
+    get_ipython()
+    get_ipython().run_line_magic('load_ext', 'autoreload')
+    get_ipython().run_line_magic('autoreload', '2')
+except Exception:
+    pass
 
 # %% Imports
 import json
