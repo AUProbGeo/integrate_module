@@ -106,6 +106,13 @@ from integrate.integrate_borehole import rescale_P_obs_temperature as Pobs_resca
 from integrate.integrate_borehole import Pobs_to_datagrid
 from integrate.integrate_borehole import get_weight_from_position
 
+# Import query functions
+from integrate.integrate_query import query
+from integrate.integrate_query import query_plot
+from integrate.integrate_query import save_query
+from integrate.integrate_query import load_query
+from integrate.integrate_query import get_prior_model_info
+
 # Import gex module functions
 from integrate.gex import read_gex as read_gex2
 from integrate.gex import describe_gex as describe_gex2
