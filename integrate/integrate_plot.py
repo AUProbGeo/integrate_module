@@ -3588,9 +3588,9 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
             if len(M_positive) > 0:
                 data_min = np.min(M_positive)
                 data_max = np.max(M_positive)
-                # Use log if data spans more than 2 orders of magnitude
+                # Use log if data spans more than 1.3 orders of magnitude
                 orders_of_magnitude = np.log10(data_max / data_min)
-                use_log_scale = orders_of_magnitude > 2.0
+                use_log_scale = orders_of_magnitude > 1.3
                 if showInfo > 0:
                     print(f'plot_prior_stats: Data range: {data_min:.2e} to {data_max:.2e} ({orders_of_magnitude:.1f} orders of magnitude)')
                     print(f'plot_prior_stats: Auto-selected {"log" if use_log_scale else "linear"} scale')
@@ -4069,9 +4069,9 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             if len(M_positive) > 0:
                 data_min = np.min(M_positive)
                 data_max = np.max(M_positive)
-                # Use log if data spans more than 2 orders of magnitude
+                # Use log if data spans more than 1.3 orders of magnitude
                 orders_of_magnitude = np.log10(data_max / data_min)
-                use_log_scale = orders_of_magnitude > 2.0
+                use_log_scale = orders_of_magnitude > 1.3
                 if showInfo > 0:
                     print(f'plot_post_stats: Data range: {data_min:.2e} to {data_max:.2e} ({orders_of_magnitude:.1f} orders of magnitude)')
                     print(f'plot_post_stats: Auto-selected {"log" if use_log_scale else "linear"} scale')
