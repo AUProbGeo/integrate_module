@@ -78,20 +78,23 @@ def is_notebook():
 def use_parallel(**kwargs):
     """
     Determine if parallel processing can be used based on the environment.
-    
-    This function checks if the code is running in a Jupyter notebook or on a 
-    POSIX system (e.g., Linux). If either condition is met, parallel processing 
-    is considered safe. Otherwise, it is not recommended unless the primary script 
-    is embedded in an `if __name__ == "__main__":` block.
-    
+
+    This function checks if the code is running in a Jupyter notebook, on a
+    POSIX system (Linux), or on Windows. Parallel processing is safe in all
+    these environments. macOS is excluded due to fork-related instability.
+
+    The module handles Windows multiprocessing transparently using an explicit
+    spawn context, so no `if __name__ == "__main__":` guard is required in
+    user scripts.
+
     Parameters
     ----------
     **kwargs : dict
         Additional keyword arguments including showInfo for verbosity control.
         showInfo : int, optional
-            If greater than 0, prints information about the environment and 
+            If greater than 0, prints information about the environment and
             parallel processing status. Default is 0.
-    
+
     Returns
     -------
     bool
@@ -99,33 +102,30 @@ def use_parallel(**kwargs):
     """
     import os
     showInfo = kwargs.get('showInfo', 0)
-    
+
     parallel = True
     if is_notebook():
         # Then it is always OK to use parallel processing
         if showInfo>0:
             print('Notebook detected. Parallel processing is OK')
         parallel = True
-    
+
     else:
-        # if os is Linux, when default is spawn, then parallel processing is OK
         if os.name == 'posix':
             if os.uname().sysname == 'Darwin':
                 if showInfo>0:
-                    # MacOS use fork, which is not OK
-                    print('MacOS detected. Parallel processing is not OK')        
+                    # macOS: fork can cause instability with shared memory
+                    print('macOS detected. Parallel processing is not recommended.')
                 parallel = False
             else:
                 if showInfo>0:
-                    print('Posix system detected. Parallel processing is OK')        
-                parallel = True            
+                    print('POSIX system detected. Parallel processing is OK.')
+                parallel = True
         else:
-            parallel = False
-        if not parallel:    
+            # Windows: handled transparently via explicit spawn context in the module
             if showInfo>0:
-                print('Non posix system detected. Parallel processing is not OK')        
-                print('If parallel processing is needed, make sure to embed you primary script in a :if __name__ == "__main__": block')        
-            parallel = False
+                print('Windows detected. Parallel processing is OK.')
+            parallel = True
 
     return parallel
 

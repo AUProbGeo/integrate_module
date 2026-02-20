@@ -833,15 +833,22 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     and returns its results, which are then aggregated by the main process.
     """
     #import integrate as ig
-    from multiprocessing import Pool
+    import multiprocessing
+    import os
 
     #shared_memory_refs = create_shared_memory(D)
     shared_memory_refs, shm_objects = create_shared_memory(D)
     #reconstructed_arrays = reconstruct_shared_arrays(shared_memory_refs)
 
-    #with Pool(Ncpu) as p:
+    # Use explicit spawn context on Windows (no __main__ guard required in user scripts)
+    # and fork on POSIX for performance
+    if os.name == 'nt':
+        ctx = multiprocessing.get_context('spawn')
+    else:
+        ctx = multiprocessing.get_context('fork')
+
     try:
-        with Pool(Ncpu) as p:
+        with ctx.Pool(Ncpu) as p:
             # New implementation with shared memory
             results = p.map(integrate_posterior_chunk, [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best) for i in range(len(ip_chunks))])
             # Old implementation where D was copied to each process
