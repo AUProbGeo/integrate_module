@@ -286,7 +286,6 @@ ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x',
 # %%
 ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x',
                 gap_threshold=50, plot_kl=True )
-#ig.integrate_posterior_stats(f_post_h5)
 
 # %%
 ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x',
@@ -312,7 +311,7 @@ plt.show()
 # to be stored in the posterior file.
 
 # %%
-ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x',
+ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='y',
                 show_n_unique=True, gap_threshold=50)
 
 # %%
