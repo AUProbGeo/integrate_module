@@ -125,7 +125,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 # %%
 # Select how many prior model realizations (N) should be generated
 N=2000000
-N=100000
+N=10000
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
                                     showInfo=1)
 #print('%s is used to hold prior realizations' % (f_prior_h5))
@@ -195,7 +195,7 @@ f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
                                    N_use = N_use, 
                                    autoT = autoT,
                                    T_base = T_base,                            
-                                   showInfo=1, 
+                                   showInfo=0, 
                                    parallel=parallel,
                                    ip_range=i_use)
 
