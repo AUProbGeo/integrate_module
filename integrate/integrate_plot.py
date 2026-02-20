@@ -4498,5 +4498,230 @@ def plot_cumulative_probability_profile(P_hypothesis, i1=0, i2=0, label=None, co
         plt.savefig(name, dpi=300)
         print("Saved figure as %s.png" % (name))
     plt.show()
-    
+
+
+def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
+    """
+    Plot borehole data as 1-D lithology sticks, one subplot per borehole.
+
+    Parameters
+    ----------
+    W : dict, list of dict, or str
+        Borehole data in one of three forms:
+
+        * A single borehole dict (keys: ``name``, ``X``, ``Y``,
+          ``depth_top``, ``depth_bottom``, ``class_obs``, ``class_prob``).
+        * A list of such dicts.
+        * A path to a JSON file written by :func:`write_borehole`.
+
+    f_prior_h5 : str, optional
+        Path to an HDF5 prior file.  When supplied, class names and the
+        RGB colormap stored on ``Mstr`` are used to colour and label the
+        lithology intervals.  When omitted, a default ``'tab10'`` colormap
+        is used and classes are labelled by their numeric ID.
+    Mstr : str, optional
+        HDF5 dataset key that holds the discrete lithology model in
+        ``f_prior_h5`` (default ``'/M2'``).  Must point to a dataset with
+        ``is_discrete == 1`` and ``class_id`` / ``class_name`` attributes.
+    hardcopy : bool, optional
+        Save the figure to a PNG file.  Default is ``False``.
+    **kwargs
+        figsize : tuple, optional
+            Figure size per subplot column, e.g. ``(2, 8)``.
+            Default is ``(2, 8)`` per well.
+        showInfo : int, optional
+            Verbosity level. Default 0.
+        name : str, optional
+            Base name for the saved PNG (without extension).
+            Default is ``'boreholes'``.
+        depth_max : float, optional
+            Maximum depth shown on y-axis.  Defaults to the deepest
+            ``depth_bottom`` value across all boreholes.
+        title : str, optional
+            Overall figure title.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+
+    Examples
+    --------
+    >>> ig.plot_boreholes(BHOLES)
+    >>> ig.plot_boreholes(BHOLES, f_prior_h5='PRIOR.h5')
+    >>> ig.plot_boreholes('all_boreholes.json', f_prior_h5='PRIOR.h5')
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    from matplotlib.colors import ListedColormap
+    import numpy as np
+    import json
+
+    showInfo  = kwargs.get('showInfo', 0)
+    figsize_w = kwargs.get('figsize', (2, 8))
+    fname     = kwargs.get('name', 'boreholes')
+    depth_max = kwargs.get('depth_max', None)
+    title     = kwargs.get('title', None)
+
+    # --- normalise input to a list of dicts ---
+    if isinstance(W, str):
+        with open(W, 'r', encoding='utf-8') as fh:
+            W = json.load(fh)
+    if isinstance(W, dict):
+        W = [W]
+
+    n_wells = len(W)
+
+    # --- read class info from prior if available ---
+    class_id   = None
+    class_name = None
+    cmap_lc    = None   # ListedColormap
+
+    if f_prior_h5 is not None:
+        try:
+            with h5py.File(f_prior_h5, 'r') as f_prior:
+                mkey = Mstr if Mstr.startswith('/') else '/' + Mstr
+                if mkey in f_prior:
+                    attrs = f_prior[mkey].attrs
+                    if 'class_id' in attrs:
+                        class_id = attrs['class_id'][:].flatten().astype(int)
+                    if 'class_name' in attrs:
+                        raw = attrs['class_name'][:].flatten()
+                        class_name = [
+                            r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                            for r in raw
+                        ]
+                    if 'cmap' in attrs:
+                        cmap_arr = attrs['cmap'][:]   # shape (3, n_colors)
+                        cmap_lc  = ListedColormap(cmap_arr.T)
+                    if showInfo > 0:
+                        print(f'plot_boreholes: read {len(class_id) if class_id is not None else 0}'
+                              f' classes from {f_prior_h5}:{mkey}')
+        except Exception as e:
+            if showInfo > 0:
+                print(f'plot_boreholes: could not read prior attributes: {e}')
+
+    # --- build class → color mapping ---
+    # collect all class ids appearing in data
+    all_classes = sorted({int(c) for bh in W for c in bh.get('class_obs', [])})
+
+    if class_id is not None and cmap_lc is not None:
+        # map each class_id to its colour in the stored cmap
+        n_colors = len(cmap_lc.colors)
+        def _color_for_class(cid):
+            if class_id is not None:
+                idx_arr = np.where(class_id == cid)[0]
+                if len(idx_arr):
+                    idx = idx_arr[0]
+                    # cmap colours run 0..n_colors-1; class_id may not be 0-based
+                    frac = idx / max(n_colors - 1, 1)
+                    return cmap_lc(frac)
+            return (0.7, 0.7, 0.7, 1.0)
+        color_map = {cid: cmap_lc(i / max(len(class_id) - 1, 1))
+                     for i, cid in enumerate(class_id)}
+    else:
+        tab10 = plt.get_cmap('tab10')
+        color_map = {cid: tab10(i % 10) for i, cid in enumerate(all_classes)}
+
+    # --- class labels for legend ---
+    # When prior info is available: show name + id, e.g. "Sand (2)"
+    # Otherwise: just the numeric id
+    if class_id is not None and class_name is not None:
+        label_map = {int(cid): f'{nm} ({cid})'
+                     for cid, nm in zip(class_id, class_name)}
+    else:
+        label_map = {cid: str(cid) for cid in all_classes}
+
+    # When a prior is provided use ALL its classes in the legend so the
+    # full legend is shown even if some classes are absent from this set
+    # of boreholes.  Without a prior, show only classes present in data.
+    if class_id is not None and color_map:
+        legend_classes = list(class_id)
+    else:
+        legend_classes = all_classes
+
+    # --- global depth range ---
+    if depth_max is None:
+        depth_max = max(
+            (max(bh['depth_bottom']) for bh in W if bh.get('depth_bottom')),
+            default=50.0
+        )
+
+    # --- figure layout: one column per well ---
+    fig_w = figsize_w[0] * n_wells
+    fig_h = figsize_w[1]
+    fig, axes = plt.subplots(1, n_wells, figsize=(fig_w, fig_h),
+                             sharey=True, squeeze=False)
+    axes = axes[0]   # shape (n_wells,)
+
+    for ax, bh in zip(axes, W):
+        depth_top    = bh.get('depth_top',    [])
+        depth_bottom = bh.get('depth_bottom', [])
+        class_obs    = bh.get('class_obs',    [])
+        class_prob   = bh.get('class_prob',   [1.0] * len(class_obs))
+
+        for top, bot, cid, prob in zip(depth_top, depth_bottom, class_obs, class_prob):
+            cid  = int(cid)
+            col  = color_map.get(cid, (0.7, 0.7, 0.7, 1.0))
+            alpha = float(prob)
+            ax.barh(
+                y      = (top + bot) / 2,
+                width  = 1.0,
+                height = bot - top,
+                left   = 0.0,
+                color  = col,
+                alpha  = alpha,
+                align  = 'center',
+                edgecolor='white',
+                linewidth=0.3,
+            )
+            # Dashed vertical line showing class_prob value for this interval
+            ax.plot(
+                [prob, prob], [top, bot],
+                color='black', linewidth=1.0,
+                linestyle='--', alpha=0.8,
+            )
+            # Thick horizontal boundary lines at top and bottom of each interval
+            ax.plot([-0.05, 1.05], [top, top], color='black', linewidth=1.5, solid_capstyle='butt')
+            ax.plot([-0.05, 1.05], [bot, bot], color='black', linewidth=1.5, solid_capstyle='butt')
+
+        bh_name = bh.get('name', '')
+        x_coord  = bh.get('X', '')
+        y_coord  = bh.get('Y', '')
+        if x_coord and y_coord:
+            subtitle = f'X={x_coord:.0f}\nY={y_coord:.0f}'
+        else:
+            subtitle = ''
+        ax.set_title(f'{bh_name}\n{subtitle}', fontsize=8)
+        ax.set_xlim(-0.05, 1.05)
+        ax.set_ylim(depth_max, 0)      # depth increases downward
+        ax.set_xticks([])
+        ax.set_xlabel('')
+        ax.tick_params(axis='y', labelsize=7)
+
+    axes[0].set_ylabel('Depth (m)')
+
+    # --- shared legend ---
+    patches = [
+        mpatches.Patch(color=color_map.get(int(cid), (0.7, 0.7, 0.7)),
+                       label=label_map.get(int(cid), str(cid)))
+        for cid in legend_classes
+    ]
+    fig.legend(handles=patches, loc='lower center',
+               ncol=min(len(patches), 6),
+               fontsize=8, frameon=True,
+               bbox_to_anchor=(0.5, 0.0))
+
+    if title:
+        fig.suptitle(title, fontsize=10, y=1.01)
+
+    plt.tight_layout(rect=[0, 0.06, 1, 1])
+
+    if hardcopy:
+        out = f'{fname}.png'
+        plt.savefig(out, dpi=150, bbox_inches='tight')
+        if showInfo >= 0:
+            print(f'plot_boreholes: saved {out}')
+
+    plt.show()
+    return fig
 

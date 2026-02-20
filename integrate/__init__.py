@@ -81,6 +81,8 @@ from integrate.integrate_io import read_usf
 from integrate.integrate_io import read_usf_mul
 from integrate.integrate_io import test_read_usf
 from integrate.integrate_io import hdf5_info
+from integrate.integrate_io import read_borehole
+from integrate.integrate_io import write_borehole
 
 from integrate.integrate_plot import plot_geometry
 from integrate.integrate_plot import plot_profile
@@ -99,6 +101,7 @@ from integrate.integrate_plot import plot_posterior_cumulative_thickness
 from integrate.integrate_plot import h5_get_clim_cmap
 from integrate.integrate_plot import get_colormap_and_limits
 from integrate.integrate_plot import find_points_along_line_segments
+from integrate.integrate_plot import plot_boreholes
 
 # Import from borehole module
 from integrate.integrate_borehole import compute_P_obs_discrete

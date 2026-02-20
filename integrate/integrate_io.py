@@ -4799,5 +4799,112 @@ def _analyze_unknown_file(f, print_line, load_data=False):
         print_structure(key, f[key], 0)
 
 
+def write_borehole(W, filename, **kwargs):
+    """
+    Write one or more borehole dictionaries to a JSON file.
 
+    Parameters
+    ----------
+    W : dict or list of dict
+        A single borehole dict, or a list of borehole dicts.
+        Each dict may contain any combination of the standard borehole
+        fields: ``name``, ``X``, ``Y``, ``depth_top``, ``depth_bottom``,
+        ``class_obs``, ``class_prob``, ``method``.
+        numpy arrays and scalars are automatically converted to plain
+        Python lists/numbers so the file is human-readable JSON.
+    filename : str
+        Output JSON file path (e.g. ``'borehole.json'``).
+    **kwargs
+        showInfo : int, optional
+            Verbosity level. Default is 0.
+
+    Returns
+    -------
+    str
+        The filename written.
+
+    Examples
+    --------
+    >>> W = {'name': 'BH1', 'X': 498832.5, 'Y': 6250843.1,
+    ...      'depth_top': [0, 10], 'depth_bottom': [10, 20],
+    ...      'class_obs': [1, 2], 'class_prob': [0.9, 0.9]}
+    >>> ig.write_borehole(W, 'borehole.json')
+    'borehole.json'
+
+    >>> WELLS = [W1, W2, W3]
+    >>> ig.write_borehole(WELLS, 'all_boreholes.json')
+    'all_boreholes.json'
+    """
+    import json
+    import numpy as np
+
+    def _convert(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, dict):
+            return {k: _convert(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_convert(v) for v in obj]
+        return obj
+
+    showInfo = kwargs.get('showInfo', 0)
+    data = _convert(W)
+
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
+    if showInfo > 0:
+        n = len(data) if isinstance(data, list) else 1
+        print(f'write_borehole: wrote {n} borehole(s) to {filename}')
+
+    return filename
+
+
+def read_borehole(filename, **kwargs):
+    """
+    Read one or more borehole dictionaries from a JSON file.
+
+    The file must have been written by :func:`write_borehole`.
+    If the file contains a single borehole (JSON object) a single dict
+    is returned.  If it contains many boreholes (JSON array) a list of
+    dicts is returned.
+
+    Parameters
+    ----------
+    filename : str
+        JSON file path to read.
+    **kwargs
+        showInfo : int, optional
+            Verbosity level. Default is 0.
+
+    Returns
+    -------
+    dict or list of dict
+        Single borehole dict, or list of borehole dicts.
+
+    Examples
+    --------
+    >>> W = ig.read_borehole('borehole.json')
+    >>> print(W['name'], W['depth_top'])
+
+    >>> WELLS = ig.read_borehole('all_boreholes.json')
+    >>> for W in WELLS:
+    ...     print(W['name'])
+    """
+    import json
+
+    showInfo = kwargs.get('showInfo', 0)
+
+    with open(filename, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    if showInfo > 0:
+        n = len(data) if isinstance(data, list) else 1
+        print(f'read_borehole: read {n} borehole(s) from {filename}')
+
+    return data
 
