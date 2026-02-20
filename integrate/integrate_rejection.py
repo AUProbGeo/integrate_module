@@ -118,8 +118,12 @@ def integrate_rejection(f_prior_h5='prior.h5',
     >>> f_post = ig.integrate_rejection('prior.h5', 'data.h5', N_use=10000)
     >>> print(f"Results saved to: {f_post}")
     """
+    # Skip execution inside spawned worker processes (Windows/macOS spawn).
+    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+        return None
+
     import integrate as ig
-    
+
     # get optional arguments
     showInfo = kwargs.get('showInfo', 0)
     updatePostStat = kwargs.get('updatePostStat', True)
@@ -844,6 +848,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     # fork on Linux for performance
     if os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin'):
         ctx = multiprocessing.get_context('spawn')
+        os.environ['_INTEGRATE_IN_WORKER'] = '1'
     else:
         ctx = multiprocessing.get_context('fork')
 
@@ -857,6 +862,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         # Always clean up shared memory
         if shm_objects:
             cleanup_shared_memory(shm_objects)
+        os.environ.pop('_INTEGRATE_IN_WORKER', None)
 
     # Cleanup shared memory
     #cleanup_shared_memory(shared_memory_refs)

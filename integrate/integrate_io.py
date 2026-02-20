@@ -2214,9 +2214,18 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
         # Open the input file
         if showInfo > 0:
             print('Trying to copy %s to %s' % (input_filename, output_filename))
-        
+
+        # Remove any stale/corrupted output file before writing (important on
+        # Windows/NTFS and WSL mounts where h5py 'w' mode may fail to truncate)
+        import os as _os
+        if _os.path.exists(output_filename):
+            try:
+                _os.remove(output_filename)
+            except OSError:
+                pass
+
         input_file = h5py.File(input_filename, 'r')
-        
+
         # Create the output file
         output_file = h5py.File(output_filename, 'w')
         

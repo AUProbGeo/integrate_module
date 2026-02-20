@@ -1227,11 +1227,17 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     """
     import integrate as ig
     import os 
+    # Skip execution inside spawned worker processes (Windows/macOS spawn).
+    # Workers re-execute the user's __main__ script; this guard prevents
+    # side effects (file creation, HDF5 writes) from running in workers.
+    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+        return None
+
     type = 'TDEM'
     method = 'ga-aem'
     showInfo = kwargs.get('showInfo', 0)
     Ncpu = kwargs.get('Ncpu', 0)
-    # of 'Nproc' is set in kwargs use it 
+    # of 'Nproc' is set in kwargs use it
     Ncpu = kwargs.get('Nproc', Ncpu)
 
     if showInfo>0:
@@ -1381,12 +1387,18 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         # 3: Compute the chunks in parallel
         forward_gaaem_chunk_partial = partial(forward_gaaem_chunk, thickness=thickness, stmfiles=stmfiles, file_gex=file_gex, Nhank=Nhank, Nfreq=Nfreq, **kwargs)
 
-        # Use spawn context on Windows for better handle management
+        # Use spawn context on Windows for better handle management.
+        # Set _INTEGRATE_IN_WORKER so that spawned workers (which re-run the
+        # user's __main__ script) skip top-level ig.* calls.
         if os.name == 'nt':
-            ctx = multiprocessing.get_context("spawn")
-            Ncpu = min(Ncpu, 60)  # Set to a safe limit below 63
-            with ctx.Pool(processes=Ncpu) as p:
-                D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
+            os.environ['_INTEGRATE_IN_WORKER'] = '1'
+            try:
+                ctx = multiprocessing.get_context("spawn")
+                Ncpu = min(Ncpu, 60)  # Set to a safe limit below 63
+                with ctx.Pool(processes=Ncpu) as p:
+                    D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
+            finally:
+                os.environ.pop('_INTEGRATE_IN_WORKER', None)
         else:
             # On non-Windows platforms, use regular Pool
             with Pool(processes=Ncpu) as p:
@@ -1598,6 +1610,10 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
     This implementation pre-generates all random values using vectorized NumPy
     operations, significantly improving performance for large N (e.g., N=50000).
     """
+
+    # Skip execution inside spawned worker processes (Windows/macOS spawn).
+    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+        return None
 
     import integrate as ig
 
@@ -1816,6 +1832,9 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
     str
         Filepath of the saved prior model.
     """
+    # Skip execution inside spawned worker processes (Windows/macOS spawn).
+    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+        return None
 
     import integrate as ig
 
@@ -1948,6 +1967,10 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     str
         Filepath of the saved prior model.
     """
+    # Skip execution inside spawned worker processes (Windows/macOS spawn).
+    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+        return None
+
     from tqdm import tqdm
     import integrate as ig
 
