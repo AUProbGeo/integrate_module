@@ -20,9 +20,7 @@ except:
     pass
 # %%
 import integrate as ig
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-hardcopy = True 
+hardcopy = True
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -87,7 +85,7 @@ print('%s is used to hold prior realizations' % (f_prior_h5))
 # %%
 # Compute prior data in linear space
 f_prior_data_h5 = ig.copy_hdf5_file(f_prior_h5,'PRIOR_DATA_linear.h5')
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_data_h5, file_gex, doMakePriorCopy=False, parallel=parallel)
+f_prior_data_h5 = ig.prior_data_gaaem(f_prior_data_h5, file_gex, doMakePriorCopy=False)
 # Compute prior data in log space
 f_prior_data_log_h5 = ig.copy_hdf5_file(f_prior_h5,'PRIOR_DATA_log.h5')
 f_prior_data_log_h5 = ig.prior_data_gaaem(f_prior_data_log_h5, file_gex, doMakePriorCopy=False, is_log=True)

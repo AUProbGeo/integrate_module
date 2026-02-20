@@ -19,8 +19,6 @@ except:
     pass
 
 import integrate as ig
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 
 import numpy as np
 import os
@@ -245,8 +243,7 @@ clim   = [min(rho)*0.8, max(rho)*1.25]
 t_elapsed = []
 for f_data_h5 in f_data_h5_arr: 
     t0 = time.time()
-    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5, 
-                                       parallel=parallel, 
+    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5,
                                        Ncpu = 8,
                                        #use_N_best=500
                                        )
@@ -347,11 +344,10 @@ else:
 f_post_log_h5_arr = []
 for i in range(len(f_data_arr)):
     f_data_h5 = f_data_arr[i]
-    f_post_h5 = ig.integrate_rejection(f_prior_log_data_h5, f_data_h5, 
-                                       parallel=parallel, 
+    f_post_h5 = ig.integrate_rejection(f_prior_log_data_h5, f_data_h5,
                                        Ncpu=8,
                                        nr=1000,
-                                       updatePostStat = True,                                       
+                                       updatePostStat = True,
                                     )
     f_post_log_h5_arr.append(f_post_h5)
 

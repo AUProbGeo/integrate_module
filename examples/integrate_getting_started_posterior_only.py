@@ -22,9 +22,7 @@ except:
     pass
 # %%
 import integrate as ig
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-hardcopy = True 
+hardcopy = True
 import matplotlib.pyplot as plt
 
 # %% [markdown]

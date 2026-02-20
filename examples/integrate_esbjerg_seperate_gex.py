@@ -23,8 +23,6 @@ except:
 import integrate as ig
 import numpy as np
 import matplotlib.pyplot as plt
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 hardcopy = True
 
 # %%
@@ -70,18 +68,18 @@ for i in range(nsubsets):
     
     # Compute prior DATA - 
     # Even though the prior model parameters are the same, the prior data diffeer, due to using a different GEX file.
-    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, parallel=parallel, showInfo=0)
+    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, showInfo=0)
     if plFigs:
         ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,alpha=1, ylim=[1e-13,1e-5], hardcopy=hardcopy, showInfo=showInfo)
 
     # Perform inversion
     N_use = N
-    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
-                                   f_data_h5, 
-                                   N_use = N_use, 
-                                   showInfo=showInfo, 
+    f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+                                   f_data_h5,
+                                   N_use = N_use,
+                                   showInfo=showInfo,
                                    Ncpu = 10,
-                                   parallel=parallel, updatePostStat=False
+                                   updatePostStat=False
                                       )
 
     f_post_h5_files.append(f_post_h5)

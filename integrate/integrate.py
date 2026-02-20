@@ -79,13 +79,10 @@ def use_parallel(**kwargs):
     """
     Determine if parallel processing can be used based on the environment.
 
-    This function checks if the code is running in a Jupyter notebook, on a
-    POSIX system (Linux), or on Windows. Parallel processing is safe in all
-    these environments. macOS is excluded due to fork-related instability.
-
-    The module handles Windows multiprocessing transparently using an explicit
-    spawn context, so no `if __name__ == "__main__":` guard is required in
-    user scripts.
+    Parallel processing is supported on all platforms. The module handles
+    platform differences internally: Linux uses fork for performance, while
+    Windows and macOS use spawn for correctness. No `if __name__ == "__main__":`
+    guard is required in user scripts on any platform.
 
     Parameters
     ----------
@@ -103,31 +100,22 @@ def use_parallel(**kwargs):
     import os
     showInfo = kwargs.get('showInfo', 0)
 
-    parallel = True
     if is_notebook():
-        # Then it is always OK to use parallel processing
         if showInfo>0:
-            print('Notebook detected. Parallel processing is OK')
-        parallel = True
-
+            print('Notebook detected. Parallel processing is OK.')
     else:
         if os.name == 'posix':
             if os.uname().sysname == 'Darwin':
                 if showInfo>0:
-                    # macOS: fork can cause instability with shared memory
-                    print('macOS detected. Parallel processing is not recommended.')
-                parallel = False
+                    print('macOS detected. Parallel processing is OK (using spawn).')
             else:
                 if showInfo>0:
-                    print('POSIX system detected. Parallel processing is OK.')
-                parallel = True
+                    print('Linux/POSIX detected. Parallel processing is OK (using fork).')
         else:
-            # Windows: handled transparently via explicit spawn context in the module
             if showInfo>0:
-                print('Windows detected. Parallel processing is OK.')
-            parallel = True
+                print('Windows detected. Parallel processing is OK (using spawn).')
 
-    return parallel
+    return True
 
     
 

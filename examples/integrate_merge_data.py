@@ -39,8 +39,6 @@ except:
 import integrate as ig
 import numpy as np
 import matplotlib.pyplot as plt
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 
 
 # %% [markdown]
@@ -108,14 +106,13 @@ for f_data_h5 in f_data_all:
 
 
     file_gex = ig.get_gex_file_from_data(f_data_h5)
-    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, parallel=parallel, showInfo=0)
+    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, showInfo=0)
     #f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, f_data_h5, parallel=parallel, showInfo=0)
     f_prior_data_all.append(f_prior_data_h5)
 
-    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
-                                    f_data_h5, 
-                                    showInfo=0, 
-                                    parallel=parallel)
+    f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+                                    f_data_h5,
+                                    showInfo=0)
                                     #updatePostStat=False)
     f_post_all.append(f_post_h5)
     
@@ -146,12 +143,11 @@ f_data_all_h5 = ig.merge_data(f_data1+f_data2+f_data3, f_gex1, f_data_merged_h5=
 
 # %%
 file_gex = ig.get_gex_file_from_data(f_data_all_h5)
-f_prior_data_all_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, parallel=parallel, showInfo=0)
+f_prior_data_all_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, showInfo=0)
 
-f_post_all_h5 = ig.integrate_rejection(f_prior_data_all_h5, 
-                                f_data_all_h5, 
-                                showInfo=0, 
-                                parallel=parallel,
+f_post_all_h5 = ig.integrate_rejection(f_prior_data_all_h5,
+                                f_data_all_h5,
+                                showInfo=0,
                                 updatePostStat=True)
 
 # %%

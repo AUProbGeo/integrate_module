@@ -12,24 +12,8 @@
 # 3. Plot and analyze the results
 
 # %%
-try:
-    # Check if the code is running in an IPython kernel (which includes Jupyter notebooks)
-    get_ipython()
-    # If the above line doesn't raise an error, it means we are in a Jupyter environment
-    # Execute the magic commands using IPython's run_line_magic function
-    get_ipython().run_line_magic('load_ext', 'autoreload')
-    get_ipython().run_line_magic('autoreload', '2')
-except:
-    # If get_ipython() raises an error, we are not in a Jupyter environment
-    # # # # # # # #%load_ext autoreload
-    # # # # # # # #%autoreload 2
-    pass
-
-# %%
 import integrate as ig
-# Check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-hardcopy = True 
+hardcopy = True
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -154,12 +138,11 @@ if useExistingData:
     # if exist f_post_data_h5 then used it, otherwise create it
     import os 
     if not os.path.exists(f_prior_data_h5):
-        f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=True, f_prior_data_h5=f_prior_data_h5, parallel=parallel)
+        f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=True, f_prior_data_h5=f_prior_data_h5)
     else:
         print('Using existing prior data file: %s' % f_prior_data_h5)
 
-#f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False, parallel=parallel)
-#f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, parallel=False)
+#f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 print('Updated %s to hold prior data (forward-modeled responses)' % (f_prior_data_h5))
 
@@ -189,14 +172,13 @@ ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,hardcopy=hardcopy)
 N_use = N   # Number of prior samples to use (use all available)
 T_base = 1  # Base annealing temperature for rejection sampling
 autoT = 1   # Automatically estimate optimal annealing temperature
-f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
-                                   f_data_h5, 
-                                   f_post_h5 = 'POST.h5', 
-                                   N_use = N_use, 
+f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+                                   f_data_h5,
+                                   f_post_h5 = 'POST.h5',
+                                   N_use = N_use,
                                    autoT = autoT,
-                                   T_base = T_base,                            
-                                   showInfo=0, 
-                                   parallel=parallel,
+                                   T_base = T_base,
+                                   showInfo=0,
                                    ip_range=i_use)
 
 # %%

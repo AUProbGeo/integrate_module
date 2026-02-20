@@ -35,9 +35,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-# Check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-
 # %% [markdown]
 # ## Quick Timing Test
 #

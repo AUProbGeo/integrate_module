@@ -27,9 +27,7 @@ except:
 
 # %%
 import integrate as ig
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-hardcopy = True 
+hardcopy = True
 import matplotlib.pyplot as plt
 
 # %% [markdown]
@@ -103,14 +101,13 @@ N_use = 2000000 # Max lookup table size
 N_use = 100000
 T_base = 1 # The base annealing temperature. 
 autoT = 1  # Automatically set the annealing temperature
-f_post_h5 = ig.integrate_rejection(f_prior_h5, 
-                                   f_data_h5, 
-                                   f_post_h5 = 'POST.h5', 
-                                   N_use = N_use, 
+f_post_h5 = ig.integrate_rejection(f_prior_h5,
+                                   f_data_h5,
+                                   f_post_h5 = 'POST.h5',
+                                   N_use = N_use,
                                    autoT = autoT,
-                                   T_base = T_base,                            
-                                   showInfo=1, 
-                                   parallel=parallel)
+                                   T_base = T_base,
+                                   showInfo=1)
 
 # %%
 # This is typically done after the inversion

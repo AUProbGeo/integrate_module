@@ -840,9 +840,9 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     shared_memory_refs, shm_objects = create_shared_memory(D)
     #reconstructed_arrays = reconstruct_shared_arrays(shared_memory_refs)
 
-    # Use explicit spawn context on Windows (no __main__ guard required in user scripts)
-    # and fork on POSIX for performance
-    if os.name == 'nt':
+    # Use spawn on Windows and macOS (required for correctness);
+    # fork on Linux for performance
+    if os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin'):
         ctx = multiprocessing.get_context('spawn')
     else:
         ctx = multiprocessing.get_context('fork')

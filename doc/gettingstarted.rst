@@ -86,10 +86,9 @@ Then the prior data, corresponding to the prior model parameters, are computed, 
 :: 
 
     # To update the PRIOR.h5
-    parallel = ig.use_parallel(showInfo=1)
-    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False, parallel=parallel)
+    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
     # To create a COPY of PRIOR.h5 and update that
-    # f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, parallel=parallel)
+    # f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex)
 
     print('Updated %s to hold prior DATA' % (f_prior_data_h5))
 
@@ -116,14 +115,13 @@ The posterior distribution is sampled using the extended rejection sampler.
     N_use = N
     T_base = 1  # The base annealing temperature. 
     autoT = 1   # Automatically set the annealing temperature
-    f_post_h5 = ig.integrate_rejection(f_prior_h5, 
-                                       f_data_h5, 
-                                       f_post_h5='POST.h5', 
-                                       N_use=N_use, 
+    f_post_h5 = ig.integrate_rejection(f_prior_h5,
+                                       f_data_h5,
+                                       f_post_h5='POST.h5',
+                                       N_use=N_use,
                                        autoT=autoT,
-                                       T_base=T_base,                            
-                                       showInfo=1, 
-                                       parallel=parallel)
+                                       T_base=T_base,
+                                       showInfo=1)
 
 
 3. Plot some statistics from the posterior distribution

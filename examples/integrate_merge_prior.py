@@ -31,8 +31,6 @@ import matplotlib.pyplot as plt
 import h5py
 import os
 
-# Check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 hardcopy = True
 
 print("="*60)
@@ -139,7 +137,7 @@ f_prior_data_files = []
 for i in range(len(f_prior_files)):
     f_prior = f_prior_files[i]
     print(f_prior)
-    f_prior_data = ig.prior_data_gaaem(f_prior, file_gex, parallel=parallel, showInfo=0)
+    f_prior_data = ig.prior_data_gaaem(f_prior, file_gex, showInfo=0)
     f_prior_data_files.append(f_prior_data)
 
 
@@ -191,7 +189,6 @@ f_post_h5 = ig.integrate_rejection(
     f_data_h5,
     f_post_h5='POST_merged_4models.h5',
     autoT=True,        # Use temperature annealing
-    parallel=parallel, # Use parallel processing if available
     showInfo=1
 )
 

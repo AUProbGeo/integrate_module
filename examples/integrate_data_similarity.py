@@ -21,8 +21,6 @@ except:
 import numpy as np
 import integrate as ig
 import matplotlib.pyplot as plt
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 
 # %%
 case = 'DAUGAARD'

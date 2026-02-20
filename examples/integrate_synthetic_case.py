@@ -18,8 +18,6 @@ except:
     pass
 
 import integrate as ig
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 
 import numpy as np
 import os
@@ -116,8 +114,7 @@ ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,alpha=1, ylim=[1e-13,1e-5],
 # ## Perform inversion
 
 # %%
-f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5, 
-                                    parallel=parallel, 
+f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5,
                                     Ncpu=8,
                                     use_N_best=0
                                     )

@@ -28,8 +28,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-# Check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 hardcopy = True
 
 print("="*60)

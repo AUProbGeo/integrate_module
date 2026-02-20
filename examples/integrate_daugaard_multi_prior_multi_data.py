@@ -25,10 +25,6 @@ import matplotlib.pyplot as plt
 import h5py
 hardcopy=True
 
-import integrate as ig
-# check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-
 # %% [markdown]
 # ## Download the data DAUGAARD data including non-trivial prior data
 
@@ -168,9 +164,8 @@ for i in range(len(id_use_arr)):
 
     id_use = id_use_arr[i]
     updatePostStat =True
-    f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5, 
-                                    parallel=parallel, 
-                                    updatePostStat=updatePostStat, 
+    f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5,
+                                    updatePostStat=updatePostStat,
                                     showInfo=0,
                                     Ncpu=8,
                                     nr=1000,

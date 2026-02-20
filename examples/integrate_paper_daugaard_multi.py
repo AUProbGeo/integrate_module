@@ -19,8 +19,6 @@ except:
     pass
 
 import integrate as ig
-# Check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
 import numpy as np
 import os
 import matplotlib.pyplot as plt
