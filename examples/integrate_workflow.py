@@ -48,6 +48,10 @@ file_gex= ig.get_gex_file_from_data(f_data_h5)
 print("Using data file: %s" % f_data_h5)
 print("Using GEX file: %s" % file_gex)
 
+f_data_old_h5 = f_data_h5
+f_data_h5 = f_data_h5.replace('.h5', '_WF.h5')
+ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
+
 
 
 # %% [markdown]
@@ -219,11 +223,6 @@ ig.plot_boreholes(BHOLES, f_prior_h5)
 
 
 
-
-
-
-
-
 # %% [markdown]
 # ## COMPUTE PRIOR DATA !!
 
@@ -232,20 +231,156 @@ ig.plot_boreholes(BHOLES, f_prior_h5)
 f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 
-# %% COMPUTE PRIOR BOREHOEL DATA and OBSERVED DATA
+# %% COMPUTE PRIOR BOREHOLE DATA and OBSERVED DATA
 #
-# Select how to extrapolate the borehoole observations from the point of obsevation to all posiutions in the grid
+# For each borehole BH in BHOLES:
+#   1. Compute prior borehole data (mode class per interval per realization)
+#      and save to f_prior_h5  →  returns P_obs and id_prior
+#   2. Extrapolate point observations across the survey grid with
+#      distance-based weighting  →  d_obs, i_use
+#   3. Save the observed borehole data to f_data_h5  →  id_out
+
+im_prior = 2       # lithology model index (M2)
+r_data   = 4       # tTEMN data based radius (db/dT) — If this is very high it will have no effect
+r_dis    = 300     # fade-out radius (m) — weight approaches zero at this distance
+
+# Compute and save prior + observed data for all boreholes in one step per borehole
+id_borehole_list = []
+for BH in BHOLES:
+    id_prior, id_out = ig.save_borehole_data(
+        f_prior_h5, f_data_h5, BH,
+        im_prior=im_prior, r_data=r_data, r_dis=r_dis,
+        doPlot=True,
+        showInfo=1)
+    id_borehole_list.append(id_out)
+
+# %% [markdown]
+# ### Select a profile 
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+
+# find the index of the [X,Y] points closts to the two boreholes
+i_bh = []
+for i, BH in enumerate(BHOLES):
+    d = np.sqrt((X-BH['X'])**2 + (Y-BH['Y'])**2)
+    i_closest = np.argmin(d)
+    print("Closest point to %s is at index %d with distance %.1f m" % (BH['name'], i_closest, d[i_closest]))
+    i_bh.append(i_closest)  
+    
+
+# Find points within buffer distance
+Xl = np.array([BHOLES[0]['X']-100, BHOLES[0]['X'], BHOLES[1]['X'], BHOLES[1]['X']+1500])
+Yl = np.array([BHOLES[0]['Y'], BHOLES[0]['Y'], BHOLES[1]['Y'], BHOLES[1]['Y']-150])
+
+indices, distances, segment_ids = ig.find_points_along_line_segments(
+    X, Y, Xl, Yl, tolerance=buffer
+)
+id_line = indices
+
+plt.figure(figsize=(10, 6))
+plt.scatter(X, Y, c=ELEVATION, s=1,label='X')
+plt.plot(X[id_line],Y[id_line], 'r.', markersize=8, label='Profile', zorder=2, linewidth=5)
+for i in range(len(i_bh)):
+    plt.plot(X[i_bh[i]], Y[i_bh[i]], 'k*', markersize=10, label='BH%d' % (i+1), zorder=3)
+plt.grid()
+plt.colorbar(label='Number of non-Nan data points')
+plt.xlabel('X (m)')
+plt.ylabel('Y (m)')
+plt.title('Survey Points Colored by Number of Non-NaN Data Points')
+plt.axis('equal')
+plt.legend()
+if hardcopy:
+    plt.savefig('DAUGAARD_survey_points_nonnan.png', dpi=300)
+plt.show()
+
+i1=np.min(id_line)
+i2=np.max(id_line)+1
 
 
 # %% [markdown]
 # ### INVERSION
+# The data is now ready for inversion with the rejection sampler.
+#
+# On total we have 3 data types (one tTEM and two WellLog). They can be all jointly inverted (the default) or one can select which data types to ínver using `id_use`
+#
+#     id_use = [1] # tTEM 
+#     id_use = [2] # Well 1
+#     id_use = [3] # Well 2
+#     id_use = [2,3] # Wells 1,2
+#     id_use = [1,2,3] # tTEM, Wells 1,2 (the default if id_use is not set)
+#
+
+# %%
+# This prt of the can be rerun using different selection of data types without rerunning the abobe parts
+nr=1000
+id_use_arr = []
+#id_use_arr.append([1]) # tTEM 
+#id_use_arr.append([2]) # Well 1
+#id_use_arr.append([3]) # Well 2
+id_use_arr.append([2,3]) # Well 1,2
+id_use_arr.append([1,2,3]) # tTEM, Well 1,2
+
+N_use = N
+
+for id_use in id_use_arr:
+    # get string from id_use
+    fileparts = os.path.splitext(f_data_h5)
+    id_use_str = '_'.join(map(str, id_use))
+    f_post_h5 = 'post_%s_id%s.h5' % (fileparts[0], id_use_str)
+    f_post_h5 = ig.integrate_rejection(f_prior_h5, 
+                                    f_data_h5, 
+                                    f_post_h5, 
+                                    showInfo=1, 
+                                    N_use = N_use,
+                                    id_use = id_use,
+                                    nr=nr,
+                                    updatePostStat=True)
 
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
-
-
+ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
 
 # %% [markdown]
 # ### QUERY POSTERIOR MODEL REALIZATIONS
+# QUERY : Probability that the cumulative thickness of lithology class 2
+# within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
+# cannot be thicker than 3m.
 
+# %% 
+doLoadQuery = False
+if doLoadQuery:
+    query = ig.load_query('query_ex1.json')
+else:
+    query = {
+        "constraints": [
+            {
+                "im": 2,
+                "classes": [2, 5],
+                "thickness_mode": "cumulative",
+                "thickness_comparison": ">",
+                "thickness_threshold": 20.0,
+                "depth_min": 0.0,
+                "depth_max": 30.0,
+                "negate": False
+            },
+            {
+                "im": 2,
+                "classes": [1, 3, 4, 6, 7, 8],  # All classes except sand (2) and gravel (5)
+                "thickness_mode": "first_occurrence",
+                "thickness_comparison": "<",
+                "thickness_threshold": 3.0,
+                "depth_min": 0.0,
+                "depth_max": 30.0,
+                "negate": False
+            }
+        ]
+    }
+
+    ig.save_query(query, 'query_daugaard.json')
+
+P, meta = ig.query(f_post_h5, query)
+
+#%%  Plot the predicted probability map, and the the outcome at the borehole locations (which should be close to 1 since the query is based on the borehole data)
+ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5)
+ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5)

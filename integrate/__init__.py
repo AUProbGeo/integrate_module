@@ -111,6 +111,10 @@ from integrate.integrate_borehole import rescale_P_obs_temperature
 from integrate.integrate_borehole import rescale_P_obs_temperature as Pobs_rescale_temperature
 from integrate.integrate_borehole import Pobs_to_datagrid
 from integrate.integrate_borehole import get_weight_from_position
+from integrate.integrate_borehole import prior_data_borehole
+from integrate.integrate_borehole import prior_data_borehole_class_mode
+from integrate.integrate_borehole import prior_data_borehole_class_layer
+from integrate.integrate_borehole import save_borehole_data
 
 # Import query functions
 from integrate.integrate_query import query

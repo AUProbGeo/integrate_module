@@ -805,3 +805,258 @@ def get_weight_from_position(f_data_h5,x_well=0,y_well=0, i_ref=-1, r_dis = 400,
         plt.savefig(plFile, dpi=300)
 
     return w_combined, w_dis, w_data, i_ref
+
+
+def prior_data_borehole_class_mode(f_prior_h5, im_prior, BH, parallel=False, **kwargs):
+    """
+    Compute mode-class prior data for a borehole and save to prior HDF5 file.
+
+    Reads M{im_prior} from f_prior_h5, extracts the most frequent class in
+    each observed depth interval for every prior realization (via
+    welllog_compute_P_obs_class_mode), then stores the result as a new dataset
+    in f_prior_h5.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+    im_prior : int
+        Index of the discrete model parameter (e.g. 2 for /M2 lithology).
+    BH : dict
+        Borehole dictionary with keys depth_top, depth_bottom, class_obs,
+        class_prob, X, Y, name, method.
+    parallel : bool, optional
+        Enable parallel mode computation. Default is False.
+    **kwargs
+        showInfo : int, optional
+            Verbosity level. Default is 1.
+
+    Returns
+    -------
+    P_obs : ndarray
+        Probability matrix, shape (nclass, n_intervals).
+    id_prior : int
+        Dataset index of the new /D{id_prior} entry added to f_prior_h5.
+    """
+    import h5py
+    import integrate as ig
+
+    showInfo = kwargs.get('showInfo', 1)
+
+    with h5py.File(f_prior_h5, 'r') as f:
+        z           = f['M%d' % im_prior].attrs['x']
+        class_id    = f['M%d' % im_prior].attrs['class_id']
+        M_lithology = f['M%d' % im_prior][:]
+
+    P_obs, class_mode = welllog_compute_P_obs_class_mode(
+        M_lithology, z=z, class_id=class_id, W=BH,
+        parallel=parallel, showInfo=showInfo)
+
+    id_prior = ig.save_prior_data(f_prior_h5, class_mode, showInfo=showInfo)
+
+    return P_obs, id_prior
+
+
+def prior_data_borehole_class_layer(f_prior_h5, im_prior, BH, **kwargs):
+    """
+    Compute layer-probability prior data for a borehole using identity mapping.
+
+    Uses compute_P_obs_discrete (no prior ensemble needed) and stores an
+    identity prior data reference in f_prior_h5 via prior_data_identity.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+    im_prior : int
+        Index of the discrete model parameter (e.g. 2 for /M2 lithology).
+    BH : dict
+        Borehole dictionary with keys depth_top, depth_bottom, class_obs,
+        class_prob, X, Y, name, method.
+    **kwargs
+        showInfo : int, optional
+            Verbosity level. Default is 1.
+
+    Returns
+    -------
+    P_obs : ndarray
+        Probability matrix, shape (nclass, n_intervals).
+    id_prior : int
+        Dataset index of the identity /D{id_prior} entry in f_prior_h5.
+    """
+    import h5py
+    import integrate as ig
+
+    showInfo = kwargs.get('showInfo', 1)
+
+    if BH is None:
+        print('prior_data_borehole_class_layer: BH is None, returning None')
+        return None, None
+
+    with h5py.File(f_prior_h5, 'r') as f:
+        z        = f['M%d' % im_prior].attrs['x']
+        class_id = f['M%d' % im_prior].attrs['class_id']
+
+    P_obs = compute_P_obs_discrete(z=z, class_id=class_id, W=BH)
+
+    f_prior_h5, id_prior = ig.prior_data_identity(
+        f_prior_h5, im=im_prior, doMakePriorCopy=False, showInfo=showInfo)
+
+    return P_obs, id_prior
+
+
+def prior_data_borehole(f_prior_h5, im_prior, BH, parallel=False, **kwargs):
+    """
+    Compute prior data for a single borehole and save to the prior HDF5 file.
+
+    Dispatches to the appropriate implementation based on BH['method']:
+
+    - ``'mode_probability'``  → :func:`prior_data_borehole_class_mode`
+      (recommended — fast and robust)
+    - ``'layer_probability'`` → :func:`prior_data_borehole_class_layer`
+    - ``'class_exact'`` / ``'layer_probability_independent'`` → NotImplementedError
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+    im_prior : int
+        Index of the discrete model parameter (e.g. 2 for /M2 lithology).
+    BH : dict
+        Borehole dictionary. Key ``'method'`` selects the integration approach
+        and defaults to ``'mode_probability'`` if absent.
+    parallel : bool, optional
+        Enable parallel mode computation for ``'mode_probability'``. Default False.
+    **kwargs
+        showInfo : int, optional
+            Verbosity level. Default is 1.
+
+    Returns
+    -------
+    P_obs : ndarray or None
+        Probability matrix, shape (nclass, n_intervals).
+    id_prior : int or None
+        Dataset index of the new /D entry added to f_prior_h5.
+
+    Examples
+    --------
+    >>> P_obs, id_prior = ig.prior_data_borehole(f_prior_h5, im_prior=2, BH=BH, parallel=True)
+    >>> # Then extrapolate to survey grid:
+    >>> d_obs, i_use, T_use = ig.Pobs_to_datagrid(P_obs, BH['X'], BH['Y'], f_data_h5)
+    >>> id_out, _ = ig.save_data_multinomial(d_obs, i_use=i_use, id_prior=id_prior, f_data_h5=f_data_h5)
+    """
+    showInfo = kwargs.get('showInfo', 1)
+
+    if BH is None:
+        return None, None
+
+    method = BH.get('method', 'mode_probability')
+
+    if showInfo > 0:
+        print('prior_data_borehole: borehole=%s  method=%s' % (BH.get('name', '?'), method))
+
+    if method == 'mode_probability':
+        return prior_data_borehole_class_mode(
+            f_prior_h5, im_prior, BH, parallel=parallel, **kwargs)
+    elif method == 'layer_probability':
+        return prior_data_borehole_class_layer(
+            f_prior_h5, im_prior, BH, **kwargs)
+    elif method in ('class_exact', 'layer_probability_independent'):
+        raise NotImplementedError("Method '%s' not implemented yet" % method)
+    else:
+        raise ValueError("Unknown method: %s" % method)
+
+
+def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
+    """
+    Compute and save prior and observed data for a single borehole in one call.
+
+    Combines the three-step borehole ingestion workflow into a single function:
+
+    1. Compute mode-class prior data and save to f_prior_h5
+       (via :func:`prior_data_borehole`)
+    2. Extrapolate point observations to the survey grid with
+       distance-based weighting (via :func:`Pobs_to_datagrid`)
+    3. Save the gridded observations to f_data_h5
+       (via ``ig.save_data_multinomial``)
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+    f_data_h5 : str
+        Path to the observed-data HDF5 file.
+    BH : dict
+        Borehole dictionary with keys depth_top, depth_bottom, class_obs,
+        class_prob, X, Y, name, method.
+    **kwargs
+        im_prior : int, optional
+            Index of the discrete model parameter in f_prior_h5 (e.g. 2 for /M2).
+            Default is 2.
+        parallel : bool, optional
+            Enable parallel mode computation. Default is False.
+        r_data : float, optional
+            Inner radius (m) within which observations have full strength.
+            Default is 2.
+        r_dis : float, optional
+            Outer radius (m) at which observations fade to zero influence.
+            Default is 300.
+        doPlot : bool, optional
+            Plot distance-weight maps. Default is False.
+        showInfo : int, optional
+            Verbosity level (0 = silent, 1 = one summary line per borehole).
+            Default is 1.
+
+    Returns
+    -------
+    id_prior : int
+        Dataset index of the new /D entry added to f_prior_h5.
+    id_out : int
+        Dataset index of the new /D entry added to f_data_h5.
+
+    Examples
+    --------
+    >>> # Single borehole
+    >>> id_prior, id_data = ig.save_borehole_data(f_prior_h5, f_data_h5, BH)
+
+    >>> # All boreholes — collect data IDs for joint inversion
+    >>> id_borehole_list = []
+    >>> for BH in BHOLES:
+    ...     _, id_out = ig.save_borehole_data(f_prior_h5, f_data_h5, BH,
+    ...                                       r_data=2, r_dis=300, parallel=True)
+    ...     id_borehole_list.append(id_out)
+    >>> f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5,
+    ...                                    id_use=[1] + id_borehole_list)
+    """
+    import integrate as ig
+
+    im_prior = kwargs.get('im_prior', 2)
+    parallel = kwargs.get('parallel', False)
+    r_data   = kwargs.get('r_data', 2)
+    r_dis    = kwargs.get('r_dis', 300)
+    doPlot   = kwargs.get('doPlot', False)
+    showInfo = kwargs.get('showInfo', 1)
+
+    # Step 1: compute mode-class prior data and save to f_prior_h5
+    P_obs, id_prior = prior_data_borehole(
+        f_prior_h5, im_prior, BH,
+        parallel=parallel, showInfo=showInfo)
+
+    # Step 2: extrapolate point observations to the survey grid
+    d_obs, i_use, T_use = Pobs_to_datagrid(
+        P_obs, BH['X'], BH['Y'], f_data_h5,
+        r_data=r_data, r_dis=r_dis, doPlot=doPlot)
+
+    # Step 3: save gridded observations to f_data_h5
+    id_out, _ = ig.save_data_multinomial(
+        D_obs=d_obs,
+        i_use=i_use,
+        id_prior=id_prior,
+        f_data_h5=f_data_h5,
+        showInfo=showInfo)
+
+    if showInfo > 0:
+        print('save_borehole_data: %s  →  prior D%d, data D%d'
+              % (BH.get('name', '?'), id_prior, id_out))
+
+    return id_prior, id_out
