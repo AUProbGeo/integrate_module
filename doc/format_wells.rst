@@ -37,13 +37,14 @@ Wells are represented as Python dictionaries containing lithology observations a
 .. code-block:: python
 
     W = {
-        'depth_top': [0, 8, 12, 16, 34],          # Top depths (m)
-        'depth_bottom': [8, 12, 16, 28, 36],      # Bottom depths (m)
-        'lithology_obs': [1, 2, 1, 5, 4],         # Lithology class IDs
-        'lithology_prob': [0.9, 0.9, 0.9, 0.9, 0.9],  # Confidence (0-1)
-        'X': 498832.5,                             # UTM Easting
-        'Y': 6250843.1,                            # UTM Northing
-        'name': '65.795'                           # Well identifier
+        'depth_top':    [0, 8, 12, 16, 34],           # Top depths (m)
+        'depth_bottom': [8, 12, 16, 28, 36],           # Bottom depths (m)
+        'class_obs':    [1, 2, 1, 5, 4],               # Lithology class IDs
+        'class_prob':   [0.9, 0.9, 0.9, 0.9, 0.9],    # Confidence (0-1)
+        'X': 498832.5,                                  # UTM Easting
+        'Y': 6250843.1,                                 # UTM Northing
+        'name': '65.795',                               # Well identifier
+        'method': 'mode_probability'                    # Integration method
     }
 
 **Field Descriptions:**
@@ -54,10 +55,10 @@ Wells are represented as Python dictionaries containing lithology observations a
 ``depth_bottom``
     Array of bottom depths for each lithology interval (meters below surface). Must match length of ``depth_top``.
 
-``lithology_obs``
+``class_obs``
     Array of observed lithology class IDs corresponding to each depth interval. Values must match ``class_id`` defined in prior model.
 
-``lithology_prob``
+``class_prob``
     Confidence level (0-1) for each observation. Can be:
 
     * Scalar: applies same confidence to all intervals
@@ -69,6 +70,98 @@ Wells are represented as Python dictionaries containing lithology observations a
 
 ``name``
     Optional string identifier for the well.
+
+``method``
+    Integration method. Options: ``'mode_probability'``, ``'layer_probability'``,
+    ``'class_exact'``, ``'layer_probability_independent'``. Default is ``'mode_probability'``.
+
+JSON File Format
+~~~~~~~~~~~~~~~~
+
+Borehole dictionaries can be saved to and loaded from human-readable JSON files
+using ``ig.write_borehole()`` and ``ig.read_borehole()``. A JSON file may contain
+either a **single borehole** (JSON object) or **many boreholes** (JSON array).
+
+Single borehole file (``borehole_65.795.json``):
+
+.. code-block:: json
+
+    {
+      "name": "65.795",
+      "X": 498832.5,
+      "Y": 6250843.1,
+      "depth_top":    [0, 8, 12, 16, 34],
+      "depth_bottom": [8, 12, 16, 28, 36],
+      "class_obs":    [1, 2, 1, 5, 4],
+      "class_prob":   [0.9, 0.9, 0.9, 0.9, 0.9],
+      "method": "mode_probability"
+    }
+
+Multi-borehole file (``all_boreholes.json``):
+
+.. code-block:: json
+
+    [
+      {
+        "name": "65.795",
+        "X": 498832.5,
+        "Y": 6250843.1,
+        "depth_top":    [0, 8, 12, 16, 34],
+        "depth_bottom": [8, 12, 16, 28, 36],
+        "class_obs":    [1, 2, 1, 5, 4],
+        "class_prob":   [0.9, 0.9, 0.9, 0.9, 0.9],
+        "method": "mode_probability"
+      },
+      {
+        "name": "65.732",
+        "X": 499100.0,
+        "Y": 6251200.0,
+        "depth_top":    [0, 5, 15, 25],
+        "depth_bottom": [5, 15, 25, 40],
+        "class_obs":    [2, 1, 3, 2],
+        "class_prob":   [0.8, 0.8, 0.8, 0.8],
+        "method": "mode_probability"
+      }
+    ]
+
+``ig.read_borehole()`` automatically detects the format: it returns a single dict
+for a single-borehole file, or a list of dicts for a multi-borehole file.
+
+numpy arrays stored in the dict are automatically converted to plain Python lists
+when writing, so the file is fully human-readable and editable in any text editor.
+
+Writing and reading boreholes:
+
+.. code-block:: python
+
+    import integrate as ig
+
+    # Write a single borehole
+    ig.write_borehole(W, 'borehole_65.795.json', showInfo=1)
+
+    # Write a list of boreholes (all in one file)
+    ig.write_borehole([W1, W2, W3], 'all_boreholes.json', showInfo=1)
+
+    # Read back a single borehole
+    W = ig.read_borehole('borehole_65.795.json', showInfo=1)
+
+    # Read back all boreholes
+    WELLS = ig.read_borehole('all_boreholes.json', showInfo=1)
+    for W in WELLS:
+        print(W['name'], W['X'], W['Y'])
+
+Visualising boreholes:
+
+.. code-block:: python
+
+    # Plot lithology sticks (one subplot per borehole)
+    ig.plot_boreholes(WELLS)
+
+    # With class names and colours from the prior HDF5 file
+    ig.plot_boreholes(WELLS, f_prior_h5='PRIOR.h5')
+
+    # Load directly from a JSON file
+    ig.plot_boreholes('all_boreholes.json', f_prior_h5='PRIOR.h5')
 
 HDF5 File Structure
 -------------------
@@ -149,11 +242,12 @@ Below is a complete workflow for integrating well log data with electromagnetic 
     W1 = {
         'depth_top': [0, 8, 12, 16, 34],
         'depth_bottom': [8, 12, 16, 28, 36],
-        'lithology_obs': [1, 2, 1, 5, 4],
-        'lithology_prob': 0.9,
+        'class_obs': [1, 2, 1, 5, 4],
+        'class_prob': 0.9,
         'X': 498832.5,
         'Y': 6250843.1,
-        'name': 'Well_1'
+        'name': 'Well_1',
+        'method': 'mode_probability'
     }
 
     # 2. Load prior lithology models
@@ -170,10 +264,10 @@ Below is a complete workflow for integrating well log data with electromagnetic 
         M_lithology,
         depth_top=W1['depth_top'],
         depth_bottom=W1['depth_bottom'],
-        lithology_obs=W1['lithology_obs'],
+        class_obs=W1['class_obs'],
         z=z,
         class_id=class_id,
-        lithology_prob=W1['lithology_prob'],
+        class_prob=W1['class_prob'],
         parallel=True,
         Ncpu=-1
     )
@@ -242,10 +336,10 @@ Two approaches are available:
     P_obs = ig.compute_P_obs_discrete(
         depth_top=W['depth_top'],
         depth_bottom=W['depth_bottom'],
-        lithology_obs=W['lithology_obs'],
+        class_obs=W['class_obs'],
         z=z,
         class_id=class_id,
-        lithology_prob=W['lithology_prob']
+        class_prob=W['class_prob']
     )
 
 This creates a probability matrix where each observed interval has high probability (e.g., 0.9) for the observed class and low probability for other classes.
@@ -258,10 +352,10 @@ This creates a probability matrix where each observed interval has high probabil
         M_lithology,
         depth_top=W['depth_top'],
         depth_bottom=W['depth_bottom'],
-        lithology_obs=W['lithology_obs'],
+        class_obs=W['class_obs'],
         z=z,
         class_id=class_id,
-        lithology_prob=W['lithology_prob'],
+        class_prob=W['class_prob'],
         parallel=True
     )
 

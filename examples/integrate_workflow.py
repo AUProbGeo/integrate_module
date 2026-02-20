@@ -233,6 +233,8 @@ f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 
 # %% COMPUTE PRIOR BOREHOEL DATA and OBSERVED DATA
+#
+# Select how to extrapolate the borehoole observations from the point of obsevation to all posiutions in the grid
 
 
 # %% [markdown]
