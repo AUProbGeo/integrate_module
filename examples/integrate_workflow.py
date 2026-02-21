@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-
 #%% SOME BASIC SETTINGS
 N = 2000000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
