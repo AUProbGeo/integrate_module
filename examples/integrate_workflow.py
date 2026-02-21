@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-# %% SOME BASIC SETTINGS
+# %%
 N = 2000000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
@@ -55,7 +55,7 @@ ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
 # simulate prior model realizations using geoprior1d # https://github.com/GEUSjesper/geoprior1d
 # We are using two prior models representing expected variability outstide and inside a buried valley system.
 
-# %% Generate N realizations of prior as defined by the XLS files
+# %%
 f_prior_h5_list = []
 for file_xlsx in f_xlsx_files:
     # get filename without extension for naming the output hdf5 file
@@ -77,7 +77,7 @@ useCorrleatedNoise = False # Whether to use correlated noise (instead of uncorre
 inflateNoise = 1 # Factor to increase noise level (std) in the data, to
 
 
-# %% Determine if the data should be hanlded in log10 space, which is often recommended for resistivity data. If True, a new hdf5 file will be created with the log-transformed data and updated standard deviations.
+# %%
 
 if useLogData:
     f_data_h5_org = f_data_h5
@@ -100,7 +100,7 @@ if useLogData:
 
 
 
-# %% Determined if the noise level in the data should be increased by a factor (inflateNoise). This can be useful for testing the sensitivity of the inversion results to noise. If inflateNoise is not equal to 1, a new hdf5 file will be created with the inflated noise level (standard deviation) and updated data values if necessary.
+# %%
 if inflateNoise != 1:
     gf=inflateNoise
     print("="*60)
@@ -124,7 +124,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 # ## the tTEM DATA
 
 
-# %% Define the well data for the Daugaard case, which can be used for validation of inversion results
+# %%
 BHOLES=[]
 P_single=0.9 # Probability assigned to the observed class in the prior model (for discrete parameters)
 
@@ -220,7 +220,7 @@ BHOLES_loaded = ig.read_borehole('daugaard_boreholes.json', showInfo=1)
 for BH in BHOLES_loaded:
     print(f"  {BH['name']:30s}  {len(BH['depth_top'])} intervals  X={BH['X']:.1f}  Y={BH['Y']:.1f}")
 
-# %% Plot boreholes as lithology sticks
+# %%
 # Plot without prior info – classes labelled by numeric ID, default colours
 ig.plot_boreholes(BHOLES)
 
@@ -233,11 +233,11 @@ ig.plot_boreholes(BHOLES, f_prior_h5)
 # ## COMPUTE PRIOR DATA !!
 
 
-# %% COMPUTE prior tTEM data
+# %%
 f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 
-# %% COMPUTE PRIOR BOREHOLE DATA and OBSERVED DATA
+# %%
 #
 # For each borehole BH in BHOLES:
 #   1. Compute prior borehole data (mode class per interval per realization)
@@ -348,26 +348,26 @@ for id_use in id_use_arr:
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
 
-# %% Profiles
+# %%
 for f_post_h5 in f_post_h5_list:
     ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
     ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
 
-# %% Median resistivity at elevation = 40m
+# %%
 for f_post_h5 in f_post_h5_list:
     ig.plot_feature_2d(f_post_h5, key='Median', im=1, elevation=40)
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     plt.legend()    
     plt.show()
 
-# %% Mode lithology at elevation = 45m
+# %%
 for f_post_h5 in f_post_h5_list:
     ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=45)
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     plt.legend()    
     plt.show()
 
-    
+
 # %% [markdown]
 # ### Posterior Probability of INSIDE vs OUTSIDE
 # QUERY : Probability that the cumulative thickness of lithology class 2
@@ -389,7 +389,7 @@ for f_post_h5 in f_post_h5_list:
 # cannot be thicker than 3m.
 
 
-# %% 
+# %%
 doLoadQuery = False
 if doLoadQuery:
     query = ig.load_query('query_ex1.json')
