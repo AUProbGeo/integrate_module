@@ -18,6 +18,7 @@ except:
     pass
 
 # %%
+import os
 import integrate as ig
 from geoprior1d import geoprior1d
 
@@ -26,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-#%% SOME BASIC SETTINGS
+# %% SOME BASIC SETTINGS
 N = 2000000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
@@ -50,11 +51,11 @@ ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
 
 
 # %% [markdown]
-# ## the PRIOR model(s) : 
+# ## the PRIOR model(s) :
 # simulate prior model realizations using geoprior1d # https://github.com/GEUSjesper/geoprior1d
 # We are using two prior models representing expected variability outstide and inside a buried valley system.
 
-# Generate N realizations of prirpo as defined  by the XLS files
+# %% Generate N realizations of prior as defined by the XLS files
 f_prior_h5_list = []
 for file_xlsx in f_xlsx_files:
     # get filename without extension for naming the output hdf5 file
@@ -69,6 +70,8 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 
 # %% [markdown]
 # ## the tTEM DATA
+
+# %%
 useLogData = False # Whether to transform data to log10 space (recommended for resistivity data)
 useCorrleatedNoise = False # Whether to use correlated noise (instead of uncorrelated) when generating the prior data. This can be more realistic for geophysical data, but it also increases the computational cost.
 inflateNoise = 1 # Factor to increase noise level (std) in the data, to
@@ -258,7 +261,9 @@ for BH in BHOLES:
     id_borehole_list.append(id_out)
 
 # %% [markdown]
-# ### Select a profile 
+# ### Select a profile
+
+# %%
 X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
 
 # find the index of the [X,Y] points closts to the two boreholes
@@ -343,7 +348,7 @@ for id_use in id_use_arr:
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
 
-# Profiles
+# %% Profiles
 for f_post_h5 in f_post_h5_list:
     ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
     ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
@@ -364,12 +369,12 @@ for f_post_h5 in f_post_h5_list:
 
     
 # %% [markdown]
-# ### QPosterior Probability of INSIDE vs OUTSIDE
+# ### Posterior Probability of INSIDE vs OUTSIDE
 # QUERY : Probability that the cumulative thickness of lithology class 2
 # within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
 # cannot be thicker than 3m.
 
-# %% 
+# %%
 for f_post_h5 in f_post_h5_list:
     ig.plot_feature_2d(f_post_h5, key='Mode', im=3, iz=0, cmap='jet')
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
