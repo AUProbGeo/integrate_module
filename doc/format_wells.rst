@@ -1,49 +1,52 @@
 .. _format_wells:
 
-Well Log Data Format
+Borehole Data Format
 ====================
 
 Overview
 --------
 
-INTEGRATE supports integration of well log (borehole) data with geophysical surveys such as electromagnetic (EM) data. Well logs provide direct observations of subsurface lithology at discrete depth intervals, which can be combined with spatially extensive geophysical data to improve characterization across the entire survey area.
+INTEGRATE supports integration of borehole (well log) data with geophysical surveys such as electromagnetic (EM) data. Boreholes provide direct observations of subsurface lithology at discrete depth intervals, which can be combined with spatially extensive geophysical data to improve characterization across the entire survey area.
 
 This document describes:
 
-1. How well log data is structured and stored
-2. The workflow for incorporating wells into probabilistic inversion
+1. How borehole data is structured and stored
+2. The workflow for incorporating boreholes into probabilistic inversion
 3. Distance-based weighting for spatial extrapolation
 4. File formats and data structures
 
 Core Functionality
 ------------------
 
-Well log handling is implemented in the ``integrate_borehole`` module with the following key functions:
+Borehole handling is implemented in the ``integrate_borehole`` module with the following key functions:
 
-* ``compute_P_obs_discrete()``: Compute observation probability from discrete lithology intervals
-* ``compute_P_obs_sparse()``: Extract mode lithology from prior models and compute probabilities
+* ``prior_data_borehole()``: Compute and save prior borehole data (dispatcher — recommended entry point)
+* ``prior_data_borehole_class_mode()``: Prior data using mode class extraction from prior realizations
+* ``prior_data_borehole_class_layer()``: Prior data using direct layer-probability approach
+* ``save_borehole_data()``: **One-call wrapper** — compute and save both prior and observed data for a borehole
+* ``compute_P_obs_discrete()``: Low-level: compute observation probability from discrete lithology intervals
 * ``rescale_P_obs_temperature()``: Apply temperature annealing for distance-based weighting
 * ``Pobs_to_datagrid()``: Extrapolate point observations to survey grid with distance weighting
 * ``get_weight_from_position()``: Calculate spatial and data-similarity weights
 
-Well Data Structure
--------------------
+Borehole Data Structure
+-----------------------
 
-Well Dictionary Format
-~~~~~~~~~~~~~~~~~~~~~~
+Borehole Dictionary Format
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Wells are represented as Python dictionaries containing lithology observations and spatial coordinates:
+Boreholes are represented as Python dictionaries containing lithology observations and spatial coordinates:
 
 .. code-block:: python
 
-    W = {
+    BH = {
         'depth_top':    [0, 8, 12, 16, 34],           # Top depths (m)
         'depth_bottom': [8, 12, 16, 28, 36],           # Bottom depths (m)
         'class_obs':    [1, 2, 1, 5, 4],               # Lithology class IDs
         'class_prob':   [0.9, 0.9, 0.9, 0.9, 0.9],    # Confidence (0-1)
         'X': 498832.5,                                  # UTM Easting
         'Y': 6250843.1,                                 # UTM Northing
-        'name': '65.795',                               # Well identifier
+        'name': '65.795',                               # Borehole identifier
         'method': 'mode_probability'                    # Integration method
     }
 
@@ -69,11 +72,10 @@ Wells are represented as Python dictionaries containing lithology observations a
     Spatial coordinates in UTM projection (meters). Used for distance-based weighting.
 
 ``name``
-    Optional string identifier for the well.
+    Optional string identifier for the borehole.
 
 ``method``
-    Integration method. Options: ``'mode_probability'``, ``'layer_probability'``,
-    ``'class_exact'``, ``'layer_probability_independent'``. Default is ``'mode_probability'``.
+    Integration method. Options: ``'mode_probability'`` (recommended), ``'layer_probability'``.
 
 JSON File Format
 ~~~~~~~~~~~~~~~~
@@ -137,28 +139,28 @@ Writing and reading boreholes:
     import integrate as ig
 
     # Write a single borehole
-    ig.write_borehole(W, 'borehole_65.795.json', showInfo=1)
+    ig.write_borehole(BH, 'borehole_65.795.json', showInfo=1)
 
     # Write a list of boreholes (all in one file)
-    ig.write_borehole([W1, W2, W3], 'all_boreholes.json', showInfo=1)
+    ig.write_borehole([BH1, BH2, BH3], 'all_boreholes.json', showInfo=1)
 
     # Read back a single borehole
-    W = ig.read_borehole('borehole_65.795.json', showInfo=1)
+    BH = ig.read_borehole('borehole_65.795.json', showInfo=1)
 
     # Read back all boreholes
-    WELLS = ig.read_borehole('all_boreholes.json', showInfo=1)
-    for W in WELLS:
-        print(W['name'], W['X'], W['Y'])
+    BHOLES = ig.read_borehole('all_boreholes.json', showInfo=1)
+    for BH in BHOLES:
+        print(BH['name'], BH['X'], BH['Y'])
 
 Visualising boreholes:
 
 .. code-block:: python
 
     # Plot lithology sticks (one subplot per borehole)
-    ig.plot_boreholes(WELLS)
+    ig.plot_boreholes(BHOLES)
 
     # With class names and colours from the prior HDF5 file
-    ig.plot_boreholes(WELLS, f_prior_h5='PRIOR.h5')
+    ig.plot_boreholes(BHOLES, f_prior_h5='PRIOR.h5')
 
     # Load directly from a JSON file
     ig.plot_boreholes('all_boreholes.json', f_prior_h5='PRIOR.h5')
@@ -183,21 +185,21 @@ The prior file contains lithology models and their spatial discretization:
     │       ├── 'class_name' → ['sand', 'clay', 'gravel', ...]
     │       └── 'cmap'       → colormap for visualization
     ├── /D1, /D2, ...                 # Forward modeled data (e.g., tTEM)
-    └── /D3, /D4, ...                 # Well lithology prior data
+    └── /D3, /D4, ...                 # Borehole lithology prior data
         ├── shape: (N_realizations, N_intervals)
-        └── stores mode lithology for each well interval
+        └── stores mode lithology for each borehole interval
 
 **Key Points:**
 
 * ``/M2`` contains the lithology models sampled from the prior distribution
 * ``M2.attrs['x']`` provides the depth discretization (uniform spacing)
 * ``M2.attrs['class_id']`` defines valid lithology class identifiers
-* ``/D3, /D4, ...`` store extracted lithology mode for each well
+* ``/D3, /D4, ...`` store extracted lithology mode for each borehole
 
 Data File (``f_data_h5``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The data file contains observed well log data and survey geometry:
+The data file contains observed borehole data and survey geometry:
 
 .. code-block:: none
 
@@ -206,7 +208,7 @@ The data file contains observed well log data and survey geometry:
     │   ├── d_obs                     # Observed data values
     │   ├── d_std                     # Data uncertainties
     │   └── id_prior                  # Reference to /D1 in prior file
-    ├── /D2, /D3, ...                 # Well log observations
+    ├── /D2, /D3, ...                 # Borehole observations
     │   ├── d_obs                     # Probability matrix (nd × nclass × nm)
     │   ├── i_use                     # Binary mask (nd × 1)
     │   ├── id_prior                  # Reference to /D{id} in prior file
@@ -221,7 +223,7 @@ The data file contains observed well log data and survey geometry:
 * ``d_obs``: shape (nd, nclass, nm) where:
     * nd = number of survey data points
     * nclass = number of lithology classes
-    * nm = number of depth intervals per well
+    * nm = number of depth intervals per borehole
 * ``i_use``: shape (nd, 1), binary mask (1 = use, 0 = ignore)
 * ``id_prior``: scalar or array, references which prior data to compare against
 
@@ -231,227 +233,107 @@ Workflow
 Complete Workflow Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Below is a complete workflow for integrating well log data with electromagnetic data:
+The recommended workflow uses ``ig.save_borehole_data()`` to handle all borehole
+processing in a single call per borehole:
 
 .. code-block:: python
 
     import integrate as ig
-    import numpy as np
 
-    # 1. Define well data
-    W1 = {
-        'depth_top': [0, 8, 12, 16, 34],
+    # 1. Define boreholes
+    BH1 = {
+        'depth_top':    [0, 8, 12, 16, 34],
         'depth_bottom': [8, 12, 16, 28, 36],
-        'class_obs': [1, 2, 1, 5, 4],
-        'class_prob': 0.9,
+        'class_obs':    [1, 2, 1, 5, 4],
+        'class_prob':   0.9,
         'X': 498832.5,
         'Y': 6250843.1,
-        'name': 'Well_1',
+        'name': 'BH_1',
         'method': 'mode_probability'
     }
+    BH2 = {
+        'depth_top':    [0, 5, 15, 25],
+        'depth_bottom': [5, 15, 25, 40],
+        'class_obs':    [2, 1, 3, 2],
+        'class_prob':   0.8,
+        'X': 499100.0,
+        'Y': 6251200.0,
+        'name': 'BH_2',
+        'method': 'mode_probability'
+    }
+    BHOLES = [BH1, BH2]
 
-    # 2. Load prior lithology models
-    M, idx = ig.load_prior_model(f_prior_h5)
-    M_lithology = M[1]  # Extract M2 (lithology)
+    # 2. Process all boreholes — one call per borehole
+    im_prior = 2     # index of lithology model parameter (M2)
+    r_data   = 2     # full-strength radius (m)
+    r_dis    = 300   # fade-out radius (m)
 
-    # Get depth array and class information
-    z = M_lithology.attrs['x'][:]
-    class_id = M_lithology.attrs['class_id']
-    class_name = M_lithology.attrs['class_name']
+    id_borehole_list = []
+    for BH in BHOLES:
+        id_prior, id_out = ig.save_borehole_data(
+            f_prior_h5, f_data_h5, BH,
+            im_prior=im_prior, r_data=r_data, r_dis=r_dis,
+            parallel=False, showInfo=1)
+        id_borehole_list.append(id_out)
 
-    # 3. Compute observation probability from prior
-    P_obs, lithology_mode = ig.compute_P_obs_sparse(
-        M_lithology,
-        depth_top=W1['depth_top'],
-        depth_bottom=W1['depth_bottom'],
-        class_obs=W1['class_obs'],
-        z=z,
-        class_id=class_id,
-        class_prob=W1['class_prob'],
-        parallel=True,
-        Ncpu=-1
-    )
-
-    # 4. Save prior lithology data for this well
-    id_prior = ig.save_prior_data(f_prior_h5, lithology_mode)
-
-    # 5. Extrapolate to survey grid with distance weighting
-    d_obs, i_use, T_use = ig.Pobs_to_datagrid(
-        P_obs,
-        W1['X'],
-        W1['Y'],
-        f_data_h5,
-        r_data=10,      # Full strength within 10m
-        r_dis=100,      # Fade to zero by 100m
-        doPlot=False
-    )
-
-    # 6. Save observed well data
-    id_well, f_data = ig.save_data_multinomial(
-        D_obs=d_obs,
-        i_use=i_use,
-        id_prior=id_prior,
-        f_data_h5=f_data_h5
-    )
-
-    # 7. Run joint inversion (tTEM + Well)
+    # 3. Run joint inversion (tTEM + boreholes)
     f_post_h5 = ig.integrate_rejection(
         f_prior_data_h5,
         f_data_h5,
-        id_use=[1, id_well],  # Combine tTEM and well data
+        id_use=[1] + id_borehole_list,  # e.g. [1, 2, 3]
         parallel=True
     )
 
-Step-by-Step Explanation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+``save_borehole_data`` internally performs these three steps automatically:
 
-Step 1: Define Well Data
-^^^^^^^^^^^^^^^^^^^^^^^^^
+1. **Compute prior borehole data** — calls ``prior_data_borehole()`` which extracts
+   mode lithology from prior realizations and saves it to ``f_prior_h5``
+2. **Extrapolate to survey grid** — calls ``Pobs_to_datagrid()`` to spatially
+   distribute the point observation with distance-based weighting
+3. **Save observed data** — calls ``save_data_multinomial()`` to write the gridded
+   observations to ``f_data_h5``
 
-Create a dictionary containing:
-
-* Depth intervals (top/bottom)
-* Observed lithology class IDs
-* Confidence levels
-* Spatial coordinates (UTM)
-
-Step 2: Load Prior Lithology Models
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Extract the lithology model array (``M2``) and its metadata:
-
-* Depth discretization (``z``)
-* Valid class identifiers (``class_id``)
-* Class names for interpretation (``class_name``)
-
-Step 3: Compute Observation Probability
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Two approaches are available:
-
-**Approach A: Direct Discrete Observations**
+``save_borehole_data`` Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-    P_obs = ig.compute_P_obs_discrete(
-        depth_top=W['depth_top'],
-        depth_bottom=W['depth_bottom'],
-        class_obs=W['class_obs'],
-        z=z,
-        class_id=class_id,
-        class_prob=W['class_prob']
+    id_prior, id_out = ig.save_borehole_data(
+        f_prior_h5,          # Path to prior HDF5 file
+        f_data_h5,           # Path to observed-data HDF5 file
+        BH,                  # Borehole dictionary
+        im_prior=2,          # Model parameter index (e.g. 2 → /M2)
+        parallel=False,      # Parallel mode extraction
+        r_data=2,            # Full-strength radius (m)
+        r_dis=300,           # Fade-out radius (m)
+        doPlot=False,        # Plot distance-weight maps
+        showInfo=1           # Verbosity (0=silent, 1=summary line)
     )
 
-This creates a probability matrix where each observed interval has high probability (e.g., 0.9) for the observed class and low probability for other classes.
+**Returns:**
 
-**Approach B: Mode from Prior (Recommended)**
+``id_prior``
+    Dataset index of the new ``/D`` entry added to ``f_prior_h5``.
 
-.. code-block:: python
+``id_out``
+    Dataset index of the new ``/D`` entry added to ``f_data_h5``.
+    Append to ``id_borehole_list`` for use in ``id_use`` during inversion.
 
-    P_obs, lithology_mode = ig.compute_P_obs_sparse(
-        M_lithology,
-        depth_top=W['depth_top'],
-        depth_bottom=W['depth_bottom'],
-        class_obs=W['class_obs'],
-        z=z,
-        class_id=class_id,
-        class_prob=W['class_prob'],
-        parallel=True
-    )
+Integration Methods
+~~~~~~~~~~~~~~~~~~~~
 
-This extracts the mode lithology from prior realizations within each depth interval, providing more realistic probability distributions that account for prior model variability.
+``BH['method']`` controls how lithology observations are converted to probabilities:
 
-**Output:**
+``'mode_probability'`` (recommended)
+    Extracts the mode lithology from prior realizations within each observed
+    depth interval, providing realistic probability distributions that account
+    for prior model variability. Uses ``prior_data_borehole_class_mode()``
+    internally.
 
-* ``P_obs``: Probability matrix, shape (nclass, nm) where nm = number of intervals
-* ``lithology_mode``: Mode lithology array, shape (N_realizations, nm)
-
-Step 4: Save Prior Lithology Data
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Store the extracted lithology mode in the prior file:
-
-.. code-block:: python
-
-    id_prior = ig.save_prior_data(f_prior_h5, lithology_mode)
-
-This creates a new dataset (``/D{id_prior}``) containing the well lithology data that can be referenced during inversion.
-
-Step 5: Extrapolate to Survey Grid
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Convert point-based well observations to gridded data using distance-based weighting:
-
-.. code-block:: python
-
-    d_obs, i_use, T_use = ig.Pobs_to_datagrid(
-        P_obs,
-        W['X'],
-        W['Y'],
-        f_data_h5,
-        r_data=10,
-        r_dis=100,
-        doPlot=False
-    )
-
-**Parameters:**
-
-``r_data``
-    Inner radius (meters). Observations within this distance receive full strength (weight ≈ 1).
-
-``r_dis``
-    Outer radius (meters). Observations are weighted by distance from well, approaching zero at this distance.
-
-**Distance Weighting Function:**
-
-The weight decreases with distance using a Gaussian-like function:
-
-.. math::
-
-    w_{dis}(d) = \exp\left(-\frac{1}{2}\left(\frac{d - r_{data}}{r_{dis} - r_{data}}\right)^2\right)
-
-This weight is converted to temperature for probability scaling:
-
-.. math::
-
-    T = \frac{1}{w_{dis}}
-
-**Output:**
-
-* ``d_obs``: Gridded probability data, shape (nd, nclass, nm)
-* ``i_use``: Binary mask indicating which survey points are influenced
-
-Step 6: Save Observed Well Data
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Store the gridded well data in the data file:
-
-.. code-block:: python
-
-    id_well, f_data = ig.save_data_multinomial(
-        D_obs=d_obs,
-        i_use=i_use,
-        id_prior=id_prior,
-        f_data_h5=f_data_h5
-    )
-
-This creates dataset ``/D{id_well}`` with the multinomial noise model.
-
-Step 7: Run Joint Inversion
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Combine multiple data types in the inversion:
-
-.. code-block:: python
-
-    f_post_h5 = ig.integrate_rejection(
-        f_prior_data_h5,
-        f_data_h5,
-        id_use=[1, id_well],  # e.g., [1, 3] for D1 (tTEM) + D3 (Well)
-        parallel=True
-    )
-
-The ``id_use`` parameter specifies which observed datasets to include in the joint inversion.
+``'layer_probability'``
+    Converts depth-interval observations directly to a probability matrix
+    without querying the prior ensemble. Faster but less prior-aware. Uses
+    ``prior_data_borehole_class_layer()`` internally.
 
 Distance-Based Weighting
 -------------------------
@@ -459,7 +341,7 @@ Distance-Based Weighting
 Spatial Weighting
 ~~~~~~~~~~~~~~~~~
 
-Well observations influence survey points based on distance:
+Borehole observations influence survey points based on distance:
 
 **Weight Calculation:**
 
@@ -467,8 +349,8 @@ Well observations influence survey points based on distance:
 
     w_combined, w_dis, w_data, i_ref = ig.get_weight_from_position(
         f_data_h5,
-        x_well=W['X'],
-        y_well=W['Y'],
+        x_well=BH['X'],
+        y_well=BH['Y'],
         r_dis=300,
         r_data=2,
         doPlot=True
@@ -503,6 +385,20 @@ Distance converts to temperature for probability scaling:
 * r_data < d < r_dis: T increases gradually
 * d > r_dis: T >> 1, observation effectively ignored
 
+**Distance Weighting Function:**
+
+The weight decreases with distance using a Gaussian-like function:
+
+.. math::
+
+    w_{dis}(d) = \exp\left(-\frac{1}{2}\left(\frac{d - r_{data}}{r_{dis} - r_{data}}\right)^2\right)
+
+This weight is converted to temperature for probability scaling:
+
+.. math::
+
+    T = \frac{1}{w_{dis}}
+
 Visualization
 ~~~~~~~~~~~~~
 
@@ -512,63 +408,46 @@ Visualize weight distribution:
 
     w, _, _, _ = ig.get_weight_from_position(
         f_data_h5,
-        x_well=W['X'],
-        y_well=W['Y'],
+        x_well=BH['X'],
+        y_well=BH['Y'],
         r_dis=300,
         doPlot=True
     )
 
-This creates a map showing how well influence decreases with distance across the survey area.
+This creates a map showing how borehole influence decreases with distance across the survey area.
 
-Multiple Wells
---------------
+Multiple Boreholes
+------------------
 
-Handling Multiple Boreholes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Processing Multiple Boreholes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Process multiple wells sequentially:
+Use ``save_borehole_data()`` in a loop — one call per borehole:
 
 .. code-block:: python
 
-    # Define multiple wells
-    wells = [W1, W2, W3]
-    well_ids = []
+    BHOLES = [BH1, BH2, BH3]
+    id_borehole_list = []
 
-    for i, W in enumerate(wells):
-        # Compute P_obs
-        P_obs, lithology_mode = ig.compute_P_obs_sparse(
-            M_lithology, **W, z=z, class_id=class_id, parallel=True
-        )
+    for BH in BHOLES:
+        id_prior, id_out = ig.save_borehole_data(
+            f_prior_h5, f_data_h5, BH,
+            im_prior=2, r_data=2, r_dis=300,
+            showInfo=1)
+        id_borehole_list.append(id_out)
 
-        # Save prior data
-        id_prior = ig.save_prior_data(f_prior_h5, lithology_mode)
-
-        # Extrapolate to grid
-        d_obs, i_use, T_use = ig.Pobs_to_datagrid(
-            P_obs, W['X'], W['Y'], f_data_h5,
-            r_data=10, r_dis=100
-        )
-
-        # Save observed data
-        id_well, _ = ig.save_data_multinomial(
-            d_obs, i_use=i_use, id_prior=id_prior,
-            f_data_h5=f_data_h5
-        )
-
-        well_ids.append(id_well)
-
-    # Joint inversion with tTEM + all wells
+    # Joint inversion: tTEM (D1) + all boreholes
     f_post_h5 = ig.integrate_rejection(
         f_prior_data_h5,
         f_data_h5,
-        id_use=[1] + well_ids,  # e.g., [1, 2, 3, 4] for D1, D2, D3, D4
+        id_use=[1] + id_borehole_list,
         parallel=True
     )
 
 Overlapping Influence Zones
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When multiple wells have overlapping influence zones (r_dis), the inversion automatically handles this through the multinomial noise model. Each well observation is treated as an independent constraint, and the posterior distribution reflects the combined information from all wells and geophysical data.
+When multiple boreholes have overlapping influence zones (r_dis), the inversion automatically handles this through the multinomial noise model. Each borehole observation is treated as an independent constraint, and the posterior distribution reflects the combined information from all boreholes and geophysical data.
 
 Performance Considerations
 --------------------------
@@ -576,18 +455,16 @@ Performance Considerations
 Parallel Processing
 ~~~~~~~~~~~~~~~~~~~
 
-For large prior ensembles (N > 100,000), enable parallel processing:
+For large prior ensembles (N > 100,000), enable parallel processing in ``save_borehole_data``:
 
 .. code-block:: python
 
-    P_obs, lithology_mode = ig.compute_P_obs_sparse(
-        M_lithology,
-        ...,
-        parallel=True,
-        Ncpu=-1  # Auto-detect all available CPUs
+    id_prior, id_out = ig.save_borehole_data(
+        f_prior_h5, f_data_h5, BH,
+        parallel=True   # Parallel mode class extraction
     )
 
-**Speedup:**
+**Speedup (mode_probability method):**
 
 * 1 core: baseline
 * 4 cores: ~3-4× faster
@@ -598,68 +475,47 @@ Memory usage scales with number of processes.
 Optimization Tips
 ~~~~~~~~~~~~~~~~~
 
-**Reduce Prior Ensemble Size:**
-
-If memory is limited, subsample the prior:
-
-.. code-block:: python
-
-    # Use random subset
-    N_use = 50000
-    idx = np.random.choice(M_lithology.shape[0], N_use, replace=False)
-    M_subset = M_lithology[idx, :]
-
 **Adjust Distance Parameters:**
 
-Smaller ``r_dis`` reduces the area influenced by wells:
+Smaller ``r_dis`` reduces the area influenced by each borehole:
 
 * Faster processing (fewer survey points affected)
 * Less memory required
-* More localized well influence
+* More localized borehole influence
 
 Examples
 --------
 
-Complete Example: Haderup Survey
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Complete Example: Workflow Script
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the complete working example:
+See the complete working example in ``examples/integrate_workflow.py``, which demonstrates:
 
-* **Script:** ``examples/integrate_haderup_wells.py``
-* **Notebook:** ``examples/integrate_haderup_wells.ipynb``
-
-This example demonstrates:
-
-* Loading tTEM survey data
-* Defining two borehole observations
-* Computing lithology probabilities from prior
-* Extrapolating wells to survey grid
-* Running joint inversion (tTEM + 2 wells)
+* Defining borehole dictionaries
+* Processing boreholes with ``ig.save_borehole_data()``
+* Running joint inversion (tTEM + boreholes)
 * Visualizing results
 
-Key code sections:
+Key code section:
 
 .. code-block:: python
 
-    # Lines 107-131: Define well dictionaries
-    W1 = {...}
-    W2 = {...}
+    im_prior = 2     # lithology model index (M2)
+    r_data   = 2     # full-strength radius (m)
+    r_dis    = 300   # fade-out radius (m)
 
-    # Lines 220-230: Read lithology metadata
-    z = f['/M2'].attrs['x'][:]
-    class_id = f['/M2'].attrs['class_id']
-    class_name = f['/M2'].attrs['class_name']
+    id_borehole_list = []
+    for BH in BHOLES:
+        id_prior, id_out = ig.save_borehole_data(
+            f_prior_h5, f_data_h5, BH,
+            im_prior=im_prior, r_data=r_data, r_dis=r_dis,
+            parallel=parallel, showInfo=1)
+        id_borehole_list.append(id_out)
 
-    # Lines 275-288: Compute P_obs
-    P_obs_1, lithology_mode_1 = ig.compute_P_obs_sparse(
-        M[1], **W1, z=z, class_id=class_id, parallel=True
-    )
-
-    # Lines 295-315: Save and extrapolate
-    id_prior_1 = ig.save_prior_data(f_prior_h5, lithology_mode_1)
-    d_obs_1, i_use_1, T_use_1 = ig.Pobs_to_datagrid(
-        P_obs_1, W1['X'], W1['Y'], f_data_h5, r_dis=100
-    )
+    f_post_h5 = ig.integrate_rejection(
+        f_prior_data_h5, f_data_h5,
+        id_use=[1] + id_borehole_list,
+        parallel=True)
 
 API Reference
 -------------
@@ -667,25 +523,32 @@ API Reference
 Quick Reference
 ~~~~~~~~~~~~~~~
 
-**Core Functions:**
+**High-level Functions (recommended):**
 
 .. code-block:: python
 
     from integrate import (
-        compute_P_obs_discrete,      # Direct probability from observations
-        compute_P_obs_sparse,         # Extract mode from prior realizations
-        rescale_P_obs_temperature,    # Temperature-based scaling
-        Pobs_to_datagrid,             # Extrapolate to survey grid
-        get_weight_from_position,     # Calculate spatial weights
-        save_prior_data,              # Save lithology to prior file
-        save_data_multinomial,        # Save discrete observations
-        load_prior_model              # Load lithology models
+        save_borehole_data,              # One-call: prior + observed data for a borehole
+        prior_data_borehole,             # Dispatcher: compute and save prior borehole data
+        prior_data_borehole_class_mode,  # Prior data via mode extraction from ensemble
+        prior_data_borehole_class_layer, # Prior data via direct layer probability
     )
 
-**Function Aliases:**
+**Low-level / utility functions:**
 
-* ``Pobs_discrete_compute`` → ``compute_P_obs_discrete``
-* ``Pobs_rescale_temperature`` → ``rescale_P_obs_temperature``
+.. code-block:: python
+
+    from integrate import (
+        compute_P_obs_discrete,          # Direct probability from observations
+        rescale_P_obs_temperature,       # Temperature-based scaling
+        Pobs_to_datagrid,                # Extrapolate to survey grid
+        get_weight_from_position,        # Calculate spatial weights
+        save_prior_data,                 # Save data to prior file
+        save_data_multinomial,           # Save discrete observations to data file
+        write_borehole,                  # Write borehole dict(s) to JSON
+        read_borehole,                   # Read borehole dict(s) from JSON
+        plot_boreholes,                  # Plot lithology sticks
+    )
 
 See Also
 --------
@@ -701,4 +564,3 @@ For more information on the theoretical background:
 
 * Hansen et al. (2021): Localized rejection sampling for Bayesian inversion
 * Madsen et al. (2023): Probabilistic lithology modeling
-

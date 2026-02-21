@@ -28,11 +28,7 @@ import copy
 
 
 #%% SOME BASIC SETTINGS
-N = 10000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-useLogData = False # Whether to transform data to log10 space (recommended for resistivity data)
-inflateNoise = 1 # Factor to increase noise level (std) in the data, to
-
-
+N = 2000000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -40,8 +36,8 @@ inflateNoise = 1 # Factor to increase noise level (std) in the data, to
 # %%
 case = 'DAUGAARD'
 f_xlsx_files = ['daugaard_standard.xlsx','daugaard_valley.xlsx']
-ig.get_case_data(case=case, showInfo=2, filelist=['daugaard_standard.xlsx','daugaard_valley.xlsx'])
-files = ig.get_case_data(case=case, showInfo=2)
+ig.get_case_data(case=case, filelist=['daugaard_standard.xlsx','daugaard_valley.xlsx'])
+files = ig.get_case_data(case=case)
 f_data_h5 = files[0]
 file_gex= ig.get_gex_file_from_data(f_data_h5)
 
@@ -57,6 +53,7 @@ ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
 # %% [markdown]
 # ## the PRIOR model(s) : 
 # simulate prior model realizations using geoprior1d # https://github.com/GEUSjesper/geoprior1d
+# We are using two prior models representing expected variability outstide and inside a buried valley system.
 
 # Generate N realizations of prirpo as defined  by the XLS files
 f_prior_h5_list = []
@@ -73,6 +70,9 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 
 # %% [markdown]
 # ## the tTEM DATA
+useLogData = False # Whether to transform data to log10 space (recommended for resistivity data)
+useCorrleatedNoise = False # Whether to use correlated noise (instead of uncorrelated) when generating the prior data. This can be more realistic for geophysical data, but it also increases the computational cost.
+inflateNoise = 1 # Factor to increase noise level (std) in the data, to
 
 
 # %% Determine if the data should be hanlded in log10 space, which is often recommended for resistivity data. If True, a new hdf5 file will be created with the log-transformed data and updated standard deviations.
@@ -90,7 +90,11 @@ if useLogData:
     lD_std_down = np.abs(np.log10(D_obs-D_std)-lD_obs)
     corr_std = 0.02
     lD_std = np.abs((lD_std_up+lD_std_down)/2) + corr_std
-    ig.save_data_gaussian(lD_obs, D_std = lD_std, f_data_h5 = f_data_h5, id=1, showInfo=0, is_log=1)
+    if useCorrleatedNoise:
+        # MISSING
+        pass
+    else:
+        ig.save_data_gaussian(lD_obs, D_std = lD_std, f_data_h5 = f_data_h5, id=1, showInfo=0, is_log=1)
 
 
 
@@ -270,7 +274,7 @@ for i, BH in enumerate(BHOLES):
 # Find points within buffer distance
 Xl = np.array([BHOLES[0]['X']-100, BHOLES[0]['X'], BHOLES[1]['X'], BHOLES[1]['X']+1500])
 Yl = np.array([BHOLES[0]['Y'], BHOLES[0]['Y'], BHOLES[1]['Y'], BHOLES[1]['Y']-150])
-
+buffer = 15.0
 indices, distances, segment_ids = ig.find_points_along_line_segments(
     X, Y, Xl, Yl, tolerance=buffer
 )
@@ -320,7 +324,7 @@ id_use_arr.append([2,3]) # Well 1,2
 id_use_arr.append([1,2,3]) # tTEM, Well 1,2
 
 N_use = N
-
+f_post_h5_list = []
 for id_use in id_use_arr:
     # get string from id_use
     fileparts = os.path.splitext(f_data_h5)
@@ -334,18 +338,52 @@ for id_use in id_use_arr:
                                     id_use = id_use,
                                     nr=nr,
                                     updatePostStat=True)
+    f_post_h5_list.append(f_post_h5)
 
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
-ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
-ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
+
+# Profiles
+for f_post_h5 in f_post_h5_list:
+    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
+    ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
+
+# %% Median resistivity at elevation = 40m
+for f_post_h5 in f_post_h5_list:
+    ig.plot_feature_2d(f_post_h5, key='Median', im=1, elevation=40)
+    plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
+    plt.legend()    
+    plt.show()
+
+# %% Mode lithology at elevation = 45m
+for f_post_h5 in f_post_h5_list:
+    ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=45)
+    plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
+    plt.legend()    
+    plt.show()
+
+    
+# %% [markdown]
+# ### QPosterior Probability of INSIDE vs OUTSIDE
+# QUERY : Probability that the cumulative thickness of lithology class 2
+# within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
+# cannot be thicker than 3m.
+
+# %% 
+for f_post_h5 in f_post_h5_list:
+    ig.plot_feature_2d(f_post_h5, key='Mode', im=3, iz=0, cmap='jet')
+    plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
+    plt.legend()    
+    plt.show()
+
 
 # %% [markdown]
 # ### QUERY POSTERIOR MODEL REALIZATIONS
 # QUERY : Probability that the cumulative thickness of lithology class 2
 # within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
 # cannot be thicker than 3m.
+
 
 # %% 
 doLoadQuery = False
@@ -379,8 +417,9 @@ else:
 
     ig.save_query(query, 'query_daugaard.json')
 
-P, meta = ig.query(f_post_h5, query)
-
-#%%  Plot the predicted probability map, and the the outcome at the borehole locations (which should be close to 1 since the query is based on the borehole data)
-ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5)
-ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5)
+for f_post_h5 in f_post_h5_list:
+    # Compute the probability of the query being satisfied for each model realization in the posterior, and get metadata about the query results (e.g. which realizations satisfy the query, etc.)
+    P, meta = ig.query(f_post_h5, query)
+    #  Plot the predicted probability map, and the the outcome at the borehole locations (which should be close to 1 since the query is based on the borehole data)
+    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5)
+    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5)
