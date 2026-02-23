@@ -118,8 +118,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
     >>> f_post = ig.integrate_rejection('prior.h5', 'data.h5', N_use=10000)
     >>> print(f"Results saved to: {f_post}")
     """
-    # Skip execution inside spawned worker processes (Windows/macOS spawn).
-    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
         return None
 
     import integrate as ig
@@ -848,9 +848,17 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     # fork on Linux for performance
     if os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin'):
         ctx = multiprocessing.get_context('spawn')
-        os.environ['_INTEGRATE_IN_WORKER'] = '1'
     else:
         ctx = multiprocessing.get_context('fork')
+
+    # Prevent spawned workers from re-executing the user's __main__ script.
+    # See prior_data_gaaem for a full explanation of this mechanism.
+    import sys
+    import types as _types
+    _main_module = sys.modules.get('__main__')
+    _spec_patched = _main_module is not None and getattr(_main_module, '__spec__', None) is None
+    if _spec_patched:
+        _main_module.__spec__ = _types.SimpleNamespace(name='__main__')
 
     try:
         with ctx.Pool(Ncpu) as p:
@@ -862,7 +870,8 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         # Always clean up shared memory
         if shm_objects:
             cleanup_shared_memory(shm_objects)
-        os.environ.pop('_INTEGRATE_IN_WORKER', None)
+        if _spec_patched:
+            _main_module.__spec__ = None
 
     # Cleanup shared memory
     #cleanup_shared_memory(shared_memory_refs)

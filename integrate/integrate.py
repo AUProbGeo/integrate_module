@@ -30,6 +30,8 @@ import numpy as np
 import os.path
 import subprocess
 from sys import exit
+import sys
+import types
 import multiprocessing
 from multiprocessing import Pool
 from multiprocessing import shared_memory
@@ -1226,11 +1228,9 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     >>> f_prior_data = prior_data_gaaem(f_prior_h5, file_gex, parallel=False)
     """
     import integrate as ig
-    import os 
-    # Skip execution inside spawned worker processes (Windows/macOS spawn).
-    # Workers re-execute the user's __main__ script; this guard prevents
-    # side effects (file creation, HDF5 writes) from running in workers.
-    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+    import os
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
         return None
 
     type = 'TDEM'
@@ -1379,30 +1379,36 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
 
 
         import os
-        if os.name == 'nt':  # Windows
-            # Log handle count before creating pool
-            handle_count_before = get_process_handle_count()
-            #print(f"Handle count before pool: {handle_count_before}")
 
         # 3: Compute the chunks in parallel
         forward_gaaem_chunk_partial = partial(forward_gaaem_chunk, thickness=thickness, stmfiles=stmfiles, file_gex=file_gex, Nhank=Nhank, Nfreq=Nfreq, **kwargs)
 
-        # Use spawn context on Windows for better handle management.
-        # Set _INTEGRATE_IN_WORKER so that spawned workers (which re-run the
-        # user's __main__ script) skip top-level ig.* calls.
-        if os.name == 'nt':
-            os.environ['_INTEGRATE_IN_WORKER'] = '1'
-            try:
-                ctx = multiprocessing.get_context("spawn")
-                Ncpu = min(Ncpu, 60)  # Set to a safe limit below 63
-                with ctx.Pool(processes=Ncpu) as p:
-                    D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
-            finally:
-                os.environ.pop('_INTEGRATE_IN_WORKER', None)
-        else:
-            # On non-Windows platforms, use regular Pool
-            with Pool(processes=Ncpu) as p:
+        # On Windows and macOS, multiprocessing uses 'spawn' which normally
+        # re-executes the user's __main__ script in every worker process.
+        # We prevent this by setting __main__.__spec__ = SimpleNamespace(name='__main__')
+        # before creating the Pool.  The spawn bootstrap then calls
+        # _fixup_main_from_name('__main__'), which immediately returns because the
+        # worker's bootstrap module already has __name__ == '__main__' — so the
+        # user's script is never re-run in workers.  No if __name__=='__main__' guard
+        # is needed in user scripts on any platform.
+        _main_module = sys.modules.get('__main__')
+        _spec_patched = _main_module is not None and getattr(_main_module, '__spec__', None) is None
+        if _spec_patched:
+            _main_module.__spec__ = types.SimpleNamespace(name='__main__')
+
+        is_spawn = os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin')
+        try:
+            if is_spawn:
+                if os.name == 'nt':
+                    Ncpu = min(Ncpu, 60)  # Windows handle limit
+                ctx = multiprocessing.get_context('spawn')
+            else:
+                ctx = multiprocessing.get_context('fork')
+            with ctx.Pool(processes=Ncpu) as p:
                 D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
+        finally:
+            if _spec_patched:
+                _main_module.__spec__ = None
 
   
         D = np.concatenate(D_chunks)
@@ -1611,8 +1617,8 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
     operations, significantly improving performance for large N (e.g., N=50000).
     """
 
-    # Skip execution inside spawned worker processes (Windows/macOS spawn).
-    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
         return None
 
     import integrate as ig
@@ -1832,8 +1838,8 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
     str
         Filepath of the saved prior model.
     """
-    # Skip execution inside spawned worker processes (Windows/macOS spawn).
-    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
         return None
 
     import integrate as ig
@@ -1967,8 +1973,8 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     str
         Filepath of the saved prior model.
     """
-    # Skip execution inside spawned worker processes (Windows/macOS spawn).
-    if os.environ.get('_INTEGRATE_IN_WORKER') == '1':
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
         return None
 
     from tqdm import tqdm
