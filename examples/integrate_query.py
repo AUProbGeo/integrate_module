@@ -6,7 +6,7 @@
 #
 # The core function `query(f_post_h5, query)` takes a posterior HDF5
 # file and a query definition (dict or JSON file path) and returns an array of
-
+#
 # probabilities – one value per data location.
 # %%
 try:
@@ -16,7 +16,7 @@ try:
 except Exception:
     pass
 
-# %% Imports
+# %%
 import json
 import os
 
@@ -99,28 +99,28 @@ import integrate as ig
 # The examples below use the posterior and prior files from the `examples/`
 # directory. They are guarded with `os.path.isfile` so the script can be
 # imported without errors if the files are absent.
-import integrate as ig
-f_post_h5 = 'post_daugaard_merged_N2000000_Nuse1000000_inflateNoise2.h5'
-with h5py.File(f_post_h5, 'r') as f:
-    f_prior_h5 = str(f.attrs.get('f5_prior', ''))
-    f_data_h5 = str(f.attrs.get('f5_data', ''))
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
-n_data = X.shape[0]
+# import integrate as ig
+# f_post_h5 = 'post_daugaard_merged_N2000000_Nuse1000000_inflateNoise2.h5'
+# with h5py.File(f_post_h5, 'r') as f:
+#     f_prior_h5 = str(f.attrs.get('f5_prior', ''))
+#     f_data_h5 = str(f.attrs.get('f5_data', ''))
+# X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+# n_data = X.shape[0]
+#
+# z = []
+# dz = []
+# with h5py.File(f_prior_h5, 'r') as f:
+#     for k in f.keys():
+#         if k.startswith('M'):
+#             z.append(f[k].attrs['x'].astype(float))
+#             # dz = [diff(z),0]
+#             dz.append(np.append(np.diff(z[-1]), 0))
+#
+# ig.plot_profile(f_post_h5, i1 = 0, i2=600, im=2)
+# M, idx = ig.load_prior_model(f_prior_h5)
 
-z = []
-dz = []
-with h5py.File(f_prior_h5, 'r') as f:
-    for k in f.keys():
-        if k.startswith('M'):
-            z.append(f[k].attrs['x'].astype(float))
-            # dz = [diff(z),0]
-            dz.append(np.append(np.diff(z[-1]), 0))
 
-ig.plot_profile(f_post_h5, i1 = 0, i2=600, im=2)
-M, idx = ig.load_prior_model(f_prior_h5)
-
-
-# %% Example setup – point to example files
+# %%
 _here = os.path.dirname(os.path.abspath(__file__)) if '__file__' in dir() else os.getcwd()
 
 # %% [markdown]
@@ -130,7 +130,7 @@ _here = os.path.dirname(os.path.abspath(__file__)) if '__file__' in dir() else o
 # within 0–30 m depth is greater than 10 m.
 
 
-# %% Basic example query definition (dict or JSON file)
+# %%
 # Q0: FIND THE TOTAL AMOUNT OF SAND and GRAVEL above 30 m depth!
 query_ex0 = {
     "constraints": [
@@ -158,7 +158,7 @@ print(f"Example 0 | N_data={meta0['N_data']}, mean P={P0.mean():.3f}")
 # Detailed: probability map + model visualization for point 1000
 ig.query_plot(P0, meta0, ip=n_data-1, query_dict=query_ex0, f_post_h5=f_post_h5)
 
-# %% 
+# %%
 # Pause execution here to allow inspection of the plots before the script continues
 #input("Press Enter to continue with manual computation...")
 
@@ -347,7 +347,7 @@ ip_example = np.argmax(P0d)
 # Detailed visualization for a specific point
 ig.query_plot(P0d, meta0d, ip=ip_example, query_dict=query_ex0d, f_post_h5=f_post_h5)
 
-#%%
+# %%
 
 
 # %%

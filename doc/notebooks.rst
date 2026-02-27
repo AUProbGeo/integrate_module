@@ -39,7 +39,6 @@ INTEGRATE allows for using both correlated and uncorrelated Gaussian noise model
 .. nbgallery::
    notebooks/integrate_gaussian_noise.ipynb     
    
-
   
 Hypothesis testing
 ==================
