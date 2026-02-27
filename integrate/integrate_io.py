@@ -2702,6 +2702,7 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
         if len(filelist)==0:
             filelist.append('DAUGAARD_AVG.h5')
             filelist.append('TX07_20231016_2x4_RC20-33.gex')
+            filelist.append('daugaard_12boreholes.json')
             filelist.append('README_DAUGAARD')
 
         if loadAll:
@@ -4808,8 +4809,18 @@ def write_borehole(W, filename, **kwargs):
     W : dict or list of dict
         A single borehole dict, or a list of borehole dicts.
         Each dict may contain any combination of the standard borehole
-        fields: ``name``, ``X``, ``Y``, ``depth_top``, ``depth_bottom``,
-        ``class_obs``, ``class_prob``, ``method``.
+        fields:
+
+        * ``name`` (str) – identifier
+        * ``X``, ``Y`` (float) – UTM coordinates
+        * ``depth_top``, ``depth_bottom`` (list of float) – interval boundaries (m)
+        * ``class_obs`` (list of int) – observed lithology class per interval
+        * ``class_prob`` (list of float) – confidence per interval (0–1)
+        * ``method`` (str, optional) – likelihood method (default ``'mode_probability'``)
+        * ``elevation`` (float, optional) – ground-surface elevation (m a.s.l.).
+          Used only by :func:`plot_boreholes` to place the well on a shared
+          elevation axis.  Has no effect on inversion.
+
         numpy arrays and scalars are automatically converted to plain
         Python lists/numbers so the file is human-readable JSON.
     filename : str
@@ -4872,6 +4883,10 @@ def read_borehole(filename, **kwargs):
     If the file contains a single borehole (JSON object) a single dict
     is returned.  If it contains many boreholes (JSON array) a list of
     dicts is returned.
+
+    The returned dict(s) preserve all fields that were written, including
+    the optional ``elevation`` key (ground-surface elevation in m a.s.l.)
+    used by :func:`plot_boreholes` for elevation-axis plotting.
 
     Parameters
     ----------

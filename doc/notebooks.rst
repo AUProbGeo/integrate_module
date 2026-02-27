@@ -14,7 +14,7 @@ Start here if you are new to INTEGRATE
    notebooks/integrate_getting_started_posterior_only.ipynb
 
 
-Dual data
+Data 
 ================
 
 Joint inversion is supported by using multiple data types.
@@ -23,6 +23,13 @@ These data can then be inverted seperately, or jointly.
 
 .. nbgallery::
    notebooks/integrate_dual_data.ipynb  
+
+
+Borehole data can also be used, either as a single data type, or in combination with tTEM data.
+
+.. nbgallery::
+   notebooks/integrate_boreholes.ipynb  
+
 
 Noise 
 ================
@@ -41,6 +48,13 @@ Hypothesis testing
    notebooks/integrate_daugaard_multi_prior_multi_data.ipynb  
    notebooks/integrate_daugaard_multi_prior.ipynb  
    .. notebooks/integrate_case_evidence_approximation.ipynb   
+
+
+Qureying the posterior
+======================
+
+.. nbgallery::
+   notebooks/integrate_query_posterior.ipynb
 
 Synthetic Case
 ================

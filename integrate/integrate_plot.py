@@ -4510,9 +4510,17 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
         Borehole data in one of three forms:
 
         * A single borehole dict (keys: ``name``, ``X``, ``Y``,
-          ``depth_top``, ``depth_bottom``, ``class_obs``, ``class_prob``).
+          ``depth_top``, ``depth_bottom``, ``class_obs``, ``class_prob``,
+          and optionally ``elevation``).
         * A list of such dicts.
         * A path to a JSON file written by :func:`write_borehole`.
+
+        If any borehole dict contains a non-zero ``elevation`` key (float,
+        metres above sea level), the function switches to **elevation mode**:
+        the shared Y-axis shows absolute elevation instead of depth, and every
+        borehole is vertically positioned at its ground-surface elevation.
+        Boreholes without an ``elevation`` key (or with ``elevation=0``) are
+        treated as if they sit at elevation 0 m a.s.l.
 
     f_prior_h5 : str, optional
         Path to an HDF5 prior file.  When supplied, class names and the
@@ -4570,6 +4578,10 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
         W = [W]
 
     n_wells = len(W)
+
+    # --- resolve per-borehole elevations ---
+    elevations    = [float(bh.get('elevation', 0)) for bh in W]
+    use_elevation = any(e != 0.0 for e in elevations)
 
     # --- read class info from prior if available ---
     class_id   = None
@@ -4639,12 +4651,21 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     else:
         legend_classes = all_classes
 
-    # --- global depth range ---
-    if depth_max is None:
-        depth_max = max(
-            (max(bh['depth_bottom']) for bh in W if bh.get('depth_bottom')),
-            default=50.0
+    # --- global y-axis range ---
+    if use_elevation:
+        y_max_global = max(elevations)
+        y_min_global = min(
+            e - max(bh.get('depth_bottom', [0]))
+            for e, bh in zip(elevations, W)
         )
+    else:
+        if depth_max is None:
+            depth_max = max(
+                (max(bh['depth_bottom']) for bh in W if bh.get('depth_bottom')),
+                default=50.0
+            )
+        y_max_global = depth_max
+        y_min_global = 0
 
     # --- figure layout: one column per well ---
     fig_w = figsize_w[0] * n_wells
@@ -4653,20 +4674,32 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
                              sharey=True, squeeze=False)
     axes = axes[0]   # shape (n_wells,)
 
-    for ax, bh in zip(axes, W):
+    for i, (ax, bh) in enumerate(zip(axes, W)):
         depth_top    = bh.get('depth_top',    [])
         depth_bottom = bh.get('depth_bottom', [])
         class_obs    = bh.get('class_obs',    [])
         class_prob   = bh.get('class_prob',   [1.0] * len(class_obs))
+        elev         = elevations[i]
 
         for top, bot, cid, prob in zip(depth_top, depth_bottom, class_obs, class_prob):
             cid  = int(cid)
             col  = color_map.get(cid, (0.7, 0.7, 0.7, 1.0))
             alpha = float(prob)
+
+            if use_elevation:
+                y_top_iv = elev - top
+                y_bot_iv = elev - bot
+            else:
+                y_top_iv = top
+                y_bot_iv = bot
+
+            y_center = (y_top_iv + y_bot_iv) / 2
+            height   = abs(y_top_iv - y_bot_iv)
+
             ax.barh(
-                y      = (top + bot) / 2,
+                y      = y_center,
                 width  = 1.0,
-                height = bot - top,
+                height = height,
                 left   = 0.0,
                 color  = col,
                 alpha  = alpha,
@@ -4676,29 +4709,40 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             )
             # Dashed vertical line showing class_prob value for this interval
             ax.plot(
-                [prob, prob], [top, bot],
+                [prob, prob], [y_top_iv, y_bot_iv],
                 color='black', linewidth=1.0,
                 linestyle='--', alpha=0.8,
             )
             # Thick horizontal boundary lines at top and bottom of each interval
-            ax.plot([-0.05, 1.05], [top, top], color='black', linewidth=1.5, solid_capstyle='butt')
-            ax.plot([-0.05, 1.05], [bot, bot], color='black', linewidth=1.5, solid_capstyle='butt')
+            ax.plot([-0.05, 1.05], [y_top_iv, y_top_iv], color='black', linewidth=1.5, solid_capstyle='butt')
+            ax.plot([-0.05, 1.05], [y_bot_iv, y_bot_iv], color='black', linewidth=1.5, solid_capstyle='butt')
+
+        # Thick black line at the ground surface (z=0 for this well)
+        y_surface = elev if use_elevation else 0
+        ax.plot([-0.05, 1.05], [y_surface, y_surface],
+                color='black', linewidth=3.0, solid_capstyle='butt')
 
         bh_name = bh.get('name', '')
         x_coord  = bh.get('X', '')
         y_coord  = bh.get('Y', '')
         if x_coord and y_coord:
-            subtitle = f'X={x_coord:.0f}\nY={y_coord:.0f}'
+            if use_elevation:
+                subtitle = f'X={x_coord:.0f}\nY={y_coord:.0f}\nElev={elev:.1f} m'
+            else:
+                subtitle = f'X={x_coord:.0f}\nY={y_coord:.0f}'
         else:
             subtitle = ''
         ax.set_title(f'{bh_name}\n{subtitle}', fontsize=8)
         ax.set_xlim(-0.05, 1.05)
-        ax.set_ylim(depth_max, 0)      # depth increases downward
+        if use_elevation:
+            ax.set_ylim(y_min_global, y_max_global)   # high elevation at top
+        else:
+            ax.set_ylim(y_max_global, y_min_global)   # depth increases downward
         ax.set_xticks([])
         ax.set_xlabel('')
         ax.tick_params(axis='y', labelsize=7)
 
-    axes[0].set_ylabel('Depth (m)')
+    axes[0].set_ylabel('Elevation (m a.s.l.)' if use_elevation else 'Depth (m)')
 
     # --- shared legend ---
     patches = [
