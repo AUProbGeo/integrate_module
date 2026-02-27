@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 2000000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 20000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -98,8 +98,6 @@ if useLogData:
     else:
         ig.save_data_gaussian(lD_obs, D_std = lD_std, f_data_h5 = f_data_h5, id=1, showInfo=0, is_log=1)
 
-
-
 # %%
 if inflateNoise != 1:
     gf=inflateNoise
@@ -125,33 +123,13 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 
 # %%
-BHOLES=[]
-P_single=0.9 # Probability assigned to the observed class in the prior model (for discrete parameters)
+doLoadBoreholes = True
+if doLoadBoreholes:
+    BHOLES = ig.read_borehole('daugaard_12boreholes.json', showInfo=1)
+else:
 
-use_well_type = 'compressed' # Options: 'full', 'compressed', 'single_layer'
-if use_well_type == 'full':
-    BH = {}
-    BH['depth_top'] =    [0  , 0.3, 0.5, 1, 1.5, 2, 10, 10.5, 13.2, 16.6]
-    BH['depth_bottom'] = [0.3, 0.5, 1, 1.5, 2, 10, 10.5, 13.2, 16.6, 20]
-    BH['class_obs'] = [2, 2, 2, 2, 2, 2, 5, 2, 5, 3]
-    BH['class_prob'] = [P_single, P_single, P_single, P_single, P_single, P_single, P_single, P_single, P_single, P_single]
-    BH['X'] = 542983.01
-    BH['Y'] = 6175822.76
-    BH['name'] = 'DAU02 - Full'
-    BHOLES.append(BH)
-
-    # WELL 2: 116.1602
-    BH = {}
-    BH['depth_top'] =     [0,  8, 15, 17, 20, 23.5, 45]
-    BH['depth_bottom'] =  [8, 15, 17, 20, 23.5, 45, 46]
-    BH['class_obs'] = [3,  5,  3,  5,  5,  6,  7]
-    BH['class_prob'] = [P_single, P_single, P_single, P_single, P_single, P_single, P_single]
-    BH['X'] = 543584.098
-    BH['Y'] = 6175788.478
-    BH['name'] = '116.1602 - Full'
-    BHOLES.append(BH)
-
-elif use_well_type == 'compressed':
+    BHOLES=[]
+    P_single=0.9 # Probability assigned to the observed class in the prior model (for discrete parameters)
 
     BH = {}
     BH['depth_top'] =    [0   , 13.2, 16.6]
@@ -173,51 +151,11 @@ elif use_well_type == 'compressed':
     BH['Y'] = 6175788.478
     BH['name'] = '116.1602 - Compressed'
     BHOLES.append(BH.copy())
-
-else :
-    # SINGLE LAYER: lithoilogy 5 from 20-24 m
-    BH = {}
-    BH['depth_top'] =     [20]
-    BH['depth_bottom'] = [24]
-    BH['class_obs'] = [5]
-    BH['class_prob'] = [P_single]
-    BH['X'] = 542983.01
-    BH['Y'] = 6175822.76
-    BH['name'] = 'DAU02'
-    BHOLES.append(BH.copy())
-
-    # SINGLE LAYER: lithoilogy 5 from 20-24 m
-    BH = {}
-    BH['depth_top'] =     [20]
-    BH['depth_bottom'] = [24]
-    BH['class_obs'] = [5]
-    BH['class_prob'] = [P_single]
-    BH['X'] = 543584.098
-    BH['Y'] = 6175788.478
-    BH['name'] = '116.1602 - Single Layer'
-    BHOLES.append(BH.copy())
-
-ig.plot_boreholes(BHOLES)
-
-# %%
-# Write each borehole to its own JSON file
+    
+    # Write all boreholes together in one JSON file
+    ig.write_borehole(BHOLES, 'daugaard_boreholes.json', showInfo=1)
+    
 for BH in BHOLES:
-    fname = 'daugaard_borehole_%s.json' % BH['name'].replace(' ', '_').replace('/', '-')
-    ig.write_borehole(BH, fname, showInfo=1)
-
-# Write all boreholes together in one JSON file
-ig.write_borehole(BHOLES, 'daugaard_boreholes.json', showInfo=1)
-
-# Read back a single borehole and inspect it
-BH_loaded = ig.read_borehole('daugaard_borehole_%s.json' % BHOLES[0]['name'].replace(' ', '_').replace('/', '-'), showInfo=1)
-print('name    :', BH_loaded['name'])
-print('X, Y    :', BH_loaded['X'], BH_loaded['Y'])
-print('intervals:', list(zip(BH_loaded['depth_top'], BH_loaded['depth_bottom'])))
-print('class_obs:', BH_loaded['class_obs'])
-
-# Read back all boreholes at once
-BHOLES_loaded = ig.read_borehole('daugaard_boreholes.json', showInfo=1)
-for BH in BHOLES_loaded:
     print(f"  {BH['name']:30s}  {len(BH['depth_top'])} intervals  X={BH['X']:.1f}  Y={BH['Y']:.1f}")
 
 # %%
@@ -226,7 +164,6 @@ ig.plot_boreholes(BHOLES)
 
 # Plot without prior info 
 ig.plot_boreholes(BHOLES, f_prior_h5)
-
 
 
 # %% [markdown]
