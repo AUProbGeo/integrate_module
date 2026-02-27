@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 2_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 500_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
