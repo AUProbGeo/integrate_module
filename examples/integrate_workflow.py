@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 20000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 2_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -213,8 +213,12 @@ for i, BH in enumerate(BHOLES):
     
 
 # Find points within buffer distance
-Xl = np.array([BHOLES[0]['X']-100, BHOLES[0]['X'], BHOLES[1]['X'], BHOLES[1]['X']+1500])
-Yl = np.array([BHOLES[0]['Y'], BHOLES[0]['Y'], BHOLES[1]['Y'], BHOLES[1]['Y']-150])
+X1 = 542983.01
+Y1 = 6175822.76
+X2 = 543584.098
+Y2 = 6175788.478
+Xl = np.array([X1-100,X1, X2, X2+1500])
+Yl = np.array([Y1, Y1, Y2, Y2-150])
 buffer = 15.0
 indices, distances, segment_ids = ig.find_points_along_line_segments(
     X, Y, Xl, Yl, tolerance=buffer
@@ -258,11 +262,14 @@ i2=np.max(id_line)+1
 # This prt of the can be rerun using different selection of data types without rerunning the abobe parts
 nr=1000
 id_use_arr = []
-#id_use_arr.append([1]) # tTEM 
+id_use_arr.append([1]) # tTEM 
 #id_use_arr.append([2]) # Well 1
 #id_use_arr.append([3]) # Well 2
-id_use_arr.append([2,3]) # Well 1,2
-id_use_arr.append([1,2,3]) # tTEM, Well 1,2
+#id_use_arr.append([2,3]) # Well 1,2
+#id_use_arr.append([2,3]) # Well 1,2
+#id_use_arr.append([1,2,3]) # tTEM, Well 1,2
+id_use_arr.append([2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels
+id_use_arr.append([1,2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels + tTEM
 
 N_use = N
 f_post_h5_list = []

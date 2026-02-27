@@ -47,7 +47,8 @@ Boreholes are represented as Python dictionaries containing lithology observatio
         'X': 498832.5,                                  # UTM Easting
         'Y': 6250843.1,                                 # UTM Northing
         'name': '65.795',                               # Borehole identifier
-        'method': 'mode_probability'                    # Integration method
+        'method': 'mode_probability',                   # Integration method
+        'elevation': 42.5                               # Ground-surface elevation (m a.s.l.) — optional
     }
 
 **Field Descriptions:**
@@ -77,6 +78,13 @@ Boreholes are represented as Python dictionaries containing lithology observatio
 ``method``
     Integration method. Options: ``'mode_probability'`` (recommended), ``'layer_probability'``.
 
+``elevation``
+    **Optional.** Ground-surface elevation of the borehole in metres above sea level (m a.s.l.).
+    When set to a non-zero value, :func:`plot_boreholes` switches to elevation mode: the shared
+    Y-axis shows absolute elevation instead of depth, and each borehole is vertically positioned
+    at its surface elevation.  Boreholes without this key (or with ``elevation=0``) are placed at
+    elevation 0 m a.s.l. in the plot.  This field has **no effect on inversion**.
+
 JSON File Format
 ~~~~~~~~~~~~~~~~
 
@@ -96,7 +104,8 @@ Single borehole file (``borehole_65.795.json``):
       "depth_bottom": [8, 12, 16, 28, 36],
       "class_obs":    [1, 2, 1, 5, 4],
       "class_prob":   [0.9, 0.9, 0.9, 0.9, 0.9],
-      "method": "mode_probability"
+      "method": "mode_probability",
+      "elevation": 42.5
     }
 
 Multi-borehole file (``all_boreholes.json``):
@@ -112,7 +121,8 @@ Multi-borehole file (``all_boreholes.json``):
         "depth_bottom": [8, 12, 16, 28, 36],
         "class_obs":    [1, 2, 1, 5, 4],
         "class_prob":   [0.9, 0.9, 0.9, 0.9, 0.9],
-        "method": "mode_probability"
+        "method": "mode_probability",
+        "elevation": 42.5
       },
       {
         "name": "65.732",
@@ -122,7 +132,8 @@ Multi-borehole file (``all_boreholes.json``):
         "depth_bottom": [5, 15, 25, 40],
         "class_obs":    [2, 1, 3, 2],
         "class_prob":   [0.8, 0.8, 0.8, 0.8],
-        "method": "mode_probability"
+        "method": "mode_probability",
+        "elevation": 38.1
       }
     ]
 
@@ -156,7 +167,7 @@ Visualising boreholes:
 
 .. code-block:: python
 
-    # Plot lithology sticks (one subplot per borehole)
+    # Plot lithology sticks (one subplot per borehole) — depth mode (default)
     ig.plot_boreholes(BHOLES)
 
     # With class names and colours from the prior HDF5 file
@@ -164,6 +175,12 @@ Visualising boreholes:
 
     # Load directly from a JSON file
     ig.plot_boreholes('all_boreholes.json', f_prior_h5='PRIOR.h5')
+
+    # Elevation mode: set BH['elevation'] on any borehole to switch the shared
+    # Y-axis from depth to absolute elevation (m a.s.l.)
+    BHOLES[0]['elevation'] = 42.5   # ground-surface elevation of first borehole
+    BHOLES[1]['elevation'] = 38.1   # ground-surface elevation of second borehole
+    ig.plot_boreholes(BHOLES)       # Y-axis now shows elevation; wells positioned correctly
 
 HDF5 File Structure
 -------------------
