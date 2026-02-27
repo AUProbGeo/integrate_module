@@ -2702,6 +2702,7 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
         if len(filelist)==0:
             filelist.append('DAUGAARD_AVG.h5')
             filelist.append('TX07_20231016_2x4_RC20-33.gex')
+            filelist.append('daugaard_12boreholes.json')
             filelist.append('README_DAUGAARD')
 
         if loadAll:
