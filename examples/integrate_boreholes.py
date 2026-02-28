@@ -11,8 +11,9 @@
 #   3. Visualising boreholes with `ig.plot_boreholes()`
 #   4. Saving and loading borehole data with `ig.write_borehole()` / `ig.read_borehole()`
 #   5. Controlling observation confidence with `class_prob`
-#   6. Integrating borehole data into the prior/data workflow with `ig.save_borehole_data()`
-#   7. Using borehole data IDs in rejection sampling
+#   6. Loading and visualising the full Daugaard borehole dataset
+#   7. Integrating borehole data into the prior/data workflow with `ig.save_borehole_data()`
+#   8. Using borehole data IDs in rejection sampling
 #
 
 # %%
@@ -280,7 +281,53 @@ plt.show()
 
 
 # %% [markdown]
-# ## 6. Integrating boreholes into the prior/data workflow
+# ## 6. Loading and visualising the full Daugaard borehole dataset
+#
+# The Daugaard case ships with a JSON file containing 12 boreholes with
+# elevation information (`daugaard_12boreholes.json`).  Because each borehole
+# dict contains an `elevation` key, `ig.plot_boreholes()` automatically
+# switches to **elevation mode**: the shared Y-axis shows metres above sea
+# level rather than depth below surface, and every borehole stick is
+# positioned at its ground-surface elevation.  This gives a more realistic
+# cross-section view of the subsurface.
+
+# %%
+# Download the borehole JSON file (skipped silently if already present)
+ig.get_case_data(case='DAUGAARD', filelist=['daugaard_12boreholes.json'])
+
+# Load all 12 boreholes
+BHOLES_12 = ig.read_borehole('daugaard_12boreholes.json', showInfo=1)
+
+print("Loaded %d boreholes:" % len(BHOLES_12))
+for BH in BHOLES_12:
+    print("  %-15s  elev=%.1f m  %d intervals" % (
+        BH['name'], BH.get('elevation', 0), len(BH['depth_top'])))
+
+# %%
+# Plot all 12 boreholes – elevation mode is triggered automatically
+ig.plot_boreholes(BHOLES_12, title='Daugaard – 12 boreholes (elevation mode)')
+if hardcopy:
+    plt.savefig('boreholes_daugaard_12.png', dpi=200, bbox_inches='tight')
+plt.show()
+
+# %%
+# Plot again with prior class names and colours (if the prior file is available)
+import glob
+prior_candidates = sorted(glob.glob('daugaard_merged_prior_N*.h5'))
+if prior_candidates:
+    f_prior_h5_12 = prior_candidates[-1]
+    print("Using prior for class labels: %s" % f_prior_h5_12)
+    ig.plot_boreholes(BHOLES_12, f_prior_h5_12,
+                      title='Daugaard – 12 boreholes with prior class labels')
+    if hardcopy:
+        plt.savefig('boreholes_daugaard_12_prior.png', dpi=200, bbox_inches='tight')
+    plt.show()
+else:
+    print("No merged prior file found – skipping plot with prior class labels.")
+
+
+# %% [markdown]
+# ## 7. Integrating boreholes into the prior/data workflow
 #
 # Before borehole data can be used in rejection sampling, two steps are needed:
 #
@@ -409,7 +456,7 @@ print("Borehole data IDs in data file:", id_borehole_list)
 
 
 # %% [markdown]
-# ## 7. Using borehole data in rejection sampling
+# ## 8. Using borehole data in rejection sampling
 #
 # After `ig.save_borehole_data()` the data HDF5 contains:
 # - Dataset 1 (`/D1`): the electromagnetic (tTEM) observed data

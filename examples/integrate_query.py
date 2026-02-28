@@ -18,7 +18,6 @@ except Exception:
 
 # %%
 import json
-import os
 
 import h5py
 import numpy as np
@@ -105,7 +104,6 @@ import integrate as ig
 #     f_prior_h5 = str(f.attrs.get('f5_prior', ''))
 #     f_data_h5 = str(f.attrs.get('f5_data', ''))
 # X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
-# n_data = X.shape[0]
 #
 # z = []
 # dz = []
@@ -121,7 +119,11 @@ import integrate as ig
 
 
 # %%
-_here = os.path.dirname(os.path.abspath(__file__)) if '__file__' in dir() else os.getcwd()
+# Select posterior hdf5 file to query 
+# (here an example the outcome og integrate_workflow.py)
+f_post_h5= 'post_DAUGAARD_AVG_WF_id1_2_3_4_5_6_7_8_9_10_11_12_13.h5'
+# Select data location to plot 
+ip = 1000
 
 # %% [markdown]
 # ### Example 1: Discrete constraint
@@ -147,7 +149,7 @@ query_ex0 = {
     ]
 }
 
-ig.save_query(query_ex0, os.path.join(_here, 'query_ex0.json'))
+ig.save_query(query_ex0, 'query_ex0.json')
 
 P0, meta0 = ig.query(f_post_h5, query_ex0)
 print(f"Example 0 | N_data={meta0['N_data']}, mean P={P0.mean():.3f}")
@@ -156,7 +158,7 @@ print(f"Example 0 | N_data={meta0['N_data']}, mean P={P0.mean():.3f}")
 # ig.query_plot(P0, meta0)
 
 # Detailed: probability map + model visualization for point 1000
-ig.query_plot(P0, meta0, ip=n_data-1, query_dict=query_ex0, f_post_h5=f_post_h5)
+ig.query_plot(P0, meta0, ip=ip, query_dict=query_ex0, f_post_h5=f_post_h5)
 
 # %%
 # Pause execution here to allow inspection of the plots before the script continues
@@ -196,14 +198,13 @@ query_ex0b = {
     ]
 }
 
-ig.save_query(query_ex0b, os.path.join(_here, 'query_ex0b.json'))
+ig.save_query(query_ex0b, 'query_ex0b.json')
 
 P0b, meta0b = ig.query(f_post_h5, query_ex0b)
 print(f"Example 0b | N_data={meta0b['N_data']}, mean P={P0b.mean():.3f}")
 
 # Detailed visualization for a specific point
-ip_example = n_data - 1
-ig.query_plot(P0b, meta0b, ip=ip_example, query_dict=query_ex0b, f_post_h5=f_post_h5)
+ig.query_plot(P0b, meta0b, ip=ip, query_dict=query_ex0b, f_post_h5=f_post_h5)
 
 
 # %% [markdown]
@@ -241,7 +242,7 @@ query_ex0c = {
     ]
 }
 
-ig.save_query(query_ex0c, os.path.join(_here, 'query_ex0c.json'))
+ig.save_query(query_ex0c, 'query_ex0c.json')
 
 P0c, meta0c = ig.query(f_post_h5, query_ex0c)
 print(f"Example 0c | N_data={meta0c['N_data']}, mean P={P0c.mean():.3f}")
@@ -289,7 +290,7 @@ query_ex0d = {
     ]
 }
 
-ig.save_query(query_ex0d, os.path.join(_here, 'query_ex0d.json'))
+ig.save_query(query_ex0d, 'query_ex0d.json')
 
 P0d, meta0d = ig.query(f_post_h5, query_ex0d)
 print(f"Example 0d | N_data={meta0d['N_data']}, mean P={P0d.mean():.3f}")
@@ -338,7 +339,7 @@ plt.title('Q0d: Q0 + NO Overburden')
 plt.gca().set_aspect('equal')
 
 plt.tight_layout()
-plt.savefig(os.path.join(_here, 'query_example0d_comparison.png'), dpi=150)
+plt.savefig('query_example0d_comparison.png', dpi=150)
 plt.show()
 
 # Choose ip_example as the index of the point with largest P0d
@@ -366,7 +367,7 @@ query_ex1 = {
     ]
 }
 
-ig.save_query(query_ex1, os.path.join(_here, 'query_ex1.json'))
+ig.save_query(query_ex1, 'query_ex1.json')
 
 P1, meta1 = ig.query(f_post_h5, query_ex1)
 print(f"Example 1 | N_data={meta1['N_data']}, mean P={P1.mean():.3f}")
@@ -396,7 +397,7 @@ query_ex2 = {
     ]
 }
 
-ig.save_query(query_ex2, os.path.join(_here, 'query_ex2.json'))
+ig.save_query(query_ex2, 'query_ex2.json')
 
 P2, meta2 = ig.query(f_post_h5, query_ex2)
 print(f"Example 2 | N_data={meta2['N_data']}, mean P={P2.mean():.3f}")
@@ -438,7 +439,7 @@ query_ex3 = {
     ]
 }
 
-ig.save_query(query_ex3, os.path.join(_here, 'query_ex3.json'))
+ig.save_query(query_ex3, 'query_ex3.json')
 
 P3, meta3 = ig.query(f_post_h5, query_ex3)
 print(f"Example 3 | N_data={meta3['N_data']}, mean P={P3.mean():.3f}")
@@ -468,7 +469,7 @@ query_ex4 = {
     ]
 }
 
-ig.save_query(query_ex4, os.path.join(_here, 'query_ex4.json'))
+ig.save_query(query_ex4, 'query_ex4.json')
 
 P4, meta4 = ig.query(f_post_h5, query_ex4)
 print(f"Example 4 | N_data={meta4['N_data']}, mean P={P4.mean():.3f}")
