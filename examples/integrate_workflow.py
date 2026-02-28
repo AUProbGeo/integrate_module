@@ -13,8 +13,8 @@ try:
     get_ipython().run_line_magic('autoreload', '2')
 except:
     # If get_ipython() raises an error, we are not in a Jupyter environment
-    # # # # # #%load_ext autoreload
-    # # # # # #%autoreload 2
+    # # # # # # #%load_ext autoreload
+    # # # # # # #%autoreload 2
     pass
 
 # %%
