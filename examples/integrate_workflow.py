@@ -29,6 +29,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N=100_000
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
