@@ -13,6 +13,14 @@ Start here if you are new to INTEGRATE
    notebooks/integrate_getting_started_no_forward.ipynb
    notebooks/integrate_getting_started_posterior_only.ipynb
 
+The complete Workflow
+=====================
+
+The complete INTEGRATE workflow in one notebook
+
+.. nbgallery::
+   notebooks/integrate_workflow.ipynb
+   
 
 Data 
 ================
@@ -39,7 +47,7 @@ INTEGRATE allows for using both correlated and uncorrelated Gaussian noise model
 .. nbgallery::
    notebooks/integrate_gaussian_noise.ipynb     
    
-  
+
 Hypothesis testing
 ==================
 
@@ -53,7 +61,7 @@ Qureying the posterior
 ======================
 
 .. nbgallery::
-   notebooks/integrate_query_posterior.ipynb
+   notebooks/integrate_query.ipynb
 
 Synthetic Case
 ================
