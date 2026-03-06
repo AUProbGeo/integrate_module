@@ -142,6 +142,7 @@ def query(f_post_h5, query_dict):
         Probability [0, 1] for each data location.
     meta : dict
         Metadata with keys:
+
         - 'X', 'Y' : coordinate arrays (or None)
         - 'N_data', 'N_post' : data location count and samples per location
         - 'i_use' : ndarray (N_data, N_post), all posterior indices from f_post_h5
