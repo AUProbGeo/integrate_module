@@ -235,7 +235,8 @@ def query(f_post_h5, query_dict):
     return P, meta
 
 
-def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=None, title=None):
+def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=None, title=None,
+               query_text=None, interpretation=None):
     """
     Plot query results and optionally detailed model visualization for a data point.
 
@@ -259,7 +260,14 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
         Path to posterior HDF5 file. Used to automatically extract prior file path
         if f_prior_h5 is not provided.
     title : str, optional
-        Custom title for the probability map. If None, uses 'Query Probability Map'.
+        Custom title for the probability map. If None, a title is built from
+        query_text and interpretation (if provided), or 'Query Probability Map'.
+    query_text : str, optional
+        The original natural-language query string. Shown in the figure title.
+    interpretation : str, optional
+        The LLM interpretation string returned by query_from_text(). Shown as a
+        second line in the figure title so the user can verify the query before
+        inspecting results.
 
     Examples
     --------
@@ -268,6 +276,10 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     >>> query_plot(P, meta, title='Custom Query Title')  # Custom title
     >>> query_plot(P, meta, ip=1000, query_dict=query_def, f_post_h5='posterior.h5')
     >>> query_plot(P, meta, ip=1000, query_dict=query_def, f_prior_h5='prior.h5')
+    >>> # With LLM query text and interpretation:
+    >>> query_dict, interp = ig.query_from_text(text, f_prior_h5)
+    >>> P, meta = ig.query(f_post_h5, query_dict)
+    >>> ig.query_plot(P, meta, query_text=text, interpretation=interp)
     """
     import matplotlib.pyplot as plt
 
@@ -293,7 +305,17 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     plt.colorbar(sc, label='Probability')
     ax.set_xlabel('UTMX [m]')
     ax.set_ylabel('UTMY [m]')
-    ax.set_title(title if title is not None else 'Query Probability Map')
+    if title is not None:
+        ax.set_title(title)
+    elif query_text is not None or interpretation is not None:
+        parts = []
+        if query_text is not None:
+            parts.append(f"Query: {query_text}")
+        if interpretation is not None:
+            parts.append(f"Interpreted as: {interpretation}")
+        ax.set_title('\n'.join(parts), fontsize=9)
+    else:
+        ax.set_title('Query Probability Map')
     ax.set_aspect('equal')
     # add grid lines
     ax.grid(True, linestyle='--', alpha=0.5)
@@ -478,3 +500,306 @@ def get_prior_model_info(f_prior_h5, im):
             'class_name':  ds.attrs.get('class_name', None),
         }
     return info
+
+
+def _build_llm_system_prompt(f_prior_h5):
+    """
+    Build a system prompt for the LLM that includes the query schema and prior model context.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+
+    Returns
+    -------
+    prompt : str
+        System prompt string.
+    """
+    # Collect all model keys from the prior file
+    with h5py.File(f_prior_h5, 'r') as f:
+        model_keys = sorted([k for k in f.keys() if k.startswith('M') and k[1:].isdigit()])
+
+    model_sections = []
+    for key in model_keys:
+        im = int(key[1:])
+        info = get_prior_model_info(f_prior_h5, im)
+        z = info['z']
+        n_layers = len(z) - 1
+        depth_min = float(z[0])
+        depth_max = float(z[-1])
+        name = info['name'] if info['name'] != key else key
+
+        if info['is_discrete']:
+            lines = [f"  Model im={im}: {name} (DISCRETE), depth {depth_min:.1f}–{depth_max:.1f} m, {n_layers} layers"]
+            if info['class_id'] is not None and info['class_name'] is not None:
+                lines.append("    Classes (use these integer IDs in the 'classes' field):")
+                ids = info['class_id'].flatten()
+                names = info['class_name'].flatten()
+                for cid, cname in zip(ids, names):
+                    lines.append(f"      {int(cid)} = {cname}")
+            else:
+                lines.append("    (Class IDs not available in prior file)")
+        else:
+            lines = [f"  Model im={im}: {name} (CONTINUOUS), depth {depth_min:.1f}–{depth_max:.1f} m, {n_layers} layers"]
+            lines.append("    Use 'value_comparison' ('<' or '>') and 'value_threshold' for this model.")
+
+        model_sections.append('\n'.join(lines))
+
+    models_text = '\n'.join(model_sections)
+
+    prompt = f"""You are a geophysics query assistant for the INTEGRATE probabilistic inversion module.
+Your task is to translate a natural-language query about geological or geophysical properties
+into a valid JSON query dict that can be executed by the query() function.
+
+## Response format
+
+You must always respond with a single JSON object containing exactly two top-level keys:
+- "interpretation": a one- or two-sentence plain English confirmation of what you understood
+  the query to mean and how you translated it. Be specific: name the classes/thresholds used.
+- "constraints": the list of constraint objects (see below).
+
+Example response structure:
+```json
+{{
+  "interpretation": "Probability that the cumulative thickness of clay (class 2) exceeds 10 m within 0–30 m depth.",
+  "constraints": [ {{ ... }} ]
+}}
+```
+
+## Constraint fields
+
+A constraint list contains one or more constraint objects combined with logical AND
+(every constraint must be satisfied).
+
+## Constraint Fields
+
+| Field                | Type        | Required          | Valid values                        | Description                                      |
+|----------------------|-------------|-------------------|-------------------------------------|--------------------------------------------------|
+| im                   | int         | always            | 1, 2, 3, ...                        | Prior model index (see Available Models below)   |
+| classes              | list[int]   | discrete only     | class IDs from the model            | Match any of these class IDs (discrete models)   |
+| value_comparison     | str         | continuous only   | "<" or ">"                          | Compare model value against threshold            |
+| value_threshold      | float       | continuous only   | any float                           | Threshold for continuous value comparison        |
+| thickness_mode       | str         | always            | "cumulative" or "first_occurrence"  | How to aggregate thickness of matching layers    |
+| thickness_comparison | str         | always            | ">", "<", ">=", "<="                | Operator applied to the computed thickness       |
+| thickness_threshold  | float       | always            | any float (meters)                  | Thickness threshold in meters                    |
+| depth_min            | float       | optional          | any float                           | Upper boundary of depth interval [m]             |
+| depth_max            | float       | optional          | any float                           | Lower boundary of depth interval [m]             |
+| negate               | bool        | optional          | true or false (default: false)      | If true, invert the constraint result            |
+
+### thickness_mode explained
+- "cumulative": sum the thickness of ALL matching layers within the depth interval
+- "first_occurrence": thickness of the FIRST contiguous block of matching layers
+
+## Available Prior Models
+
+{models_text}
+
+## Examples
+
+### Example 1: Discrete cumulative constraint
+Query: "Probability that cumulative clay thickness exceeds 10 m within 0–30 m depth"
+```json
+{{
+  "interpretation": "Probability that the cumulative thickness of clay (class 2) exceeds 10 m within 0–30 m depth.",
+  "constraints": [
+    {{
+      "im": 2,
+      "classes": [2],
+      "thickness_mode": "cumulative",
+      "thickness_comparison": ">",
+      "thickness_threshold": 10.0,
+      "depth_min": 0.0,
+      "depth_max": 30.0,
+      "negate": false
+    }}
+  ]
+}}
+```
+
+### Example 2: Continuous cumulative constraint
+Query: "Probability that resistivity is below 100 ohm-m for at least 25 m within 0–50 m"
+```json
+{{
+  "interpretation": "Probability that resistivity (im=1) is below 100 ohm-m for a cumulative thickness of at least 25 m within 0–50 m depth.",
+  "constraints": [
+    {{
+      "im": 1,
+      "value_comparison": "<",
+      "value_threshold": 100.0,
+      "thickness_mode": "cumulative",
+      "thickness_comparison": ">",
+      "thickness_threshold": 25.0,
+      "depth_min": 0.0,
+      "depth_max": 50.0,
+      "negate": false
+    }}
+  ]
+}}
+```
+
+### Example 3: Multi-constraint AND
+Query: "Probability that clay > 5 m within 0–20 m AND resistivity > 500 ohm-m for >= 1 m within 20–60 m"
+```json
+{{
+  "interpretation": "Probability that cumulative clay (class 2) thickness exceeds 5 m within 0–20 m AND resistivity (im=1) exceeds 500 ohm-m for at least 1 m within 20–60 m. Both constraints must hold simultaneously.",
+  "constraints": [
+    {{
+      "im": 2,
+      "classes": [2],
+      "thickness_mode": "cumulative",
+      "thickness_comparison": ">",
+      "thickness_threshold": 5.0,
+      "depth_min": 0.0,
+      "depth_max": 20.0,
+      "negate": false
+    }},
+    {{
+      "im": 1,
+      "value_comparison": ">",
+      "value_threshold": 500.0,
+      "thickness_mode": "cumulative",
+      "thickness_comparison": ">",
+      "thickness_threshold": 1.0,
+      "depth_min": 20.0,
+      "depth_max": 60.0,
+      "negate": false
+    }}
+  ]
+}}
+```
+
+### Example 4: First-occurrence with negation
+Query: "Probability that the first occurrence of clay at the surface is less than 3 m thick"
+```json
+{{
+  "interpretation": "Probability that the first contiguous block of clay (class 2) starting from the surface is less than 3 m thick, within 0–30 m depth.",
+  "constraints": [
+    {{
+      "im": 2,
+      "classes": [2],
+      "thickness_mode": "first_occurrence",
+      "thickness_comparison": "<",
+      "thickness_threshold": 3.0,
+      "depth_min": 0.0,
+      "depth_max": 30.0,
+      "negate": false
+    }}
+  ]
+}}
+```
+
+## Instructions
+
+- Respond with ONLY a valid JSON object with keys "interpretation" and "constraints". No markdown fences, no extra commentary.
+- Use only the model indices (im) and class IDs listed under Available Prior Models above.
+- If the query cannot be expressed with the available schema and models, respond with exactly:
+  UNSUPPORTED: <brief reason>
+- Do not invent class IDs or model indices that are not listed above.
+"""
+    return prompt
+
+
+def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, verbose=False):
+    """
+    Translate a natural-language query into a query dict using an LLM.
+
+    Uses the Anthropic API to interpret the user's text query in the context
+    of the available prior models and the integrate query schema, returning
+    a query dict and a plain-English interpretation of what the LLM understood.
+
+    Parameters
+    ----------
+    text : str
+        Natural language description of the query, e.g.
+        "What is the probability that cumulative clay thickness exceeds 10 m?".
+    f_prior_h5 : str
+        Path to the prior HDF5 file. Model metadata (class names, depth ranges,
+        discrete/continuous type) is read automatically and included in the
+        LLM prompt so the model knows what constraints are valid.
+    model : str, optional
+        Anthropic model ID to use (default: 'claude-sonnet-4-6').
+    api_key : str, optional
+        Anthropic API key. If None, the ANTHROPIC_API_KEY environment variable
+        is used.
+    verbose : bool, optional
+        If True, print the system prompt and LLM response for inspection.
+
+    Returns
+    -------
+    query_dict : dict
+        Query dict ready to pass to ig.query(f_post_h5, query_dict).
+    interpretation : str
+        Plain English confirmation of what the LLM understood the query to mean.
+        Check this before running ig.query() to catch misunderstandings cheaply.
+
+    Raises
+    ------
+    ImportError
+        If the anthropic package is not installed.
+    ValueError
+        If the LLM reports the query is unsupported, or if the response
+        cannot be parsed as valid JSON.
+
+    Notes
+    -----
+    Requires either the api_key parameter or the ANTHROPIC_API_KEY environment
+    variable to be set. Install the dependency with: pip install anthropic
+
+    Examples
+    --------
+    >>> import integrate as ig
+    >>> query_dict, interpretation = ig.query_from_text(
+    ...     "Probability that cumulative clay thickness > 10 m within 0-30 m",
+    ...     f_prior_h5='prior.h5',
+    ...     api_key='sk-ant-...',
+    ... )
+    >>> print(interpretation)
+    >>> P, meta = ig.query('posterior.h5', query_dict)
+    >>> ig.query_plot(P, meta)
+    """
+    try:
+        import anthropic
+    except ImportError:
+        raise ImportError(
+            "The 'anthropic' package is required for query_from_text(). "
+            "Install it with: pip install anthropic"
+        )
+
+    system_prompt = _build_llm_system_prompt(f_prior_h5)
+
+    if verbose:
+        print("=== SYSTEM PROMPT ===")
+        print(system_prompt)
+        print("=== USER TEXT ===")
+        print(text)
+
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model=model,
+        max_tokens=1024,
+        system=system_prompt,
+        messages=[{"role": "user", "content": text}],
+    )
+
+    response = message.content[0].text.strip()
+
+    if verbose:
+        print("=== LLM RESPONSE ===")
+        print(response)
+
+    if response.startswith("UNSUPPORTED:"):
+        reason = response[len("UNSUPPORTED:"):].strip()
+        raise ValueError(f"Query cannot be expressed with the current schema: {reason}")
+
+    try:
+        parsed = json.loads(response)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"LLM response could not be parsed as JSON: {e}\nRaw response:\n{response}"
+        )
+
+    interpretation = parsed.pop('interpretation', '')
+    print(f"Interpretation: {interpretation}")
+
+    return parsed, interpretation
