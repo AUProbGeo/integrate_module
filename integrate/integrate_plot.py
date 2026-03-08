@@ -1440,25 +1440,31 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         Accepted panel names: 'mode', 'entropy', 'stats', 'temperature', 't'
 
         Note: The stats panel optionally shows the number of unique realizations
-        when show_n_unique=True is passed in kwargs
-    **kwargs : dict
-        Additional keyword arguments:
-        - alpha : float, transparency scaling factor based on entropy (0.0 to 1.0).
-          alpha=0.0 means no transparency (default), alpha=1.0 means full entropy-based
-          transparency where high-uncertainty regions become transparent
-        - entropy_min : float, minimum entropy value for transparency scaling. Values below
-          this are fully opaque (alpha=1). Default is np.nanmin(Entropy) from the data.
-        - entropy_max : float, maximum entropy value for transparency scaling. Values above
-          this reach maximum transparency (alpha=1-alpha parameter). Default is 0.6*np.nanmax(Entropy).
-        - hardcopy : bool, save plot as PNG file (default False)
-        - txt : str, additional text for filename
-        - showInfo : int, level of debug output (0=none, >0=verbose)
-        - show_n_unique : bool, if True, adds a plot of the number of unique realizations
-          in the stats panel. Uses the same y-axis as temperature (default False)
-        - clim : list, color scale limits for discrete classes
-        - plot_kl : bool, if True, plot KL divergence instead of entropy in the entropy
-          panel. KL is only plotted if the ``/Mx/KL`` dataset exists in the posterior
-          HDF5 file; otherwise entropy is plotted as fallback (default False)
+        when show_n_unique=True is passed in kwargs.
+    alpha : float, optional
+        Transparency scaling factor based on entropy (0.0=no transparency, default;
+        1.0=full entropy-based transparency where high-uncertainty regions become transparent).
+    entropy_min : float, optional
+        Minimum entropy for transparency scaling; values below are fully opaque.
+        Default is ``np.nanmin(Entropy)`` from the data.
+    entropy_max : float, optional
+        Maximum entropy for transparency scaling; values above reach maximum transparency.
+        Default is ``0.6 * np.nanmax(Entropy)``.
+    hardcopy : bool, optional
+        Save plot as PNG file (default False).
+    txt : str, optional
+        Additional text for filename.
+    showInfo : int, optional
+        Level of debug output (0=none, >0=verbose).
+    show_n_unique : bool, optional
+        If True, adds a plot of the number of unique realizations in the stats panel,
+        sharing the temperature y-axis (default False).
+    clim : list, optional
+        Color scale limits for discrete classes.
+    plot_kl : bool, optional
+        If True, plot KL divergence instead of entropy in the entropy panel.
+        KL is plotted only if the ``/Mx/KL`` dataset exists; otherwise entropy
+        is used as fallback (default False).
 
     Returns
     -------
@@ -1467,16 +1473,16 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
 
     Notes
     -----
-    The plot structure uses 3 subplots (matching plot_profile_continuous()):
-    - ax[0]: Mode - most probable class at each depth/location (optionally with entropy transparency)
-    - ax[1]: Entropy - uncertainty measure (0=certain, 1=maximum uncertainty)
-    - ax[2]: Temperature and evidence curves
+    The plot structure uses 3 subplots: ax[0] shows the mode (most probable class,
+    optionally with entropy-based transparency), ax[1] shows entropy (0=certain,
+    1=maximum uncertainty), and ax[2] shows temperature and evidence curves.
 
     Class names and colors are automatically retrieved from prior file attributes.
     Depth coordinates are computed relative to surface elevation.
 
-    When alpha > 0, the mode panel shows both classification and uncertainty in one view:
-    solid colors indicate high certainty, transparent colors indicate high uncertainty.
+    When alpha > 0, the mode panel shows both classification and uncertainty in one
+    view: solid colors indicate high certainty, transparent colors indicate high
+    uncertainty.
     The alpha value (0.0 to 1.0) controls the strength of this transparency effect.
 
     Examples
@@ -2004,28 +2010,32 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         - ['stats']: Only temperature and log-likelihood
         - Any combination of the above (e.g., ['value', 'stats'])
         Accepted panel names: 'value', 'median', 'mean', 'std', 'uncertainty', 'stats', 'temperature', 't'
-    **kwargs : dict
-        Additional keyword arguments:
-        - hardcopy : bool, save plot as PNG file (default False)
-        - cmap : str or colormap, color scheme for plotting (default 'jet')
-        - key : {'Mean', 'Median'}, statistic to plot (default 'Median')
-        - alpha : float, transparency scaling factor based on normalized standard deviation (0.0 to 1.0).
-          alpha=0.0 means no transparency (default), alpha=1.0 means full uncertainty-based
-          transparency where high-uncertainty regions become transparent
-        - txt : str, additional text for filename
-        - showInfo : int, level of debug output (0=none, >0=verbose)
-        - clim : list, color scale limits [min, max]
-        - std_min : float, minimum standard deviation value for uncertainty-based transparency normalization.
-          Values below std_min render as fully opaque (alpha=1). Works with alpha parameter.
-          Default is np.nanmin(Std)
-        - std_max : float, maximum standard deviation value for uncertainty-based transparency normalization.
-          Values above std_max render with maximum transparency (alpha=1-alpha_value). Works with alpha parameter.
-          Default is 0.6*np.nanmax(Std)
-        - show_n_unique : bool, if True, adds a plot of the number of unique realizations
-          in the stats panel. Uses the same y-axis as temperature (default False)
-        - plot_kl : bool, if True, plot KL divergence instead of standard deviation in
-          the std panel. KL is only plotted if the ``/Mx/KL`` dataset exists in the
-          posterior HDF5 file; otherwise Std is plotted as fallback (default False)
+    hardcopy : bool, optional
+        Save plot as PNG file (default False).
+    cmap : str or colormap, optional
+        Color scheme for plotting (default ``'jet'``).
+    key : str, optional
+        Statistic to plot, either ``'Mean'`` or ``'Median'`` (default ``'Median'``).
+    alpha : float, optional
+        Transparency scaling factor based on normalized standard deviation (0.0=no
+        transparency, default; 1.0=full uncertainty-based transparency).
+    txt : str, optional
+        Additional text for filename.
+    showInfo : int, optional
+        Level of debug output (0=none, >0=verbose).
+    clim : list, optional
+        Color scale limits ``[min, max]``.
+    std_min : float, optional
+        Minimum std for transparency normalization; values below render as fully opaque.
+        Default is ``np.nanmin(Std)``.
+    std_max : float, optional
+        Maximum std for transparency normalization; values above render with maximum
+        transparency. Default is ``0.6 * np.nanmax(Std)``.
+    show_n_unique : bool, optional
+        If True, adds a plot of unique realizations in the stats panel (default False).
+    plot_kl : bool, optional
+        If True, plot KL divergence instead of standard deviation in the std panel.
+        Falls back to Std if ``/Mx/KL`` does not exist (default False).
 
     Returns
     -------
@@ -2034,20 +2044,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
 
     Notes
     -----
-    The plot structure uses 3 subplots:
-    - ax[0]: Mean or median values (for multi-layer) or line plot with confidence bounds (for single parameter)
-    - ax[1]: Standard deviation or KL divergence (for multi-layer, hidden for single parameter)
-    - ax[2]: Temperature and evidence curves
-
-    For multi-layer models (nm > 1):
-    - Panel 0: Mean or median values with logarithmic color scale
-    - Panel 1: Standard deviation with grayscale colormap
-    - Panel 2: Temperature and evidence curves
-
-    For single-parameter models (nm = 1):
-    - Panel 0: Line plot with mean ± 2*std confidence bounds
-    - Panel 1: Hidden
-    - Panel 2: Temperature and evidence curves
+    The plot structure uses 3 subplots: ax[0] shows mean or median values
+    (or a line plot with confidence bounds for single-parameter models), ax[1]
+    shows standard deviation or KL divergence (hidden for single-parameter models),
+    and ax[2] shows temperature and evidence curves.
 
     Transparency can be applied based on uncertainty levels when alpha > 0.
     Depth coordinates are computed relative to surface elevation.
@@ -3071,13 +3071,15 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
     Dkey : list or str, optional
         Explicit data key specification. If empty, automatically detects
         available datasets (default is []).
-    **kwargs : dict
-        Additional keyword arguments:
-        - showInfo : int, level of debug output (0=none, >0=verbose)
-        - is_log : bool, use linear instead of logarithmic y-axis (default False)
-        - hardcopy : bool, save plot as PNG file (default False)
-        - title : str, custom title for the plot. If not provided, uses default format
-          'Data set {Dkey}, Observation # {i_plot+1}'
+    showInfo : int, optional
+        Level of debug output (0=none, >0=verbose).
+    is_log : bool, optional
+        Use linear instead of logarithmic y-axis (default False).
+    hardcopy : bool, optional
+        Save plot as PNG file (default False).
+    title : str, optional
+        Custom title for the plot. If not provided, uses default format
+        ``'Data set {Dkey}, Observation # {i_plot+1}'``.
 
     Returns
     -------
@@ -3465,9 +3467,8 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     showInfo : int, optional
         Verbosity level for diagnostic output. If > 0, prints data range and
         auto-selected scale choice (default is 0).
-    **kwargs : dict
-        Additional keyword arguments:
-        - hardcopy : bool, save plots as PNG files (default True)
+    hardcopy : bool, optional
+        Save plots as PNG files (default True).
 
     Returns
     -------
@@ -3476,24 +3477,19 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
 
     Notes
     -----
-    Creates a 1x3 subplot layout with custom width ratios:
+    Creates a 1x3 subplot layout with custom width ratios.
 
-    **For continuous parameters:**
-    - Left (narrow, width 1): Histogram (log10 or linear) with horizontal orientation
-    - Middle (medium, width 1.5): Statistics vs depth showing Mean (red line),
-      Median (blue line), and ±1 Std (gray shading)
-    - Right (wide, width 2): Realizations plot with corresponding normalization
-      (LogNorm for log scale, linear for linear scale)
+    For continuous parameters: left panel (width 1) shows a histogram,
+    middle panel (width 1.5) shows statistics vs depth (Mean, Median, ±1 Std),
+    and right panel (width 2) shows realizations with LogNorm or linear colormap.
 
-    **For discrete parameters:**
-    - Left (narrow, width 1): Class distribution histogram with class names (always linear)
-    - Middle (medium, width 2): Probability of each class vs depth (separate line per class)
-    - Right (wide, width 3): Categorical realizations with class names and colors
+    For discrete parameters: left panel (width 1) shows a class distribution
+    histogram, middle panel (width 2) shows class probabilities vs depth,
+    and right panel (width 3) shows categorical realizations.
 
-    The `use_log` parameter controls scaling for histogram and realizations:
-    - Histogram: log10(values) vs linear values on y-axis
-    - Middle panel: Uses same scale as histogram (log/linear x-axis)
-    - Realizations: LogNorm vs linear colormap normalization
+    The ``use_log`` parameter controls log10 vs linear scaling for histogram bins
+    and colormap normalization. When ``use_log=None``, log scale is chosen
+    automatically for continuous parameters spanning more than 2 orders of magnitude.
 
     **Automatic Scale Selection (when use_log=None):**
     For continuous parameters, the function automatically chooses between log and
@@ -3884,9 +3880,8 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
     showInfo : int, optional
         Verbosity level for diagnostic output. If > 0, prints data range and
         auto-selected scale choice (default is 0).
-    **kwargs : dict
-        Additional keyword arguments:
-        - hardcopy : bool, save plots as PNG files (default True)
+    hardcopy : bool, optional
+        Save plots as PNG files (default True).
 
     Returns
     -------
@@ -3895,20 +3890,16 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
 
     Notes
     -----
-    Creates a 1x3 subplot layout with custom width ratios:
+    Creates a 1x3 subplot layout with custom width ratios.
 
-    **For continuous parameters:**
-    - Left (narrow, width 1): Histogram of posterior samples for selected data point
-    - Middle (medium, width 1.5): Posterior statistics vs depth showing Mean (red line),
-      Median (blue line), and ±1 Std (gray shading). Uses pre-computed statistics from
-      posterior file when available, otherwise computes from realizations.
-    - Right (wide, width 2): Realizations plot showing accepted samples
+    For continuous parameters: left panel (width 1) shows a histogram of posterior
+    samples, middle panel (width 1.5) shows posterior statistics vs depth (Mean,
+    Median, ±1 Std, using pre-computed stats when available), and right panel
+    (width 2) shows the accepted realizations.
 
-    **For discrete parameters:**
-    - Left (narrow, width 1): Class distribution histogram for posterior samples
-    - Middle (medium, width 2): Probability of each class vs depth for posterior
-      (separate line per class)
-    - Right (wide, width 3): Categorical realizations with class names and colors
+    For discrete parameters: left panel (width 1) shows a class distribution
+    histogram, middle panel (width 2) shows class probabilities vs depth for the
+    posterior, and right panel (width 3) shows categorical realizations.
 
     The function reads i_use[i_plot, :] to get accepted sample indices from the
     posterior file, then retrieves corresponding realizations from the referenced

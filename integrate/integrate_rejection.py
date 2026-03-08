@@ -441,21 +441,18 @@ def integrate_rejection_range(D,
     
     Returns
     -------
-    tuple
-        Tuple containing (i_use_all, T_all, EV_all, EV_post_all, N_UNIQUE_all, ip_range)
-        where:
-        - i_use_all : ndarray, shape (nump, nr)
-            Indices of accepted posterior samples for each data point
-        - T_all : ndarray, shape (nump,)
-            Temperature values used for each data point
-        - EV_all : ndarray, shape (nump,)
-            Evidence values for each data point
-        - EV_post_all : ndarray, shape (nump,)
-            Posterior evidence values for each data point
-        - N_UNIQUE_all : ndarray, shape (nump,)
-            Number of unique samples for each data point
-        - ip_range : ndarray
-            Range of data point indices that were processed
+    i_use_all : ndarray, shape (nump, nr)
+        Indices of accepted posterior samples for each data point.
+    T_all : ndarray, shape (nump,)
+        Temperature values used for each data point.
+    EV_all : ndarray, shape (nump,)
+        Evidence values for each data point.
+    EV_post_all : ndarray, shape (nump,)
+        Posterior evidence values for each data point.
+    N_UNIQUE_all : ndarray, shape (nump,)
+        Number of unique samples for each data point.
+    ip_range : ndarray
+        Range of data point indices that were processed.
     
     Notes
     -----
@@ -814,18 +811,16 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     
     Returns
     -------
-    tuple
-        Tuple containing aggregated results from all chunks:
-        - i_use_all : ndarray, shape (Ndp, nr)
-            Indices of accepted posterior samples for all data points
-        - T_all : ndarray, shape (Ndp,)
-            Temperature values used for all data points
-        - EV_all : ndarray, shape (Ndp,)
-            Evidence values for all data points
-        - EV_post_all : ndarray, shape (Ndp,)
-            Posterior evidence values for all data points
-        - N_UNIQUE_all : ndarray, shape (Ndp,)
-            Number of unique samples for all data points
+    i_use_all : ndarray, shape (Ndp, nr)
+        Indices of accepted posterior samples for all data points.
+    T_all : ndarray, shape (Ndp,)
+        Temperature values used for all data points.
+    EV_all : ndarray, shape (Ndp,)
+        Evidence values for all data points.
+    EV_post_all : ndarray, shape (Ndp,)
+        Posterior evidence values for all data points.
+    N_UNIQUE_all : ndarray, shape (Ndp,)
+        Number of unique samples for all data points.
     
     Notes
     -----
@@ -922,46 +917,24 @@ def integrate_posterior_chunk(args):
     Parameters
     ----------
     args : tuple
-        Tuple containing chunk parameters:
-        - i_chunk : int
-            Index of the current chunk being processed
-        - ip_chunks : list
-            List of all data point index chunks
-        - DATA : dict
-            Dictionary containing observed data structures
-        - idx : list
-            Indices of prior samples to use for inversion
-        - N_use : int
-            Maximum number of prior samples to evaluate
-        - id_use : list
-            List of data identifiers for likelihood calculation
-        - shared_memory_refs : list
-            References to shared memory segments containing forward modeled data
-        - autoT : int
-            Automatic temperature estimation flag
-        - T_base : float
-            Base temperature for rejection sampling
-        - nr : int
-            Number of posterior samples to retain per data point
-        - use_N_best : int
-            Flag to use only the N best-fitting samples
-    
+        Packed arguments: (i_chunk, ip_chunks, DATA, idx, N_use, id_use,
+        shared_memory_refs, autoT, T_base, nr, use_N_best). See
+        ``integrate_rejection_range`` for descriptions of individual fields.
+
     Returns
     -------
-    tuple
-        Tuple containing chunk results:
-        - i_use : ndarray, shape (nump, nr)
-            Indices of accepted posterior samples for the chunk
-        - T : ndarray, shape (nump,)
-            Temperature values used for the chunk
-        - EV : ndarray, shape (nump,)
-            Evidence values for the chunk
-        - EV_post : ndarray, shape (nump,)
-            Posterior evidence values for the chunk
-        - N_UNIQUE : ndarray, shape (nump,)
-            Number of unique samples for the chunk
-        - ip_range : ndarray
-            Range of data point indices that were processed
+    i_use : ndarray, shape (nump, nr)
+        Indices of accepted posterior samples for the chunk.
+    T : ndarray, shape (nump,)
+        Temperature values used for the chunk.
+    EV : ndarray, shape (nump,)
+        Evidence values for the chunk.
+    EV_post : ndarray, shape (nump,)
+        Posterior evidence values for the chunk.
+    N_UNIQUE : ndarray, shape (nump,)
+        Number of unique samples for the chunk.
+    ip_range : ndarray
+        Range of data point indices that were processed.
     
     Notes
     -----
@@ -1462,12 +1435,10 @@ def create_shared_memory(arrays):
     
     Returns
     -------
-    tuple
-        Tuple containing (shared_memories, shm_objects) where:
-        - shared_memories : list
-            List of (name, shape, dtype) tuples identifying shared memory segments
-        - shm_objects : list
-            List of SharedMemory objects for cleanup
+    shared_memories : list
+        List of ``(name, shape, dtype)`` tuples identifying shared memory segments.
+    shm_objects : list
+        List of SharedMemory objects for cleanup.
     
     Notes
     -----
@@ -1512,12 +1483,10 @@ def reconstruct_shared_arrays(shared_memory_refs):
     
     Returns
     -------
-    tuple
-        Tuple containing:
-        - reconstructed_arrays : list
-            List of numpy arrays reconstructed from shared memory
-        - shm_objects : list
-            List of shared memory objects that must be closed after use
+    reconstructed_arrays : list
+        List of numpy arrays reconstructed from shared memory.
+    shm_objects : list
+        List of shared memory objects that must be closed after use.
     
     Warnings
     --------
@@ -1612,10 +1581,8 @@ def compute_hypothesis_probability(f_post_h5_list, **kwargs):
     f_post_h5_list : list of str
         List of paths to posterior HDF5 files, one for each hypothesis.
         Each file must contain an '/EV' dataset with log-evidence values (natural log).
-    **kwargs : dict
-        Additional keyword arguments.
-        showInfo : int, optional
-            Level of verbosity for output. Default is 0.
+    showInfo : int, optional
+        Level of verbosity for output. Default is 0.
 
     Returns
     -------

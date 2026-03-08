@@ -53,8 +53,7 @@ Hypothesis testing
 
 .. nbgallery::
    notebooks/integrate_daugaard_multi_prior_multi_data.ipynb  
-   notebooks/integrate_daugaard_multi_prior.ipynb  
-   .. notebooks/integrate_case_evidence_approximation.ipynb   
+   notebooks/integrate_daugaard_multi_prior.ipynb
 
 
 Qureying the posterior

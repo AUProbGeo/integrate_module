@@ -339,7 +339,7 @@ The attribute ``/method`` refer to a specific choice of forward method.
 or can be ``identity`` for an identity mapping (useful to represent log data).
 
 TDEM: Time domain EM, method='tdem'.
-----------------------------------------
+"""""""""""""""""""""""""""""""""""""
 
 ``/method='TDEM'`` make use of time-domain EM forward modeling. 
 The following three types of forward models will (eventually) be available:
@@ -358,7 +358,7 @@ Not yet implemented
 [SimPEG]_. Python only.
 
 LOG: Well log conditioning, method='log'
-----------------------------------------
+""""""""""""""""""""""""""""""""""""""""
 
 ``/method='identity'`` maps attributes of a specific model (realizations of the prior) directly into data. 
   
@@ -444,7 +444,7 @@ Statistics are written by :func:`integrate.integrate_posterior_stats`.
 
 
 Continuous parameters
----------------------
+"""""""""""""""""""""
 
 Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
 :func:`integrate.integrate_posterior_stats`.
@@ -480,7 +480,7 @@ Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
 
 
 Discrete parameters
--------------------
+"""""""""""""""""""
 
 Written for each discrete model parameter ``/Mx`` (``is_discrete=1``) by
 :func:`integrate.integrate_posterior_stats`.
@@ -595,7 +595,7 @@ All HDF5 write functions accept ``compression`` and ``compression_opts`` paramet
 
 
 A typical workflow
-------------------
+==================
 
 1. Setup DATA.h5
    

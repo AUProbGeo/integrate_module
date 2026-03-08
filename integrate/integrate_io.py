@@ -970,27 +970,22 @@ def read_gex(file_gex, **kwargs):
     ----------
     file_gex : str
         Path to the GEX file containing electromagnetic system configuration.
-    **kwargs : dict
-        Additional parsing parameters:
-        - Nhank : int, number of Hankel transform abscissae for both frequency
-          windows (used in processing, not directly from file)
-        - Nfreq : int, number of frequencies per decade for both frequency
-          windows (used in processing, not directly from file)
-        - Ndig : int, number of digits for waveform digitizing frequency
-          (used in processing, not directly from file)
-        - showInfo : int, verbosity level (0=silent, >0=verbose, default 0)
+    Nhank : int, optional
+        Number of Hankel transform abscissae for both frequency windows.
+    Nfreq : int, optional
+        Number of frequencies per decade for both frequency windows.
+    Ndig : int, optional
+        Number of digits for waveform digitizing frequency.
+    showInfo : int, optional
+        Verbosity level (0=silent, >0=verbose, default 0).
 
     Returns
     -------
     dict
-        Dictionary containing parsed GEX file contents with structure:
-        - 'filename' : str, original file path
-        - 'General' : dict, system description and general parameters
-        - Section-specific dictionaries containing parameters grouped by
-          functionality (e.g., timing, waveforms, filters)
-        - 'WaveformLM' : numpy.ndarray, low-moment waveform points
-        - 'WaveformHM' : numpy.ndarray, high-moment waveform points  
-        - 'GateArray' : numpy.ndarray, measurement gate timing
+        Dictionary containing parsed GEX file contents. Keys include
+        ``'filename'`` (str), ``'General'`` (dict), section-specific
+        parameter dicts, ``'WaveformLM'`` (ndarray), ``'WaveformHM'``
+        (ndarray), and ``'GateArray'`` (ndarray).
 
     Raises
     ------
@@ -1263,22 +1258,22 @@ def gex_to_stm(file_gex, **kwargs):
     Parameters
     ----------
     file_gex : str or dict
-        GEX system configuration. Can be either:
-        - str: Path to GEX file to be read and processed
-        - dict: Pre-loaded GEX dictionary from previous read_gex() call
-    **kwargs : dict
-        Additional parameters passed to write_stm_files():
-        - Nhank : int, number of Hankel transform coefficients
-        - Nfreq : int, number of frequencies for transform
-        - showInfo : int, verbosity level
-        - Other STM generation parameters
+        GEX system configuration. Pass a file path (str) to read and process
+        a GEX file, or pass a pre-loaded GEX dictionary from a previous
+        ``read_gex()`` call.
+    Nhank : int, optional
+        Number of Hankel transform coefficients.
+    Nfreq : int, optional
+        Number of frequencies for transform.
+    showInfo : int, optional
+        Verbosity level.
 
     Returns
     -------
-    tuple
-        Tuple containing (stm_files, GEX) where:
-        - stm_files : list of str, paths to generated STM files
-        - GEX : dict, processed GEX dictionary used for STM generation
+    stm_files : list of str
+        Paths to the generated STM files.
+    GEX : dict
+        Processed GEX dictionary used for STM generation.
 
     Raises
     ------
@@ -1294,13 +1289,12 @@ def gex_to_stm(file_gex, **kwargs):
     contain system transfer functions needed for accurate forward modeling
     with GA-AEM.
 
-    When file_gex is a string, the function attempts to read the GEX file:
-    - First tries read_gex() for legacy format compatibility
-    - If that fails (e.g., Workbench format), automatically falls back to
-      read_gex_workbench() which handles both legacy and Workbench formats
+    When file_gex is a string, the function first tries ``read_gex()`` for
+    legacy format compatibility. If that fails (e.g., Workbench format), it
+    automatically falls back to ``read_gex_workbench()``.
 
-    When file_gex is a dictionary, it's assumed to be a valid GEX structure
-    from a previous read_gex() or read_gex_workbench() call.
+    When file_gex is a dictionary, it is assumed to be a valid GEX structure
+    from a previous ``read_gex()`` or ``read_gex_workbench()`` call.
 
     The write_stm_files() function handles the actual STM file generation
     with the provided or default parameters.
@@ -1676,10 +1670,9 @@ def get_discrete_classes(f_h5, im=1):
     Parameters
     ----------
     f_h5 : str
-        Path to the HDF5 file. Can be either:
-        - Prior file (f_prior_h5): Reads classes directly from the prior
-        - Posterior file (f_post_h5): Extracts prior file reference first,
-          then reads classes from the prior
+        Path to the HDF5 file. Can be a prior file (reads classes directly)
+        or a posterior file (extracts the prior file reference first, then
+        reads classes from the prior).
 
     im : int, optional
         Model index to get classes for (e.g., 1 for M1, 2 for M2, default is 1).
@@ -3488,23 +3481,9 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
     between different survey areas. The merged files retain full compatibility
     with INTEGRATE analysis and visualization functions.
     
-    File naming convention for merged outputs follows pattern:
-    'MERGED_{timestamp}_{description}.h5' when automatic naming is used.
-        **File Naming:**
-        
-        - If f_post_merged_h5 is not provided, uses format: 'POST_merged_N{number_of_files}.h5'
-        - Data file uses format: 'DATA_merged_N{number_of_files}.h5'
-        
-        **Dependencies:**
-        
-        - Requires the merge_data function to be available for merging observational data
-        - Posterior files must have compatible structure for merging
-        
-        **Merging Process:**
-        
-        - Combines posterior sampling results from multiple files
-        - Merges corresponding observational data
-        - Maintains data integrity and structure consistency
+    If f_post_merged_h5 is not provided, the output uses the format
+    ``'POST_merged_N{N}.h5'`` and the data file uses ``'DATA_merged_N{N}.h5'``.
+    Posterior files must have compatible structure for merging.
     """
     import h5py
     import integrate as ig

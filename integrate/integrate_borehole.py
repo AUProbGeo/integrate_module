@@ -623,10 +623,12 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False)
     2. Converts distance weight to temperature: T = 1 / w_dis
     3. Caps maximum temperature at 100 (very weak influence)
     4. For each grid point:
+
        - If T < 100: include point (i_use=1) and apply temperature scaling
        - If T ≥ 100: exclude point (i_use=0) and set observations to NaN
 
     Temperature scaling reduces probability certainty with distance:
+
     - T = 1 (close to observation): Original probabilities preserved
     - T > 1 (far from observation): Probabilities become more uniform
     - T ≥ 100 (very far): Observations effectively ignored

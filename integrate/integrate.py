@@ -88,11 +88,9 @@ def use_parallel(**kwargs):
 
     Parameters
     ----------
-    **kwargs : dict
-        Additional keyword arguments including showInfo for verbosity control.
-        showInfo : int, optional
-            If greater than 0, prints information about the environment and
-            parallel processing status. Default is 0.
+    showInfo : int, optional
+        If greater than 0, prints information about the environment and
+        parallel processing status. Default is 0.
 
     Returns
     -------
@@ -220,14 +218,12 @@ def integrate_update_prior_attributes(f_prior_h5, **kwargs):
     ----------
     f_prior_h5 : str
         The path to the HDF5 file to process.
-    **kwargs : dict
-        Additional keyword arguments.
-        showInfo : int, optional
-            Level of verbosity for output (default is 0).
+    showInfo : int, optional
+        Level of verbosity for output (default is 0).
     """
-    
+
     showInfo = kwargs.get('showInfo', 0)
-    
+
     # Check that hdf5 files exists
     if not os.path.isfile(f_prior_h5):
         if showInfo>=2:
@@ -706,7 +702,7 @@ def sample_from_posterior(is_, d_sim, f_data_h5='tTEM-Djursland.h5', N_use=10000
             Temperature.
         EV : float
             Expected value.
-        is_ : int
+        is_index : int
             Index of the posterior sample.
     """
     with h5py.File(f_data_h5, 'r') as f:
@@ -862,13 +858,11 @@ def forward_gaaem(C=np.array(()),
         Path to GEX file. Default is None.
     showtime : bool, optional
         Flag to display execution time. Default is False.
-    **kwargs : dict
-        Additional keyword arguments.
-        showInfo : int, optional
-            Level of verbosity for output.
-        doCompress : bool, optional
-            Flag to enable layer compression. Default is True.
-    
+    showInfo : int, optional
+        Level of verbosity for output.
+    doCompress : bool, optional
+        Flag to enable layer compression. Default is True.
+
     Returns
     -------
     numpy.ndarray
@@ -1462,13 +1456,11 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
         Number of soundings to consider. Default is 0 (use all).
     doMakePriorCopy : bool, optional
         Flag indicating whether to make a copy of the prior file. Default is False.
-    **kwargs : dict
-        Additional keyword arguments.
-        showInfo : int, optional
-            Level of verbosity for output.
-        forceDeleteExisting : bool, optional
-            Flag to force deletion of existing data. Default is True.
-    
+    showInfo : int, optional
+        Level of verbosity for output.
+    forceDeleteExisting : bool, optional
+        Flag to force deletion of existing data. Default is True.
+
     Returns
     -------
     str
@@ -1476,7 +1468,7 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
     """
     import integrate as ig
     import time
-    
+
     type = 'idenity'
     method = '--'
     showInfo = kwargs.get('showInfo', 0)
@@ -1599,12 +1591,10 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
         values below this threshold (including zero or negative values from 'normal'
         distribution) will be clamped to this value. Ensures physically realistic
         positive resistivity values. Default is 0.001 Ohm·m.
-    **kwargs : dict
-        Additional keyword arguments.
-        f_prior_h5 : str, optional
-            Path to the prior model file in HDF5 format. Default is ''.
-        showInfo : int, optional
-            Level of verbosity for output.
+    f_prior_h5 : str, optional
+        Path to the prior model file in HDF5 format. Default is ''.
+    showInfo : int, optional
+        Level of verbosity for output.
 
     Returns
     -------
@@ -1826,12 +1816,10 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
         values below this threshold (including zero or negative values from 'normal'
         distribution) will be clamped to this value. Ensures physically realistic
         positive resistivity values. Default is 0.001 Ohm·m.
-    **kwargs : dict
-        Additional keyword arguments.
-        f_prior_h5 : str, optional
-            Path to the prior model file in HDF5 format. Default is ''.
-        showInfo : int, optional
-            Level of verbosity for output.
+    f_prior_h5 : str, optional
+        Path to the prior model file in HDF5 format. Default is ''.
+    showInfo : int, optional
+        Level of verbosity for output.
 
     Returns
     -------
@@ -1961,12 +1949,10 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
         values below this threshold (including zero or negative values from 'normal'
         distribution) will be clamped to this value. Ensures physically realistic
         positive resistivity values. Default is 0.001 Ohm·m.
-    **kwargs : dict
-        Additional keyword arguments.
-        f_prior_h5 : str, optional
-            Path to the prior model file in HDF5 format. Default is ''.
-        showInfo : int, optional
-            Level of verbosity for output.
+    f_prior_h5 : str, optional
+        Path to the prior model file in HDF5 format. Default is ''.
+    showInfo : int, optional
+        Level of verbosity for output.
 
     Returns
     -------
@@ -2352,72 +2338,48 @@ def synthetic_case(case='Wedge', **kwargs):
     case : str, optional
         The type of synthetic case to generate. Options are 'Wedge' and '3Layer'.
         Default is 'Wedge'.
-    **kwargs : dict
-        Additional parameters for synthetic case generation.
-
-        Common Parameters
-        -----------------
-        showInfo : int, optional
-            If greater than 0, print information about the generated case. Default is 0.
-        rho_1 : list or array_like, optional
-            Resistivity values for layer 1 along the profile. If a single value [v],
-            resistivity is constant at v. If multiple values [v1, v2, ...], resistivity
-            varies from v1 (left) to v2 (middle) to vN (right) using interpolation.
-            Only used when rho_1, rho_2, and rho_3 are all provided.
-        rho_2 : list or array_like, optional
-            Resistivity values for layer 2 along the profile. Same format as rho_1.
-        rho_3 : list or array_like, optional
-            Resistivity values for layer 3 along the profile. Same format as rho_1.
-
-        Parameters for 'Wedge' case
-        ---------------------------
-        x_max : int, optional
-            Maximum x-dimension size. Default is 1000.
-        dx : float, optional
-            Step size in the x-dimension. Default is 1000./x_max.
-        z_max : int, optional
-            Maximum z-dimension size. Default is 90.
-        dz : float, optional
-            Step size in the z-dimension. Default is 1.
-        z1 : float, optional
-            Depth at which the wedge starts. Default is z_max/10.
-        rho : list, optional
-            Density values for different layers. Default is [100, 200, 120].
-            Overridden by rho_1, rho_2, rho_3 if all three are provided.
-        wedge_angle : float, optional
-            Angle of the wedge in degrees. Default is 1.
-
-        Parameters for '3Layer' case
-        ----------------------------
-        x_max : int, optional
-            Maximum x-dimension size. Default is 100.
-        x_range : float, optional
-            Range in the x-dimension for the cosine function. Default is x_max/4.
-        dx : float, optional
-            Step size in the x-dimension. Default is 1.
-        z_max : int, optional
-            Maximum z-dimension size. Default is 60.
-        dz : float, optional
-            Step size in the z-dimension. Default is 1.
-        z1 : float, optional
-            Depth at which the first layer ends. Default is z_max/3.
-        z_thick : float, optional
-            Thickness of the second layer. Default is z_max/2.
-        rho1_1 : float, optional
-            Density at the start of the first layer. Default is 120.
-            Overridden by rho_1 if provided.
-        rho1_2 : float, optional
-            Density at the end of the first layer. Default is 10.
-            Overridden by rho_1 if provided.
-        rho2_1 : float, optional
-            Density at the start of the second layer. Default is rho1_2.
-            Overridden by rho_2 if provided.
-        rho2_2 : float, optional
-            Density at the end of the second layer. Default is rho1_1.
-            Overridden by rho_2 if provided.
-        rho3 : float, optional
-            Density of the third layer. Default is 120.
-            Overridden by rho_3 if provided.
+    showInfo : int, optional
+        If greater than 0, print information about the generated case. Default is 0.
+    rho_1 : list or array_like, optional
+        Resistivity values for layer 1 along the profile. If a single value [v],
+        resistivity is constant at v. If multiple values [v1, v2, ...], resistivity
+        varies from v1 (left) to v2 (middle) to vN (right) using interpolation.
+        Only used when rho_1, rho_2, and rho_3 are all provided.
+    rho_2 : list or array_like, optional
+        Resistivity values for layer 2 along the profile. Same format as rho_1.
+    rho_3 : list or array_like, optional
+        Resistivity values for layer 3 along the profile. Same format as rho_1.
+    x_max : int, optional
+        Maximum x-dimension size. Default is 1000 for 'Wedge', 100 for '3Layer'.
+    dx : float, optional
+        Step size in the x-dimension.
+    z_max : int, optional
+        Maximum z-dimension size. Default is 90 for 'Wedge', 60 for '3Layer'.
+    dz : float, optional
+        Step size in the z-dimension. Default is 1.
+    z1 : float, optional
+        Depth at which the wedge starts ('Wedge': default z_max/10) or first layer
+        ends ('3Layer': default z_max/3).
+    rho : list, optional
+        Density values for different layers ('Wedge' case). Default is [100, 200, 120].
+        Overridden by rho_1, rho_2, rho_3 if all three are provided.
+    wedge_angle : float, optional
+        Angle of the wedge in degrees ('Wedge' case). Default is 1.
+    x_range : float, optional
+        Range in the x-dimension for the cosine function ('3Layer' case).
+        Default is x_max/4.
+    z_thick : float, optional
+        Thickness of the second layer ('3Layer' case). Default is z_max/2.
+    rho1_1 : float, optional
+        Density at the start of the first layer ('3Layer'). Default is 120.
+    rho1_2 : float, optional
+        Density at the end of the first layer ('3Layer'). Default is 10.
+    rho2_1 : float, optional
+        Density at the start of the second layer ('3Layer'). Default is rho1_2.
+    rho2_2 : float, optional
+        Density at the end of the second layer ('3Layer'). Default is rho1_1.
+    rho3 : float, optional
+        Density of the third layer ('3Layer'). Default is 120.
 
     Returns
     -------
