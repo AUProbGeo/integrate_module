@@ -29,7 +29,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N=100_000
+N = 1_000_0
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -75,7 +75,7 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 # %%
 useLogData = False # Whether to transform data to log10 space (recommended for resistivity data)
 useCorrleatedNoise = False # Whether to use correlated noise (instead of uncorrelated) when generating the prior data. This can be more realistic for geophysical data, but it also increases the computational cost.
-inflateNoise = 1 # Factor to increase noise level (std) in the data, to
+inflateNoise = 2 # Factor to increase noise level (std) in the data, to
 
 
 # %%
@@ -109,6 +109,7 @@ if inflateNoise != 1:
     D_obs = D['d_obs'][0]
     D_std = D['d_std'][0]*gf
     f_data_old_h5 = f_data_h5
+    fname_data = f_data_h5.split('.')[0]
     f_data_h5 = '%s_gf%g.h5' % (fname_data, gf)
     ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
     ig.save_data_gaussian(D_obs, D_std=D_std, f_data_h5=f_data_h5, file_gex=file_gex)
