@@ -2710,6 +2710,23 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
             filelist.append('tTEM_20231109_AVG_export.h5')
             filelist.append('DAUGAARD_AVG_inout.h5')
 
+        if (loadAll or loadType=='xyz'):            
+            filelist.append('tTEM_20230727_AVG_export.xyz')
+            filelist.append('tTEM_20230814_AVG_export.xyz')
+            filelist.append('tTEM_20230829_AVG_export.xyz')
+            filelist.append('tTEM_20230913_AVG_export.xyz')
+            filelist.append('tTEM_20231109_AVG_export.xyz')
+            filelist.append('tTEM_20230727_RAW_export.xyz')
+            filelist.append('tTEM_20230814_RAW_export.xyz')
+            filelist.append('tTEM_20230829_RAW_export.xyz')
+            filelist.append('tTEM_20230913_RAW_export.xyz')
+            filelist.append('tTEM_20231109_RAW_export.xyz')
+            filelist.append('TX07_20230731_2x4_RC20-33.gex')
+            filelist.append('TX07_20230828_2x4_RC20-33.gex')
+            filelist.append('TX07_20230906_2x4_RC20-33.gex')
+            filelist.append('TX07_20231016_2x4_RC20-33.gex')
+
+            
         if (loadAll or loadType=='shapefiles'):            
             #filelist.append('Begravet dal.zip')
             filelist.append('Begravet dal.shp')
