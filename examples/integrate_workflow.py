@@ -29,7 +29,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 1_000_0
+N = 1000000
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -41,6 +41,16 @@ ig.get_case_data(case=case, filelist=['daugaard_standard.xlsx','daugaard_valley.
 files = ig.get_case_data(case=case)
 f_data_h5 = files[0]
 file_gex= ig.get_gex_file_from_data(f_data_h5)
+
+loadFromXyz=True
+if loadFromXyz:
+    ig.get_case_data(case=case, loadType='xyz')
+    useRaw = True
+    if useRaw:
+        file_xyz_list=['tTEM_20230727_RAW_export.xyz', 'tTEM_20230814_RAW_export.xyz', 'tTEM_20230829_RAW_export.xyz', 'tTEM_20230913_RAW_export.xyz', 'tTEM_20231109_RAW_export.xyz']
+    else:
+        file_xyz_list=['tTEM_20230727_AVG_export.xyz', 'tTEM_20230814_AVG_export.xyz', 'tTEM_20230829_AVG_export.xyz', 'tTEM_20230913_AVG_export.xyz', 'tTEM_20231109_AVG_export.xyz']
+    f_data_h5 = ig.xyz_to_h5(file_xyz_list, file_gex, showInfo=1)
 
 print("Using data file: %s" % f_data_h5)
 print("Using GEX file: %s" % file_gex)
