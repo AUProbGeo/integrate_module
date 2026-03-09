@@ -28,6 +28,7 @@ dependencies = [
     "jupytext",
     "pandas",
     "pyvista",
+    "libaarhusxyz @ git+https://github.com/cultpenguin/libaarhusxyz",
 ]
 
 [project.optional-dependencies]

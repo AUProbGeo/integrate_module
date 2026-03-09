@@ -3017,7 +3017,8 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
 
     D_str = 'D%d' % id
     ns,nd=D_obs.shape
-    print('Data has %d stations and %d channels' % (ns,nd))
+    if showInfo>-1:
+        print('Data has %d stations and %d channels' % (ns,nd))
 
     # Handle i_use parameter
     if i_use is None:
@@ -3113,6 +3114,232 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
             f['/%s/' % D_str].attrs['gex'] = f_gex
     
     return f_data_h5
+
+
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True):
+    """
+    Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
+
+    Reads one or more tTEM/SkyTEM XYZ files exported from Aarhus Workbench and
+    writes a Gaussian-noise HDF5 data file suitable for use with
+    ``integrate_rejection()``.  The GEX file is used to determine which initial
+    gates to skip per channel (``RemoveInitialGates``) and the total gate count
+    (``NoGates``).
+
+    Parameters
+    ----------
+    file_xyz : str or list of str
+        Path(s) to Aarhus Workbench XYZ export file(s).  Multiple files are
+        concatenated in order (e.g. several flight days sharing one GEX).
+    file_gex : str
+        Path to the GEX file describing the EM system configuration.  Gate
+        selection and channel count are read from this file.
+    f_data_h5 : str, optional
+        Output HDF5 file path.  If None, derived by joining the XYZ
+        basename(s) with ``'_'`` and appending ``'.h5'``.
+    i_lm_skip : list of int, optional
+        Workbench LM gate numbers to exclude from inversion (1-indexed, same
+        numbering as in the XYZ file header, e.g. ``DBDT_Ch1GT3`` = gate 3).
+        Gates already removed by ``RemoveInitialGates`` in the GEX are silently
+        ignored.  Excluded gates have their ``d_obs`` set to NaN and
+        ``d_std`` set to 100.
+    i_hm_skip : list of int, optional
+        Same as ``i_lm_skip`` but for HM (channel 2) Workbench gate numbers.
+    nan_value : float or None, optional
+        Value used as a missing-data sentinel in the XYZ file.  If None
+        (default), the value is read from the XYZ file header (``/DUMMY``
+        field, via ``model_info['dummy']``); falls back to 9999 if the
+        header field is absent.  Pass an explicit value to override the
+        header (e.g. ``nan_value=9999``).
+    showInfo : int, optional
+        Verbosity level (default 0).
+        ``-1``: suppress all output.
+        ``0``: minimal — print only the output file summary ("Adding group …").
+        ``>=1``: verbose — also print each XYZ file as it is read.
+    disregardFullNan : bool, optional
+        If True (default), soundings where all gates are NaN are excluded
+        from the output HDF5 file.
+
+    Returns
+    -------
+    str
+        Path to the written HDF5 file.
+
+    Notes
+    -----
+    - ``d_std`` in the XYZ file is a relative (fractional) uncertainty;
+      absolute ``d_std`` is computed as ``relative_std * d_obs``.
+    - Geometry (UTMX, UTMY, LINE, ELEVATION) is taken from channel-1 rows.
+    - The ``/D1/i_lm`` and ``/D1/i_hm`` datasets store the 0-indexed gate
+      arrays that were used (mirrors the MATLAB output).
+    - The GEX file path is stored as the ``gex`` attribute on ``/D1``.
+    - Requires ``libaarhusxyz`` (``pip install libaarhusxyz``).
+
+    Examples
+    --------
+    Single file:
+
+    >>> f = xyz_to_h5('tTEM_20230727_AVG_export.xyz',
+    ...                          'TX07_20230731_2x4_RC20-33.gex')
+
+    Multiple files merged into one HDF5:
+
+    >>> f = xyz_to_h5(
+    ...     ['tTEM_20230727_AVG_export.xyz', 'tTEM_20230814_AVG_export.xyz'],
+    ...     'TX07_20230731_2x4_RC20-33.gex'
+    ... )
+
+    Skip Workbench LM gates 2, 3 and HM gates 27-30:
+
+    >>> f = xyz_to_h5('data.xyz', 'system.gex',
+    ...                          i_lm_skip=[2, 3], i_hm_skip=[27, 28, 29, 30])
+    """
+    try:
+        import libaarhusxyz
+    except ImportError:
+        raise ImportError(
+            "libaarhusxyz is required for xyz_to_h5(). "
+            "Install it with: pip install libaarhusxyz"
+        )
+    import contextlib, io
+    import pandas as pd
+
+    if showInfo > -1:
+        print('Converting XYZ to HDF5: %s → %s' % (file_xyz, f_data_h5 if f_data_h5 else '(derived from XYZ)'))
+
+    _sink = contextlib.redirect_stdout(io.StringIO())
+
+    if isinstance(file_xyz, str):
+        file_xyz = [file_xyz]
+    if i_lm_skip is None:
+        i_lm_skip = []
+    if i_hm_skip is None:
+        i_hm_skip = []
+
+    # --- default output filename ---
+    if f_data_h5 is None:
+        basenames = [os.path.splitext(os.path.basename(f))[0] for f in file_xyz]
+        f_data_h5 = '_'.join(basenames) + '.h5'
+
+    # --- read GEX for gate/channel configuration ---
+    with (_sink if showInfo < 1 else contextlib.nullcontext()):
+        gex = libaarhusxyz.GEX(file_gex)
+    n_channels = int(gex.number_channels)
+    i_lm_start = int(gex.remove_initial_gates(1))
+    i_lm_end   = int(gex.no_gates(1))
+    if n_channels >= 2:
+        i_hm_start = int(gex.remove_initial_gates(2))
+        i_hm_end   = int(gex.no_gates(2))
+
+    if showInfo >= 1:
+        print('LM gates used: %d (gates %d-%d)' % (i_lm_end - i_lm_start, i_lm_start + 1, i_lm_end))
+        if n_channels >= 2:
+            print('HM gates used: %d (gates %d-%d)' % (i_hm_end - i_hm_start, i_hm_start + 1, i_hm_end))
+
+    # --- read and concatenate XYZ file(s) ---
+    xyz_list = []
+    for f in file_xyz:
+        if showInfo >= 1:
+            print('Reading %s' % f)
+        with (_sink if showInfo < 1 else contextlib.nullcontext()):
+            xyz_list.append(libaarhusxyz.XYZ(f))
+    fl = pd.concat([xyz.flightlines for xyz in xyz_list], ignore_index=True)
+    ld = {k: pd.concat([xyz.layer_data[k] for xyz in xyz_list], ignore_index=True)
+          for k in xyz_list[0].layer_data}
+
+    # Determine dummy/missing value: explicit arg > XYZ header > fallback 9999
+    if nan_value is None:
+        nan_value = xyz_list[0].model_info.get('dummy', 9999)
+    for k in ld:
+        ld[k] = ld[k].replace(nan_value, np.nan)
+
+    # --- pair ch1 / ch2 rows (mirrors MATLAB logic) ---
+    # Every ch1 row becomes a sounding.  HM data is filled where the
+    # immediately following row is ch2; otherwise those columns stay NaN.
+    channel_arr = fl['channel_no'].values
+    ch1_pos = np.where(channel_arr == 1)[0]
+
+    # geometry from channel-1 rows (all of them)
+    UTMX      = fl['utmx'].values[ch1_pos].astype(float)
+    UTMY      = fl['utmy'].values[ch1_pos].astype(float)
+    LINE      = fl['line_no'].values[ch1_pos].astype(float)
+    ELEVATION = fl['elevation'].values[ch1_pos].astype(float)
+
+    # --- LM data (channel 1) ---
+    lm_obs = ld['dbdt_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
+    lm_rel = ld['dbdt_std_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
+    lm_std = lm_rel * lm_obs  # relative → absolute
+
+    # --- HM data (channel 2, dual-channel systems only) ---
+    if n_channels >= 2:
+        n_hm = i_hm_end - i_hm_start
+        hm_obs = np.full((len(ch1_pos), n_hm), np.nan)
+        hm_std = np.full((len(ch1_pos), n_hm), np.nan)
+        ch2_pos = ch1_pos + 1  # candidate ch2 row index for each ch1 sounding
+        has_ch2 = channel_arr[np.minimum(ch2_pos, len(channel_arr) - 1)] == 2
+        ch2_valid = ch2_pos[has_ch2]
+        raw_obs = ld['dbdt_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
+        raw_rel = ld['dbdt_std_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
+        hm_obs[has_ch2] = raw_obs[ch2_valid]
+        hm_std[has_ch2] = raw_rel[ch2_valid] * raw_obs[ch2_valid]
+        d_obs = np.hstack([lm_obs, hm_obs])
+        d_std = np.hstack([lm_std, hm_std])
+    else:
+        d_obs = lm_obs
+        d_std = lm_std
+
+    n_lm = lm_obs.shape[1]
+
+    # --- apply gate skipping using Workbench gate numbers (mirrors MATLAB) ---
+    # Workbench gate number → column index in d_obs:
+    #   LM col j = Workbench gate (i_lm_start + 1 + j)
+    #   HM col j = Workbench gate (i_hm_start + 1 + j)
+    d_std_high = 100.0
+    lm_wb_gates = np.arange(i_lm_start + 1, i_lm_end + 1)  # Workbench gate nums used
+    for il in i_lm_skip:
+        j_arr = np.where(lm_wb_gates == il)[0]
+        if len(j_arr):
+            d_obs[:, j_arr[0]] = np.nan
+            d_std[:, j_arr[0]] = d_std_high
+    if n_channels >= 2:
+        hm_wb_gates = np.arange(i_hm_start + 1, i_hm_end + 1)
+        for ih in i_hm_skip:
+            j_arr = np.where(hm_wb_gates == ih)[0]
+            if len(j_arr):
+                d_obs[:, n_lm + j_arr[0]] = np.nan
+                d_std[:, n_lm + j_arr[0]] = d_std_high
+
+    # --- exclude all-NaN soundings ---
+    if disregardFullNan:
+        keep = ~np.all(np.isnan(d_obs), axis=1)
+        n_removed = np.sum(~keep)
+        if showInfo >= 1 and n_removed > 0:
+            print('Removed %d all-NaN soundings (%d remaining)' % (n_removed, np.sum(keep)))
+        d_obs     = d_obs[keep]
+        d_std     = d_std[keep]
+        UTMX      = UTMX[keep]
+        UTMY      = UTMY[keep]
+        LINE      = LINE[keep]
+        ELEVATION = ELEVATION[keep]
+
+    # --- write HDF5 ---
+    save_data_gaussian(
+        d_obs, D_std=d_std,
+        f_data_h5=f_data_h5,
+        UTMX=UTMX, UTMY=UTMY, LINE=LINE, ELEVATION=ELEVATION,
+        delete_if_exist=True,
+        f_gex=file_gex,
+        showInfo=showInfo,
+    )
+
+    # store gate index arrays (0-indexed; mirrors MATLAB i_lm / i_hm)
+    with h5py.File(f_data_h5, 'a') as hf:
+        hf.create_dataset('/D1/i_lm', data=np.arange(i_lm_start, i_lm_end))
+        if n_channels >= 2:
+            hf.create_dataset('/D1/i_hm', data=np.arange(i_hm_start, i_hm_end))
+
+    return f_data_h5
+
 
 def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='data.h5', compression=None, compression_opts=None, **kwargs):
     """
