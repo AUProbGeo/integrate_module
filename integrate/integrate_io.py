@@ -663,21 +663,21 @@ def load_data(f_data_h5, id_arr=[], ii=None, **kwargs):
     if not isinstance(id_arr, list):
         id_arr = [id_arr]
 
-    # If id_arr is empty find find all '/D{id}' datasets in the file
-    if len(id_arr) == 0:
-        with h5py.File(f_data_h5, 'r') as f_data:
-            id_arr = [int(re.search(r'D(\d+)', key).group(1)) for key in f_data.keys() if re.match(r'D\d+', key)]
-            id_arr.sort()
-
     if showInfo > 0:
         print('Loading data from %s. ' % f_data_h5, end='')
-        print('Using data types: %s' % str(id_arr))
-    
+
     # Convert ii to numpy array if provided
     if ii is not None:
         ii = np.asarray(ii)
-    
+
     with h5py.File(f_data_h5, 'r') as f_data:
+        # If id_arr is empty find all '/D{id}' datasets in the file
+        if len(id_arr) == 0:
+            id_arr = [int(re.search(r'D(\d+)', key).group(1)) for key in f_data.keys() if re.match(r'D\d+', key)]
+            id_arr.sort()
+
+        if showInfo > 0:
+            print('Using data types: %s' % str(id_arr))
         noise_model = [f_data[f'/D{id}'].attrs.get('noise_model', 'none') for id in id_arr]
         
         # Load data with selective indexing if ii is provided
@@ -1393,11 +1393,16 @@ def get_geometry(f_data_h5):
     original data file from the 'f5_data' attribute.
     """
 
-    # if f_data_h5 has a feature called 'f5_prior' then use that file
     with h5py.File(f_data_h5, 'r') as f_data:
         if 'f5_data' in f_data.attrs:
             f_data_h5 = f_data.attrs['f5_data']
             print('Using f5_data_h5: %s' % f_data_h5)
+        else:
+            X = f_data['/UTMX'][:].flatten()
+            Y = f_data['/UTMY'][:].flatten()
+            LINE = f_data['/LINE'][:].flatten()
+            ELEVATION = f_data['/ELEVATION'][:].flatten()
+            return X, Y, LINE, ELEVATION
 
     with h5py.File(f_data_h5, 'r') as f_data:
         X = f_data['/UTMX'][:].flatten()

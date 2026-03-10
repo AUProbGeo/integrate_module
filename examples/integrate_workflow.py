@@ -29,7 +29,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 1000000
+#N = 10000
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -268,6 +268,7 @@ i2=np.max(id_line)+1
 #     id_use = [3] # Well 2
 #     id_use = [2,3] # Wells 1,2
 #     id_use = [1,2,3] # tTEM, Wells 1,2 (the default if id_use is not set)
+#     id_use = [1,2,3,4,5,6,7,8,9,10,11,12,13] # tTEM, and all 12 borehole data channels (the default if id_use is not set)
 #
 
 # %%

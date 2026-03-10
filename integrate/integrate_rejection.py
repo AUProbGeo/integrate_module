@@ -38,6 +38,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
                               Ncpu=0,
                               parallel=True,
                               use_N_best=0,
+                              T_N_above=None,
+                              T_P_acc_level=None,
                               progress_callback=None,
                               console_progress=None,
                               **kwargs):
@@ -90,6 +92,14 @@ def integrate_rejection(f_prior_h5='prior.h5',
     use_N_best : int, optional
         Use only the N best-fitting samples (0=disabled).
         Default is 0.
+    T_N_above : int, optional
+        Number of top samples used by ``logl_T_est`` to estimate the annealing
+        temperature. Passed as ``N_above`` to :func:`logl_T_est`.
+        Default is None (uses ``logl_T_est`` default of 10).
+    T_P_acc_level : float, optional
+        Target acceptance probability level used by ``logl_T_est`` to estimate
+        the annealing temperature. Passed as ``P_acc_lev`` to :func:`logl_T_est`.
+        Default is None (uses ``logl_T_est`` default of 0.2).
     progress_callback : callable, optional
         Callback function for progress updates. Called as progress_callback(current, total, info_dict).
         Default is None (no callback).
@@ -278,7 +288,11 @@ def integrate_rejection(f_prior_h5='prior.h5',
     t_start = datetime.now()
     
     
-    # Depending in whether parallel processing is used or not, 
+    # Resolve None to logl_T_est defaults before forwarding into parallel/serial paths
+    _T_N_above     = T_N_above     if T_N_above     is not None else 10
+    _T_P_acc_level = T_P_acc_level if T_P_acc_level is not None else 0.2
+
+    # Depending in whether parallel processing is used or not,
     # two function are implemented to perform the inversion directly on the loaded data.
 
 
@@ -289,23 +303,27 @@ def integrate_rejection(f_prior_h5='prior.h5',
                 Nchunks = Ncpu
             else:   
                 Nchunks = 1
-        ip_chunks = np.array_split(ip_range, Nchunks) 
+        ip_range_shuffled = ip_range.copy()
+        np.random.shuffle(ip_range_shuffled)
+        ip_chunks = np.array_split(ip_range_shuffled, Nchunks)
 
         if showInfo>1:
             print('Ncpu = %d\nNchunks=%d' % (Ncpu, Nchunks))
 
         i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all = integrate_posterior_main(
             ip_chunks=ip_chunks,
-            D=D, 
+            D=D,
             DATA = DATA,
-            idx = idx,  
+            idx = idx,
             N_use=N_use,
             id_use=id_use,
             autoT=autoT,
             T_base=T_base,
             nr=nr,
             Ncpu=Ncpu,
-            use_N_best=use_N_best            
+            use_N_best=use_N_best,
+            T_N_above=_T_N_above,
+            T_P_acc_level=_T_P_acc_level,
         )
 
 
@@ -314,16 +332,18 @@ def integrate_rejection(f_prior_h5='prior.h5',
             # Extract progress_callback for non-parallel execution
             progress_callback = kwargs.get('progress_callback', None)
             
-            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(D=D, 
+            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(D=D,
                                         DATA = DATA,
-                                        idx = idx,                                   
-                                        N_use=N_use, 
+                                        idx = idx,
+                                        N_use=N_use,
                                         id_use=id_use,
                                         ip_range=ip_range,
                                         autoT=autoT,
                                         T_base = T_base,
                                         nr=nr,
                                         use_N_best=use_N_best,
+                                        T_N_above=_T_N_above,
+                                        T_P_acc_level=_T_P_acc_level,
                                         progress_callback=progress_callback,
                                         console_progress=console_progress,
                                         **kwargs
@@ -396,6 +416,8 @@ def integrate_rejection_range(D,
                               nr=400,
                               autoT=1,
                               T_base = 1,
+                              T_N_above=10,
+                              T_P_acc_level=0.2,
                               progress_callback=None,
                               **kwargs):
     """
@@ -433,6 +455,14 @@ def integrate_rejection_range(D,
     T_base : float, optional
         Base temperature for rejection sampling when autoT=0.
         Default is 1.
+    T_N_above : int, optional
+        Number of top samples used by ``logl_T_est`` to estimate the annealing
+        temperature. Passed as ``N_above`` to :func:`logl_T_est`.
+        Default is 10.
+    T_P_acc_level : float, optional
+        Target acceptance probability level used by ``logl_T_est`` to estimate
+        the annealing temperature. Passed as ``P_acc_lev`` to :func:`logl_T_est`.
+        Default is 0.2.
     progress_callback : callable, optional
         Optional callback function for progress updates. Called with (current, total).
         Default is None (no callbacks).
@@ -672,7 +702,7 @@ def integrate_rejection_range(D,
         t0=time.time()
         # Compute the annealing temperature
         if autoT == 1:
-            T = ig.logl_T_est(L)
+            T = ig.logl_T_est(L, N_above=T_N_above, P_acc_lev=T_P_acc_level)
         else:
             T = T_base        
         # maxlogL = np.nanmax(logL)
@@ -776,7 +806,7 @@ def integrate_rejection_range(D,
 
 
 
-def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best):
+def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2):
     """
     Coordinate parallel processing of posterior sampling across multiple chunks.
     
@@ -808,7 +838,11 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         Number of CPU cores to use for parallel processing.
     use_N_best : int
         Flag to use only the N best-fitting samples.
-    
+    T_N_above : int, optional
+        Passed through to ``integrate_rejection_range`` / ``logl_T_est``. Default is 10.
+    T_P_acc_level : float, optional
+        Passed through to ``integrate_rejection_range`` / ``logl_T_est``. Default is 0.2.
+
     Returns
     -------
     i_use_all : ndarray, shape (Ndp, nr)
@@ -858,7 +892,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     try:
         with ctx.Pool(Ncpu) as p:
             # New implementation with shared memory
-            results = p.map(integrate_posterior_chunk, [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best) for i in range(len(ip_chunks))])
+            results = p.map(integrate_posterior_chunk, [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level) for i in range(len(ip_chunks))])
             # Old implementation where D was copied to each process
             #results = p.map(integrate_posterior_chunk, [(i, ip_chunks, D, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best) for i in range(len(ip_chunks))])
     finally:
@@ -918,7 +952,7 @@ def integrate_posterior_chunk(args):
     ----------
     args : tuple
         Packed arguments: (i_chunk, ip_chunks, DATA, idx, N_use, id_use,
-        shared_memory_refs, autoT, T_base, nr, use_N_best). See
+        shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level). See
         ``integrate_rejection_range`` for descriptions of individual fields.
 
     Returns
@@ -948,7 +982,7 @@ def integrate_posterior_chunk(args):
     #import integrate as ig
     
     # New implementation with shared memory
-    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best = args
+    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level = args
     # Old implementation where D was copied to each process
     #i_chunk, ip_chunks, D, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best = args
     #D=reconstruct_shared_arrays(shared_memory_refs)
@@ -976,6 +1010,8 @@ def integrate_posterior_chunk(args):
             T_base=T_base,
             nr=nr,
             use_N_best=use_N_best,
+            T_N_above=T_N_above,
+            T_P_acc_level=T_P_acc_level,
         )
 
         return i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range
