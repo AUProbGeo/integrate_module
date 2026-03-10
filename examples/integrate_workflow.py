@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 100_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 
 # %% [markdown]
