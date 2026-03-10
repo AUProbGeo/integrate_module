@@ -145,20 +145,15 @@ def load_prior_model(f_prior_h5, im_use=[], idx=[], N_use=0, Randomize=False):
     import numpy as np
 
 
-    if len(im_use)==0:
-        Nmt=0
-        with h5py.File(f_prior_h5, 'r') as f_prior:
-            for key in f_prior.keys():
-                if key[0]=='M':
-                    Nmt = Nmt+1
-        if len(im_use)==0:
-            im_use = np.arange(1,Nmt+1) 
-    
     with h5py.File(f_prior_h5, 'r') as f_prior:
+        if len(im_use)==0:
+            Nmt = sum(1 for key in f_prior.keys() if key[0]=='M')
+            im_use = np.arange(1, Nmt+1)
+
         N = f_prior['/M1'].shape[0]
         if N_use == 0:
-            N_use = N    
-        
+            N_use = N
+
         if len(idx)==0:
             if Randomize:
                 idx = np.sort(np.random.choice(N, min(N_use, N), replace=False)) if N_use < N else np.arange(N)
@@ -168,9 +163,9 @@ def load_prior_model(f_prior_h5, im_use=[], idx=[], N_use=0, Randomize=False):
             # check if length of idx is equal to N_use
             if len(idx)!=N_use:
                 print('Length of idx (%d) must be equal to N_use)=%d' % (len(idx), N_use))
-                N_use = len(idx)      
+                N_use = len(idx)
                 print('using N_use=len(idx)=%d' % N_use)
-                
+
         M = [f_prior[f'/M{id}'][:][idx] for id in im_use]
     
     
@@ -279,20 +274,19 @@ def save_prior_model(f_prior_h5, M_new,
             pass
 
         
-    if im is None:
-        Nmt=0
-        with h5py.File(f_prior_h5, 'r') as f_prior:
-            for key in f_prior.keys():
-                if key[0]=='M':
-                    Nmt = Nmt+1
-        im = Nmt+1
-    
-    key = '/M%d' % im
-    if showInfo>1:
-        print("Saving new prior model '%s' to file: %s " % (key,f_prior_h5))
+    # Make sure the data is 2D using atleast_2d
+    if M_new.ndim<2:
+        M_new = np.atleast_2d(M_new.flatten()).T
 
-    # Delete the 'key' if it exists
     with h5py.File(f_prior_h5, 'a') as f_prior:
+        if im is None:
+            Nmt = sum(1 for key in f_prior.keys() if key[0]=='M')
+            im = Nmt+1
+
+        key = '/M%d' % im
+        if showInfo>1:
+            print("Saving new prior model '%s' to file: %s " % (key,f_prior_h5))
+
         if key in f_prior:
             print("Deleting prior model '%s' from file: %s " % (key,f_prior))
             if force_replace:
@@ -301,12 +295,7 @@ def save_prior_model(f_prior_h5, M_new,
                 print("Key '%s' already exists. Use force_replace=True to overwrite." % key)
                 return False
 
-    # Make sure the data is 2D using atleast_2d
-    if M_new.ndim<2:
-        M_new = np.atleast_2d(M_new.flatten()).T
-
-    # Write the new data
-    with h5py.File(f_prior_h5, 'a') as f_prior:
+        # Write the new data
         # Convert to 32-bit float for better memory efficiency if the data is floating point
         if np.issubdtype(M_new.dtype, np.floating):
             M_new_32 = M_new.astype(np.float32)
@@ -532,20 +521,15 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
     if compression == 'lzf':
         compression_opts = None
 
-    if id is None:
-        Ndt=0
-        with h5py.File(f_prior_h5, 'r') as f_prior:
-            for key in f_prior.keys():
-                if key[0]=='D':
-                    Ndt = Ndt+1
-        id = Ndt+1
-    
-    key = '/D%d' % id
-    if showInfo>2:
-        print("Saving new prior data '%s' to file: %s " % (key,f_prior_h5))
-
-    # Delete the 'key' if it exists
     with h5py.File(f_prior_h5, 'a') as f_prior:
+        if id is None:
+            Ndt = sum(1 for key in f_prior.keys() if key[0]=='D')
+            id = Ndt+1
+
+        key = '/D%d' % id
+        if showInfo>2:
+            print("Saving new prior data '%s' to file: %s " % (key,f_prior_h5))
+
         if key in f_prior:
             print("Deleting prior data '%s' from file: %s " % (key,f_prior))
             if force_delete:
@@ -554,8 +538,7 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
                 print("Key '%s' already exists. Use force_delete=True to overwrite." % key)
                 return False
 
-    # Write the new data
-    with h5py.File(f_prior_h5, 'a') as f_prior:
+        # Write the new data
         # Convert to 32-bit float for better memory efficiency if the data is floating point
         if np.issubdtype(D_new.dtype, np.floating):
             D_new_32 = D_new.astype(np.float32)

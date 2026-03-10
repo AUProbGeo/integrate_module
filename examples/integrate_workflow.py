@@ -29,7 +29,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-#N = 10000
+
 
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -45,10 +45,12 @@ file_gex= ig.get_gex_file_from_data(f_data_h5)
 loadFromXyz=True
 if loadFromXyz:
     ig.get_case_data(case=case, loadType='xyz')
-    useRaw = True
+    useRaw = False
     if useRaw:
+        # Unprocessed and unstacked data
         file_xyz_list=['tTEM_20230727_RAW_export.xyz', 'tTEM_20230814_RAW_export.xyz', 'tTEM_20230829_RAW_export.xyz', 'tTEM_20230913_RAW_export.xyz', 'tTEM_20231109_RAW_export.xyz']
     else:
+        # Processed and stacked data
         file_xyz_list=['tTEM_20230727_AVG_export.xyz', 'tTEM_20230814_AVG_export.xyz', 'tTEM_20230829_AVG_export.xyz', 'tTEM_20230913_AVG_export.xyz', 'tTEM_20231109_AVG_export.xyz']
     f_data_h5 = ig.xyz_to_h5(file_xyz_list, file_gex, showInfo=1)
 
@@ -187,6 +189,8 @@ f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 
 # %%
+
+# %%
 #
 # For each borehole BH in BHOLES:
 #   1. Compute prior borehole data (mode class per interval per realization)
@@ -274,6 +278,9 @@ i2=np.max(id_line)+1
 # %%
 # This prt of the can be rerun using different selection of data types without rerunning the abobe parts
 nr=1000
+T_N_above=50
+T_P_acc_level=0.2 
+autoT = 1 # We need minium of T_N_above realizations with an acceptance probability above T_P_acc_level
 id_use_arr = []
 id_use_arr.append([1]) # tTEM 
 #id_use_arr.append([2]) # Well 1
@@ -298,6 +305,8 @@ for id_use in id_use_arr:
                                     N_use = N_use,
                                     id_use = id_use,
                                     nr=nr,
+                                    T_N_above = T_N_above,
+                                    T_P_acc_level = T_P_acc_level,
                                     updatePostStat=True)
     f_post_h5_list.append(f_post_h5)
 
