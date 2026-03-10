@@ -2036,108 +2036,103 @@ def post_to_csv(f_post_h5='', Mstr='/M1'):
     if len(f_post_h5)==0:
         f_post_h5 = 'POST_PRIOR_Daugaard_N2000000_TX07_20230731_2x4_RC20-33_Nh280_Nf12_Nu2000000_aT1.h5'
 
-    f_post =  h5py.File(f_post_h5, 'r')
-    f_prior_h5 = f_post.attrs['f5_prior']
-    f_prior =  h5py.File(f_prior_h5, 'r')
-    f_data_h5 = f_post.attrs['f5_data']
-    if 'x' in f_prior[Mstr].attrs.keys():
-        z = f_prior[Mstr].attrs['x']
-    else:
-        z = f_prior[Mstr].attrs['z']    
-    is_discrete = f_prior[Mstr].attrs['is_discrete']
+    with h5py.File(f_post_h5, 'r') as f_post:
+        f_prior_h5 = f_post.attrs['f5_prior']
+        f_data_h5 = f_post.attrs['f5_data']
+        with h5py.File(f_prior_h5, 'r') as f_prior:
+            if 'x' in f_prior[Mstr].attrs.keys():
+                z = f_prior[Mstr].attrs['x']
+            else:
+                z = f_prior[Mstr].attrs['z']
+            is_discrete = f_prior[Mstr].attrs['is_discrete']
 
-    X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+            X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
 
-    # Check that Dstr exist in f_poyt_h5
-    if Mstr not in f_post:
-        print("ERROR: %s not in %s" % (Mstr, f_post_h5))
-        sys.exit(1)
+            # Check that Dstr exist in f_poyt_h5
+            if Mstr not in f_post:
+                print("ERROR: %s not in %s" % (Mstr, f_post_h5))
+                sys.exit(1)
 
-    D_mul = []
-    D_name = []
-    if is_discrete:
-        D_mul.append(f_post[Mstr+'/Mode'])
-        D_name.append('Mode')
-        D_mul.append(f_post[Mstr+'/Entropy'])
-        D_name.append('Entropy')
-    else:
-        D_mul.append(f_post[Mstr+'/Median'])
-        D_name.append('Median')
-        D_mul.append(f_post[Mstr+'/Mean'])
-        D_name.append('Mean')
-        D_mul.append(f_post[Mstr+'/Std'])
-        D_name.append('Std')
-    
+            D_mul = []
+            D_name = []
+            if is_discrete:
+                D_mul.append(f_post[Mstr+'/Mode'])
+                D_name.append('Mode')
+                D_mul.append(f_post[Mstr+'/Entropy'])
+                D_name.append('Entropy')
+            else:
+                D_mul.append(f_post[Mstr+'/Median'])
+                D_name.append('Median')
+                D_mul.append(f_post[Mstr+'/Mean'])
+                D_name.append('Mean')
+                D_mul.append(f_post[Mstr+'/Std'])
+                D_name.append('Std')
 
-    # replicate z[1::] to be a 2D matric of zie ndx89
-    ZZ = np.tile(z[1::], (D_mul[0].shape[0], 1))
 
-    #
-    df = pd.DataFrame(data={'X': X, 'Y': Y, 'Line': LINE, 'ELEVATION': ELEVATION})
+            # replicate z[1::] to be a 2D matric of zie ndx89
+            ZZ = np.tile(z[1::], (D_mul[0].shape[0], 1))
 
-    dataframes = [df]
+            #
+            df = pd.DataFrame(data={'X': X, 'Y': Y, 'Line': LINE, 'ELEVATION': ELEVATION})
 
-    for i in range(len(D_mul)):
-        D = D_mul[i][:]
-        
-        for j in range(D.shape[1]):
-            temp_df = pd.DataFrame(D[:,j], columns=[D_name[i]+'_'+str(j)])
-            dataframes.append(temp_df)
+            dataframes = [df]
 
-    for j in range(ZZ.shape[1]):
-        temp_df = pd.DataFrame(ZZ[:,j], columns=['zbot_'+str(j)])
-        dataframes.append(temp_df)
+            for i in range(len(D_mul)):
+                D = D_mul[i][:]
 
-    df = pd.concat(dataframes, axis=1)
-    f_post_csv='%s_%s.csv' % (os.path.splitext(f_post_h5)[0],Mstr[1::])
-    #f_post_csv='%s.csv' % (os.path.splitext(f_post_h5)[0])
-    #f_post_csv = f_post_h5.replace('.h5', '.csv')
-    print('Writing to %s' % f_post_csv)
-    df.to_csv(f_post_csv, index=False)
+                for j in range(D.shape[1]):
+                    temp_df = pd.DataFrame(D[:,j], columns=[D_name[i]+'_'+str(j)])
+                    dataframes.append(temp_df)
 
-    
-    #%% Store point data sets of varianle in D_name
-    # # Save a file with columns, x, y, z, and the median.
-    print("----------------------------------------------------")
-    D_mul_out = []
-    for icat in range(len(D_name)):
-        #icat=0
-        Vstr = D_name[icat]
-        print('Creating point data set: %s'  % Vstr)
-        D=f_post[Mstr+'/'+Vstr]
-        nd,nz=D.shape
-        n = nd*nz
+            for j in range(ZZ.shape[1]):
+                temp_df = pd.DataFrame(ZZ[:,j], columns=['zbot_'+str(j)])
+                dataframes.append(temp_df)
 
-        Xp = np.zeros(n)
-        Yp = np.zeros(n)
-        Zp = np.zeros(n)
-        LINEp = np.zeros(n)
-        Dp = np.zeros(n)
-        
-        for i in range(nd):
-            for j in range(nz):
-                k = i*nz+j
-                Xp[k] = X[i]
-                Yp[k] = Y[i]
-                Zp[k] = ELEVATION[i]-z[j]
-                LINEp[k] = LINE[i]
-                Dp[k] = D[i,j]        
-        D_mul_out.append(Dp)
+            df = pd.concat(dataframes, axis=1)
+            f_post_csv='%s_%s.csv' % (os.path.splitext(f_post_h5)[0],Mstr[1::])
+            #f_post_csv='%s.csv' % (os.path.splitext(f_post_h5)[0])
+            #f_post_csv = f_post_h5.replace('.h5', '.csv')
+            print('Writing to %s' % f_post_csv)
+            df.to_csv(f_post_csv, index=False)
 
-    if is_discrete:
-        df = pd.DataFrame(data={'X': Xp, 'Y': Yp, 'Z': Zp, 'LINE': LINEp, D_name[0]: D_mul_out[0], D_name[1]: D_mul_out[1] })
-    else:
-        df = pd.DataFrame(data={'X': Xp, 'Y': Yp, 'Z': Zp, 'LINE': LINEp, D_name[0]: D_mul_out[0], D_name[1]: D_mul_out[1], D_name[2]: D_mul_out[2] })
-    
-    f_csv = '%s_%s_point.csv' % (os.path.splitext(f_post_h5)[0],Mstr[1::])
-    print('- saving to : %s'  % f_csv)
 
-    df.to_csv(f_csv, index=False)
+            #%% Store point data sets of varianle in D_name
+            # # Save a file with columns, x, y, z, and the median.
+            print("----------------------------------------------------")
+            D_mul_out = []
+            for icat in range(len(D_name)):
+                #icat=0
+                Vstr = D_name[icat]
+                print('Creating point data set: %s'  % Vstr)
+                D=f_post[Mstr+'/'+Vstr]
+                nd,nz=D.shape
+                n = nd*nz
 
-    
-    #%% CLOSE
-    f_post.close()
-    f_prior.close()
+                Xp = np.zeros(n)
+                Yp = np.zeros(n)
+                Zp = np.zeros(n)
+                LINEp = np.zeros(n)
+                Dp = np.zeros(n)
+
+                for i in range(nd):
+                    for j in range(nz):
+                        k = i*nz+j
+                        Xp[k] = X[i]
+                        Yp[k] = Y[i]
+                        Zp[k] = ELEVATION[i]-z[j]
+                        LINEp[k] = LINE[i]
+                        Dp[k] = D[i,j]
+                D_mul_out.append(Dp)
+
+            if is_discrete:
+                df = pd.DataFrame(data={'X': Xp, 'Y': Yp, 'Z': Zp, 'LINE': LINEp, D_name[0]: D_mul_out[0], D_name[1]: D_mul_out[1] })
+            else:
+                df = pd.DataFrame(data={'X': Xp, 'Y': Yp, 'Z': Zp, 'LINE': LINEp, D_name[0]: D_mul_out[0], D_name[1]: D_mul_out[1], D_name[2]: D_mul_out[2] })
+
+            f_csv = '%s_%s_point.csv' % (os.path.splitext(f_post_h5)[0],Mstr[1::])
+            print('- saving to : %s'  % f_csv)
+
+            df.to_csv(f_csv, index=False)
 
     return f_post_csv, f_csv
 
@@ -2167,113 +2162,95 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
     showInfo = kwargs.get('showInfo', 0)
     delay_after_close = kwargs.get('delay_after_close', 0.1)
     
-    input_file = None
-    output_file = None
-    
+    # Check and close any open HDF5 file handles for these files
     try:
-        # Check and close any open HDF5 file handles for these files
-        try:
-            # Get all open file objects
-            open_files = list(h5py.h5f.get_obj_ids())
-            for fid in open_files:
-                try:
-                    f_temp = h5py.h5i.get_name(fid)
-                    if f_temp:
-                        f_temp = f_temp.decode('utf-8') if isinstance(f_temp, bytes) else f_temp
-                        if f_temp == input_filename or f_temp == output_filename:
-                            if showInfo > 0:
-                                print(f'Closing open HDF5 file handle for: {f_temp}')
-                            h5py.h5f.close(fid)
-                except (ValueError, OSError, RuntimeError):
-                    # Handle cases where the file ID might be invalid or already closed
-                    continue
-        except (ValueError, OSError):
-            # If we can't get file IDs, continue without closing
-            if showInfo > 0:
-                print('Could not check for open HDF5 file handles')
-        
-        # Open the input file
-        if showInfo > 0:
-            print('Trying to copy %s to %s' % (input_filename, output_filename))
-
-        # Remove any stale/corrupted output file before writing (important on
-        # Windows/NTFS and WSL mounts where h5py 'w' mode may fail to truncate)
-        import os as _os
-        if _os.path.exists(output_filename):
+        # Get all open file objects
+        open_files = list(h5py.h5f.get_obj_ids())
+        for fid in open_files:
             try:
-                _os.remove(output_filename)
-            except OSError:
-                pass
+                f_temp = h5py.h5i.get_name(fid)
+                if f_temp:
+                    f_temp = f_temp.decode('utf-8') if isinstance(f_temp, bytes) else f_temp
+                    if f_temp == input_filename or f_temp == output_filename:
+                        if showInfo > 0:
+                            print(f'Closing open HDF5 file handle for: {f_temp}')
+                        h5py.h5f.close(fid)
+            except (ValueError, OSError, RuntimeError):
+                # Handle cases where the file ID might be invalid or already closed
+                continue
+    except (ValueError, OSError):
+        # If we can't get file IDs, continue without closing
+        if showInfo > 0:
+            print('Could not check for open HDF5 file handles')
 
-        input_file = h5py.File(input_filename, 'r')
+    # Open the input file
+    if showInfo > 0:
+        print('Trying to copy %s to %s' % (input_filename, output_filename))
 
-        # Create the output file
-        output_file = h5py.File(output_filename, 'w')
-        
-        # Copy each group/dataset from the input file to the output file
-        i_use = []
-        for name in input_file:
-            if showInfo > 2:
-                print('Copying %s. ' % name, end='')
-            if isinstance(input_file[name], h5py.Dataset):                    
-                # If N is specified, only copy the first N elements
+    # Remove any stale/corrupted output file before writing (important on
+    # Windows/NTFS and WSL mounts where h5py 'w' mode may fail to truncate)
+    import os as _os
+    if _os.path.exists(output_filename):
+        try:
+            _os.remove(output_filename)
+        except OSError:
+            pass
 
-                if len(i_use) == 0:
-                    N_in = input_file[name].shape[0]
-                    if N is None:
-                        N = N_in
-                    if N > N_in:
-                        N = N_in
-                    if N == N_in:                            
-                        i_use = np.arange(N)
+    try:
+        with h5py.File(input_filename, 'r') as input_file, h5py.File(output_filename, 'w') as output_file:
+            # Copy each group/dataset from the input file to the output file
+            i_use = []
+            for name in input_file:
+                if showInfo > 2:
+                    print('Copying %s. ' % name, end='')
+                if isinstance(input_file[name], h5py.Dataset):
+                    # If N is specified, only copy the first N elements
+
+                    if len(i_use) == 0:
+                        N_in = input_file[name].shape[0]
+                        if N is None:
+                            N = N_in
+                        if N > N_in:
+                            N = N_in
+                        if N == N_in:
+                            i_use = np.arange(N)
+                        else:
+                            i_use = np.sort(np.random.choice(N_in, N, replace=False))
+
+                    if N < 20000:
+                        loadToMemory = False
+
+                    # Read full dataset into memory
+                    if loadToMemory:
+                        # Load all data to memory, before slicing
+                        if showInfo > 1:
+                            print('%s ' % name, end='')
+                        data_in = input_file[name][:]
+                        data = data_in[i_use]
                     else:
-                        i_use = np.sort(np.random.choice(N_in, N, replace=False))
+                        # Read directly from HDF5 file
+                        data = input_file[name][i_use]
 
-                if N < 20000:
-                    loadToMemory = False
+                    # Create new dataset in output file with compression
+                    # Convert floating point data to 32-bit precision
+                    if data.dtype.kind == 'f':
+                        data = data.astype(np.float32)
 
-                # Read full dataset into memory
-                if loadToMemory:
-                    # Load all data to memory, before slicing
-                    if showInfo > 1:
-                        print('%s ' % name, end='')
-                    data_in = input_file[name][:]    
-                    data = data_in[i_use]
+                    if compress:
+                        output_dataset = output_file.create_dataset(name, data=data, compression="gzip", compression_opts=4)
+                    else:
+                        output_dataset = output_file.create_dataset(name, data=data)
+                    # Copy the attributes of the dataset
+                    for key, value in input_file[name].attrs.items():
+                        output_dataset.attrs[key] = value
                 else:
-                    # Read directly from HDF5 file   
-                    data = input_file[name][i_use]
+                    input_file.copy(name, output_file)
 
-                # Create new dataset in output file with compression
-                # Convert floating point data to 32-bit precision
-                if data.dtype.kind == 'f':
-                    data = data.astype(np.float32)
-                    
-                if compress:
-                    output_dataset = output_file.create_dataset(name, data=data, compression="gzip", compression_opts=4)
-                else:
-                    output_dataset = output_file.create_dataset(name, data=data)
-                # Copy the attributes of the dataset
-                for key, value in input_file[name].attrs.items():                        
-                    output_dataset.attrs[key] = value
-            else:
-                input_file.copy(name, output_file)
-
-        # Copy the attributes of the input file to the output file
-        for key, value in input_file.attrs.items():
-            output_file.attrs[key] = value
+            # Copy the attributes of the input file to the output file
+            for key, value in input_file.attrs.items():
+                output_file.attrs[key] = value
 
     except Exception as e:
-        # Clean up files in case of error
-        if output_file is not None:
-            try:
-                output_file.close()
-            except:
-                pass
-        if input_file is not None:
-            try:
-                input_file.close()
-            except:
-                pass
         # Remove partially created output file
         try:
             import os
@@ -2282,28 +2259,13 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
         except:
             pass
         raise e
-    
-    finally:
-        # Ensure files are properly closed
-        if output_file is not None:
-            try:
-                output_file.flush()
-                output_file.close()
-            except:
-                pass
-        if input_file is not None:
-            try:
-                input_file.close()
-            except:
-                pass
-        
-        # Add small delay to ensure file handles are fully released
-        if delay_after_close > 0:
-            time.sleep(delay_after_close)
 
+    # Add small delay to ensure file handles are fully released
+    if delay_after_close > 0:
+        time.sleep(delay_after_close)
 
-        if showInfo > 1:
-            print('')            
+    if showInfo > 1:
+        print('')
 
     return output_filename
 
@@ -2354,108 +2316,90 @@ def copy_prior(input_filename, output_filename, idx=None, N_use=None, loadtomem=
     delay_after_close = kwargs.get('delay_after_close', 0.1)
     compress = kwargs.get('compress', True)
 
-    input_file = None
-    output_file = None
-
+    # Open the input file to determine dataset size if needed, then copy
     try:
-        # Open the input file to determine dataset size if needed
-        input_file = h5py.File(input_filename, 'r')
+        with h5py.File(input_filename, 'r') as input_file:
+            # Handle N_use parameter: generate random indices if N_use is set and idx is not
+            if idx is None and N_use is not None:
+                # Find the first dataset to determine the total number of samples
+                first_dataset_name = None
+                for name in input_file:
+                    if isinstance(input_file[name], h5py.Dataset) and input_file[name].ndim > 0:
+                        first_dataset_name = name
+                        break
 
-        # Handle N_use parameter: generate random indices if N_use is set and idx is not
-        if idx is None and N_use is not None:
-            # Find the first dataset to determine the total number of samples
-            first_dataset_name = None
-            for name in input_file:
-                if isinstance(input_file[name], h5py.Dataset) and input_file[name].ndim > 0:
-                    first_dataset_name = name
-                    break
+                if first_dataset_name is None:
+                    raise ValueError("Could not find any dataset in the prior file to determine size")
 
-            if first_dataset_name is None:
-                raise ValueError("Could not find any dataset in the prior file to determine size")
+                N_total = input_file[first_dataset_name].shape[0]
 
-            N_total = input_file[first_dataset_name].shape[0]
+                if N_use > N_total:
+                    raise ValueError(f"N_use ({N_use}) exceeds total number of samples ({N_total})")
 
-            if N_use > N_total:
-                raise ValueError(f"N_use ({N_use}) exceeds total number of samples ({N_total})")
+                # Generate random indices
+                idx = np.random.choice(N_total, size=N_use, replace=False)
+                idx = np.sort(idx)  # Sort for better HDF5 read performance
 
-            # Generate random indices
-            idx = np.random.choice(N_total, size=N_use, replace=False)
-            idx = np.sort(idx)  # Sort for better HDF5 read performance
+                if showInfo > 0:
+                    print(f'Randomly selected {N_use} samples from {N_total} total samples')
 
             if showInfo > 0:
-                print(f'Randomly selected {N_use} samples from {N_total} total samples')
+                print('Copying PRIOR file %s to %s' % (input_filename, output_filename))
+                if idx is not None:
+                    print('Using subset with %d indices' % len(idx))
 
-        # Open the input file
-        if showInfo > 0:
-            print('Copying PRIOR file %s to %s' % (input_filename, output_filename))
+            # Convert idx to numpy array if provided
             if idx is not None:
-                print('Using subset with %d indices' % len(idx))
+                idx = np.asarray(idx)
 
-        # Create the output file
-        output_file = h5py.File(output_filename, 'w')
+            with h5py.File(output_filename, 'w') as output_file:
+                # Copy each group/dataset from the input file to the output file
+                for name in input_file:
+                    if showInfo > 0:
+                        print('Copying %s' % name)
 
-        # Convert idx to numpy array if provided
-        if idx is not None:
-            idx = np.asarray(idx)
-        
-        # Copy each group/dataset from the input file to the output file
-        for name in input_file:
-            if showInfo > 0:
-                print('Copying %s' % name)
-                
-            if isinstance(input_file[name], h5py.Dataset):
-                # Determine if this is a dataset that should be subset
-                dataset = input_file[name]
-                
-                if idx is not None and dataset.ndim > 0:
-                    if len(idx) > dataset.shape[0]:
-                        raise ValueError(f"Index array length ({len(idx)}) exceeds dataset size ({dataset.shape[0]}) for {name}")
-                    
-                    # Get the subset of data
-                    if loadtomem:
-                        if showInfo > 1:
-                            print(f"Loading '{name}' to memory before slicing.", end='')
-                        data = dataset[:][idx]
+                    if isinstance(input_file[name], h5py.Dataset):
+                        # Determine if this is a dataset that should be subset
+                        dataset = input_file[name]
+
+                        if idx is not None and dataset.ndim > 0:
+                            if len(idx) > dataset.shape[0]:
+                                raise ValueError(f"Index array length ({len(idx)}) exceeds dataset size ({dataset.shape[0]}) for {name}")
+
+                            # Get the subset of data
+                            if loadtomem:
+                                if showInfo > 1:
+                                    print(f"Loading '{name}' to memory before slicing.", end='')
+                                data = dataset[:][idx]
+                            else:
+                                data = dataset[idx]
+                        else:
+                            # Copy all data
+                            data = dataset[:]
+
+                        # Convert floating point data to 32-bit precision
+                        if data.dtype.kind == 'f':
+                            data = data.astype(np.float32)
+
+                        # Create new dataset in output file with compression
+                        if compress:
+                            output_dataset = output_file.create_dataset(name, data=data, compression="gzip", compression_opts=4)
+                        else:
+                            output_dataset = output_file.create_dataset(name, data=data)
+
+                        # Copy all attributes of the dataset
+                        for key, value in dataset.attrs.items():
+                            output_dataset.attrs[key] = value
+
                     else:
-                        data = dataset[idx]
-                else:
-                    # Copy all data
-                    data = dataset[:]
-                
-                # Convert floating point data to 32-bit precision
-                if data.dtype.kind == 'f':
-                    data = data.astype(np.float32)
-                    
-                # Create new dataset in output file with compression
-                if compress:
-                    output_dataset = output_file.create_dataset(name, data=data, compression="gzip", compression_opts=4)
-                else:
-                    output_dataset = output_file.create_dataset(name, data=data)
-                
-                # Copy all attributes of the dataset
-                for key, value in dataset.attrs.items():                        
-                    output_dataset.attrs[key] = value
-                    
-            else:
-                # Copy groups and other non-dataset objects directly
-                input_file.copy(name, output_file)
+                        # Copy groups and other non-dataset objects directly
+                        input_file.copy(name, output_file)
 
-        # Copy all attributes of the input file to the output file
-        for key, value in input_file.attrs.items():
-            output_file.attrs[key] = value
+                # Copy all attributes of the input file to the output file
+                for key, value in input_file.attrs.items():
+                    output_file.attrs[key] = value
 
     except Exception as e:
-        # Clean up files in case of error
-        if output_file is not None:
-            try:
-                output_file.close()
-            except:
-                pass
-        if input_file is not None:
-            try:
-                input_file.close()
-            except:
-                pass
         # Remove partially created output file
         try:
             import os
@@ -2464,24 +2408,10 @@ def copy_prior(input_filename, output_filename, idx=None, N_use=None, loadtomem=
         except:
             pass
         raise e
-    
-    finally:
-        # Ensure files are properly closed
-        if output_file is not None:
-            try:
-                output_file.flush()
-                output_file.close()
-            except:
-                pass
-        if input_file is not None:
-            try:
-                input_file.close()
-            except:
-                pass
-        
-        # Add small delay to ensure file handles are fully released
-        if delay_after_close > 0:
-            time.sleep(delay_after_close)
+
+    # Add small delay to ensure file handles are fully released
+    if delay_after_close > 0:
+        time.sleep(delay_after_close)
 
     return output_filename
 

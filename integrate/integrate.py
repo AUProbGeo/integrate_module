@@ -1298,27 +1298,27 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     Dname = '/D%d' % id
 
 
-    f_prior = h5py.File(f_prior_data_h5, 'a')
+    with h5py.File(f_prior_data_h5, 'r') as f_prior_r:
+        if im_height>0:
+            if (showInfo>1):
+                print('Using M%d for height' % im_height)
+            tx_height = f_prior_r[Mheight][:]
 
-    if im_height>0:    
-        if (showInfo>1):
-            print('Using M%d for height' % im_height)
-        tx_height = f_prior[Mheight][:]
+        # Get thickness
+        if 'x' in f_prior_r[Mname].attrs:
+            z = f_prior_r[Mname].attrs['x']
+        else:
+            z = f_prior_r[Mname].attrs['z']
+        thickness = np.diff(z)
 
-    # Get thickness
-    if 'x' in f_prior[Mname].attrs:
-        z = f_prior[Mname].attrs['x']
-    else:
-        z = f_prior[Mname].attrs['z']
-    thickness = np.diff(z)
+        # Get conductivity
+        if Mname in f_prior_r.keys():
+            C = 1 / f_prior_r[Mname][:]
+        else:
+            print('Could not load %s from %s' % (Mname, f_prior_data_h5))
 
-    # Get conductivity
-    if Mname in f_prior.keys():
-        C = 1 / f_prior[Mname][:]
-    else:
-        print('Could not load %s from %s' % (Mname, f_prior_data_h5))
+        N = f_prior_r[Mname].shape[0]
 
-    N = f_prior[Mname].shape[0]
     t1 = time.time()
     if not parallel:
         if (showInfo>-1):
@@ -1424,16 +1424,15 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         print('prior_data_gaaem: Time=%5.1fs/%d soundings. %4.1fms/sounding, %3.1fit/s' % (t_elapsed, N, 1000*t_elapsed/N,N/t_elapsed))
     
     # Write D to f_prior['/D1']
-    f_prior[Dname] = D
+    with h5py.File(f_prior_data_h5, 'a') as f_prior:
+        f_prior[Dname] = D
 
-    # Add method, type, file_ex, and im as attributes to '/D1'
-    f_prior[Dname].attrs['method'] = method
-    f_prior[Dname].attrs['type'] = type
-    f_prior[Dname].attrs['im'] = im
-    f_prior[Dname].attrs['Nhank'] = Nhank
-    f_prior[Dname].attrs['Nfreq'] = Nfreq
-
-    f_prior.close()
+        # Add method, type, file_ex, and im as attributes to '/D1'
+        f_prior[Dname].attrs['method'] = method
+        f_prior[Dname].attrs['type'] = type
+        f_prior[Dname].attrs['im'] = im
+        f_prior[Dname].attrs['Nhank'] = Nhank
+        f_prior[Dname].attrs['Nfreq'] = Nfreq
 
     integrate_update_prior_attributes(f_prior_data_h5)
     
@@ -2201,9 +2200,8 @@ def posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], usePrior=False, **
             i_use[i,:]=np.arange(nr)
         
 
-    f_prior = h5py.File(f_prior_h5,'r')
-    M_prior = f_prior[Mstr][:]
-    f_prior.close()
+    with h5py.File(f_prior_h5,'r') as f_prior:
+        M_prior = f_prior[Mstr][:]
     nz = M_prior.shape[1]
 
     thick_mean = np.zeros((ns))

@@ -909,10 +909,10 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         plt.show()
     if (pl=='all') or (pl=='ND'):
         #
-        f_data = h5py.File(f_data_h5,'r')
-        ndata,ns = f_data['/%s' % 'D1']['d_obs'].shape
-        # find number of nan values on d_obs
-        non_nan = np.sum(~np.isnan(f_data['/%s' % 'D1']['d_obs']), axis=1)
+        with h5py.File(f_data_h5,'r') as f_data:
+            ndata,ns = f_data['/%s' % 'D1']['d_obs'].shape
+            # find number of nan values on d_obs
+            non_nan = np.sum(~np.isnan(f_data['/%s' % 'D1']['d_obs']), axis=1)
         #print(non_nan)
 
         fig = plt.figure(3, figsize=(wx, wy))
@@ -2748,140 +2748,140 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
         return
 
 
-    f_data = h5py.File(f_data_h5,'r')
+    with h5py.File(f_data_h5,'r') as f_data:
 
-    if len(Dkey)==0:
-        nd = 0
-        Dkeys = []
-        for key in f_data.keys():
-            if key[0]=='D':
-                print("plot_data: Found data set %s" % key)
-                Dkeys.append(key)
-            nd += 1
-        Dkey=Dkeys[0]
-        print("plot_data: Using data set %s" % Dkey)
- 
-    noise_model = f_data['/%s' % Dkey].attrs['noise_model']
-    
-    # Get name attribute if it exists
-    name_attr = f_data['/%s' % Dkey].attrs.get('name', None)
-    
-    # Force plot type for discrete/multinomial data
-    if noise_model == 'multinomial' or Dkey.upper() in ['D2', 'D3', 'D4', 'D5']:
-        plType = 'plot'
-    
-    if noise_model == 'gaussian':
-        noise_model = 'Gaussian'
-        d_obs = f_data['/%s' % Dkey]['d_obs'][:]
-        d_std = f_data['/%s' % Dkey]['d_std'][:]
+        if len(Dkey)==0:
+            nd = 0
+            Dkeys = []
+            for key in f_data.keys():
+                if key[0]=='D':
+                    print("plot_data: Found data set %s" % key)
+                    Dkeys.append(key)
+                nd += 1
+            Dkey=Dkeys[0]
+            print("plot_data: Using data set %s" % Dkey)
+
+        noise_model = f_data['/%s' % Dkey].attrs['noise_model']
+
+        # Get name attribute if it exists
+        name_attr = f_data['/%s' % Dkey].attrs.get('name', None)
+
+        # Force plot type for discrete/multinomial data
+        if noise_model == 'multinomial' or Dkey.upper() in ['D2', 'D3', 'D4', 'D5']:
+            plType = 'plot'
+
+        if noise_model == 'gaussian':
+            noise_model = 'Gaussian'
+            d_obs = f_data['/%s' % Dkey]['d_obs'][:]
+            d_std = f_data['/%s' % Dkey]['d_std'][:]
 
 
-        ndata,ns = f_data['/%s' % Dkey]['d_obs'].shape
-        # set i_plot as an array from 0 to ndata
-        if len(i_plot)==0:
-            i_plot = np.arange(ndata)
-            #i_plot = 1000+np.arange(5000)
+            ndata,ns = f_data['/%s' % Dkey]['d_obs'].shape
+            # set i_plot as an array from 0 to ndata
+            if len(i_plot)==0:
+                i_plot = np.arange(ndata)
+                #i_plot = 1000+np.arange(5000)
 
-        # remove all values in i_plot that are larger than the number of data
-        i_plot = i_plot[i_plot<ndata]
-        # remove all values in i_plot that are smaller than 0
-        i_plot = i_plot[i_plot>=0]
-        
-        # reaplce values larger than 1 with nan in d_std
-        d_std[d_std>1] = np.nan
+            # remove all values in i_plot that are larger than the number of data
+            i_plot = i_plot[i_plot<ndata]
+            # remove all values in i_plot that are smaller than 0
+            i_plot = i_plot[i_plot>=0]
 
-        # find number of nan values on d_obs
-        non_nan = np.sum(~np.isnan(d_obs), axis=1)
+            # reaplce values larger than 1 with nan in d_std
+            d_std[d_std>1] = np.nan
 
-        # Calculate the extent
-        xlim = [i_plot.min(), i_plot.max()]
-        extent = [xlim[0], xlim[1], 0, d_obs.shape[1]]
+            # find number of nan values on d_obs
+            non_nan = np.sum(~np.isnan(d_obs), axis=1)
 
-        # plot figure with data
+            # Calculate the extent
+            xlim = [i_plot.min(), i_plot.max()]
+            extent = [xlim[0], xlim[1], 0, d_obs.shape[1]]
 
-        fig, ax = plt.subplots(4,1,figsize=(10,12), gridspec_kw={'height_ratios': [3, 3, 3, 1]})
+            # plot figure with data
 
-        # Set suptitle with optional name attribute
+            fig, ax = plt.subplots(4,1,figsize=(10,12), gridspec_kw={'height_ratios': [3, 3, 3, 1]})
 
-        if plType=='plot':
-            if uselog:
-                im1 = ax[0].semilogy(d_obs[i_plot,:], linewidth=.5)
-                im2 = ax[1].semilogy(d_std[i_plot,:], linewidth=.5)
-                im3 = ax[2].semilogy((d_obs[i_plot,:]/d_std[i_plot,:]), linewidth=.5)
+            # Set suptitle with optional name attribute
+
+            if plType=='plot':
+                if uselog:
+                    im1 = ax[0].semilogy(d_obs[i_plot,:], linewidth=.5)
+                    im2 = ax[1].semilogy(d_std[i_plot,:], linewidth=.5)
+                    im3 = ax[2].semilogy((d_obs[i_plot,:]/d_std[i_plot,:]), linewidth=.5)
+                else:
+                    im1 = ax[0].plot(d_obs[i_plot,:], linewidth=.5)
+                    im2 = ax[1].plot(d_std[i_plot,:], linewidth=.5)
+                    im3 = ax[2].plot((d_obs[i_plot,:]/d_std[i_plot,:]), linewidth=.5)
+                ax[0].set_xlim(xlim)
+                ax[1].set_xlim(xlim)
+                ax[2].set_xlim(xlim)
+                ax[2].set_ylim([.5, 50])
+                ax[0].set_ylabel('d_obs')
+                ax[1].set_ylabel('d_std')
+                ax[2].set_ylabel('S/N (d_obs/d_std)')
+
+            elif plType=='imshow':
+                if uselog:
+                    # Handle NaN and invalid values for LogNorm
+                    d_obs_clean = d_obs[i_plot,:].copy()
+                    d_std_clean = d_std[i_plot,:].copy()
+
+                    # Replace NaN/inf/zero values with small positive values for LogNorm
+                    d_obs_clean[~np.isfinite(d_obs_clean) | (d_obs_clean <= 0)] = 1e-12
+                    d_std_clean[~np.isfinite(d_std_clean) | (d_std_clean <= 0)] = 1e-12
+
+                    im1 = ax[0].imshow(d_obs_clean.T, aspect='auto', cmap='jet_r', norm=matplotlib.colors.LogNorm(), extent=extent)
+                    im2 = ax[1].imshow(d_std_clean.T, aspect='auto', cmap='hot_r', norm=matplotlib.colors.LogNorm(), extent=extent)
+                else:
+                    im1 = ax[0].imshow(d_obs[i_plot,:].T, aspect='auto', cmap='jet_r', extent=extent)
+                    im2 = ax[1].imshow(d_std[i_plot,:].T, aspect='auto', cmap='hot_r', extent=extent)
+
+                # For signal-to-noise ratio, handle division by zero and set reasonable limits
+                snr_data = d_obs[i_plot,:] / d_std[i_plot,:]
+                snr_data = np.where(np.isfinite(snr_data), snr_data, 1.0)
+                im3 = ax[2].imshow(snr_data.T, aspect='auto', vmin = 0.5, vmax = 50, extent=extent)
+
+                fig.colorbar(im1, ax=ax[0])
+                fig.colorbar(im2, ax=ax[1])
+                fig.colorbar(im3, ax=ax[2])
+
+                ax[0].set_ylabel('gate number')
+                ax[1].set_ylabel('gate number')
+                ax[2].set_ylabel('gate number')
+
+                ax[0].set_title('d_obs: observed data')
+                ax[1].set_title('d_std: standard deviation')
+                #ax[2].set_title('d_std/d_obs: relative standard deviation')
+
+
+            im4 = ax[3].plot(i_plot,non_nan[i_plot], 'k.', markersize=.5)
+            ax[3].set_ylabel('Number of data')
+            ax[3].set_xlim(xlim)
+
+            if plType=='imshow':
+                # Create an invisible colorbar for the last subplot
+                cbar4 = fig.colorbar(im3, ax=ax[3])
+                cbar4.solids.set(alpha=0)
+                cbar4.outline.set_visible(False)
+                cbar4.ax.set_yticks([])  # Hide the colorbar ticks
+                cbar4.ax.set_yticklabels([])  # Hide the colorbar ticks labels
+
+            ax[-1].set_xlabel('Index')
+
+            ax[0].grid()
+            ax[1].grid()
+            ax[2].grid()
+            ax[3].grid()
+
+            if name_attr is not None:
+                fig.suptitle("Dataset %s: %s" % (Dkey, name_attr))
             else:
-                im1 = ax[0].plot(d_obs[i_plot,:], linewidth=.5)
-                im2 = ax[1].plot(d_std[i_plot,:], linewidth=.5)
-                im3 = ax[2].plot((d_obs[i_plot,:]/d_std[i_plot,:]), linewidth=.5)
-            ax[0].set_xlim(xlim)
-            ax[1].set_xlim(xlim)
-            ax[2].set_xlim(xlim)
-            ax[2].set_ylim([.5, 50])
-            ax[0].set_ylabel('d_obs')
-            ax[1].set_ylabel('d_std')
-            ax[2].set_ylabel('S/N (d_obs/d_std)')
+                fig.suptitle("Dataset %s" % Dkey)
 
-        elif plType=='imshow':            
-            if uselog:
-                # Handle NaN and invalid values for LogNorm
-                d_obs_clean = d_obs[i_plot,:].copy()
-                d_std_clean = d_std[i_plot,:].copy()
-                
-                # Replace NaN/inf/zero values with small positive values for LogNorm
-                d_obs_clean[~np.isfinite(d_obs_clean) | (d_obs_clean <= 0)] = 1e-12
-                d_std_clean[~np.isfinite(d_std_clean) | (d_std_clean <= 0)] = 1e-12
-                
-                im1 = ax[0].imshow(d_obs_clean.T, aspect='auto', cmap='jet_r', norm=matplotlib.colors.LogNorm(), extent=extent)
-                im2 = ax[1].imshow(d_std_clean.T, aspect='auto', cmap='hot_r', norm=matplotlib.colors.LogNorm(), extent=extent)
-            else:
-                im1 = ax[0].imshow(d_obs[i_plot,:].T, aspect='auto', cmap='jet_r', extent=extent)
-                im2 = ax[1].imshow(d_std[i_plot,:].T, aspect='auto', cmap='hot_r', extent=extent)
-            
-            # For signal-to-noise ratio, handle division by zero and set reasonable limits
-            snr_data = d_obs[i_plot,:] / d_std[i_plot,:]
-            snr_data = np.where(np.isfinite(snr_data), snr_data, 1.0)
-            im3 = ax[2].imshow(snr_data.T, aspect='auto', vmin = 0.5, vmax = 50, extent=extent)
-
-            fig.colorbar(im1, ax=ax[0])
-            fig.colorbar(im2, ax=ax[1])
-            fig.colorbar(im3, ax=ax[2])
-        
-            ax[0].set_ylabel('gate number')
-            ax[1].set_ylabel('gate number')
-            ax[2].set_ylabel('gate number')
-                
-            ax[0].set_title('d_obs: observed data')
-            ax[1].set_title('d_std: standard deviation')
-            #ax[2].set_title('d_std/d_obs: relative standard deviation')
-            
-        
-        im4 = ax[3].plot(i_plot,non_nan[i_plot], 'k.', markersize=.5)
-        ax[3].set_ylabel('Number of data')
-        ax[3].set_xlim(xlim)
-
-        if plType=='imshow':            
-            # Create an invisible colorbar for the last subplot
-            cbar4 = fig.colorbar(im3, ax=ax[3])
-            cbar4.solids.set(alpha=0)
-            cbar4.outline.set_visible(False)
-            cbar4.ax.set_yticks([])  # Hide the colorbar ticks
-            cbar4.ax.set_yticklabels([])  # Hide the colorbar ticks labels
-
-        ax[-1].set_xlabel('Index')
-        
-        ax[0].grid()
-        ax[1].grid()
-        ax[2].grid()
-        ax[3].grid()
-
-        if name_attr is not None:
-            fig.suptitle("Dataset %s: %s" % (Dkey, name_attr))
+            plt.tight_layout()
         else:
-            fig.suptitle("Dataset %s" % Dkey)
+            print("plot_data: Unknown noise model: %s" % noise_model)
 
-        plt.tight_layout()
-    else:
-        print("plot_data: Unknown noise model: %s" % noise_model)
-        
     # set plot in kwarg to True if not allready set
     if 'hardcopy' not in kwargs:
         kwargs['hardcopy'] = True
@@ -2951,61 +2951,60 @@ def plot_data_prior(f_prior_data_h5,
     
     cols=['wheat','black','red']
 
-    f_data = h5py.File(f_data_h5)
-    f_prior_data = h5py.File(f_prior_data_h5)
-    
-    # Get data dimensions to determine plot type
-    prior_data = None
-    obs_data = None
-    is_1d = False
-    
-    # Load prior data
-    dh5_str_prior = 'D%d' % (id)
-    if dh5_str_prior in f_prior_data:
-        npr = f_prior_data[dh5_str_prior].shape[0]
-        nr_prior = np.min([nr, npr])
-        i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
-        prior_data = f_prior_data[dh5_str_prior][i_use]
-        
-        # Check if data is 1D (only one column)
-        if prior_data.shape[1] == 1:
-            is_1d = True
-            prior_data = prior_data.flatten()
-    else:   
-        print('%s not in f_prior_data' % dh5_str_prior)
-    
-    # Load observed data
-    dh5_str_obs = 'D%d/%s' % (id_data, d_str)
-    if dh5_str_obs in f_data:
-        d_obs_full = f_data[dh5_str_obs][:]
-        if len(d_obs_full.shape) == 1:
-            d_obs_full = d_obs_full.reshape(-1, 1)
-        ns, nd = d_obs_full.shape
-        nr_obs = np.min([nr, ns])    
-        i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
-        obs_data = d_obs_full[i_use_d, :]
-        
-        # Check if observed data is also 1D
-        if obs_data.shape[1] == 1:
-            is_1d = True
-            obs_data = obs_data.flatten()
-    else:
-        print('%s not in f_data' % dh5_str_obs)
-    
+    with h5py.File(f_data_h5,'r') as f_data, h5py.File(f_prior_data_h5,'r') as f_prior_data:
+
+        # Get data dimensions to determine plot type
+        prior_data = None
+        obs_data = None
+        is_1d = False
+
+        # Load prior data
+        dh5_str_prior = 'D%d' % (id)
+        if dh5_str_prior in f_prior_data:
+            npr = f_prior_data[dh5_str_prior].shape[0]
+            nr_prior = np.min([nr, npr])
+            i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
+            prior_data = f_prior_data[dh5_str_prior][i_use]
+
+            # Check if data is 1D (only one column)
+            if prior_data.shape[1] == 1:
+                is_1d = True
+                prior_data = prior_data.flatten()
+        else:
+            print('%s not in f_prior_data' % dh5_str_prior)
+
+        # Load observed data
+        dh5_str_obs = 'D%d/%s' % (id_data, d_str)
+        if dh5_str_obs in f_data:
+            d_obs_full = f_data[dh5_str_obs][:]
+            if len(d_obs_full.shape) == 1:
+                d_obs_full = d_obs_full.reshape(-1, 1)
+            ns, nd = d_obs_full.shape
+            nr_obs = np.min([nr, ns])
+            i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
+            obs_data = d_obs_full[i_use_d, :]
+
+            # Check if observed data is also 1D
+            if obs_data.shape[1] == 1:
+                is_1d = True
+                obs_data = obs_data.flatten()
+        else:
+            print('%s not in f_data' % dh5_str_obs)
+
     plt.figure(figsize=(7,6))
-    
+
     if is_1d:
         # Create histogram plot for 1D data
         bins = 50
-        
+
         if prior_data is not None:
-            plt.hist(prior_data, bins=bins, alpha=alpha, color=cols[1], 
+            plt.hist(prior_data, bins=bins, alpha=alpha, color=cols[1],
                     label='Prior data', density=True, histtype='stepfilled')
-        
+
         if obs_data is not None:
-            plt.hist(obs_data, bins=bins, alpha=alpha, color=cols[2], 
+            plt.hist(obs_data, bins=bins, alpha=alpha, color=cols[2],
                     label='Observed data', density=True, histtype='stepfilled')
-        
+
         plt.xlabel('Data Value')
         plt.ylabel('Probability Density')
         plt.legend()
@@ -3013,17 +3012,17 @@ def plot_data_prior(f_prior_data_h5,
     else:
         # Original 2D line plot
         if prior_data is not None:
-            plt.semilogy(prior_data.T, '-', alpha=alpha, linewidth=0.1, 
+            plt.semilogy(prior_data.T, '-', alpha=alpha, linewidth=0.1,
                         color=cols[1], label='Prior data')
-        
+
         if obs_data is not None:
-            plt.semilogy(obs_data.T, '-', alpha=alpha, linewidth=0.1, 
+            plt.semilogy(obs_data.T, '-', alpha=alpha, linewidth=0.1,
                         label='Observed data', color=cols[2])
-        
+
         plt.xlabel('Data #')
         plt.ylabel('Data Value')
         plt.title('Prior data (black) and observed data (red)')
-    
+
     if ylim is not None:
         if is_1d:
             plt.xlim(ylim)  # For histogram, ylim becomes xlim
@@ -3032,9 +3031,6 @@ def plot_data_prior(f_prior_data_h5,
 
     plt.grid()
     plt.tight_layout()
-    
-    f_data.close()
-    f_prior_data.close()
 
     # set plot in kwarg to True if not allready set
     if 'hardcopy' not in kwargs:
@@ -3113,19 +3109,17 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
         return
 
 
-    f_post = h5py.File(f_post_h5,'r')
+    with h5py.File(f_post_h5,'r') as f_post:
+        f_prior_h5 = f_post['/'].attrs['f5_prior']
+        f_data_h5 = f_post['/'].attrs['f5_data']
 
-    f_prior_h5 = f_post['/'].attrs['f5_prior']
-    f_data_h5 = f_post['/'].attrs['f5_data']
-    
-    # Load CHI2 if it exists
-    try:
-        CHI2 = f_post['/CHI2'][:]
-    except:
-        CHI2 = None
+        # Load CHI2 if it exists
+        try:
+            CHI2 = f_post['/CHI2'][:]
+        except:
+            CHI2 = None
 
-
-    # if id is a list of integers, then loop over them and call 
+    # if id is a list of integers, then loop over them and call
     # plot_data_prior_post for each id
     if isinstance(id, list):
         for i in id:
@@ -3142,7 +3136,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                     if showInfo>0:
                         print("plot_data_prior_post: Found data set %s" % key)
                     nd += 1
-                    id_plot.append(nd)  
+                    id_plot.append(nd)
 
         #print(id_plot)
         plot_data_prior_post(f_post_h5, i_plot=i_plot, nr=nr, id=id_plot, ylim=ylim, **kwargs)
@@ -3151,156 +3145,154 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
     if id>0:
         Dkey = 'D%d' % id
 
-    f_data = h5py.File(f_data_h5,'r')
-    f_prior = h5py.File(f_prior_h5,'r')
+    with h5py.File(f_post_h5,'r') as f_post, h5py.File(f_data_h5,'r') as f_data, h5py.File(f_prior_h5,'r') as f_prior:
 
-    cols=['gray','black','red']
-    cols=['wheat','black','red']
+        cols=['gray','black','red']
+        cols=['wheat','black','red']
 
-    if len(Dkey)==0:
-        nd = 0
-        Dkeys = []
-        for key in f_data.keys():
-            if key[0]=='D':
-                if showInfo>0:
-                    print("plot_data_prior_post: Found data set %s" % key)
-                Dkeys.append(key)
-            nd += 1
-        Dkey=Dkeys[0]
-        if showInfo>0:
-            print("plot_data_prior_post: Using data set %s" % Dkey)
+        if len(Dkey)==0:
+            nd = 0
+            Dkeys = []
+            for key in f_data.keys():
+                if key[0]=='D':
+                    if showInfo>0:
+                        print("plot_data_prior_post: Found data set %s" % key)
+                    Dkeys.append(key)
+                nd += 1
+            Dkey=Dkeys[0]
+            if showInfo>0:
+                print("plot_data_prior_post: Using data set %s" % Dkey)
 
-    noise_model = f_data['/%s' % Dkey].attrs['noise_model']
-    if noise_model == 'gaussian':
-        noise_model = 'Gaussian'
-        d_obs = f_data['/%s' % Dkey]['d_obs'][:]
-        try:
-            d_std = f_data['/%s' % Dkey]['d_std'][:]
-        except:
-            if 'Cd' in f_data['/%s' % Dkey].keys():
-                # if 'Cd' is 3 dim then take the diagonal
-                if len(f_data['/%s' % Dkey]['Cd'].shape)==3:
-                    d_std = np.sqrt(np.diag(f_data['/%s' % Dkey]['Cd'][i_plot]))
+        noise_model = f_data['/%s' % Dkey].attrs['noise_model']
+        if noise_model == 'gaussian':
+            noise_model = 'Gaussian'
+            d_obs = f_data['/%s' % Dkey]['d_obs'][:]
+            try:
+                d_std = f_data['/%s' % Dkey]['d_std'][:]
+            except:
+                if 'Cd' in f_data['/%s' % Dkey].keys():
+                    # if 'Cd' is 3 dim then take the diagonal
+                    if len(f_data['/%s' % Dkey]['Cd'].shape)==3:
+                        d_std = np.sqrt(np.diag(f_data['/%s' % Dkey]['Cd'][i_plot]))
+                    else:
+                        d_std = np.sqrt(f_data['/%s' % Dkey]['Cd'])
                 else:
-                    d_std = np.sqrt(f_data['/%s' % Dkey]['Cd'])
-            else:
-                d_std = np.zeros(d_obs.shape)
+                    d_std = np.zeros(d_obs.shape)
 
-        if i_plot==-1:
-            # get 400 random unique index of d_obs
-            i_use = np.random.choice(d_obs.shape[0], nr, replace=False)
-        else:
-            nr = np.min([nr,d_obs.shape[0]])
-            i_use = f_post['/i_use'][i_plot,0:nr]
-            i_use = i_use.flatten()
-        nr=len(i_use)
-        
-        ns,ndata = f_data['/%s' % Dkey]['d_obs'].shape
-        d_post = np.zeros((nr,ndata))
-        d_prior = np.zeros((nr,ndata))
-        
-        N = f_prior[Dkey].shape[0]
-        # set id_plot to be nr random locagtions in 1:ndata
-        i_prior_plot = np.random.randint(0,N,nr)
-        for i in range(nr):
-            d_prior[i]=f_prior[Dkey][i_prior_plot[i],:]    
-            if i_plot>-1:
-                d_post[i]=f_prior[Dkey][i_use[i],:]
-    
-        #i_plot=[]
-        fig, ax = plt.subplots(1,1,figsize=(7,7))
-        if ndata>1:
-            if is_log:
-                if showInfo>1:
-                    print('plot_data_prior_post: Plotting log10(d_prior)')
-                    print('This is not implemented yet')
-                ax.plot(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
-                ax.plot(d_post.T,'-',linewidth=.2, label='d_prior', color=cols[1])
-                ax.plot(d_obs[i_plot,:],'.',markersize=6, label='d_obs', color=cols[2])
-                try:
-                    ax.plot(d_obs[i_plot,:]-2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
-                    ax.plot(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
-                except:
-                    pass
-                plt.ylabel('log10(dBDt)')
+            if i_plot==-1:
+                # get 400 random unique index of d_obs
+                i_use = np.random.choice(d_obs.shape[0], nr, replace=False)
             else:
-                ax.semilogy(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
+                nr = np.min([nr,d_obs.shape[0]])
+                i_use = f_post['/i_use'][i_plot,0:nr]
+                i_use = i_use.flatten()
+            nr=len(i_use)
 
-                if i_plot>-1:            
-                    ax.semilogy(d_post.T,'-',linewidth=.2, label='d_prior', color=cols[1])
-                
-                    ax.semilogy(d_obs[i_plot,:],'.',markersize=6, label='d_obs', color=cols[2])
+            ns,ndata = f_data['/%s' % Dkey]['d_obs'].shape
+            d_post = np.zeros((nr,ndata))
+            d_prior = np.zeros((nr,ndata))
+
+            N = f_prior[Dkey].shape[0]
+            # set id_plot to be nr random locagtions in 1:ndata
+            i_prior_plot = np.random.randint(0,N,nr)
+            for i in range(nr):
+                d_prior[i]=f_prior[Dkey][i_prior_plot[i],:]
+                if i_plot>-1:
+                    d_post[i]=f_prior[Dkey][i_use[i],:]
+
+            #i_plot=[]
+            fig, ax = plt.subplots(1,1,figsize=(7,7))
+            if ndata>1:
+                if is_log:
+                    if showInfo>1:
+                        print('plot_data_prior_post: Plotting log10(d_prior)')
+                        print('This is not implemented yet')
+                    ax.plot(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
+                    ax.plot(d_post.T,'-',linewidth=.2, label='d_prior', color=cols[1])
+                    ax.plot(d_obs[i_plot,:],'.',markersize=6, label='d_obs', color=cols[2])
                     try:
-                        ax.semilogy(d_obs[i_plot,:]-2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
-                        ax.semilogy(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
+                        ax.plot(d_obs[i_plot,:]-2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
+                        ax.plot(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
                     except:
                         pass
-                    #ax.text(0.1, 0.1, 'Data set %s, Observation # %d' % (Dkey, i_plot+1), transform=ax.transAxes)
-                else:   
-                    # select nr random unqiue index of d_obs
-                    i_d = np.random.choice(d_obs.shape[0], nr, replace=False)
-                    if is_log:
-                        ax.plot(d_obs[i_d,:].T,'-',linewidth=.1, label='d_obs', color=cols[2])
-                        ax.plot(d_obs[i_d,:].T,'*',linewidth=.1, label='d_obs', color=cols[2])
+                    plt.ylabel('log10(dBDt)')
+                else:
+                    ax.semilogy(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
+
+                    if i_plot>-1:
+                        ax.semilogy(d_post.T,'-',linewidth=.2, label='d_prior', color=cols[1])
+
+                        ax.semilogy(d_obs[i_plot,:],'.',markersize=6, label='d_obs', color=cols[2])
+                        try:
+                            ax.semilogy(d_obs[i_plot,:]-2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
+                            ax.semilogy(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
+                        except:
+                            pass
+                        #ax.text(0.1, 0.1, 'Data set %s, Observation # %d' % (Dkey, i_plot+1), transform=ax.transAxes)
                     else:
-                        ax.semilogy(d_obs[i_d,:].T,'-',linewidth=1, label='d_obs', color=cols[2])
-                        ax.semilogy(d_obs[i_d,:].T,'*',linewidth=1, label='d_obs', color=cols[2])
+                        # select nr random unqiue index of d_obs
+                        i_d = np.random.choice(d_obs.shape[0], nr, replace=False)
+                        if is_log:
+                            ax.plot(d_obs[i_d,:].T,'-',linewidth=.1, label='d_obs', color=cols[2])
+                            ax.plot(d_obs[i_d,:].T,'*',linewidth=.1, label='d_obs', color=cols[2])
+                        else:
+                            ax.semilogy(d_obs[i_d,:].T,'-',linewidth=1, label='d_obs', color=cols[2])
+                            ax.semilogy(d_obs[i_d,:].T,'*',linewidth=1, label='d_obs', color=cols[2])
 
-                if ylim is not None:            
-                    plt.ylim(ylim)
-                plt.ylabel('dBDt')
+                    if ylim is not None:
+                        plt.ylim(ylim)
+                    plt.ylabel('dBDt')
 
-                plt.xlabel('Data #')
+                    plt.xlabel('Data #')
+                    plt.grid()
+
+
+            else:
+                # nadat=1
+                plt.hist(d_prior.flatten(), bins=50, alpha=0.5, color=cols[0], label='d_prior', density=True)
+                plt.hist(d_post.flatten(), bins=50, alpha=0.5, color=cols[1], label='d_post', density=True)
+                # plot a vertical solid line at x=d_obs[i_plot], and two dashed lines at d_obs[i_plot]-2*d_std[i_plot] and d_obs[i_plot]+2*d_std[i_plot]
+                plt.plot([d_obs[i_plot],d_obs[i_plot]], [0, plt.ylim()[1]], 'r-', label='d_obs', linewidth=2)
+
+                plt.xlabel('Value')
+                plt.ylabel('PDF')
+                plt.legend()
+
                 plt.grid()
 
 
-        else:   
-            # nadat=1
-            plt.hist(d_prior.flatten(), bins=50, alpha=0.5, color=cols[0], label='d_prior', density=True)
-            plt.hist(d_post.flatten(), bins=50, alpha=0.5, color=cols[1], label='d_post', density=True)
-            # plot a vertical solid line at x=d_obs[i_plot], and two dashed lines at d_obs[i_plot]-2*d_std[i_plot] and d_obs[i_plot]+2*d_std[i_plot]
-            plt.plot([d_obs[i_plot],d_obs[i_plot]], [0, plt.ylim()[1]], 'r-', label='d_obs', linewidth=2)
-            
-            plt.xlabel('Value')
-            plt.ylabel('PDF')
-            plt.legend()
+            if i_plot>-1:
 
-            plt.grid()
-        
-
-        if i_plot>-1:
-            
-            ax.text(0.1, 0.1, 'T = %4.2f.' % (f_post['/T'][i_plot]), transform=ax.transAxes)
-            ax.text(0.1, 0.2, 'log(EV) = %4.2f.' % (f_post['/EV'][i_plot]), transform=ax.transAxes)
-            try:
-                if CHI2 is not None:
-                    # Sum CHI2 across all data types if multiple types exist
-                    if len(CHI2.shape) == 2:
-                        CHI2_total = np.nansum(CHI2[i_plot, :])
-                        n_types = np.sum(~np.isnan(CHI2[i_plot, :]))
-                        ax.text(0.1, 0.3, f'CHI2 = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes)
-                    else:
-                        ax.text(0.1, 0.3, f'CHI2 = {CHI2[i_plot]:.2f}', transform=ax.transAxes)
-            except:
-                pass
-            # Use custom title if provided, otherwise use default
-            if 'title' in kwargs:
-                plt.title(kwargs['title'])
-            else:
-                plt.title('Data set %s, Observation # %d' % (Dkey, i_plot+1))
+                ax.text(0.1, 0.1, 'T = %4.2f.' % (f_post['/T'][i_plot]), transform=ax.transAxes)
+                ax.text(0.1, 0.2, 'log(EV) = %4.2f.' % (f_post['/EV'][i_plot]), transform=ax.transAxes)
+                try:
+                    if CHI2 is not None:
+                        # Sum CHI2 across all data types if multiple types exist
+                        if len(CHI2.shape) == 2:
+                            CHI2_total = np.nansum(CHI2[i_plot, :])
+                            n_types = np.sum(~np.isnan(CHI2[i_plot, :]))
+                            ax.text(0.1, 0.3, f'CHI2 = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes)
+                        else:
+                            ax.text(0.1, 0.3, f'CHI2 = {CHI2[i_plot]:.2f}', transform=ax.transAxes)
+                except:
+                    pass
+                # Use custom title if provided, otherwise use default
+                if 'title' in kwargs:
+                    plt.title(kwargs['title'])
+                else:
+                    plt.title('Data set %s, Observation # %d' % (Dkey, i_plot+1))
 
 
-        #plt.legend()
+            #plt.legend()
 
- 
-        if hardcopy:
-            # strip the filename from f_data_h5
-            # get filename without extension of f_post_h5
-            if i_plot==-1:
-                plt.savefig('%s_%s.png' % (os.path.splitext(f_post_h5)[0],Dkey))
-            else:
-                plt.savefig('%s_%s_id%05d.png' % (os.path.splitext(f_post_h5)[0],Dkey,i_plot))
-        plt.show()
+            if hardcopy:
+                # strip the filename from f_data_h5
+                # get filename without extension of f_post_h5
+                if i_plot==-1:
+                    plt.savefig('%s_%s.png' % (os.path.splitext(f_post_h5)[0],Dkey))
+                else:
+                    plt.savefig('%s_%s_id%05d.png' % (os.path.splitext(f_post_h5)[0],Dkey,i_plot))
+            plt.show()
 
 
 def find_points_along_line_segments(X, Y, Xl, Yl, ID=None, tolerance=None, method='closest'):
@@ -3519,58 +3511,65 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     import matplotlib.pyplot as plt
     from matplotlib.colors import LogNorm
 
-    f_prior = h5py.File(f_prior_h5,'r')
+    with h5py.File(f_prior_h5,'r') as f_prior:
 
-    # If Mkey is not set, plot for all M* keys in prior and return
-    if len(Mkey)==0:
-        for key in f_prior.keys():
-            if (key[0]=='M'):
-                plot_prior_stats(f_prior_h5, Mkey=key, nr=nr, use_log=use_log, showInfo=showInfo, **kwargs)
+        # If Mkey is not set, plot for all M* keys in prior and return
+        if len(Mkey)==0:
+            for key in f_prior.keys():
+                if (key[0]=='M'):
+                    plot_prior_stats(f_prior_h5, Mkey=key, nr=nr, use_log=use_log, showInfo=showInfo, **kwargs)
+            return
 
-        f_prior.close()
-        return  
+        if Mkey[0]!='/':
+            Mkey = '/%s' % Mkey
 
-    if Mkey[0]!='/':
-        Mkey = '/%s' % Mkey
+        # check if Mkey is in the keys of f_prior
+        if Mkey not in f_prior.keys():
+            print("Mkey=%s not found in %s" % (Mkey, f_prior_h5))
+            return
 
-    # check if Mkey is in the keys of f_prior
-    if Mkey not in f_prior.keys():
-        print("Mkey=%s not found in %s" % (Mkey, f_prior_h5))
-        return
-
-    # check if name is in the attributes of key Mkey
-    if 'name' in f_prior['/%s'%Mkey].attrs.keys():
-        name = '%s:%s' %  (Mkey[1::],f_prior['/%s'%Mkey].attrs['name'][:])
-        name = '%s' %  (f_prior['/%s'%Mkey].attrs['name'][:])
+        # check if name is in the attributes of key Mkey
+        if 'name' in f_prior['/%s'%Mkey].attrs.keys():
+            name = '%s:%s' %  (Mkey[1::],f_prior['/%s'%Mkey].attrs['name'][:])
+            name = '%s' %  (f_prior['/%s'%Mkey].attrs['name'][:])
 
 
-        #print(name)
-    else:
-        name = Mkey
+            #print(name)
+        else:
+            name = Mkey
 
 
-    f_prior['/%s'%Mkey].attrs.keys()
-    if 'x' in f_prior['/%s'%Mkey].attrs.keys():
-        z = f_prior['/%s'%Mkey].attrs['x']
-    else:
-        z = f_prior['/%s'%Mkey].attrs['z']
+        f_prior['/%s'%Mkey].attrs.keys()
+        if 'x' in f_prior['/%s'%Mkey].attrs.keys():
+            z = f_prior['/%s'%Mkey].attrs['x']
+        else:
+            z = f_prior['/%s'%Mkey].attrs['z']
 
 
-    # update nr if it is larger than the number of realizations in f_prior[Mkey]
-    if len(f_prior[Mkey][:])<nr:
-        nr = np.min([nr, len(f_prior[Mkey][:])])
-        print('plot_prior_stats: Using %d realizations' % nr)
+        # update nr if it is larger than the number of realizations in f_prior[Mkey]
+        if len(f_prior[Mkey][:])<nr:
+            nr = np.min([nr, len(f_prior[Mkey][:])])
+            print('plot_prior_stats: Using %d realizations' % nr)
 
-    M = f_prior[Mkey][:]
-    N, Nm = M.shape
-    clim,cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
+        M = f_prior[Mkey][:]
+        N, Nm = M.shape
+        clim,cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
 
-    # Convert string colormap name to actual colormap object
-    if isinstance(cmap, str):
-        import matplotlib.pyplot as plt
-        cmap = plt.get_cmap(cmap)
+        # Convert string colormap name to actual colormap object
+        if isinstance(cmap, str):
+            import matplotlib.pyplot as plt
+            cmap = plt.get_cmap(cmap)
 
-    is_discrete = f_prior['/%s'%Mkey].attrs['is_discrete']
+        is_discrete = f_prior['/%s'%Mkey].attrs['is_discrete']
+
+        if 'class_id' in f_prior[Mkey].attrs.keys():
+            _class_id = f_prior[Mkey].attrs['class_id'][:].flatten()
+        else:
+            _class_id = None
+        if 'class_name' in f_prior[Mkey].attrs.keys():
+            _class_name = f_prior[Mkey].attrs['class_name'][:].flatten()
+        else:
+            _class_name = []
 
     # Determine whether to use log scale
     if use_log is None:
@@ -3721,16 +3720,11 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     else:
         # DISCRETE
 
-        # get attribute class_name if it exist
-
-        if 'class_id' in f_prior[Mkey].attrs.keys():
-            class_id = f_prior[Mkey].attrs['class_id'][:].flatten()
-        else:
+        # use attributes already loaded inside the with block
+        class_id = _class_id
+        if class_id is None:
             print('No class_id found')
-        if 'class_name' in f_prior[Mkey].attrs.keys():
-            class_name = f_prior[Mkey].attrs['class_name'][:].flatten()
-        else:
-            class_name = []
+        class_name = _class_name
         n_class = len(class_name)
 
         # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
@@ -3840,8 +3834,6 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         tit = '%s - %s ' % (os.path.splitext(f_prior_h5)[0],name)
         #plt.suptitle(tit)
 
-    f_prior.close()
-
     if 'hardcopy' not in kwargs:
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
@@ -3930,123 +3922,123 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         print("plot_post_stats: File %s does not exist" % f_post_h5)
         return
 
-    f_post = h5py.File(f_post_h5, 'r')
+    with h5py.File(f_post_h5, 'r') as f_post:
 
-    # Get prior file path
-    if 'f5_prior' not in f_post.attrs.keys():
-        print("plot_post_stats: Posterior file does not contain 'f5_prior' attribute")
-        f_post.close()
-        return
-
-    f_prior_h5 = f_post.attrs['f5_prior']
-
-    # Check if prior file exists (might be relative path)
-    if not os.path.exists(f_prior_h5):
-        # Try relative to posterior file directory
-        post_dir = os.path.dirname(f_post_h5)
-        f_prior_h5_abs = os.path.join(post_dir, f_prior_h5)
-        if os.path.exists(f_prior_h5_abs):
-            f_prior_h5 = f_prior_h5_abs
-        else:
-            print("plot_post_stats: Prior file %s not found" % f_prior_h5)
-            print("plot_post_stats: Searched in: %s" % f_prior_h5_abs)
-            f_post.close()
+        # Get prior file path
+        if 'f5_prior' not in f_post.attrs.keys():
+            print("plot_post_stats: Posterior file does not contain 'f5_prior' attribute")
             return
 
-    # Check i_plot bounds
-    if 'i_use' not in f_post.keys():
-        print("plot_post_stats: Posterior file does not contain 'i_use' dataset")
-        f_post.close()
-        return
+        f_prior_h5 = f_post.attrs['f5_prior']
 
-    i_use = f_post['i_use']
-    n_data, n_accepted = i_use.shape
+        # Check if prior file exists (might be relative path)
+        if not os.path.exists(f_prior_h5):
+            # Try relative to posterior file directory
+            post_dir = os.path.dirname(f_post_h5)
+            f_prior_h5_abs = os.path.join(post_dir, f_prior_h5)
+            if os.path.exists(f_prior_h5_abs):
+                f_prior_h5 = f_prior_h5_abs
+            else:
+                print("plot_post_stats: Prior file %s not found" % f_prior_h5)
+                print("plot_post_stats: Searched in: %s" % f_prior_h5_abs)
+                return
 
-    if i_plot < 0 or i_plot >= n_data:
-        print("plot_post_stats: i_plot=%d out of bounds [0, %d)" % (i_plot, n_data))
-        f_post.close()
-        return
+        # Check i_plot bounds
+        if 'i_use' not in f_post.keys():
+            print("plot_post_stats: Posterior file does not contain 'i_use' dataset")
+            return
 
-    # Get accepted indices for this data point
-    i_accepted = i_use[i_plot, :]
+        i_use = f_post['i_use']
+        n_data, n_accepted = i_use.shape
 
-    # If Mkey is not set, plot for all M* keys in posterior and return
-    if len(Mkey) == 0:
-        for key in f_post.keys():
-            if (key[0] == 'M') and isinstance(f_post[key], h5py.Group):
-                plot_post_stats(f_post_h5, i_plot=i_plot, Mkey=key, nr=nr, use_log=use_log, showInfo=showInfo, **kwargs)
+        if i_plot < 0 or i_plot >= n_data:
+            print("plot_post_stats: i_plot=%d out of bounds [0, %d)" % (i_plot, n_data))
+            return
 
-        f_post.close()
-        return
+        # Get accepted indices for this data point
+        i_accepted = i_use[i_plot, :]
 
-    if Mkey[0] != '/':
-        Mkey = '/%s' % Mkey
+        # If Mkey is not set, plot for all M* keys in posterior and return
+        if len(Mkey) == 0:
+            for key in f_post.keys():
+                if (key[0] == 'M') and isinstance(f_post[key], h5py.Group):
+                    plot_post_stats(f_post_h5, i_plot=i_plot, Mkey=key, nr=nr, use_log=use_log, showInfo=showInfo, **kwargs)
+            return
 
-    # Check if Mkey is in the keys of f_post (as a Group with stats)
-    if Mkey not in f_post.keys():
-        print("plot_post_stats: Mkey=%s not found in %s" % (Mkey, f_post_h5))
-        f_post.close()
-        return
+        if Mkey[0] != '/':
+            Mkey = '/%s' % Mkey
 
-    # Open prior file to get realizations
-    f_prior = h5py.File(f_prior_h5, 'r')
+        # Check if Mkey is in the keys of f_post (as a Group with stats)
+        if Mkey not in f_post.keys():
+            print("plot_post_stats: Mkey=%s not found in %s" % (Mkey, f_post_h5))
+            return
 
-    if Mkey not in f_prior.keys():
-        print("plot_post_stats: Mkey=%s not found in prior file %s" % (Mkey, f_prior_h5))
-        f_prior.close()
-        f_post.close()
-        return
+        # Load pre-computed statistics from posterior file
+        if isinstance(f_post[Mkey], h5py.Group):
+            if 'Mean' in f_post[Mkey].keys():
+                stat_mean = f_post[Mkey]['Mean'][i_plot, :]
+            else:
+                stat_mean = None
 
-    # Get parameter name
-    if 'name' in f_prior['/%s' % Mkey].attrs.keys():
-        name = '%s' % (f_prior['/%s' % Mkey].attrs['name'][:])
-    else:
-        name = Mkey
-
-    # Get depth/coordinate vector
-    if 'x' in f_prior['/%s' % Mkey].attrs.keys():
-        z = f_prior['/%s' % Mkey].attrs['x']
-    else:
-        z = f_prior['/%s' % Mkey].attrs['z']
-
-    # Update nr if it is larger than the number of accepted samples
-    nr_actual = np.min([nr, n_accepted])
-    if showInfo > 0:
-        print('plot_post_stats: Using %d realizations for display out of %d accepted' % (nr_actual, n_accepted))
-
-    # Load ALL posterior realizations from prior file for statistics computation
-    M_prior_all = f_prior[Mkey][:]
-    M_all = M_prior_all[i_accepted, :]  # All accepted samples for statistics
-    N_all, Nm = M_all.shape
-
-    # Load subset for realizations display (right panel only)
-    M_display = M_prior_all[i_accepted[:nr_actual], :]
-    N_display = nr_actual
-
-    # Get color limits and colormap
-    clim, cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
-
-    # Convert string colormap name to actual colormap object
-    if isinstance(cmap, str):
-        cmap = plt.get_cmap(cmap)
-
-    # Check if discrete
-    is_discrete = f_prior['/%s' % Mkey].attrs['is_discrete']
-
-    # Load pre-computed statistics from posterior file
-    if isinstance(f_post[Mkey], h5py.Group):
-        if 'Mean' in f_post[Mkey].keys():
-            stat_mean = f_post[Mkey]['Mean'][i_plot, :]
+            if 'Median' in f_post[Mkey].keys():
+                stat_median = f_post[Mkey]['Median'][i_plot, :]
+            else:
+                stat_median = None
         else:
             stat_mean = None
-
-        if 'Median' in f_post[Mkey].keys():
-            stat_median = f_post[Mkey]['Median'][i_plot, :]
-        else:
             stat_median = None
-    else:
-        stat_mean = None
-        stat_median = None
+
+    with h5py.File(f_prior_h5, 'r') as f_prior:
+
+        if Mkey not in f_prior.keys():
+            print("plot_post_stats: Mkey=%s not found in prior file %s" % (Mkey, f_prior_h5))
+            return
+
+        # Get parameter name
+        if 'name' in f_prior['/%s' % Mkey].attrs.keys():
+            name = '%s' % (f_prior['/%s' % Mkey].attrs['name'][:])
+        else:
+            name = Mkey
+
+        # Get depth/coordinate vector
+        if 'x' in f_prior['/%s' % Mkey].attrs.keys():
+            z = f_prior['/%s' % Mkey].attrs['x']
+        else:
+            z = f_prior['/%s' % Mkey].attrs['z']
+
+        # Update nr if it is larger than the number of accepted samples
+        nr_actual = np.min([nr, n_accepted])
+        if showInfo > 0:
+            print('plot_post_stats: Using %d realizations for display out of %d accepted' % (nr_actual, n_accepted))
+
+        # Load ALL posterior realizations from prior file for statistics computation
+        M_prior_all = f_prior[Mkey][:]
+        M_all = M_prior_all[i_accepted, :]  # All accepted samples for statistics
+        N_all, Nm = M_all.shape
+
+        # Load subset for realizations display (right panel only)
+        M_display = M_prior_all[i_accepted[:nr_actual], :]
+        N_display = nr_actual
+
+        # Get color limits and colormap
+        clim, cmap = h5_get_clim_cmap(f_prior_h5, Mstr=Mkey)
+
+        # Convert string colormap name to actual colormap object
+        if isinstance(cmap, str):
+            cmap = plt.get_cmap(cmap)
+
+        # Check if discrete
+        is_discrete = f_prior['/%s' % Mkey].attrs['is_discrete']
+
+        # Load discrete attrs while file is open
+        if 'class_id' in f_prior[Mkey].attrs.keys():
+            _ps_class_id = f_prior[Mkey].attrs['class_id'][:].flatten()
+        else:
+            _ps_class_id = None
+        if 'class_name' in f_prior[Mkey].attrs.keys():
+            _ps_class_name = f_prior[Mkey].attrs['class_name'][:].flatten()
+        else:
+            _ps_class_name = []
 
     # Determine whether to use log scale
     if use_log is None:
@@ -4227,17 +4219,11 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
     else:
         # DISCRETE
 
-        # Get attribute class_name if it exists
-        if 'class_id' in f_prior[Mkey].attrs.keys():
-            class_id = f_prior[Mkey].attrs['class_id'][:].flatten()
-        else:
+        # Use attributes already loaded inside the with block
+        class_id = _ps_class_id
+        if class_id is None:
             print('plot_post_stats: No class_id found')
-            class_id = None
-
-        if 'class_name' in f_prior[Mkey].attrs.keys():
-            class_name = f_prior[Mkey].attrs['class_name'][:].flatten()
-        else:
-            class_name = []
+        class_name = _ps_class_name
         n_class = len(class_name)
 
         # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
@@ -4346,9 +4332,6 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
 
         tit = '%s - %s (i_plot=%d)' % (os.path.splitext(f_post_h5)[0], name, i_plot)
         plt.suptitle(tit)
-
-    f_prior.close()
-    f_post.close()
 
     if 'hardcopy' not in kwargs:
         kwargs['hardcopy'] = True
