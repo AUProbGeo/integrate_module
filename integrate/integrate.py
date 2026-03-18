@@ -334,11 +334,13 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
 
     For each **continuous** model parameter ``/Mx``:
 
-    - ``/Mx/Mean``     [Np, Nm]  Arithmetic mean of posterior realizations.
-    - ``/Mx/LogMean``  [Np, Nm]  Geometric mean (exp of mean of log values).
-    - ``/Mx/Median``   [Np, Nm]  Median of posterior realizations.
-    - ``/Mx/Std``      [Np, Nm]  Standard deviation of log10(posterior).
-    - ``/Mx/KL``       [Np, Nm]  KL divergence in bits. Only written when
+    - ``/Mx/Mean``          [Np, Nm]  Arithmetic mean of posterior realizations.
+    - ``/Mx/LogMean``       [Np, Nm]  Geometric mean (exp of mean of log values).
+    - ``/Mx/Median``        [Np, Nm]  Median of posterior realizations.
+    - ``/Mx/Std``           [Np, Nm]  Standard deviation of log10(posterior).
+    - ``/Mx/HarmonicMean``  [Np, Nm]  Trimmed harmonic mean: conductivity samples
+      are trimmed 10% each tail, averaged, then inverted back to resistivity.
+    - ``/Mx/KL``            [Np, Nm]  KL divergence in bits. Only written when
       ``computeKL_continuous=True``.
 
     For each **discrete** model parameter ``/Mx``:
@@ -470,6 +472,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 M_mean = np.full((nsounding, nm), np.nan)
                 M_std = np.full((nsounding, nm), np.nan)
                 M_median = np.full((nsounding, nm), np.nan)
+                M_harmonicmean = np.full((nsounding, nm), np.nan)
                 if computeKL_continuous:
                     M_KL = np.full((nsounding, nm), np.nan)
 
@@ -506,6 +509,10 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         M_median[iid,:] = np.median(m_post, axis=0)
                         with np.errstate(invalid='ignore', divide='ignore'):
                             M_std[iid,:] = np.std(np.log10(np.maximum(m_post, 1e-10)), axis=0)
+                        _c = 1.0 / np.maximum(m_post, 1e-10)
+                        _k = int(np.floor(0.10 * _c.shape[0]))
+                        _cs = np.sort(_c, axis=0)
+                        M_harmonicmean[iid, :] = 1.0 / np.mean(_cs[_k:_c.shape[0]-_k, :], axis=0)
                         if computeKL_continuous:
                             m_post_log = np.log10(np.maximum(m_post, 1e-10))
                             for _i in range(nm):
@@ -556,16 +563,23 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         # Geometric Mean: exp(mean(log(x)))
                         M_logmean[current_iids, :] = np.exp(np.mean(log_cube, axis=1))
                         
-                        # Std of Log10: 
+                        # Std of Log10:
                         # Math identity: std(log10(x)) = std(ln(x) / ln(10)) = std(ln(x)) * (1/ln(10))
                         # We reuse 'log_cube' and multiply by constant (faster than re-calculating log10)
                         M_std[current_iids, :] = np.std(log_cube, axis=1) * INV_LOG_10
+
+                        # Harmonic mean (trimmed 10% each tail in conductivity space)
+                        _c = 1.0 / np.maximum(m_cube, 1e-10)
+                        _nr = _c.shape[1]
+                        _k = int(np.floor(0.10 * _nr))
+                        _cs = np.sort(_c, axis=1)
+                        M_harmonicmean[current_iids, :] = 1.0 / np.mean(_cs[:, _k:_nr-_k, :], axis=1)
 
 
 
 
                 # Create datasets
-                for stat in ['Mean', 'Median', 'Std','LogMean']:
+                for stat in ['Mean', 'Median', 'Std', 'LogMean', 'HarmonicMean']:
                     if stat not in f_post:
                         dset = '/%s/%s' % (name,stat)
                         if dset not in f_post:
@@ -577,6 +591,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 f_post['/%s/%s' % (name,'Mean')][:] = M_mean
                 f_post['/%s/%s' % (name,'Median')][:] = M_median
                 f_post['/%s/%s' % (name,'Std')][:] = M_std
+                f_post['/%s/%s' % (name,'HarmonicMean')][:] = M_harmonicmean
                 if computeKL_continuous:
                     dset = '/%s/KL' % name
                     if dset not in f_post:

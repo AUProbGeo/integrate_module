@@ -2015,7 +2015,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     cmap : str or colormap, optional
         Color scheme for plotting (default ``'jet'``).
     key : str, optional
-        Statistic to plot, either ``'Mean'`` or ``'Median'`` (default ``'Median'``).
+        Statistic to plot: ``'Mean'``, ``'Median'``, or ``'HarmonicMean'`` (default ``'Median'``).
     alpha : float, optional
         Transparency scaling factor based on normalized standard deviation (0.0=no
         transparency, default; 1.0=full uncertainty-based transparency).
@@ -2157,6 +2157,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     with h5py.File(f_post_h5,'r') as f_post:
         Mean=f_post[Mstr+'/Mean'][:].T
         Median=f_post[Mstr+'/Median'][:].T
+        try:
+            HarmonicMean=f_post[Mstr+'/HarmonicMean'][:].T
+        except KeyError:
+            HarmonicMean=None
         Std=f_post[Mstr+'/Std'][:].T
         T=f_post['/T'][:].T
         try:
@@ -2449,6 +2453,25 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         ax[isp].set_title('Median %s' % name)
         ax[isp].set_ylabel('Elevation (m)')
         fig.colorbar(im2, ax=ax[isp], label='%s' % name)
+
+    if show_value and (nm>1) and (key=='HarmonicMean'):
+        isp=0
+        if HarmonicMean is None:
+            print("Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.")
+        else:
+            hm_data = HarmonicMean[:,ii]
+            if gap_alpha is not None:
+                hm_data = np.ma.masked_where(gap_alpha == 0.0, hm_data)
+            im_hm = ax[isp].pcolormesh(DDc, ZZc, hm_data,
+                    cmap=cmap,
+                    shading='auto',
+                    norm=LogNorm())
+            im_hm.set_clim(clim[0],clim[1])
+            if alpha>0:
+                im_hm.set_alpha(A[:,ii])
+            ax[isp].set_title('HarmonicMean %s' % name)
+            ax[isp].set_ylabel('Elevation (m)')
+            fig.colorbar(im_hm, ax=ax[isp], label='%s' % name)
 
     if show_std and nm>1:
         isp=1

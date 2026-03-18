@@ -473,6 +473,10 @@ Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
      - [Np, Nm]
      - always
      - Standard deviation of log10(posterior). Measures spread on the logarithmic scale.
+   * - /Mx/HarmonicMean
+     - [Np, Nm]
+     - always
+     - Trimmed harmonic mean: posterior samples are converted to conductivity (1/resistivity), trimmed 10% from each tail, averaged, then inverted back to resistivity. More robust to high-resistivity outliers than the arithmetic mean.
    * - /Mx/KL
      - [Np, Nm]
      - ``computeKL_continuous=True``

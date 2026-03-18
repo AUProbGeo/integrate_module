@@ -109,7 +109,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 # %%
 # Select how many prior model realizations (N) should be generated
 N=2000000
-N=10000
+N=100000
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
                                     showInfo=1)
 #print('%s is used to hold prior realizations' % (f_prior_h5))
@@ -223,8 +223,13 @@ ig.plot_T_EV(f_post_h5, pl='CHI2',hardcopy=hardcopy)
 # %%
 # Plot resistivity profile for model M1
 ig.plot_profile(f_post_h5, im=1, hardcopy=hardcopy)
-# Plot resistivity profile for model M1 from data point i1 to i2
-ig.plot_profile(f_post_h5, i1=1401, i2=2000, im=1, hardcopy=hardcopy)
+# Plot resistivity 'Median' profile for model M1 from data point i1 to i2
+ig.plot_profile(f_post_h5, i1=1401, i2=2000, im=1, key='Median', hardcopy=hardcopy)
+# Plot resistivity 'HarmonicMean' profile for model M1 from data point i1 to i2
+ig.plot_profile(f_post_h5, i1=1401, i2=2000, im=1, key='HarmonicMean', hardcopy=hardcopy)
+# Plot resistivity 'Mean' profile for model M1 from data point i1 to i2
+ig.plot_profile(f_post_h5, i1=1401, i2=2000, im=1, key='Mean', hardcopy=hardcopy)
+
 if useSubset:
     # Plot resistivity profile for model M1 for specific data points, along 'x', 'y' and 'index' axes
     ig.plot_profile(f_post_h5, ii=i_use, im=1, hardcopy=hardcopy, xaxis='x')
@@ -245,6 +250,10 @@ if useSubset:
 # Plot 2D features: Resistivity at different depths
 try:
     ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Median', uselog=1, cmap='jet', s=2, hardcopy=hardcopy)
+    plt.show()
+    ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Mean', uselog=1, cmap='jet', s=2, hardcopy=hardcopy)
+    plt.show()
+    ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='HarmonicMean', uselog=1, cmap='jet', s=2, hardcopy=hardcopy)
     plt.show()
 except:
     pass
