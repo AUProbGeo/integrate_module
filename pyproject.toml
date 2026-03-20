@@ -28,7 +28,8 @@ dependencies = [
     "jupytext",
     "pandas",
     "pyvista",
-    "libaarhusxyz @ git+https://github.com/cultpenguin/libaarhusxyz",
+    # libaarhusxyz must be installed manually (see README) — PyPI does not allow git dependencies.
+    # pip install git+https://github.com/cultpenguin/libaarhusxyz
 ]
 
 [project.optional-dependencies]

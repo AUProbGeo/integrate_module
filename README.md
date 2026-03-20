@@ -13,6 +13,9 @@ This repository contains the INTEGRATE Python module for localized probabilistic
 
 Assuming you already have Python 3.10+ installed:
 
+`libaarhusxyz` must be installed manually before installing `integrate_module`, because the version that supports Python >= 3.12 is only available on GitHub (not PyPI):
+
+    pip install git+https://github.com/cultpenguin/libaarhusxyz
     pip install integrate_module
 
 On Windows, this will also install the Python wrapper for GA-AEM (1D EM forward modeling - GPL v2 code): [ga-aem-forward-win](https://pypi.org/project/ga-aem-forward-win/)
