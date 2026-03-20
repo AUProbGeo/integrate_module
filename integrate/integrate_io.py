@@ -2806,7 +2806,7 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
     if showInfo>-1:
         print('--> Got data for case: %s' % case)
 
-    return filelist
+    return [os.path.basename(f) for f in filelist]
 
 
 
