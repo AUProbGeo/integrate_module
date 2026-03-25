@@ -3051,7 +3051,7 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     return f_data_h5
 
 
-def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True):
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None):
     """
     Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
 
@@ -3094,6 +3094,15 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     disregardFullNan : bool, optional
         If True (default), soundings where all gates are NaN are excluded
         from the output HDF5 file.
+    data_obs : list of str, optional
+        Flightlines column names (case-insensitive) to write as additional
+        data blocks.  The first entry becomes ``/D2/d_obs``, the second
+        ``/D3/d_obs``, and so on.  Example: ``['RX_ALTITUDE', 'TX_ALTITUDE']``.
+    data_std : list of str or None, optional
+        Flightlines column names for the corresponding standard deviations,
+        same length as ``data_obs``.  Use ``None`` for an individual entry to
+        fall back to ``0.05 * |d_obs|`` for that column.  If the whole
+        parameter is omitted, all columns default to ``0.05 * |d_obs|``.
 
     Returns
     -------
@@ -3182,6 +3191,10 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     ld = {k: pd.concat([xyz.layer_data[k] for xyz in xyz_list], ignore_index=True)
           for k in xyz_list[0].layer_data}
 
+    # Handle XYZ files that use 'x'/'y' instead of 'utmx'/'utmy'
+    if 'utmx' not in fl.columns and 'x' in fl.columns:
+        fl = fl.rename(columns={'x': 'utmx', 'y': 'utmy'})
+
     # Determine dummy/missing value: explicit arg > XYZ header > fallback 9999
     if nan_value is None:
         nan_value = xyz_list[0].model_info.get('dummy', 9999)
@@ -3245,17 +3258,17 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
                 d_std[:, n_lm + j_arr[0]] = d_std_high
 
     # --- exclude all-NaN soundings ---
-    if disregardFullNan:
-        keep = ~np.all(np.isnan(d_obs), axis=1)
+    keep = ~np.all(np.isnan(d_obs), axis=1) if disregardFullNan else np.ones(len(d_obs), dtype=bool)
+    if disregardFullNan and showInfo >= 1:
         n_removed = np.sum(~keep)
-        if showInfo >= 1 and n_removed > 0:
+        if n_removed > 0:
             print('Removed %d all-NaN soundings (%d remaining)' % (n_removed, np.sum(keep)))
-        d_obs     = d_obs[keep]
-        d_std     = d_std[keep]
-        UTMX      = UTMX[keep]
-        UTMY      = UTMY[keep]
-        LINE      = LINE[keep]
-        ELEVATION = ELEVATION[keep]
+    d_obs     = d_obs[keep]
+    d_std     = d_std[keep]
+    UTMX      = UTMX[keep]
+    UTMY      = UTMY[keep]
+    LINE      = LINE[keep]
+    ELEVATION = ELEVATION[keep]
 
     # --- write HDF5 ---
     save_data_gaussian(
@@ -3272,6 +3285,24 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         hf.create_dataset('/D1/i_lm', data=np.arange(i_lm_start, i_lm_end))
         if n_channels >= 2:
             hf.create_dataset('/D1/i_hm', data=np.arange(i_hm_start, i_hm_end))
+
+    # --- write additional data columns as D2, D3, ... ---
+    if data_obs is not None:
+        _data_std = data_std if data_std is not None else [None] * len(data_obs)
+        for i, col_obs in enumerate(data_obs):
+            obs = fl[col_obs.lower()].values[ch1_pos][keep].reshape(-1, 1).astype(float)
+            std_col = _data_std[i]
+            if std_col is not None:
+                std = fl[std_col.lower()].values[ch1_pos][keep].reshape(-1, 1).astype(float)
+            else:
+                std = 0.05 * np.abs(obs)
+            save_data_gaussian(
+                obs, D_std=std,
+                f_data_h5=f_data_h5,
+                id=i + 2,
+                delete_if_exist=False,
+                showInfo=showInfo,
+            )
 
     return f_data_h5
 

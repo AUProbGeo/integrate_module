@@ -31,7 +31,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
                               N_use=100000000000, 
                               id_use=[], 
                               ip_range=[], 
-                              nr=400,
+                              nr=1000,
                               autoT=1,
                               T_base = 1,
                               Nchunks=0,
@@ -73,7 +73,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
         Default is empty list.
     nr : int, optional
         Number of posterior samples to retain per data point.
-        Default is 400.
+        Default is 1000.
     autoT : int, optional
         Automatic temperature estimation method (1=enabled, 0=disabled).
         Default is 1.
@@ -413,7 +413,7 @@ def integrate_rejection_range(D,
                               N_use=None, 
                               id_use=[], 
                               ip_range=[], 
-                              nr=400,
+                              nr=1000,
                               autoT=1,
                               T_base = 1,
                               T_N_above=10,
@@ -448,7 +448,7 @@ def integrate_rejection_range(D,
         Default is empty list.
     nr : int, optional
         Number of posterior samples to retain per data point.
-        Default is 400.
+        Default is 1000.
     autoT : int, optional
         Automatic temperature estimation method (1=enabled, 0=disabled).
         Default is 1.
