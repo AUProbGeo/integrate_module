@@ -2810,9 +2810,6 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
             # remove all values in i_plot that are smaller than 0
             i_plot = i_plot[i_plot>=0]
 
-            # reaplce values larger than 1 with nan in d_std
-            d_std[d_std>1] = np.nan
-
             # find number of nan values on d_obs
             non_nan = np.sum(~np.isnan(d_obs), axis=1)
 
@@ -2981,6 +2978,12 @@ def plot_data_prior(f_prior_data_h5,
         obs_data = None
         is_1d = False
 
+        # Read name attribute from observed data group
+        dh5_str_name = 'D%d' % id_data
+        name_attr = f_data[dh5_str_name].attrs.get('name', None) if dh5_str_name in f_data else None
+        if isinstance(name_attr, bytes):
+            name_attr = name_attr.decode('utf-8')
+
         # Load prior data
         dh5_str_prior = 'D%d' % (id)
         if dh5_str_prior in f_prior_data:
@@ -3031,7 +3034,8 @@ def plot_data_prior(f_prior_data_h5,
         plt.xlabel('Data Value')
         plt.ylabel('Probability Density')
         plt.legend()
-        plt.title('Prior data vs Observed data (1D Histogram)')
+        name_suffix = ': %s' % name_attr if name_attr else ''
+        plt.title('D%d%s: Prior vs Observed (1D Histogram)' % (id_data, name_suffix))
     else:
         # Original 2D line plot
         if prior_data is not None:
@@ -3044,7 +3048,8 @@ def plot_data_prior(f_prior_data_h5,
 
         plt.xlabel('Data #')
         plt.ylabel('Data Value')
-        plt.title('Prior data (black) and observed data (red)')
+        name_suffix = ': %s' % name_attr if name_attr else ''
+        plt.title('D%d%s: Prior (black) vs Observed (red)' % (id_data, name_suffix))
 
     if ylim is not None:
         if is_1d:

@@ -538,6 +538,10 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
                 print("Key '%s' already exists. Use force_delete=True to overwrite." % key)
                 return False
 
+        # Ensure 2D array: reshape 1D (N,) to (N, 1)
+        if D_new.ndim == 1:
+            D_new = D_new.reshape(-1, 1)
+
         # Write the new data
         # Convert to 32-bit float for better memory efficiency if the data is floating point
         if np.issubdtype(D_new.dtype, np.floating):
@@ -3300,6 +3304,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
                 obs, D_std=std,
                 f_data_h5=f_data_h5,
                 id=i + 2,
+                name=col_obs,
                 delete_if_exist=False,
                 showInfo=showInfo,
             )
@@ -3307,7 +3312,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     return f_data_h5
 
 
-def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='data.h5', compression=None, compression_opts=None, **kwargs):
+def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='data.h5', name=None, compression=None, compression_opts=None, **kwargs):
     """
     Save observed data to an HDF5 file in a specified group with a multinomial noise model.
 
@@ -3319,6 +3324,9 @@ def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='d
     :type id_prior: int, optional
     :param f_data_h5: The path to the HDF5 file where the data will be written. Default is 'data.h5'.
     :type f_data_h5: str, optional
+    :param name: Optional human-readable name for this dataset (e.g. 'Lithology'). Stored as
+        the ``name`` attribute on the HDF5 group and used by plotting routines for titles.
+    :type name: str, optional
     :param kwargs: Additional keyword arguments.
     :return: The path to the HDF5 file where the data was written.
     :rtype: str
@@ -3405,7 +3413,9 @@ def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='d
 
         # write attribute noise_model as 'multinomial'
         f['/%s/' % D_str].attrs['noise_model'] = 'multinomial'
-        
+        if name is not None:
+            f['/%s/' % D_str].attrs['name'] = name
+
     return id, f_data_h5
 
 

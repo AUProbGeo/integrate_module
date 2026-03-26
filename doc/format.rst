@@ -81,7 +81,13 @@ The attribute ``D1/noise_model`` is mandatory for all data types, and describes 
      - [integer]
      -
      -
-     - The prior dataset ID to compare against. Observed data in /D1 will be compared with prior data in /D{id_prior} during inversion. If not set, defaults to the same ID as the observed data (D1→D1, D2→D2, etc.) 
+     - The prior dataset ID to compare against. Observed data in /D1 will be compared with prior data in /D{id_prior} during inversion. If not set, defaults to the same ID as the observed data (D1→D1, D2→D2, etc.)
+   * - /D1/name
+     - [string]
+     - *
+     -
+     - Optional human-readable name for this dataset (e.g. ``'dBdT'``). When present,
+       plotting routines use it to label figures as ``"D1: dBdT"``.
    * - /D1/i_use
      - [NP,1] int [0/1]
      - 
