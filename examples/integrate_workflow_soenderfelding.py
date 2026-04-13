@@ -217,15 +217,3 @@ for f_post_h5 in f_post_h5_list:
     plt.legend()    
     plt.show()
 
-
-# %% [markdown]
-# ### Posterior Probability of INSIDE vs OUTSIDE
-# QUERY : Probability that the cumulative thickness of lithology class 2
-# within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
-# cannot be thicker than 3m.
-
-# %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Mode', im=3, iz=0, cmap='jet')
-    plt.legend()    
-    plt.show()
