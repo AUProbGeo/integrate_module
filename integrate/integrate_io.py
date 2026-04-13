@@ -2791,6 +2791,36 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
         if loadAll:
             filelist.append('haderup_N1000000_dmax90_dz1.h5')
                   
+    elif case=='SOENDER_FELDING':
+        # 20240819_AVG_export.xyz  20240911_eksterngps_AVG_export.xyz  20241008_AVG_export.xyz            README_SOENDER_FELDING                    TX07_20241014_2x4_RC20_33_and_57_EksternGPS.gex
+        # 20240820_AVG_export.xyz  20240924_AVG_export.xyz             20241029_AVG_export.xyz            TX07_20240802_2x4_RC20-39.gex             TX07_20241202_2x4_RC20_57.gex
+        # 20240821_AVG_export.xyz  20240924_test_AVG_export.xyz        20241210_AVG_export.xyz            TX07_20240802_2x4_RC20-39_eksternGPS.gex  TX07_20241202_2x4_RC20_57_EksternGPS.gex
+        # 20240911_AVG_export.xyz  20241007_AVG_export.xyz             20241210_InternGPS_AVG_export.xyz  TX07_20240912_2x4_RC20-39_eksterngps.gex
+        # README_SOENDER_FELDING
+        # TX07_20240802_2x4_RC20-39.gex             TX07_20240912_2x4_RC20-39_eksterngps.gex         TX07_20241202_2x4_RC20_57.gex
+        # TX07_20240802_2x4_RC20-39_eksternGPS.gex  TX07_20241014_2x4_RC20_33_and_57_EksternGPS.gex  TX07_20241202_2x4_RC20_57_EksternGPS.gex
+        filelist.append('README_SOENDER_FELDING')
+        filelist.append('TX07_20240802_2x4_RC20-39.gex')
+        filelist.append('TX07_20240802_2x4_RC20-39_eksternGPS.gex')
+        filelist.append('TX07_20240912_2x4_RC20-39_eksterngps.gex')
+        filelist.append('TX07_20241014_2x4_RC20_33_and_57_EksternGPS.gex')
+        filelist.append('TX07_20241202_2x4_RC20_57.gex')
+        filelist.append('TX07_20241202_2x4_RC20_57_EksternGPS.gex')
+        filelist.append('20240819_AVG_export.xyz')
+        filelist.append('20240820_AVG_export.xyz')
+        filelist.append('20240821_AVG_export.xyz')
+        filelist.append('20240911_AVG_export.xyz')
+        filelist.append('20240924_AVG_export.xyz')
+        filelist.append('20240924_test_AVG_export.xyz')
+        filelist.append('20241007_AVG_export.xyz')
+        filelist.append('20241008_AVG_export.xyz')
+        filelist.append('20241029_AVG_export.xyz')
+        filelist.append('20240911_eksterngps_AVG_export.xyz')      
+        filelist.append('20241210_AVG_export.xyz')
+        filelist.append('20241210_InternGPS_AVG_export.xyz')
+
+
+        
     else:
         
         filelist = []
