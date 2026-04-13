@@ -27,10 +27,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-# %%
-N = 100_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-
-
 # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
 
@@ -46,6 +42,13 @@ files_gex = [f for f in files if f.endswith('.gex')]
 # This is probably NOT usefull at all, and leading to errors.
 # Update: FDoes not work as some GEX files define 29 and som 40 data
 f_data_all_h5 = ig.xyz_to_h5(files_xyz, files_gex[0], f_data_h5='SOENDER_FELDING_data.h5', showInfo=1)
+
+# The electromagnetic data (d_obs and d_std) can be plotted using ig.plot_data:
+ig.plot_data(f_data_all_h5, hardcopy=hardcopy)
+# Plot data channel 15 in an XY grid
+ig.plot_data_xy(f_data_all_h5, data_channel=15, cmap='jet')
+
+
 
 # %% Create a data file for each GEX file . This is boring handwork, but it is just an example, and it is not expected that users will do this manually in the future. In the future we will probably have a more automated way to link the XYZ files to the GEX files, e.g. by using a naming convention or by reading the GEX file to see which XYZ files are associated with it.
 # 
@@ -98,43 +101,23 @@ f_data_sub.append(ig.xyz_to_h5(file_xyz, file_gex, f_data_h5='%s_data.h5' % fnam
 
 
 # %% [markdown]
+N = 100_000
 # ## the PRIOR model(s) :
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
                                     showInfo=1)
 
 # ## the PRIOR data :
-f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=True)
-
-# %% [markdown]
-# ## the tTEM DATA
-
-# %%
-inflateNoise = 1 # Factor to increase noise level (std) in the data, to
-if inflateNoise != 1:
-    gf=inflateNoise
-    print("="*60)
-    print("Increasing noise level (std) by a factor of %d" % gf)
-    print("="*60)
-    D = ig.load_data(f_data_h5)
-    D_obs = D['d_obs'][0]
-    D_std = D['d_std'][0]*gf
-    f_data_old_h5 = f_data_h5
-    fname_data = f_data_h5.split('.')[0]
-    f_data_h5 = '%s_gf%g.h5' % (fname_data, gf)
-    ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
-    ig.save_data_gaussian(D_obs, D_std=D_std, f_data_h5=f_data_h5, file_gex=file_gex)
-
-# The electromagnetic data (d_obs and d_std) can be plotted using ig.plot_data:
-ig.plot_data(f_data_h5, hardcopy=hardcopy)
-# Plot data channel 15 in an XY grid
-ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
+f_prior_sub = []
+for file_gex in files_gex:
+    f_prior_sub_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=True)
+    f_prior_sub.append(f_prior_sub_h5)
 
 
 # %% [markdown]
 # ### Select a profile
 
 # %%
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_all_h5)
 
 # Find points within buffer distance
 X1 = 483272.0
@@ -172,17 +155,16 @@ i2=np.max(id_line)+1
 
 # %% INVERT ALL
 # This prt of the can be rerun using different selection of data types without rerunning the abobe parts
-N_use = 10000
-nr=1000
+N_use = N
+nr=10
 T_N_above=50
 T_P_acc_level=0.2 
 autoT = 1 # We need minium of T_N_above realizations with an acceptance probability above T_P_acc_level
 
-
 f_post_sub = []
 
 for i in range(len(f_data_sub)):
-    f_post_h5_single = ig.integrate_rejection(f_prior_h5, 
+    f_post_h5_single = ig.integrate_rejection(f_prior_sub[i], 
                                     f_data_sub[i], 
                                     showInfo=1, 
                                     N_use = N_use,
@@ -190,30 +172,25 @@ for i in range(len(f_data_sub)):
                                     T_N_above = T_N_above,
                                     T_P_acc_level = T_P_acc_level,
                                     updatePostStat=True)
-    f_post_sub.append(f_post_h5_)
+    f_post_sub.append(f_post_h5_single)
 
 #%%  Merge posterior models from different data sets (this is just for testing, and it is not expected that users will do this manually in the future, but it is just to show how it can be done)
-f_post_h5 = ig.merge_posteriors(f_post_sub, f_post_h5_merged='POSTERIOR_MERGED.h5', showInfo=1)
-
-
+f_post_merged_h5, f_data_merged_h5 = ig.merge_posterior(f_post_sub, f_data_sub, showInfo=4)
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
 
 # %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
-    ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
+ig.plot_profile(f_post_merged_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
+#ig.plot_profile(f_post_merged_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
 
 # %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Median', im=1, elevation=40)
-    plt.legend()    
-    plt.show()
+ig.plot_feature_2d(f_post_merged_h5, key='Median', im=1, elevation=-10)
+plt.legend()    
+plt.show()
 
 # %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=45)
-    plt.legend()    
-    plt.show()
+#ig.plot_feature_2d(f_post_merged_h5, key='Mode', im=2, elevation=45)
+#plt.legend()    
+#plt.show()
 
