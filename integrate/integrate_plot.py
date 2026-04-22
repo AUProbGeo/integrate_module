@@ -2765,6 +2765,8 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
     import matplotlib
     import h5py
 
+    showInfo = kwargs.get('showInfo', -1)
+
     # Check if the data file f_data_h5 exists
     if not os.path.exists(f_data_h5):
         print("plot_data: File %s does not exist" % f_data_h5)
@@ -2778,11 +2780,13 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
             Dkeys = []
             for key in f_data.keys():
                 if key[0]=='D':
-                    print("plot_data: Found data set %s" % key)
+                    if showInfo>0:
+                        print("plot_data: Found data set %s" % key)
                     Dkeys.append(key)
                 nd += 1
             Dkey=Dkeys[0]
-            print("plot_data: Using data set %s" % Dkey)
+            if showInfo>0:
+                print("plot_data: Using data set %s" % Dkey)
 
         noise_model = f_data['/%s' % Dkey].attrs['noise_model']
 
@@ -4768,6 +4772,5 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
         if showInfo >= 0:
             print(f'plot_boreholes: saved {out}')
 
-    plt.show()
     return fig
 
