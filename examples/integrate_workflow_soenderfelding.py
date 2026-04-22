@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %% Parameters for the workflow
-N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 500_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 showInfo = -1 # Determines how much nfo to print to screen
 
 # %% load the data from the server
@@ -244,52 +244,6 @@ for f_data_h5 in f_data_sub:
 
 
 
-# %% [markdown]
-# ### Select a profile
-
-# %%
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
-
-# find the index of the [X,Y] points closts to the two boreholes
-i_bh = []
-for i, BH in enumerate(BHOLES):
-    d = np.sqrt((X-BH['X'])**2 + (Y-BH['Y'])**2)
-    i_closest = np.argmin(d)
-    print("Closest point to %s is at index %d with distance %.1f m" % (BH['name'], i_closest, d[i_closest]))
-    i_bh.append(i_closest)  
-    
-
-# Find points within buffer distance
-X1 = 542983.01
-Y1 = 6175822.76
-X2 = 543584.098
-Y2 = 6175788.478
-Xl = np.array([X1-100,X1, X2, X2+1500])
-Yl = np.array([Y1, Y1, Y2, Y2-150])
-buffer = 15.0
-indices, distances, segment_ids = ig.find_points_along_line_segments(
-    X, Y, Xl, Yl, tolerance=buffer
-)
-id_line = indices
-
-plt.figure(figsize=(10, 6))
-plt.scatter(X, Y, c=ELEVATION, s=1,label='X')
-plt.plot(X[id_line],Y[id_line], 'r.', markersize=8, label='Profile', zorder=2, linewidth=5)
-for i in range(len(i_bh)):
-    plt.plot(X[i_bh[i]], Y[i_bh[i]], 'k*', markersize=10, label='BH%d' % (i+1), zorder=3)
-plt.grid()
-plt.colorbar(label='Number of non-Nan data points')
-plt.xlabel('X (m)')
-plt.ylabel('Y (m)')
-plt.title('Survey Points Colored by Number of Non-NaN Data Points')
-plt.axis('equal')
-plt.legend()
-if hardcopy:
-    plt.savefig('DAUGAARD_survey_points_nonnan.png', dpi=300)
-plt.show()
-
-i1=np.min(id_line)
-i2=np.max(id_line)+1
 
 
 # %% [markdown]
@@ -353,13 +307,67 @@ for i in range(len(f_prior_sub)):
 # %% Optionally merge all output posterior files into one file (if they are based on different data subsets, this will not be a true merge since the data subsets are different, but it can be useful for plotting and analysis to have all posterior realizations in one file)
 mergePost = True
 if len(f_post_sub) ==1:
-    merge_post = False
+    mergePost = False
 
 if not mergePost:
     f_post_merged_h5 = f_post_sub[0]
     f_data_merged_h5 = f_data_sub[0]
 else:
     f_post_merged_h5, f_data_merged_h5 = ig.merge_posterior(f_post_sub, f_data_sub, showInfo=4)
+
+
+
+# %% 
+ig.plot_profile(f_post_merged_h5, im=1, i1=0, i2=10000)
+ig.plot_profile(f_post_merged_h5, im=2, i1=0, i2=10000)
+
+# %% [markdown]
+# ### Select a profile
+
+# %%
+
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+
+# find the index of the [X,Y] points closts to the two boreholes
+i_bh = []
+for i, BH in enumerate(BHOLES):
+    d = np.sqrt((X-BH['X'])**2 + (Y-BH['Y'])**2)
+    i_closest = np.argmin(d)
+    print("Closest point to %s is at index %d with distance %.1f m" % (BH['name'], i_closest, d[i_closest]))
+    i_bh.append(i_closest)  
+    
+
+# Find points within buffer distance
+X1 = 542983.01
+Y1 = 6175822.76
+X2 = 543584.098
+Y2 = 6175788.478
+Xl = np.array([X1-100,X1, X2, X2+1500])
+Yl = np.array([Y1, Y1, Y2, Y2-150])
+buffer = 15.0
+indices, distances, segment_ids = ig.find_points_along_line_segments(
+    X, Y, Xl, Yl, tolerance=buffer
+)
+id_line = indices
+
+plt.figure(figsize=(10, 6))
+plt.scatter(X, Y, c=ELEVATION, s=1,label='X')
+plt.plot(X[id_line],Y[id_line], 'r.', markersize=8, label='Profile', zorder=2, linewidth=5)
+for i in range(len(i_bh)):
+    plt.plot(X[i_bh[i]], Y[i_bh[i]], 'k*', markersize=10, label='BH%d' % (i+1), zorder=3)
+plt.grid()
+plt.colorbar(label='Number of non-Nan data points')
+plt.xlabel('X (m)')
+plt.ylabel('Y (m)')
+plt.title('Survey Points Colored by Number of Non-NaN Data Points')
+plt.axis('equal')
+plt.legend()
+if hardcopy:
+    plt.savefig('DAUGAARD_survey_points_nonnan.png', dpi=300)
+plt.show()
+
+i1=np.min(id_line)
+i2=np.max(id_line)+1
 
 
 # %% [markdown]
