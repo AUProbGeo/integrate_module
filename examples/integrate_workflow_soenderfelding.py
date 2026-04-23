@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %% Parameters for the workflow
-N = 500_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 #N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 showInfo = -1 # Determines how much nfo to print to screen
@@ -427,17 +427,17 @@ else:
         "constraints": [
             {
                 "im": 2,
-                "classes": [2, 5],
+                "classes": [1,2, 4],
                 "thickness_mode": "cumulative",
                 "thickness_comparison": ">",
-                "thickness_threshold": 20.0,
+                "thickness_threshold": 5.0,
                 "depth_min": 0.0,
                 "depth_max": 30.0,
                 "negate": False
             },
             {
                 "im": 2,
-                "classes": [1, 3, 4, 6, 7, 8],  # All classes except sand (2) and gravel (5)
+                "classes": [3,5],  # All classes except sand (2) and gravel (5)
                 "thickness_mode": "first_occurrence",
                 "thickness_comparison": "<",
                 "thickness_threshold": 3.0,
@@ -448,11 +448,39 @@ else:
         ]
     }
 
+    query = {
+        "constraints": [
+            {
+                "im": 2,
+                "classes": [1],
+                "thickness_mode": "cumulative",
+                "thickness_comparison": ">",
+                "thickness_threshold": 10.0,
+                "depth_min": 0.0,
+                "depth_max": 80.0,
+                "negate": False
+            },
+            {
+                "im": 2,
+                "classes": [1],
+                "thickness_mode": "cumulative",
+                "thickness_comparison": "<",
+                "thickness_threshold": 20.0,
+                "depth_min": 0.0,
+                "depth_max": 80.0,
+                "negate": False
+            }
+        ]
+    }
+
+
     ig.save_query(query, 'query_daugaard.json')
 
-for f_post_h5 in f_post_h5_list:
+for f_post_h5 in f_post_sub:
     # Compute the probability of the query being satisfied for each model realization in the posterior, and get metadata about the query results (e.g. which realizations satisfy the query, etc.)
     P, meta = ig.query(f_post_h5, query)
-    #  Plot the predicted probability map, and the the outcome at the borehole locations (which should be close to 1 since the query is based on the borehole data)
+    #  Plot the predicted probability map, and the the outcome at the borehole locations
     ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5)
     ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5)
+
+# %%
