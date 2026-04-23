@@ -1173,7 +1173,7 @@ def get_process_handle_count():
     import os
     return psutil.Process(os.getpid()).num_handles()
 
-def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, **kwargs):
+def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, force_replace=False, **kwargs):
     """
     Generate prior data for the GA-AEM method.
 
@@ -1211,6 +1211,10 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         Ncpu : int, optional
             Number of CPUs to use for parallel processing. Default is 0, which
             uses all available CPUs. Only used when parallel=True.
+        force_replace : bool, optional
+            If True, delete an existing /D{id} dataset before writing.
+            If False (default), print a warning and return early if the
+            dataset already exists.
         showInfo : int, optional
             Level of verbosity for output (0=silent, 1=normal, 2=verbose).
 
@@ -1440,6 +1444,12 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     
     # Write D to f_prior['/D1']
     with h5py.File(f_prior_data_h5, 'a') as f_prior:
+        if Dname in f_prior:
+            if force_replace:
+                del f_prior[Dname]
+            else:
+                print("Key '%s' already exists in %s. Use force_replace=True to overwrite." % (Dname, f_prior_data_h5))
+                return f_prior_data_h5
         f_prior[Dname] = D
 
         # Add method, type, file_ex, and im as attributes to '/D1'

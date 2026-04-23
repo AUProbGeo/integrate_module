@@ -29,6 +29,8 @@ import copy
 
 # %% Parameters for the workflow
 N = 500_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+
 showInfo = -1 # Determines how much nfo to print to screen
 
 # %% load the data from the server
@@ -181,7 +183,6 @@ if mergeData:
 X, Y, LINE, ELEVATION = ig.get_geometry(f_data_sub[0])
 
 BHOLES = ig.read_borehole('SdrFelding_boreholes.json', showInfo=1)
-BHOLES = BHOLES[0:5]
 
 # Go trhoug the boreholes. and if elevation is set at -9999 replace it with the elevation from the geometry of the tTEM data at the 
 # borehole location. This is just to have a more correct elevation for plotting, and it does not affect the inversion since the elevation is not used in the inversion (the depth intervals are defined relative to the borehole top, which is at depth 0).
@@ -212,7 +213,7 @@ for i in range(0, len(BHOLES), 10):
 f_prior_sub = []
 for i in range(len(f_data_sub)):
     file_gex = ig.get_gex_file_from_data(f_data_sub[i])
-    f_prior_sub_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N, doMakePriorCopy=True)
+    f_prior_sub_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N, doMakePriorCopy=True, )
     f_prior_sub.append(f_prior_sub_h5)
 
 
@@ -226,22 +227,26 @@ for i in range(len(f_data_sub)):
 #   2. Extrapolate point observations across the survey grid with
 #      distance-based weighting  →  d_obs, i_use
 #   3. Save the observed borehole data to f_data_h5  →  id_out
+import tqdm
 
 im_prior = 2       # lithology model index (M2)
 r_data   = 4       # tTEMN data based radius (db/dT) — If this is very high it will have no effect
 r_dis    = 300     # fade-out radius (m) — weight approaches zero at this distance
 
 # Compute and save prior + observed data for all boreholes in one step per borehole
-for f_data_h5 in f_data_sub:
+for i in range(len(f_data_sub)):
+    f_data_h5 = f_data_sub[i]
+    file_gex = ig.get_gex_file_from_data(f_data_h5)
+    f_prior_h5 = f_prior_sub[i]
+
     id_borehole_list = []
-    for BH in BHOLES:
+    for BH in tqdm.tqdm(BHOLES, desc="Processing boreholes"):
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
             im_prior=im_prior, r_data=r_data, r_dis=r_dis,
             doPlot=True,
             showInfo=1)
         id_borehole_list.append(id_out)
-
 
 
 
@@ -268,16 +273,11 @@ T_P_acc_level=0.2
 autoT = 1 # We need minium of T_N_above realizations with an acceptance probability above T_P_acc_level
 id_use_arr = []
 id_use_arr.append([1]) # tTEM 
-#id_use_arr.append([2]) # Well 1
-#id_use_arr.append([3]) # Well 2
-#id_use_arr.append([2,3]) # Well 1,2
-#id_use_arr.append([2,3]) # Well 1,2
-#id_use_arr.append([1,2,3]) # tTEM, Well 1,2
-#id_use_arr.append([2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels
-#id_use_arr.append([1,2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels + tTEM
-#id_use_arr.append([1]) # All 12 borehole data channels + tTEM
+id_use_arr.append(list(range(1, len(BHOLES)+2))) # ALL data
+id_use_arr.append(list(range(2, len(BHOLES)+2))) # ONLY BORREHOLES
 
-id_use = id_use_arr[0]
+
+id_use = id_use_arr[-1]
 
 f_post_sub = []
 for i in range(len(f_prior_sub)):
@@ -317,33 +317,43 @@ else:
 
 
 
-# %% 
-ig.plot_profile(f_post_merged_h5, im=1, i1=0, i2=10000)
-ig.plot_profile(f_post_merged_h5, im=2, i1=0, i2=10000)
+#%%  SELECT WHICH DATA TO USE FOR ANLAYSIS
+f_post_h5 = f_post_merged_h5
+f_data_h5 = f_data_merged_h5
+
 
 # %% [markdown]
 # ### Select a profile
 
 # %%
 
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_merged_h5)
 
-# find the index of the [X,Y] points closts to the two boreholes
+# find the index of the [X,Y] points closest to each borehole, keep only those within dist_max
+dist_max = 1000
 i_bh = []
-for i, BH in enumerate(BHOLES):
+BHOLES_filtered = []
+for BH in BHOLES:
     d = np.sqrt((X-BH['X'])**2 + (Y-BH['Y'])**2)
     i_closest = np.argmin(d)
     print("Closest point to %s is at index %d with distance %.1f m" % (BH['name'], i_closest, d[i_closest]))
-    i_bh.append(i_closest)  
-    
+    if d[i_closest] <= dist_max:
+        i_bh.append(i_closest)
+        BHOLES_filtered.append(BH)
+    else:
+        print("  -> skipping %s (distance %.1f m > %.1f m)" % (BH['name'], d[i_closest], dist_max))
+BHOLES = BHOLES_filtered
+print("Using %d boreholes within %.1f m of a data point" % (len(BHOLES), dist_max))
 
-# Find points within buffer distance
-X1 = 542983.01
-Y1 = 6175822.76
-X2 = 543584.098
-Y2 = 6175788.478
-Xl = np.array([X1-100,X1, X2, X2+1500])
-Yl = np.array([Y1, Y1, Y2, Y2-150])
+X1 = BHOLES[12]['X']
+Y1 = BHOLES[12]['Y']
+X2 = BHOLES[18]['X']
+Y2 = BHOLES[18]['Y']
+X3 = BHOLES[1]['X']
+Y3 = BHOLES[1]['Y']
+    
+Xl = np.array([X1-100,X1, X2, X3, X3+1500])
+Yl = np.array([Y1,    Y1, Y2, Y3, Y3])
 buffer = 15.0
 indices, distances, segment_ids = ig.find_points_along_line_segments(
     X, Y, Xl, Yl, tolerance=buffer
@@ -354,17 +364,21 @@ plt.figure(figsize=(10, 6))
 plt.scatter(X, Y, c=ELEVATION, s=1,label='X')
 plt.plot(X[id_line],Y[id_line], 'r.', markersize=8, label='Profile', zorder=2, linewidth=5)
 for i in range(len(i_bh)):
-    plt.plot(X[i_bh[i]], Y[i_bh[i]], 'k*', markersize=10, label='BH%d' % (i+1), zorder=3)
+    #plt.plot(X[i_bh[i]], Y[i_bh[i]], 'k*', markersize=10, label='BH%d' % (i+1), zorder=3)
+    plt.plot(BHOLES[i]['X'], BHOLES[i]['Y'], 'k*', markersize=10, label='BH%d' % (i), zorder=3)
+    plt.text(BHOLES[i]['X']+10, BHOLES[i]['Y']+10, '%s [%d]' % (BHOLES[i]['name'], i), fontsize=9, zorder=4, rotation=20)
+
 plt.grid()
 plt.colorbar(label='Number of non-Nan data points')
 plt.xlabel('X (m)')
 plt.ylabel('Y (m)')
 plt.title('Survey Points Colored by Number of Non-NaN Data Points')
 plt.axis('equal')
-plt.legend()
+#plt.legend()
 if hardcopy:
     plt.savefig('DAUGAARD_survey_points_nonnan.png', dpi=300)
 plt.show()
+# %%
 
 i1=np.min(id_line)
 i2=np.max(id_line)+1
@@ -372,24 +386,21 @@ i2=np.max(id_line)+1
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
+ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=.5, entropy_min =0.7, entropy_max=0.8)
 
 # %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
-    ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
-
-# %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Median', im=1, elevation=40)
+for elevation in [40, 20, 0, -20]:
+    ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
-    plt.legend()    
+    #plt.legend()    
     plt.show()
 
 # %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=45)
-    plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
-    plt.legend()    
+for elevation in range(40, -21, -5):
+    ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=elevation, plotPoints=True, hardcopy=hardcopy)
+    #plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
+    #plt.legend()    
     plt.show()
 
 
@@ -398,14 +409,6 @@ for f_post_h5 in f_post_h5_list:
 # QUERY : Probability that the cumulative thickness of lithology class 2
 # within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
 # cannot be thicker than 3m.
-
-# %%
-for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Mode', im=3, iz=0, cmap='jet')
-    plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
-    plt.legend()    
-    plt.show()
-
 
 # %% [markdown]
 # ### QUERY POSTERIOR MODEL REALIZATIONS
