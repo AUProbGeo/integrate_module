@@ -2503,13 +2503,15 @@ def download_file(url, download_dir, use_checksum=False, **kwargs):
         return
 
     # Download and save the file
-    print(f'Downloading {file_name}')
+    if showInfo>0:
+        print(f'Downloading {file_name}')
     response = requests.get(url)
     response.raise_for_status()  # Check if the request was successful
 
     with open(file_path, 'wb') as file:
         file.write(response.content)
-    print(f'Downloaded {file_name}')
+    if showInfo>-1:
+        print(f'Downloaded {file_name}')
 
     # Check if checksum verification is enabled
     if use_checksum:
@@ -2827,10 +2829,9 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
 
     urlErda = 'https://anon.erda.au.dk/share_redirect/dxOLKDtoul'
     urlErdaCase = '%s/%s' % (urlErda,case)
-    for remotefile in filelist:
-        #print(remotefile)
+    from tqdm import tqdm
+    for remotefile in tqdm(filelist, desc='Downloading %s' % case):
         remoteurl = '%s/%s' % (urlErdaCase,remotefile)
-        #remoteurl = 'https://anon.erda.au.dk/share_redirect/dxOLKDtoul/%s/%s' % (case,remotefile)
         download_file(remoteurl,'.',showInfo=showInfo)
     if showInfo>-1:
         print('--> Got data for case: %s' % case)

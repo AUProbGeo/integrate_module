@@ -29,7 +29,7 @@ import copy
 
 # %% Parameters for the workflow
 N = 500_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+#N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -380,9 +380,6 @@ if hardcopy:
 plt.show()
 # %%
 
-i1=np.min(id_line)
-i2=np.max(id_line)+1
-
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
@@ -397,7 +394,7 @@ for elevation in [40, 20, 0, -20]:
     plt.show()
 
 # %%
-for elevation in range(40, -21, -5):
+for elevation in range(40, -41, -5):
     ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=elevation, plotPoints=True, hardcopy=hardcopy)
     #plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     #plt.legend()    
