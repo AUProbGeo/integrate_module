@@ -273,9 +273,8 @@ T_P_acc_level=0.2
 autoT = 1 # We need minium of T_N_above realizations with an acceptance probability above T_P_acc_level
 id_use_arr = []
 id_use_arr.append([1]) # tTEM 
-id_use_arr.append(list(range(1, len(BHOLES)+2))) # ALL data
 id_use_arr.append(list(range(2, len(BHOLES)+2))) # ONLY BORREHOLES
-
+id_use_arr.append(list(range(1, len(BHOLES)+2))) # ALL data
 
 id_use = id_use_arr[-1]
 
@@ -342,18 +341,23 @@ for BH in BHOLES:
         BHOLES_filtered.append(BH)
     else:
         print("  -> skipping %s (distance %.1f m > %.1f m)" % (BH['name'], d[i_closest], dist_max))
-BHOLES = BHOLES_filtered
-print("Using %d boreholes within %.1f m of a data point" % (len(BHOLES), dist_max))
 
-X1 = BHOLES[12]['X']
-Y1 = BHOLES[12]['Y']
-X2 = BHOLES[18]['X']
-Y2 = BHOLES[18]['Y']
-X3 = BHOLES[1]['X']
-Y3 = BHOLES[1]['Y']
+# The following does not work unless the DATA.h5 and PRIOR.h5 is updated consistently!!
+#BHOLES = BHOLES_filtered
+#print("Using %d boreholes within %.1f m of a data point" % (len(BHOLES), dist_max))
+
+X1 = BHOLES[23]['X']
+Y1 = BHOLES[23]['Y']
+X2 = BHOLES[7]['X']
+Y2 = BHOLES[7]['Y']
+X3 = BHOLES[4]['X']
+Y3 = BHOLES[4]['Y']
+X4 = BHOLES[11]['X']
+Y4 = BHOLES[11]['Y']
     
-Xl = np.array([X1-100,X1, X2, X3, X3+1500])
-Yl = np.array([Y1,    Y1, Y2, Y3, Y3])
+
+Xl = np.array([X1, X2, X3, X4])
+Yl = np.array([Y1, Y2, Y3, Y4])
 buffer = 15.0
 indices, distances, segment_ids = ig.find_points_along_line_segments(
     X, Y, Xl, Yl, tolerance=buffer
