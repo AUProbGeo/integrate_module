@@ -35,7 +35,7 @@ showInfo = -1 # Determines how much nfo to print to screen
 
 # %% load the data from the server
 case = 'SOENDER_FELDING'
-files = ig.get_case_data(case=case)
+files = ig.get_case_data(case=case, showInfo = -1)
 
 
 # %% [markdown]

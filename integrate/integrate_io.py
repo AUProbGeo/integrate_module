@@ -2419,6 +2419,93 @@ def copy_prior(input_filename, output_filename, idx=None, N_use=None, loadtomem=
 
     return output_filename
 
+
+def filter_prior(f_prior_h5, type='nonnegative_data', id=1,
+                 f_prior_filtered_h5='', **kwargs):
+    """
+    Filter prior realizations and write the result to a new HDF5 file.
+
+    Removes rows (realizations) from all M and D datasets in a prior file
+    based on a criterion evaluated on a chosen D dataset. The filtered file
+    is a complete, self-consistent prior that can be used directly in place
+    of the original.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the input prior HDF5 file.
+    type : str, optional
+        Filter criterion to apply. Supported values:
+
+        ``'nonnegative_data'``
+            Keep only realizations where every value in ``/D{id}`` is >= 0.
+            Useful after forward modelling to remove unphysical responses.
+
+        Default is ``'nonnegative_data'``.
+    id : int, optional
+        Index of the D dataset used for filtering (e.g. ``id=1`` uses ``/D1``).
+        Default is 1.
+    f_prior_filtered_h5 : str, optional
+        Output filename. If empty, auto-generates as
+        ``<stem>_filtered_<type>.h5``. Default is ``''``.
+    **kwargs
+        showInfo : int, optional
+            Verbosity level (default 0). Passed through to ``copy_prior``.
+
+    Returns
+    -------
+    str
+        Path to the filtered output HDF5 file.
+
+    Raises
+    ------
+    KeyError
+        If ``/D{id}`` is not found in the input file.
+    ValueError
+        If an unknown ``type`` is specified.
+
+    Examples
+    --------
+    >>> f_prior_filtered = ig.filter_prior(f_prior_h5, type='nonnegative_data', id=1)
+
+    Notes
+    -----
+    Filtering is delegated to ``copy_prior``, which preserves all dataset
+    attributes and applies compression. New filter types can be added by
+    extending the ``if/elif`` block that computes ``idx``.
+    """
+    import numpy as np
+    import os
+
+    showInfo = kwargs.get('showInfo', 0)
+
+    if not f_prior_filtered_h5:
+        stem = os.path.splitext(f_prior_h5)[0]
+        f_prior_filtered_h5 = '%s_filtered_%s.h5' % (stem, type)
+
+    Dname = '/D%d' % id
+
+    with h5py.File(f_prior_h5, 'r') as f:
+        if Dname not in f:
+            raise KeyError("Dataset '%s' not found in %s" % (Dname, f_prior_h5))
+        D = f[Dname][:]
+
+    if type == 'nonnegative_data':
+        idx = np.where(np.all(D >= 0, axis=1))[0]
+    else:
+        raise ValueError("Unknown filter type: '%s'" % type)
+
+    N_in = D.shape[0]
+    N_out = len(idx)
+    if showInfo >= 0:
+        print("filter_prior [%s on %s]: keeping %d / %d realizations (%.1f%%)"
+              % (type, Dname, N_out, N_in, 100.0 * N_out / N_in))
+
+    copy_prior(f_prior_h5, f_prior_filtered_h5, idx=idx, **kwargs)
+
+    return f_prior_filtered_h5
+
+
 def hdf5_scan(file_path):
     """
     Scans an HDF5 file and prints information about datasets (including their size) and attributes.
