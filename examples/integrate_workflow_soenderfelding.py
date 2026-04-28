@@ -29,7 +29,7 @@ import copy
 
 # %% Parameters for the workflow
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-#N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -55,7 +55,9 @@ else:
         file_xlsx = 'Sddr_Felding_prior_standard.xlsx'
         f_prior_h5, flags  = geoprior1d(file_xlsx, Nreals=N, dz=1, dmax =90, output_file='%s_prior_N%d.h5' % (fname, N))
     else:
-        f_prior_h5 = 'Sdr_Felding_prior_standard_N1000000_dmax90_20260417_0929.h5'
+        #f_prior_h5 = 'Sdr_Felding_prior_standard_N1000000_dmax90_20260417_0929.h5'
+        f_prior_h5 = 'Sdr_Felding_prior_240426_N1000000_dmax90_20260424_1521.h5'
+
 
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 
