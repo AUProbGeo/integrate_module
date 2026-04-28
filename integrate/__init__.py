@@ -78,6 +78,7 @@ from integrate.integrate_io import check_data
 from integrate.integrate_io import merge_prior
 from integrate.integrate_io import merge_data
 from integrate.integrate_io import merge_posterior
+from integrate.integrate_io import filter_prior
 from integrate.integrate_io import read_usf
 from integrate.integrate_io import read_usf_mul
 from integrate.integrate_io import test_read_usf
