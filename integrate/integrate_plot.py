@@ -1465,6 +1465,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         If True, plot KL divergence instead of entropy in the entropy panel.
         KL is plotted only if the ``/Mx/KL`` dataset exists; otherwise entropy
         is used as fallback (default False).
+    fontsize : int or float, optional
+        Font size applied to all text elements (titles, axis labels, colorbar labels,
+        tick labels). If None, matplotlib's current default is used (default None).
 
     Returns
     -------
@@ -1525,6 +1528,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     entropy_max = kwargs.get('entropy_max', None)  # Will set default after loading Entropy
     show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
     plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of entropy
+    fontsize = kwargs.get('fontsize', None)
 
     # Default to showing all panels
     if panels is None:
@@ -1942,7 +1946,15 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         else:
             ax[2].legend(loc='upper right')
 
+        ax[2].set_xlabel({'x': 'X (m)', 'y': 'Y (m)', 'id': 'ID', 'index': 'Index'}.get(xaxis, xaxis))
         plt.grid(True)
+
+    if fontsize is not None:
+        import matplotlib.text as _mtext
+        for _t in fig.findobj(_mtext.Text):
+            _t.set_fontsize(fontsize)
+        for _ax in fig.get_axes():
+            _ax.tick_params(labelsize=fontsize)
 
     plt.tight_layout()
 
@@ -2009,13 +2021,15 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         - ['std']: Only standard deviation
         - ['stats']: Only temperature and log-likelihood
         - Any combination of the above (e.g., ['value', 'stats'])
-        Accepted panel names: 'value', 'median', 'mean', 'std', 'uncertainty', 'stats', 'temperature', 't'
+        Accepted panel names: 'value', 'median', 'mean', 'harmonicmean', 'std', 'uncertainty', 'stats', 'temperature', 't'
+        Using a statistic name (``'median'``, ``'mean'``, ``'harmonicmean'``) as the panel name also
+        selects that statistic as the plotted value, overriding the default ``key``.
     hardcopy : bool, optional
         Save plot as PNG file (default False).
     cmap : str or colormap, optional
         Color scheme for plotting (default ``'jet'``).
     key : str, optional
-        Statistic to plot: ``'Mean'``, ``'Median'``, or ``'HarmonicMean'`` (default ``'Median'``).
+        Statistic to plot in the value panel: ``'Mean'``, ``'Median'``, or ``'HarmonicMean'`` (default ``'HarmonicMean'``).
     alpha : float, optional
         Transparency scaling factor based on normalized standard deviation (0.0=no
         transparency, default; 1.0=full uncertainty-based transparency).
@@ -2036,6 +2050,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     plot_kl : bool, optional
         If True, plot KL divergence instead of standard deviation in the std panel.
         Falls back to Std if ``/Mx/KL`` does not exist (default False).
+    fontsize : int or float, optional
+        Font size applied to all text elements (titles, axis labels, colorbar labels,
+        tick labels). If None, matplotlib's current default is used (default None).
 
     Returns
     -------
@@ -2083,11 +2100,12 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     kwargs.setdefault('clim', None)
 
     alpha = kwargs.get('alpha',0.0)
-    key = kwargs.get('key','Median')
+    key = kwargs.get('key','HarmonicMean')
     txt = kwargs.get('txt','')
     showInfo = kwargs.get('showInfo', 0)
     show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
     plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of Std
+    fontsize = kwargs.get('fontsize', None)
 
     # Default to showing all panels
     if panels is None:
@@ -2096,8 +2114,17 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     # Normalize panel names to lowercase
     panels = [p.lower() for p in panels]
 
+    # Infer key from panel name if not explicitly provided
+    if 'key' not in kwargs:
+        if 'median' in panels:
+            key = 'Median'
+        elif 'mean' in panels:
+            key = 'Mean'
+        elif 'harmonicmean' in panels:
+            key = 'HarmonicMean'
+
     # Determine which panels to show
-    show_value = any(p in panels for p in ['value', 'median', 'mean'])
+    show_value = any(p in panels for p in ['value', 'median', 'mean', 'harmonicmean'])
     show_std = any(p in panels for p in ['std', 'uncertainty'])
     show_stats = any(p in panels for p in ['stats', 't', 'temperature'])
     
@@ -2162,6 +2189,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         except KeyError:
             HarmonicMean=None
         Std=f_post[Mstr+'/Std'][:].T
+        try:
+            logStd=f_post[Mstr+'/logStd'][:].T
+        except KeyError:
+            logStd=None
         T=f_post['/T'][:].T
         try:
             CHI2=f_post['/CHI2'][:]
@@ -2492,7 +2523,8 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             fig.colorbar(im3, ax=ax[isp], label='KL Divergence (bits)')
         else:
             # STD
-            std_data = Std[:,ii]
+            std_src = logStd if logStd is not None else Std
+            std_data = std_src[:,ii]
             if gap_alpha is not None:
                 std_data = np.ma.masked_where(gap_alpha == 0.0, std_data)
             std_cmap, _ = get_colormap_and_limits('entropy')
@@ -2500,9 +2532,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
                         cmap=std_cmap,
                         shading='auto')
             im3.set_clim(0,1)
-            ax[isp].set_title('Std %s' % name)
+            std_label = 'logStd' if logStd is not None else 'log₁₀ Std'
+            ax[isp].set_title('logStd %s' % name)
             ax[isp].set_ylabel('Elevation (m)')
-            fig.colorbar(im3, ax=ax[isp], label='Standard deviation (Ohm.m)')
+            fig.colorbar(im3, ax=ax[isp], label=std_label)
 
     # Handle single parameter case (nm <= 1)
     if show_value and nm<=1:
@@ -2579,7 +2612,15 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         else:
             ax[2].legend(loc='upper right')
 
+        ax[2].set_xlabel({'x': 'X (m)', 'y': 'Y (m)', 'id': 'ID', 'index': 'Index'}.get(xaxis, xaxis))
         plt.grid(True)
+
+    if fontsize is not None:
+        import matplotlib.text as _mtext
+        for _t in fig.findobj(_mtext.Text):
+            _t.set_fontsize(fontsize)
+        for _ax in fig.get_axes():
+            _ax.tick_params(labelsize=fontsize)
 
     plt.tight_layout()
 

@@ -478,7 +478,11 @@ Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
    * - /Mx/Std
      - [Np, Nm]
      - always
-     - Standard deviation of log10(posterior). Measures spread on the logarithmic scale.
+     - Standard deviation of the posterior realizations in linear (parameter) space. Units match the parameter (e.g. Ohm-m for resistivity).
+   * - /Mx/logStd
+     - [Np, Nm]
+     - always
+     - Standard deviation of log10(posterior). Dimensionless measure of spread on the logarithmic scale. Use this for visualisation of uncertainty in log-normally distributed parameters such as resistivity.
    * - /Mx/HarmonicMean
      - [Np, Nm]
      - always
