@@ -237,7 +237,7 @@ def query(f_post_h5, query_dict):
 
 
 def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=None, title=None,
-               query_text=None, interpretation=None):
+               query_text=None, interpretation=None, text_panel=False, hardcopy=False):
     """
     Plot query results and optionally detailed model visualization for a data point.
 
@@ -264,11 +264,19 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
         Custom title for the probability map. If None, a title is built from
         query_text and interpretation (if provided), or 'Query Probability Map'.
     query_text : str, optional
-        The original natural-language query string. Shown in the figure title.
+        The original natural-language query string. Shown in the figure title,
+        or in the text panel if text_panel=True.
     interpretation : str, optional
         The LLM interpretation string returned by query_from_text(). Shown as a
-        second line in the figure title so the user can verify the query before
-        inspecting results.
+        second line in the figure title, or in the text panel if text_panel=True.
+    text_panel : bool, optional
+        If True and query_text or interpretation is provided, adds a narrow text
+        column to the right of the probability map. The query text appears at the
+        top and the interpretation below. Default False.
+    hardcopy : bool or str, optional
+        Save the probability map figure. If True, saves as 'query_plot.png'.
+        If a string, uses that as the filename (a '.png' extension is appended
+        if the string has no extension). Default False.
 
     Examples
     --------
@@ -295,18 +303,27 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     Y = meta['Y']
 
     # Always plot probability map
-    plt.figure(figsize=(8, 6))
-    ax = plt.gca()
+    has_text = text_panel and (query_text is not None or interpretation is not None)
+    if has_text:
+        fig = plt.figure(figsize=(11, 6))
+        gs = fig.add_gridspec(1, 2, width_ratios=[3, 1], wspace=0.05)
+        ax = fig.add_subplot(gs[0])
+        ax_text = fig.add_subplot(gs[1])
+    else:
+        fig, ax = plt.subplots(figsize=(8, 6))
+
     # Plot black dots underneath to make P=0 (white) visible
     ax.scatter(X, Y, c='black', s=2, alpha=0.5)
     sc = ax.scatter(X, Y, c=P, cmap='hot_r', vmin=0, vmax=1, s=1)
     if ip is not None and X is not None and Y is not None:
         ax.plot(X[ip], Y[ip], 'kx', markersize=12, markeredgewidth=2, label=f'Point {ip}')
         ax.legend()
-    plt.colorbar(sc, label='Probability')
+    plt.colorbar(sc, ax=ax, label='Probability')
     ax.set_xlabel('UTMX [m]')
     ax.set_ylabel('UTMY [m]')
-    if title is not None:
+    if has_text:
+        ax.set_title('Query Probability Map')
+    elif title is not None:
         ax.set_title(title)
     elif query_text is not None or interpretation is not None:
         parts = []
@@ -318,8 +335,36 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     else:
         ax.set_title('Query Probability Map')
     ax.set_aspect('equal')
-    # add grid lines
     ax.grid(True, linestyle='--', alpha=0.5)
+
+    if has_text:
+        import textwrap
+        ax_text.set_axis_off()
+        CHARS = 36       # characters per wrapped line
+        LH = 0.062       # axes-fraction height per text line (fontsize 8)
+        LABEL_GAP = 0.03 # gap between bold label and text box
+        SECTION_GAP = 0.07  # gap between sections
+
+        y = 0.97
+        if query_text is not None:
+            ax_text.text(0.02, y, "Query:", transform=ax_text.transAxes,
+                         fontsize=8, fontweight='bold', va='top')
+            y -= LH + LABEL_GAP
+            wrapped_q = textwrap.fill(query_text, CHARS)
+            n_q = wrapped_q.count('\n') + 1
+            ax_text.text(0.02, y, wrapped_q, transform=ax_text.transAxes,
+                         fontsize=7.5, va='top',
+                         bbox=dict(boxstyle='round,pad=0.4', facecolor='#f0f0f0', edgecolor='none'))
+            y -= n_q * LH + SECTION_GAP
+        if interpretation is not None:
+            ax_text.text(0.02, y, "Interpretation:", transform=ax_text.transAxes,
+                         fontsize=8, fontweight='bold', va='top')
+            y -= LH + LABEL_GAP
+            wrapped_i = textwrap.fill(interpretation, CHARS)
+            ax_text.text(0.02, y, wrapped_i, transform=ax_text.transAxes,
+                         fontsize=7.5, va='top',
+                         bbox=dict(boxstyle='round,pad=0.4', facecolor='#e8f4e8', edgecolor='none'))
+
     plt.tight_layout()
 
     # If ip provided and we have necessary data, plot detailed model view
@@ -436,6 +481,16 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
             plt.colorbar(im2, label='Model value')
 
         plt.tight_layout()
+
+    _VALID_EXTS = {'.png', '.jpg', '.jpeg', '.pdf', '.svg', '.eps', '.tif', '.tiff', '.webp'}
+    if hardcopy is not False and hardcopy is not None:
+        if isinstance(hardcopy, str):
+            safe = hardcopy.replace(':', '_').replace('/', '_')
+            f_png = safe if os.path.splitext(safe)[1].lower() in _VALID_EXTS else safe + '.png'
+        else:
+            f_png = 'query_plot.png'
+        plt.savefig(f_png)
+        print(f"Figure saved to {f_png}")
 
     plt.show()
 
@@ -693,6 +748,7 @@ Query: "Probability that the first occurrence of clay at the surface is less tha
 ## Instructions
 
 - Respond with ONLY a valid JSON object with keys "interpretation" and "constraints". No markdown fences, no extra commentary.
+- Keep the "interpretation" field to 1–2 sentences.
 - Use only the model indices (im) and class IDs listed under Available Prior Models above.
 - If the query cannot be expressed with the available schema and models, respond with exactly:
   UNSUPPORTED: <brief reason>
@@ -701,13 +757,20 @@ Query: "Probability that the first occurrence of clay at the surface is less tha
     return prompt
 
 
-def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, verbose=False):
+def _litellm_extra(model):
+    """Return extra_body kwargs for litellm.completion to disable thinking on Ollama models."""
+    if model.startswith('ollama'):
+        return {'extra_body': {'think': False}}
+    return {}
+
+
+def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_key=None, max_tokens=4096, verbose=False):
     """
     Translate a natural-language query into a query dict using an LLM.
 
-    Uses the Anthropic API to interpret the user's text query in the context
-    of the available prior models and the integrate query schema, returning
-    a query dict and a plain-English interpretation of what the LLM understood.
+    Uses LiteLLM to interpret the user's text query in the context of the
+    available prior models and the integrate query schema, returning a query
+    dict and a plain-English interpretation of what the LLM understood.
 
     Parameters
     ----------
@@ -719,10 +782,11 @@ def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, v
         discrete/continuous type) is read automatically and included in the
         LLM prompt so the model knows what constraints are valid.
     model : str, optional
-        Anthropic model ID to use (default: 'claude-sonnet-4-6').
+        LiteLLM model string (default: 'anthropic/claude-sonnet-4-6'). Any
+        LiteLLM-supported model works, e.g. 'openai/gpt-4o'.
     api_key : str, optional
-        Anthropic API key. If None, the ANTHROPIC_API_KEY environment variable
-        is used.
+        Provider API key. If None, the relevant environment variable
+        (e.g. ANTHROPIC_API_KEY) is used.
     verbose : bool, optional
         If True, print the system prompt and LLM response for inspection.
 
@@ -737,15 +801,15 @@ def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, v
     Raises
     ------
     ImportError
-        If the anthropic package is not installed.
+        If the litellm package is not installed.
     ValueError
         If the LLM reports the query is unsupported, or if the response
         cannot be parsed as valid JSON.
 
     Notes
     -----
-    Requires either the api_key parameter or the ANTHROPIC_API_KEY environment
-    variable to be set. Install the dependency with: pip install anthropic
+    Requires either the api_key parameter or the relevant provider environment
+    variable to be set. Install the dependency with: pip install litellm
 
     Examples
     --------
@@ -760,11 +824,11 @@ def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, v
     >>> ig.query_plot(P, meta)
     """
     try:
-        import anthropic
+        import litellm
     except ImportError:
         raise ImportError(
-            "The 'anthropic' package is required for query_from_text(). "
-            "Install it with: pip install anthropic"
+            "The 'litellm' package is required for query_from_text(). "
+            "Install it with: pip install litellm"
         )
 
     system_prompt = _build_llm_system_prompt(f_prior_h5)
@@ -775,15 +839,33 @@ def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, v
         print("=== USER TEXT ===")
         print(text)
 
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
+    def _strip_fences(s):
+        if s.startswith("```"):
+            s = s.split("\n", 1)[-1]
+            if s.endswith("```"):
+                s = s.rsplit("```", 1)[0].strip()
+        return s
+
+    response_obj = litellm.completion(
         model=model,
-        max_tokens=1024,
-        system=system_prompt,
-        messages=[{"role": "user", "content": text}],
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ],
+        api_key=api_key,
+        **_litellm_extra(model),
     )
 
-    response = message.content[0].text.strip()
+    msg = response_obj.choices[0].message
+    response = _strip_fences((msg.content or '').strip())
+
+    if not response:
+        raise ValueError(
+            f"Model '{model}' returned empty content. "
+            "If this is a thinking model (e.g. Qwen3, DeepSeek-R1), ensure /no_think "
+            "is in the prompt or increase max_tokens."
+        )
 
     if verbose:
         print("=== LLM RESPONSE ===")
@@ -795,12 +877,103 @@ def query_from_text(text, f_prior_h5, model='claude-sonnet-4-6', api_key=None, v
 
     try:
         parsed = json.loads(response)
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"LLM response could not be parsed as JSON: {e}\nRaw response:\n{response}"
+    except json.JSONDecodeError:
+        if verbose:
+            print("=== JSON PARSE FAILED — RETRYING ===")
+        retry_obj = litellm.completion(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": response},
+                {"role": "user", "content": "Your response was not valid JSON. Output ONLY the JSON object with no extra text, no markdown fences, no explanation."},
+            ],
+            api_key=api_key,
+            **_litellm_extra(model),
         )
+        response = _strip_fences(retry_obj.choices[0].message.content.strip())
+        if verbose:
+            print("=== RETRY RESPONSE ===")
+            print(response)
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError as e2:
+            raise ValueError(
+                f"LLM response could not be parsed as JSON after retry: {e2}\nRaw response:\n{response}"
+            )
 
     interpretation = parsed.pop('interpretation', '')
     print(f"Interpretation: {interpretation}")
 
     return parsed, interpretation
+
+
+def query_test_llm(model='anthropic/claude-sonnet-4-6', api_key=None, verbose=1):
+    """
+    Test whether a given LLM model and API key are working correctly.
+
+    Sends a minimal JSON-generation prompt and checks that the response is
+    valid JSON. Prints a summary and returns a status dict.
+
+    Parameters
+    ----------
+    model : str, optional
+        LiteLLM model string (default: 'anthropic/claude-sonnet-4-6').
+    api_key : str, optional
+        Provider API key. If None, the relevant environment variable is used.
+    verbose : int, optional
+        0 = silent, 1 = summary only (default), 2 = full response included.
+
+    Returns
+    -------
+    result : dict
+        Keys: 'ok' (bool), 'model', 'response' (str or None), 'error' (str or None).
+    """
+    try:
+        import litellm
+    except ImportError:
+        raise ImportError(
+            "The 'litellm' package is required. Install it with: pip install litellm"
+        )
+
+    test_prompt = 'Reply with exactly this JSON and nothing else: {"status": "ok"}'
+    result = {'ok': False, 'model': model, 'response': None, 'error': None}
+
+    try:
+        response_obj = litellm.completion(
+            model=model,
+            max_tokens=256,
+            messages=[{"role": "user", "content": test_prompt}],
+            api_key=api_key,
+            **_litellm_extra(model),
+        )
+        msg = response_obj.choices[0].message
+        raw = (msg.content or '').strip()
+        # strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+            if raw.endswith("```"):
+                raw = raw.rsplit("```", 1)[0].strip()
+        result['response'] = raw
+
+        if not raw:
+            reasoning = getattr(msg, 'reasoning_content', None)
+            hint = " (model returned empty content — it may be a thinking model with all tokens used for reasoning)" if not reasoning else f" (content was empty; reasoning_content present, length {len(reasoning)})"
+            raise ValueError(f"Empty response from model{hint}")
+
+        json.loads(raw)  # validate JSON
+        result['ok'] = True
+        if verbose >= 1:
+            print(f"[query_test_llm] OK — model '{model}' responded with valid JSON.")
+        if verbose >= 2:
+            print(f"  Response: {raw}")
+    except Exception as e:
+        result['error'] = str(e)
+        if verbose >= 1:
+            print(f"[query_test_llm] FAILED — model '{model}'")
+            print(f"  Error: {e}")
+        if verbose >= 2 and result['response']:
+            print(f"  Raw response: {result['response']}")
+
+    return result

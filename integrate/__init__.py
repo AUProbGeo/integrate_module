@@ -125,6 +125,7 @@ from integrate.integrate_query import save_query
 from integrate.integrate_query import load_query
 from integrate.integrate_query import get_prior_model_info
 from integrate.integrate_query import query_from_text
+from integrate.integrate_query import query_test_llm
 
 # Import gex module functions
 from integrate.gex import read_gex as read_gex2
