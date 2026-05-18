@@ -35,9 +35,9 @@ hardcopy=True
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
-inflateNoise = 4   # 1,2, 4
+inflateNoise = 1   # 1,2, 4
 useLogData = False
-N_use = 100000
+N_use = 1_000_000
 N_use_org= N_use
 #N_use = 100000
 #N_use = 100000
@@ -400,8 +400,10 @@ for i_post in range(len(f_post_h5_list)):
     if plLevel>0:
         #ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy)
         ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy, im=1, alpha=.9, std_min = 0.6, std_max=0.63)
-        ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy, im=2, alpha=.8, entropy_min = 0.5)
-        
+        try:
+            ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy, im=2, alpha=.8, entropy_min = 0.5)
+        except:
+            pass
     if plLevel>1:
 
         ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_1, hardcopy=hardcopy)
@@ -513,13 +515,14 @@ f_post_h5_all_list = f_post_h5_list + f_post_h5_N_list + f_post_h5_T_list
 # concatenate f_post_h5_list, f_post_h5_N_list, f_post_h5_T_list
 
 if doPlotAll:
+
     plLevel=2
     
     #f_post_h5_all_list = f_post_h5_T_list
 
     for i_post in range(len(f_post_h5_all_list)):
         f_post_h5 = f_post_h5_all_list[i_post]
-        #%%
+        #%
         with h5py.File(f_post_h5,'r') as f:
             f_prior_h5 = f.attrs['f5_prior']
 
@@ -572,7 +575,9 @@ if doPlotAll:
             ig.plot_prior_stats(f_prior_h5)
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
             ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
-            
+
+            if 'post_PRIOR' in f_post_h5:
+                ig.plot_feature_2d(f_post_h5,im=3,iz=0, key='HarmonicMean', uselog=0, hardcopy=hardcopy, title = 'Posterior Mean number of layers', cmap='hot_r' )
 
 # %% TEST 
 doTest=True
@@ -714,16 +719,17 @@ if doReadList:
     #f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
 
     f_txt_list=[]
+    # if exist
     f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt')
     f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt')
     f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt')
-
-
+    
     f_post_h5_all_list = []
     for f_txt in f_txt_list:
-        with open(f_txt, 'r') as f:
-            for line in f:
-                f_post_h5_all_list.append(line.strip())
+        if os.path.exists(f_txt):
+            with open(f_txt, 'r') as f:
+                for line in f:
+                    f_post_h5_all_list.append(line.strip())
 
 
 
@@ -938,13 +944,6 @@ if doTestInversion:
     plt.title('EV1 (Valley) - %s' % f_prior_data_h5_list[0][0:19])
     plt.grid(True, which='both', alpha=0.3)
 
-
-#%%  TEST
-f_post_h5 = 'post_daugaard_merged_N2000000_Nuse1000000_T1_inflateNoise2.h5'
-ig.plot_feature_2d(f_post_h5, im=1, iz=10)
-plt.show()
-ig.plot_feature_2d(f_post_h5, im=2, iz=10)
-plt.show()
 
 # %% 
 ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y')

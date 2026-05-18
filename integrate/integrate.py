@@ -471,6 +471,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 M_logmean = np.full((nsounding, nm), np.nan)
                 M_mean = np.full((nsounding, nm), np.nan)
                 M_std = np.full((nsounding, nm), np.nan)
+                M_logstd = np.full((nsounding, nm), np.nan)
                 M_median = np.full((nsounding, nm), np.nan)
                 M_harmonicmean = np.full((nsounding, nm), np.nan)
                 if computeKL_continuous:
@@ -508,7 +509,8 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         M_mean[iid,:] = np.mean(m_post, axis=0)
                         M_median[iid,:] = np.median(m_post, axis=0)
                         with np.errstate(invalid='ignore', divide='ignore'):
-                            M_std[iid,:] = np.std(np.log10(np.maximum(m_post, 1e-10)), axis=0)
+                            M_logstd[iid,:] = np.std(np.log10(np.maximum(m_post, 1e-10)), axis=0)
+                        M_std[iid,:] = np.std(m_post, axis=0)
                         _c = 1.0 / np.maximum(m_post, 1e-10)
                         _k = int(np.floor(0.10 * _c.shape[0]))
                         _cs = np.sort(_c, axis=0)
@@ -563,10 +565,9 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         # Geometric Mean: exp(mean(log(x)))
                         M_logmean[current_iids, :] = np.exp(np.mean(log_cube, axis=1))
                         
-                        # Std of Log10:
-                        # Math identity: std(log10(x)) = std(ln(x) / ln(10)) = std(ln(x)) * (1/ln(10))
-                        # We reuse 'log_cube' and multiply by constant (faster than re-calculating log10)
-                        M_std[current_iids, :] = np.std(log_cube, axis=1) * INV_LOG_10
+                        # logStd: std(log10(x)) = std(ln(x)) * (1/ln(10)); reuse log_cube for speed
+                        M_logstd[current_iids, :] = np.std(log_cube, axis=1) * INV_LOG_10
+                        M_std[current_iids, :] = np.std(m_cube, axis=1)
 
                         # Harmonic mean (trimmed 10% each tail in conductivity space)
                         _c = 1.0 / np.maximum(m_cube, 1e-10)
@@ -579,7 +580,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
 
 
                 # Create datasets
-                for stat in ['Mean', 'Median', 'Std', 'LogMean', 'HarmonicMean']:
+                for stat in ['Mean', 'Median', 'Std', 'logStd', 'LogMean', 'HarmonicMean']:
                     if stat not in f_post:
                         dset = '/%s/%s' % (name,stat)
                         if dset not in f_post:
@@ -591,6 +592,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 f_post['/%s/%s' % (name,'Mean')][:] = M_mean
                 f_post['/%s/%s' % (name,'Median')][:] = M_median
                 f_post['/%s/%s' % (name,'Std')][:] = M_std
+                f_post['/%s/%s' % (name,'logStd')][:] = M_logstd
                 f_post['/%s/%s' % (name,'HarmonicMean')][:] = M_harmonicmean
                 if computeKL_continuous:
                     dset = '/%s/KL' % name

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "integrate_module"
-version = "0.97.1"
+version = "0.97.3"
 description = "Localized probabilistic data integration"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -28,6 +28,7 @@ dependencies = [
     "jupytext",
     "pandas",
     "pyvista",
+    "litellm",
     # libaarhusxyz must be installed manually (see README) — PyPI does not allow git dependencies.
     # pip install git+https://github.com/cultpenguin/libaarhusxyz
 ]
