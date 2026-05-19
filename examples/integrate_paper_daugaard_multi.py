@@ -40,7 +40,7 @@ useLogData = False
 N_use = 1_000_000
 N_use_org= N_use
 #N_use = 100000
-#N_use = 100000
+N_use = 100_000
 
 doEffectSize = True
 doTbase = True
