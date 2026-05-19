@@ -2736,7 +2736,6 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
             filelist.append('TX07_20230828_2x4_RC20-33.gex')
             filelist.append('TX07_20230906_2x4_RC20-33.gex')
             filelist.append('TX07_20231016_2x4_RC20-33.gex')
-
             
         if (loadAll or loadType=='shapefiles'):            
             #filelist.append('Begravet dal.zip')
@@ -2769,6 +2768,22 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
             filelist.append('POST_DAUGAARD_AVG_prior_detailed_invalleys_N2000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu2000000_aT1.h5')
             filelist.append('POST_DAUGAARD_AVG_prior_detailed_outvalleys_N2000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu2000000_aT1.h5')    
             filelist.append('prior_detailed_inout_N4000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5')
+
+        if (loadAll or loadType=='WB_sharp'):
+            filelist.append('SCI7_40_ml_sharp2_I02_MOD_syn.xyz')
+            filelist.append('SCI7_40_ml_sharp2_I02_MOD_dat.xyz')
+            filelist.append('SCI7_40_ml_sharp2_I02_MOD_inv.xyz')
+            filelist.append('SCI7_40_ml_sharp2_I02_MOD.xyz')
+            filelist.append('SCI7_40_ml_sharp2_Daugaard.gdb')
+        
+        if (loadAll or loadType=='WB_smooth'):
+            filelist.append('SCI7_40_ml_Daugaard_I01_MOD_syn.xyz')
+            filelist.append('SCI7_40_ml_Daugaard_I01_MOD_dat.xyz')
+            filelist.append('SCI7_40_ml_Daugaard_I01_MOD_inv.xyz')
+            filelist.append('SCI7_40_ml_Daugaard_I01_MOD.xyz')
+            filelist.append('SCI7_40_ml_Daugaard_I01.gdb')
+
+
 
     elif case=='ESBJERG':
 
