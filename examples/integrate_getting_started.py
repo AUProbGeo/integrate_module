@@ -109,6 +109,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 # %%
 # Select how many prior model realizations (N) should be generated
 N=2000000
+N=1000000
 #N=50000
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
                                     showInfo=1)
@@ -269,6 +270,14 @@ try:
     plt.show()
 except:
     pass
+
+try:
+    # Plot number of layers
+    ig.plot_feature_2d(f_post_h5,im=3,key='Median', uselog=0, cmap='jet', s=2,hardcopy=hardcopy)
+    plt.show()
+except:
+    pass
+
 
 
 # %%
