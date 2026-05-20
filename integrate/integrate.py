@@ -1723,14 +1723,15 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
 
         # Apply boundaries if any exist
         if n_boundaries > 0:
-            boundaries = i_boundaries_all[i, :n_boundaries]
+            boundaries = np.sort(i_boundaries_all[i, :n_boundaries])
             for j in range(n_boundaries):
                 M_rho[i, boundaries[j]:] = rho_all[i, j + 1]
 
         # Save sparse representation if requested
         if save_sparse:
             if n_boundaries > 0:
-                m_current = np.concatenate((z_boundaries_all[i, :n_boundaries], rho_all[i, :n_lay]))
+                z_sorted = np.sort(z_boundaries_all[i, :n_boundaries])
+                m_current = np.concatenate((z_sorted, rho_all[i, :n_lay]))
             else:
                 m_current = rho_all[i, :n_lay]
             M_rho_sparse[i, 0:len(m_current)] = m_current

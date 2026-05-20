@@ -184,20 +184,22 @@ plt.ylabel('Density')
 plt.grid()
 plt.legend()
 plt.show()
+plt.gcf().savefig('%s_prior_M3_median.png' % f_base, dpi=300)
 
+#%%
 # Plot the mean
 #ig.plot_feature_2d(f_post_h5, key='Mean', im=3, uselog=False, cmap='jet', s=2)
 #plt.gcf().savefig('%s_prior_M3_mean.png' % f_base, dpi=300)
 #plt.plot(X[i_plot], Y[i_plot], 'ko', markersize=30, label='Profile Point')
 #plt.show()
 #% Plot the median 
-cmap_disc = plt.cm.get_cmap('jet', 8)
+cmap_disc = plt.cm.get_cmap('seismic_r', 8)
 norm_disc = plt.matplotlib.colors.BoundaryNorm(np.arange(0.5, 9.5), 8)
 ig.plot_feature_2d(f_post_h5, key='Median', im=3, uselog=False, cmap=cmap_disc, norm=norm_disc, s=2)
-plt.plot(X[id_line],Y[id_line],'k.', markersize=1.1, label='Survey Points')
+#plt.plot(X[id_line],Y[id_line],'k.', markersize=1.1, label='Survey Points')
 plt.plot(X[i_plot], Y[i_plot], 'ko', markersize=10, markerfacecolor='none', label='Profile Point')
 plt.gcf().axes[-1].set_yticks(range(1, 9))
-plt.gcf().savefig('%s_prior_M3_median.png' % f_base, dpi=300)
+plt.gcf().savefig('%s_prior_M3_median_2d.png' % f_base, dpi=300)
 
 #%% 
 # Now compute the probability of a layer boundary at each depth index, as the
@@ -206,14 +208,40 @@ for i in range(nd):
     i_use_single = i_use[i]
     rho_post = M[0][i_use_single].T
     # 1 if any relative change >= rel_change occurs within ±delta_z depth cells
-    rel_change = 0.5
+    rel_change = 0.001
     delta_z = 3
     rho_change_raw = np.zeros_like(rho_post)
     rho_change_raw[1:, :] = (np.abs(rho_post[1:, :] - rho_post[:-1, :]) / rho_post[:-1, :] >= rel_change).astype(float)
     rho_change = maximum_filter1d(rho_change_raw, size=2*delta_z+1, axis=0)
     M1_boundary[i, :] = rho_change.mean(axis=1)
 
-plt.imshow(M1_boundary[id_line].T, cmap='gray_r', vmin=0.2, vmax=1)
+plt.imshow(M1_boundary[id_line].T, cmap='gray_r', vmin=0.1, vmax=1)
 plt.colorbar()
+plt.gcf().savefig('%s_prior_M1_boundary_2d.png' % f_base, dpi=300)
+
+# %%
+plt.figure()
+nshow = 11
+for i in range(nshow):
+    data = M[1][i]
+    
+    n = int((len(data) + 1) / 2)
+    z = np.insert(data[0:n-1], 0, 0)  # n depth edges, starting at surface
+    rho = data[n-1:]                   # n resistivity values
+    n_valid = int(np.sum(~np.isnan(rho)))
+    if n_valid == 0:
+        continue
+    rho = rho[:n_valid]
+    z = z[:n_valid]
+    dz = (z[-1] - z[-2]) if n_valid > 1 else 10
+    z_edges = np.append(z, z[-1] + dz)  # n_valid+1 edges for n_valid values
+    plt.stairs(rho, z_edges, orientation='horizontal')
+
+plt.gca().invert_yaxis()
+plt.xlabel('Resistivity (Ohm·m)')
+plt.ylabel('Depth (m)')
+plt.title('Staircase plot of resistivity vs depth')
+plt.show()
+
 
 # %%
