@@ -53,8 +53,14 @@ def print_timing_summary(f_timing):
         except:
             nobs = 11693  # Default fallback value
 
+        try:
+            backend = str(data['backend'])
+        except:
+            backend = 'numpy'
+
         print(f"\n{'='*60}")
         print(f"INTEGRATE Timing Summary: {f_timing}")
+        print(f"Rejection backend: {backend}")
         print(f"{'='*60}")
 
         print(f"\nDataset sizes tested: {N_arr.astype(int)}")
@@ -265,6 +271,8 @@ Results are saved as .npz files and automatically plotted with performance analy
                             help='Use exactly this dataset size (number of models), overriding size and Nmin options (default: 0, use size-based defaults)')
     time_parser.add_argument('--no-summary', action='store_true',
                             help='Disable timing summary output (enabled by default)')
+    time_parser.add_argument('--backend', choices=['numpy', 'jax'], default='numpy',
+                            help='Rejection sampling backend: numpy (default) or jax')
     
     # Add special case handling for '-time' without size argument
     if '-time' in sys.argv and len(sys.argv) == 2:
@@ -364,9 +372,14 @@ Results are saved as .npz files and automatically plotted with performance analy
             else:
                 N_arr = np.ceil(np.logspace(4,6,7))
 
+        # JAX doesn't use multiprocessing — fix to a single "process" entry
+        if args.backend == 'jax':
+            Nproc_arr = np.array([1])
+
         f_timing = timing_compute(
             N_arr=N_arr,
-            Nproc_arr=Nproc_arr
+            Nproc_arr=Nproc_arr,
+            backend=args.backend,
         )
 
         # Show summary and plot the results

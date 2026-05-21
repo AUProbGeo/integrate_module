@@ -3034,7 +3034,7 @@ def allocate_large_page():
         return None
 
 
-def timing_compute(N_arr=[], Nproc_arr=[]):
+def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy'):
     """
     Execute timing benchmark for INTEGRATE workflow components.
     
@@ -3124,7 +3124,8 @@ def timing_compute(N_arr=[], Nproc_arr=[]):
     print("Testing on %d sets of core(s):" % len(Nproc_arr), Nproc_arr)
 
 
-    file_out  = 'timing_%s-%s-%dcore_Nproc%d_N%d.npz' % (hostname,system,Ncpu,len(Nproc_arr), len(N_arr))
+    print("Rejection sampling backend: %s" % backend)
+    file_out  = 'timing_%s-%s-%dcore_Nproc%d_N%d_%s.npz' % (hostname,system,Ncpu,len(Nproc_arr), len(N_arr), backend)
     print("Writing results to %s " % file_out)
 
     ## TIMING
@@ -3180,7 +3181,7 @@ def timing_compute(N_arr=[], Nproc_arr=[]):
                 N_use = 1000000
                 t0_rejection = time.time()
                 if testRejection:
-                    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5, N_use = N_use, parallel=1, updatePostStat=False,  Ncpu=Ncpu, showInfo=showInfo)
+                    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5, N_use=N_use, parallel=1, updatePostStat=False, Ncpu=Ncpu, showInfo=showInfo, backend=backend)
                 T_rejection[i,j]=time.time()-t0_rejection
 
                 #% Compute some generic statistic of the posterior distribution (Mean, Median, Std)
@@ -3190,7 +3191,7 @@ def timing_compute(N_arr=[], Nproc_arr=[]):
                     T_poststat[i,j]=time.time()-t0_poststat
 
             T_total = T_prior + T_forward + T_rejection + T_poststat
-            np.savez(file_out, T_total=T_total, T_prior=T_prior, T_forward=T_forward, T_rejection=T_rejection, T_poststat=T_poststat, N_arr=N_arr, Nproc_arr=Nproc_arr, nobs=nobs)
+            np.savez(file_out, T_total=T_total, T_prior=T_prior, T_forward=T_forward, T_rejection=T_rejection, T_poststat=T_poststat, N_arr=N_arr, Nproc_arr=Nproc_arr, nobs=nobs, backend=backend)
             
             
     return file_out

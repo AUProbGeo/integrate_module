@@ -1,17 +1,11 @@
 #!/usr/bin/env python
 # %% [markdown]
-# # JAX backend comparison for integrate_rejection
+# # JAX vs parallel NumPy: integrate_rejection comparison
 #
-# Compares the **parallel NumPy** backend (multiprocessing + shared memory)
-# against the new **JAX** backend for the likelihood hot-path.
-#
-# The JAX backend uses a JIT-compiled, vmapped kernel that reads D once per
-# batch of data points instead of once per CPU core, avoiding the
-# memory-bandwidth contention that limits the multiprocessing path past ~8 CPUs.
-#
-# Results shown:
-# - Wall-clock time: parallel NumPy (several Ncpu values) vs JAX
-# - Numerical agreement of EV (evidence) and T (temperature)
+# Benchmarks wall-clock time and verifies numerical agreement between the
+# **parallel NumPy** backend (multiprocessing + shared memory) and the new
+# **JAX** backend.  Profile plots from both backends are saved side-by-side
+# so visual agreement can be confirmed.
 
 # %%
 try:
@@ -24,14 +18,13 @@ except:
 # %%
 import multiprocessing
 import time
+import h5py
 import numpy as np
+import matplotlib.pyplot as plt
 import integrate as ig
-from integrate.integrate_rejection import integrate_posterior_main
-from integrate.integrate_rejection_jax import integrate_rejection_range_jax
 
 # %% [markdown]
 # ## 1. Get example data
-# Downloads the DAUGAARD case (data + forward-modelled prior) if not already present.
 
 # %%
 case = 'DAUGAARD'
@@ -40,49 +33,36 @@ f_data_h5 = files[0]
 f_prior_h5 = files[-1]
 file_gex = ig.get_gex_file_from_data(f_data_h5)
 
-print("Using data file: %s" % f_data_h5)
-print("Using GEX file: %s" % file_gex)
-print("Using prior model and data file: %s" % f_prior_h5)
+print("Using data file:       %s" % f_data_h5)
+print("Using GEX file:        %s" % file_gex)
+print("Using prior data file: %s" % f_prior_h5)
 
 # %% [markdown]
-# ## 2. Load prior and observed data
+# ## 2. Setup
 
 # %%
-DATA = ig.load_data(f_data_h5, showInfo=0)
-D, idx = ig.load_prior_data(f_prior_h5, showInfo=0)
+# Number of soundings to invert (increase for a richer profile, costs more time)
+N_test = 100
+ip_range = list(np.arange(N_test))
 
-N   = D[0].shape[0]
-Nf  = D[0].shape[1]
-Ndp = DATA['d_obs'][0].shape[0]
-
-# Number of soundings to invert
-N_test = 10
-ip_range = np.arange(N_test)
-
-print("Prior samples  N  = %d" % N)
-print("Features       Nf = %d" % Nf)
-print("Data points       = %d  (using %d)" % (Ndp, N_test))
-
-# CPU count for parallel NumPy runs
 Ncpu_max = multiprocessing.cpu_count()
 Ncpu_list = [c for c in [1, 2, 4, 8] if c <= Ncpu_max]
 print("CPUs available: %d  (will test: %s)" % (Ncpu_max, str(Ncpu_list)))
 
 # %% [markdown]
 # ## 3. JAX warm-up
-# The very first JAX call triggers XLA compilation; time it separately so it
-# does not inflate the benchmark.
+# The first JAX call triggers XLA compilation; time it separately so it does
+# not inflate the benchmark numbers.
 
 # %%
-kw_jax = dict(
-    D=D, DATA=DATA, idx=idx, N_use=N, id_use=[],
-    ip_range=ip_range, nr=200, autoT=1,
-    showInfo=-1, console_progress=False,
-)
-
 print('\nJAX warm-up (XLA compilation) ...')
 t0 = time.time()
-integrate_rejection_range_jax(**kw_jax, Nbatch=64)
+ig.integrate_rejection(
+    f_prior_h5, f_data_h5,
+    ip_range=[0],
+    nr=50, backend='jax',
+    updatePostStat=False, showInfo=-1,
+)
 t_warmup = time.time() - t0
 print('  compile + run: %.2fs' % t_warmup)
 
@@ -92,40 +72,45 @@ print('  compile + run: %.2fs' % t_warmup)
 # %%
 # --- Parallel NumPy ---
 t_np = {}
-res_np_last = None
+f_post_np_last = None
 for Ncpu in Ncpu_list:
-    ip_range_shuffled = ip_range.copy()
-    np.random.shuffle(ip_range_shuffled)
-    ip_chunks = np.array_split(ip_range_shuffled, Ncpu)
-
     print('\nNumPy parallel  Ncpu=%d ...' % Ncpu)
     t0 = time.time()
-    res_np = integrate_posterior_main(
-        ip_chunks=ip_chunks,
-        D=D, DATA=DATA, idx=idx, N_use=N, id_use=[],
-        autoT=1, T_base=1, nr=200, Ncpu=Ncpu,
-        use_N_best=0, T_N_above=10, T_P_acc_level=0.2,
+    f_post_np = ig.integrate_rejection(
+        f_prior_h5, f_data_h5,
+        ip_range=ip_range,
+        nr=200, Ncpu=Ncpu,
+        backend='numpy',
+        f_post_h5='POST_numpy_Ncpu%d.h5' % Ncpu,
+        updatePostStat=False, showInfo=0,
     )
     t_np[Ncpu] = time.time() - t0
-    res_np_last = res_np
+    f_post_np_last = f_post_np
     print('  %.2fs' % t_np[Ncpu])
 
 # %%
 # --- JAX ---
 print('\nJAX  Nbatch=64 ...')
 t0 = time.time()
-res_jx = integrate_rejection_range_jax(**kw_jax, Nbatch=64)
+f_post_jx = ig.integrate_rejection(
+    f_prior_h5, f_data_h5,
+    ip_range=ip_range,
+    nr=200,
+    backend='jax',
+    f_post_h5='POST_jax.h5',
+    updatePostStat=False, showInfo=0,
+)
 t_jx = time.time() - t0
 print('  %.2fs' % t_jx)
 
 # %% [markdown]
-# ## 5. Results
+# ## 5. Timing results
 
 # %%
-t_ref = t_np[Ncpu_list[0]]   # single-CPU parallel NumPy as reference
+t_ref = t_np[Ncpu_list[0]]
 
 print('\n' + '='*56)
-print('  N=%d, Nf=%d, Ndp=%d' % (N, Nf, N_test))
+print('  Ndp=%d' % N_test)
 print('='*56)
 for Ncpu in Ncpu_list:
     print('  NumPy parallel  Ncpu=%-2d   %6.2fs   %.1fx' % (
@@ -133,23 +118,54 @@ for Ncpu in Ncpu_list:
 print('  JAX  Nbatch=64            %6.2fs   %.1fx' % (t_jx, t_ref / t_jx))
 print('='*56)
 
-# %%
-# Numerical agreement between JAX and parallel NumPy (Ncpu_list[-1])
-EV_np = res_np_last[2]
-T_np  = res_np_last[1]
-EV_jx = np.zeros(Ndp) * np.nan
-T_jx  = np.zeros(Ndp) * np.nan
-EV_jx[ip_range] = res_jx[2]
-T_jx[ip_range]  = res_jx[1]
+# %% [markdown]
+# ## 6. Numerical agreement
 
-ev_diff = np.abs(EV_np[ip_range] - EV_jx[ip_range])
-t_diff  = np.abs(T_np[ip_range]  - T_jx[ip_range])
+# %%
+with h5py.File(f_post_np_last, 'r') as f:
+    EV_np = f['EV'][:]
+    T_np  = f['T'][:]
+with h5py.File(f_post_jx, 'r') as f:
+    EV_jx = f['EV'][:]
+    T_jx  = f['T'][:]
+
+mask = ~np.isnan(EV_np[:N_test]) & ~np.isnan(EV_jx[:N_test])
+ev_diff = np.abs(EV_np[:N_test][mask] - EV_jx[:N_test][mask])
+t_diff  = np.abs(T_np[:N_test][mask]  - T_jx[:N_test][mask])
 
 print('\nNumerical agreement (parallel NumPy vs JAX):')
 print('  EV  max|diff| = %.2e   mean|diff| = %.2e' % (ev_diff.max(), ev_diff.mean()))
 print('  T   max|diff| = %.2e   mean|diff| = %.2e' % (t_diff.max(),  t_diff.mean()))
-
 if ev_diff.max() < 1e-3:
     print('\n  PASS: results agree within tolerance')
 else:
     print('\n  WARN: results differ -- check implementation')
+
+# %% [markdown]
+# ## 7. Profile comparison
+# Compute posterior statistics for both backends, then plot side-by-side.
+
+# %%
+print('\nComputing posterior statistics ...')
+ig.integrate_posterior_stats(f_post_np_last, ip_range=ip_range)
+ig.integrate_posterior_stats(f_post_jx,      ip_range=ip_range)
+
+# %%
+# NumPy profile
+ig.plot_profile(f_post_np_last, im=1, i1=1, i2=N_test)
+plt.suptitle('NumPy backend (Ncpu=%d)' % Ncpu_list[-1])
+plt.tight_layout()
+f_fig_np = 'POST_numpy_profile.png'
+plt.savefig(f_fig_np, dpi=150)
+print('NumPy profile saved to %s' % f_fig_np)
+plt.show()
+
+# %%
+# JAX profile
+ig.plot_profile(f_post_jx, im=1, i1=1, i2=N_test)
+plt.suptitle('JAX backend')
+plt.tight_layout()
+f_fig_jx = 'POST_jax_profile.png'
+plt.savefig(f_fig_jx, dpi=150)
+print('JAX profile saved to %s' % f_fig_jx)
+plt.show()
