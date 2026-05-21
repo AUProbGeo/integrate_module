@@ -42,6 +42,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
                               T_P_acc_level=None,
                               progress_callback=None,
                               console_progress=None,
+                              backend='numpy',
                               **kwargs):
     """
     Perform probabilistic inversion using rejection sampling.
@@ -106,8 +107,15 @@ def integrate_rejection(f_prior_h5='prior.h5',
     console_progress : bool, optional
         Whether to show console TQDM progress bar. If None, auto-detects based on progress_callback.
         Default is None.
+    backend : str, optional
+        Computation backend to use.  ``'numpy'`` (default) uses the original
+        NumPy/multiprocessing implementation.  ``'jax'`` uses a JIT-compiled,
+        vmapped JAX implementation that processes data points in batches; pass
+        ``Nbatch=<int>`` (via **kwargs, default 64) to tune the batch size.
+        JAX must be installed separately: ``pip install jax``.
     **kwargs : dict
-        Additional keyword arguments including showInfo, updatePostStat, post_dir.
+        Additional keyword arguments including showInfo, updatePostStat, post_dir,
+        and Nbatch (batch size for backend='jax').
     
     Returns
     -------
@@ -294,9 +302,39 @@ def integrate_rejection(f_prior_h5='prior.h5',
 
     # Depending in whether parallel processing is used or not,
     # two function are implemented to perform the inversion directly on the loaded data.
+    # A third option, backend='jax', uses JAX for likelihood computation.
 
 
-    if parallel:
+    if backend == 'jax':
+        from integrate.integrate_rejection_jax import integrate_rejection_range_jax
+        Nbatch = kwargs.get('Nbatch', 64)
+        i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range_jax(
+            D=D,
+            DATA=DATA,
+            idx=idx,
+            N_use=N_use,
+            id_use=id_use,
+            ip_range=ip_range,
+            autoT=autoT,
+            T_base=T_base,
+            nr=nr,
+            T_N_above=_T_N_above,
+            T_P_acc_level=_T_P_acc_level,
+            progress_callback=progress_callback,
+            Nbatch=Nbatch,
+            **kwargs,
+        )
+        for i in range(len(ip_range)):
+            ip = ip_range[i]
+            i_use_all[ip] = i_use[i]
+            T_all[ip] = T[i]
+            EV_all[ip] = EV[i]
+            EV_post_all[ip] = EV_post[i]
+            EV_post_all_mean[ip] = EV_post_mean[i]
+            CHI2_all[ip, :] = CHI2[i, :]
+            N_UNIQUE_all[ip] = N_UNIQUE[i]
+
+    elif parallel:
         # Split the ip_range into Nchunks
         if Nchunks==0:
             if parallel:
