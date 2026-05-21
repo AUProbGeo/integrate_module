@@ -223,7 +223,8 @@ def integrate_rejection_range_jax(
         n_data_per_type = np.zeros((bsz, Ndt))
 
         for i in range(Ndt):
-            active = np.array([i_use_data[i][ip] for ip in ip_batch])  # (bsz,)
+            # i_use_data rows may be shaped (1,) rather than scalars; flatten to 1D
+            active = np.array([i_use_data[i][ip] for ip in ip_batch]).ravel()  # (bsz,)
 
             if noise_model[i] == 'gaussian':
                 d_obs_batch = np.array([DATA['d_obs'][i][ip] for ip in ip_batch])  # (bsz, Nf)
