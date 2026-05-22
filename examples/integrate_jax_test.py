@@ -44,6 +44,7 @@ import time
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+plt.ion()
 import integrate as ig
 
 # %% [markdown]
