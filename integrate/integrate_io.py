@@ -2420,34 +2420,47 @@ def copy_prior(input_filename, output_filename, idx=None, N_use=None, loadtomem=
     return output_filename
 
 
-def filter_prior(f_prior_h5, type='nonnegative_data', id=1,
-                 f_prior_filtered_h5='', **kwargs):
+def filter_prior(f_prior_h5, index_use=None, *, type=None, id=1,
+                 f_prior_filtered_h5='', makeCopy=True, f_prior_out_h5=None, **kwargs):
     """
     Filter prior realizations and write the result to a new HDF5 file.
 
-    Removes rows (realizations) from all M and D datasets in a prior file
-    based on a criterion evaluated on a chosen D dataset. The filtered file
-    is a complete, self-consistent prior that can be used directly in place
-    of the original.
+    Removes rows (realizations) from all M and D datasets in a prior file,
+    either by supplying an explicit index array (``index_use``) or by applying
+    a named criterion to a D dataset (``type``). The filtered file is a
+    complete, self-consistent prior that can be used directly in place of the
+    original.
 
     Parameters
     ----------
     f_prior_h5 : str
         Path to the input prior HDF5 file.
+    index_use : array-like, optional
+        Explicit array of row indices to keep. When provided, ``type`` and
+        ``id`` are ignored. If ``None`` and ``makeCopy=True``, all rows are
+        kept (i.e. the result is a full copy). Default is ``None``.
     type : str, optional
-        Filter criterion to apply. Supported values:
+        Filter criterion used when ``index_use`` is ``None``. Supported values:
 
         ``'nonnegative_data'``
             Keep only realizations where every value in ``/D{id}`` is >= 0.
             Useful after forward modelling to remove unphysical responses.
 
-        Default is ``'nonnegative_data'``.
+        When ``None`` (default) and ``index_use`` is also ``None``, all rows
+        are kept (equivalent to a full copy).
     id : int, optional
-        Index of the D dataset used for filtering (e.g. ``id=1`` uses ``/D1``).
-        Default is 1.
+        Index of the D dataset used for criterion-based filtering
+        (e.g. ``id=1`` uses ``/D1``). Default is 1.
     f_prior_filtered_h5 : str, optional
-        Output filename. If empty, auto-generates as
-        ``<stem>_filtered_<type>.h5``. Default is ``''``.
+        Output filename (kept for backward compatibility). Superseded by
+        ``f_prior_out_h5`` when both are provided. Default is ``''``.
+    makeCopy : bool, optional
+        If ``True`` (default), write to a new file and leave the original
+        untouched. If ``False``, overwrite the original file in-place.
+    f_prior_out_h5 : str, optional
+        Output filename. Auto-generated when ``None`` (default):
+        ``<stem>_filtered_index.h5`` for index-based filtering or
+        ``<stem>_filtered_<type>.h5`` for criterion-based filtering.
     **kwargs
         showInfo : int, optional
             Verbosity level (default 0). Passed through to ``copy_prior``.
@@ -2460,50 +2473,73 @@ def filter_prior(f_prior_h5, type='nonnegative_data', id=1,
     Raises
     ------
     KeyError
-        If ``/D{id}`` is not found in the input file.
+        If ``/D{id}`` is not found in the input file (criterion mode only).
     ValueError
-        If an unknown ``type`` is specified.
+        If an unknown ``type`` is specified (criterion mode only).
 
     Examples
     --------
-    >>> f_prior_filtered = ig.filter_prior(f_prior_h5, type='nonnegative_data', id=1)
-
-    Notes
-    -----
-    Filtering is delegated to ``copy_prior``, which preserves all dataset
-    attributes and applies compression. New filter types can be added by
-    extending the ``if/elif`` block that computes ``idx``.
+    >>> f_out = ig.filter_prior(f_prior_h5, index_use=np.arange(1000))
+    >>> f_out = ig.filter_prior(f_prior_h5, type='nonnegative_data', id=1)
     """
     import numpy as np
     import os
 
     showInfo = kwargs.get('showInfo', 0)
 
-    if not f_prior_filtered_h5:
-        stem = os.path.splitext(f_prior_h5)[0]
-        f_prior_filtered_h5 = '%s_filtered_%s.h5' % (stem, type)
-
-    Dname = '/D%d' % id
-
-    with h5py.File(f_prior_h5, 'r') as f:
-        if Dname not in f:
-            raise KeyError("Dataset '%s' not found in %s" % (Dname, f_prior_h5))
-        D = f[Dname][:]
-
-    if type == 'nonnegative_data':
-        idx = np.where(np.all(D >= 0, axis=1))[0]
+    # Determine output path
+    if f_prior_out_h5 is not None:
+        out_file = f_prior_out_h5
+    elif f_prior_filtered_h5:
+        out_file = f_prior_filtered_h5
+    elif not makeCopy:
+        out_file = f_prior_h5 + '.tmp'
     else:
-        raise ValueError("Unknown filter type: '%s'" % type)
+        stem = os.path.splitext(f_prior_h5)[0]
+        if index_use is not None:
+            out_file = '%s_filtered_index.h5' % stem
+        elif type is not None:
+            out_file = '%s_filtered_%s.h5' % (stem, type)
+        else:
+            out_file = '%s_filtered.h5' % stem
 
-    N_in = D.shape[0]
-    N_out = len(idx)
-    if showInfo >= 0:
-        print("filter_prior [%s on %s]: keeping %d / %d realizations (%.1f%%)"
-              % (type, Dname, N_out, N_in, 100.0 * N_out / N_in))
+    # Determine indices
+    if index_use is not None:
+        idx = np.asarray(index_use)
+        with h5py.File(f_prior_h5, 'r') as f:
+            first = next(k for k in f if isinstance(f[k], h5py.Dataset))
+            N_in = f[first].shape[0]
+        N_out = len(idx)
+        if showInfo >= 0:
+            print("filter_prior [index_use]: keeping %d / %d realizations (%.1f%%)"
+                  % (N_out, N_in, 100.0 * N_out / N_in))
+    elif type is not None:
+        Dname = '/D%d' % id
+        with h5py.File(f_prior_h5, 'r') as f:
+            if Dname not in f:
+                raise KeyError("Dataset '%s' not found in %s" % (Dname, f_prior_h5))
+            D = f[Dname][:]
 
-    copy_prior(f_prior_h5, f_prior_filtered_h5, idx=idx, **kwargs)
+        if type == 'nonnegative_data':
+            idx = np.where(np.all(D >= 0, axis=1))[0]
+        else:
+            raise ValueError("Unknown filter type: '%s'" % type)
 
-    return f_prior_filtered_h5
+        N_in = D.shape[0]
+        N_out = len(idx)
+        if showInfo >= 0:
+            print("filter_prior [%s on %s]: keeping %d / %d realizations (%.1f%%)"
+                  % (type, Dname, N_out, N_in, 100.0 * N_out / N_in))
+    else:
+        idx = None
+
+    copy_prior(f_prior_h5, out_file, idx=idx, **kwargs)
+
+    if not makeCopy:
+        os.replace(out_file, f_prior_h5)
+        return f_prior_h5
+
+    return out_file
 
 
 def hdf5_scan(file_path):
