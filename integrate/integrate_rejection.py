@@ -307,7 +307,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
 
     if backend == 'jax':
         from integrate.integrate_rejection_jax import integrate_rejection_range_jax
-        Nbatch = kwargs.get('Nbatch', 64)
+        Nbatch = kwargs.pop('Nbatch', 64)
         i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range_jax(
             D=D,
             DATA=DATA,

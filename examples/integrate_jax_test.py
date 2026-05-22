@@ -16,6 +16,29 @@ except:
     pass
 
 # %%
+import os
+
+# --- JAX device / memory settings (must be set before 'import jax' or 'import integrate') ---
+#
+# Disable JAX's default behaviour of pre-allocating ~75 % of GPU VRAM upfront.
+# Without this, JAX tries to grab ~18 GB on a 24 GB card at startup and fails
+# when the display driver or other processes already occupy some VRAM.
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+#
+# Alternatively, cap the fraction of VRAM JAX is allowed to use (0.0–1.0).
+# Useful if you want pre-allocation but need to leave room for other processes.
+#   os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.5"
+#
+# Force JAX to run on CPU even when a GPU is present.
+# Remove or comment out to let JAX pick GPU automatically.
+#os.environ["JAX_PLATFORMS"] = "cpu"
+#
+# XLA GPU kernel compilation cache:
+# Configured automatically in integrate_rejection_jax.py via jax.config.update.
+# Compiled kernels are stored in ~/.cache/jax_xla_gpu — warmup drops from
+# ~40s to ~1s after the first run.
+# -----------------------------------------------------------------------------
+
 import multiprocessing
 import time
 import h5py
@@ -42,12 +65,13 @@ print("Using prior data file: %s" % f_prior_h5)
 
 # %%
 # Number of soundings to invert (increase for a richer profile, costs more time)
-N_test = 100
+N_test = 10000
 ip_range = list(np.arange(N_test))
 
 Ncpu_max = multiprocessing.cpu_count()
-Ncpu_list = [c for c in [1, 2, 4, 8] if c <= Ncpu_max]
+Ncpu_list = [c for c in [8] if c <= Ncpu_max]
 print("CPUs available: %d  (will test: %s)" % (Ncpu_max, str(Ncpu_list)))
+Nbatch = 64  # JAX batch size (data points per GPU kernel launch)
 
 # %% [markdown]
 # ## 3. JAX warm-up
@@ -59,8 +83,8 @@ print('\nJAX warm-up (XLA compilation) ...')
 t0 = time.time()
 ig.integrate_rejection(
     f_prior_h5, f_data_h5,
-    ip_range=[0],
-    nr=50, backend='jax',
+    ip_range=list(np.arange(min(Nbatch, N_test))),  # same Nbatch as benchmark
+    nr=200, backend='jax',                           # same nr as benchmark
     updatePostStat=False, showInfo=-1,
 )
 t_warmup = time.time() - t0
@@ -68,6 +92,23 @@ print('  compile + run: %.2fs' % t_warmup)
 
 # %% [markdown]
 # ## 4. Benchmark
+
+# %%
+# --- JAX ---
+print('\nJAX  Nbatch=%d ...' % Nbatch)
+t0 = time.time()
+f_post_jx = ig.integrate_rejection(
+    f_prior_h5, f_data_h5,
+    ip_range=ip_range,
+    nr=200,
+    Nbatch=Nbatch,
+    backend='jax',
+    f_post_h5='POST_jax.h5',
+    updatePostStat=False, showInfo=0,
+)
+t_jx = time.time() - t0
+print('  %.2fs' % t_jx)
+
 
 # %%
 # --- Parallel NumPy ---
@@ -88,20 +129,6 @@ for Ncpu in Ncpu_list:
     f_post_np_last = f_post_np
     print('  %.2fs' % t_np[Ncpu])
 
-# %%
-# --- JAX ---
-print('\nJAX  Nbatch=64 ...')
-t0 = time.time()
-f_post_jx = ig.integrate_rejection(
-    f_prior_h5, f_data_h5,
-    ip_range=ip_range,
-    nr=200,
-    backend='jax',
-    f_post_h5='POST_jax.h5',
-    updatePostStat=False, showInfo=0,
-)
-t_jx = time.time() - t0
-print('  %.2fs' % t_jx)
 
 # %% [markdown]
 # ## 5. Timing results
@@ -115,7 +142,7 @@ print('='*56)
 for Ncpu in Ncpu_list:
     print('  NumPy parallel  Ncpu=%-2d   %6.2fs   %.1fx' % (
         Ncpu, t_np[Ncpu], t_ref / t_np[Ncpu]))
-print('  JAX  Nbatch=64            %6.2fs   %.1fx' % (t_jx, t_ref / t_jx))
+print('  JAX  Nbatch=%-2d            %6.2fs   %.1fx' % (Nbatch, t_jx, t_ref / t_jx))
 print('='*56)
 
 # %% [markdown]
@@ -153,19 +180,7 @@ ig.integrate_posterior_stats(f_post_jx,      ip_range=ip_range)
 # %%
 # NumPy profile
 ig.plot_profile(f_post_np_last, im=1, i1=1, i2=N_test)
-plt.suptitle('NumPy backend (Ncpu=%d)' % Ncpu_list[-1])
-plt.tight_layout()
-f_fig_np = 'POST_numpy_profile.png'
-plt.savefig(f_fig_np, dpi=150)
-print('NumPy profile saved to %s' % f_fig_np)
-plt.show()
 
 # %%
 # JAX profile
 ig.plot_profile(f_post_jx, im=1, i1=1, i2=N_test)
-plt.suptitle('JAX backend')
-plt.tight_layout()
-f_fig_jx = 'POST_jax_profile.png'
-plt.savefig(f_fig_jx, dpi=150)
-print('JAX profile saved to %s' % f_fig_jx)
-plt.show()
