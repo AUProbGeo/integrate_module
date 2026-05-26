@@ -6,6 +6,29 @@
 # **parallel NumPy** backend (multiprocessing + shared memory) and the new
 # **JAX** backend.  Profile plots from both backends are saved side-by-side
 # so visual agreement can be confirmed.
+#
+#
+
+#
+# Some preliminary results on a 24-core CPU and NVIDIA RTX 4090 GPU (24 GB VRAM):
+# N=1_000_000, Nd = 11648
+# 
+# NUMPY (Ncpu=8) CPU
+#  full run : 1054s   (reference)
+#
+# JAX (Nbatch=64) CPU
+#   warmup + run: 2.25s
+#   full run: 323s   (3.3x faster than NumPy)
+#
+#
+# JAX (Nbatch=64) GPU
+#   warmup + run: 1.13s
+#   full run:  12s    (88x faster than NumPy)
+#
+#
+# Note that JAX warm up on GPU seems to 'hang'/Get stuck
+# A simple kill of the process is needed to stop it, but after that the GPU runs fine and the timing is good.
+#
 
 # %%
 try:
@@ -24,6 +47,11 @@ import os
 # Without this, JAX tries to grab ~18 GB on a 24 GB card at startup and fails
 # when the display driver or other processes already occupy some VRAM.
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", os.path.expanduser("~/.cache/jax_xla_gpu"))  # add this
+
+os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")
+
+
 #
 # Alternatively, cap the fraction of VRAM JAX is allowed to use (0.0–1.0).
 # Useful if you want pre-allocation but need to leave room for other processes.
@@ -47,6 +75,10 @@ import matplotlib.pyplot as plt
 plt.ion()
 import integrate as ig
 
+# %% 
+import os
+print(os.path.expanduser("~/.cache/jax_xla_gpu"))
+
 # %% [markdown]
 # ## 1. Get example data
 
@@ -61,19 +93,23 @@ print("Using data file:       %s" % f_data_h5)
 print("Using GEX file:        %s" % file_gex)
 print("Using prior data file: %s" % f_prior_h5)
 
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+Nd = len(X)
 # %% [markdown]
 # ## 2. Setup
 
 # %%
 # Number of soundings to invert (increase for a richer profile, costs more time)
-N_test = 10000
-N_test = 1000
+N_test = 500
+N_test = Nd
+Nbatch = 64  # JAX batch size (data points per GPU kernel launch)
+N_test = int(np.floor(N_test / Nbatch) * Nbatch)  # round up to avoid partial last batch
 ip_range = list(np.arange(N_test))
 
 Ncpu_max = multiprocessing.cpu_count()
 Ncpu_list = [c for c in [8] if c <= Ncpu_max]
 print("CPUs available: %d  (will test: %s)" % (Ncpu_max, str(Ncpu_list)))
-Nbatch = 64  # JAX batch size (data points per GPU kernel launch)
+print("Soundings to invert: %d" % N_test)
 
 # %% [markdown]
 # ## 3. JAX warm-up
