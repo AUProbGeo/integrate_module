@@ -67,6 +67,7 @@ print("Using prior data file: %s" % f_prior_h5)
 # %%
 # Number of soundings to invert (increase for a richer profile, costs more time)
 N_test = 10000
+N_test = 1000
 ip_range = list(np.arange(N_test))
 
 Ncpu_max = multiprocessing.cpu_count()
