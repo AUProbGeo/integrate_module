@@ -372,8 +372,9 @@ Results are saved as .npz files and automatically plotted with performance analy
             else:
                 N_arr = np.ceil(np.logspace(4,6,7))
 
-        # JAX doesn't use multiprocessing — fix to a single "process" entry
-        if args.backend == 'jax':
+        # JAX doesn't use multiprocessing — default to a single "process" entry
+        # but respect an explicit --Ncpu value if the user provided one
+        if args.backend == 'jax' and args.Ncpu == 0:
             Nproc_arr = np.array([1])
 
         f_timing = timing_compute(

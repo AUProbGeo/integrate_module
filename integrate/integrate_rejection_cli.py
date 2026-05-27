@@ -102,12 +102,17 @@ For more information, see the INTEGRATE documentation.
                        default='',
                        help='Comma-separated IP range for distributed processing')
     
-    parser.add_argument('--use-n-best', 
-                       type=int, 
+    parser.add_argument('--use-n-best',
+                       type=int,
                        default=0,
                        help='Use N best samples for analysis (default: 0)')
-    
-    parser.add_argument('--verbose', '-v', 
+
+    parser.add_argument('--backend',
+                       choices=['numpy', 'jax'],
+                       default='numpy',
+                       help='Rejection sampling backend: numpy (default) or jax')
+
+    parser.add_argument('--verbose', '-v',
                        action='store_true',
                        help='Enable verbose output')
     
@@ -166,6 +171,7 @@ For more information, see the INTEGRATE documentation.
         print(f"  Base temperature: {args.temp_base}")
         print(f"  Parallel processing: {parallel}")
         print(f"  CPU cores: {args.cpus if args.cpus > 0 else 'auto-detect'}")
+        print(f"  Backend: {args.backend}")
         print("")
     
     try:
@@ -184,6 +190,7 @@ For more information, see the INTEGRATE documentation.
             Ncpu=args.cpus,
             parallel=parallel,
             use_N_best=args.use_n_best,
+            backend=args.backend,
             showInfo=1 if args.verbose else 0
         )
         
