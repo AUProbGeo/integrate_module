@@ -3034,7 +3034,7 @@ def allocate_large_page():
         return None
 
 
-def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy'):
+def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
     """
     Execute timing benchmark for INTEGRATE workflow components.
     
@@ -3049,7 +3049,11 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy'):
         Default is [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000].
     Nproc_arr : array_like, optional
         Array of processor counts to test. Default is powers of 2 up to available CPUs.
-        
+    NcpuForward : int, optional
+        Fixed number of CPUs to use for forward modeling. When > 0, forward modeling always
+        uses this many CPUs regardless of the current Nproc_arr entry. The inversion
+        (rejection sampling) still varies over Nproc_arr. Default is 0 (use Nproc_arr value).
+
     Returns
     -------
     str
@@ -3122,6 +3126,8 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy'):
 
     print("Testing on %d data sets of size(s):" % len(N_arr), N_arr)
     print("Testing on %d sets of core(s):" % len(Nproc_arr), Nproc_arr)
+    if NcpuForward > 0:
+        print("Forward modeling fixed to %d CPUs (inversion varies over Nproc_arr)" % NcpuForward)
 
 
     print("Rejection sampling backend: %s" % backend)
@@ -3174,7 +3180,8 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy'):
                 #ig.plot_prior_stats(f_prior_h5)
                 #% A2. Compute prior DATA
                 t0_forward = time.time()
-                f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, Ncpu=Ncpu, showInfo=showInfo)
+                Ncpu_fwd = NcpuForward if NcpuForward > 0 else Ncpu
+                f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, Ncpu=Ncpu_fwd, showInfo=showInfo)
                 T_forward[i,j]=time.time()-t0_forward
 
                 #% READY FOR INVERSION

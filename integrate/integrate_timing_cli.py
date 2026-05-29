@@ -273,6 +273,11 @@ Results are saved as .npz files and automatically plotted with performance analy
                             help='Disable timing summary output (enabled by default)')
     time_parser.add_argument('--backend', choices=['numpy', 'jax'], default='numpy',
                             help='Rejection sampling backend: numpy (default) or jax')
+    time_parser.add_argument('--NcpuForward', type=int, default=0,
+                            help='Fix the number of CPUs used for forward modeling only. '
+                                 'When set, forward modeling always uses this many CPUs while '
+                                 'inversion (rejection sampling) varies over the usual CPU range. '
+                                 '(default: 0, forward uses same count as inversion)')
     
     # Add special case handling for '-time' without size argument
     if '-time' in sys.argv and len(sys.argv) == 2:
@@ -370,7 +375,7 @@ Results are saved as .npz files and automatically plotted with performance analy
                 # Use Nmin as starting point for large benchmark
                 N_arr = np.ceil(np.logspace(np.log10(args.Nmin), 6, 7))
             else:
-                N_arr = np.ceil(np.logspace(4,6,7))
+                N_arr = np.ceil(np.logspace(3,6,7))
 
         # JAX doesn't use multiprocessing — default to a single "process" entry
         # but respect an explicit --Ncpu value if the user provided one
@@ -381,6 +386,7 @@ Results are saved as .npz files and automatically plotted with performance analy
             N_arr=N_arr,
             Nproc_arr=Nproc_arr,
             backend=args.backend,
+            NcpuForward=args.NcpuForward,
         )
 
         # Show summary and plot the results
