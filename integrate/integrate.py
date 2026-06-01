@@ -3131,7 +3131,23 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
 
 
     print("Rejection sampling backend: %s" % backend)
-    file_out  = 'timing_%s-%s-%dcore_Nproc%d_N%d_%s.npz' % (hostname,system,Ncpu,len(Nproc_arr), len(N_arr), backend)
+    backend_label = backend
+    if backend == 'jax':
+        import os
+        jax_platform_env = os.environ.get('JAX_PLATFORMS', '').strip().lower()
+        if jax_platform_env in ('gpu', 'cuda', 'rocm'):
+            backend_label = 'jax_gpu'
+        elif jax_platform_env == 'cpu':
+            backend_label = 'jax_cpu'
+        else:
+            try:
+                import jax
+                jax_device = jax.default_backend()
+                backend_label = 'jax_gpu' if jax_device == 'gpu' else 'jax_cpu'
+            except Exception:
+                backend_label = 'jax_cpu'
+        print("JAX backend label: %s (JAX_PLATFORMS='%s')" % (backend_label, jax_platform_env))
+    file_out  = 'timing_%s-%s-%dcore_Nproc%d_N%d_%s.npz' % (hostname,system,Ncpu,len(Nproc_arr), len(N_arr), backend_label)
     print("Writing results to %s " % file_out)
 
     ## TIMING
