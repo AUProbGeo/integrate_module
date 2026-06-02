@@ -342,6 +342,10 @@ with h5py.File(f_post_h5, 'r') as f:
     f_prior_h5 = str(f.attrs.get('f5_prior', ''))
     f_data_h5 = str(f.attrs.get('f5_data', ''))
     
+# %%    
+# PLot prior and observed data 
+ig.plot_data_prior(f_prior_h5, f_data_h5, hardcopy=hardcopy, showInfo=-1)
+
 # %% [markdown]
 # ### Select a profile
 
@@ -419,16 +423,12 @@ for elevation in range(40, -41, -5):
 
 
 # %% [markdown]
-# ### Posterior Probability of INSIDE vs OUTSIDE
-# QUERY : Probability that the cumulative thickness of lithology class 2
-# within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
-# cannot be thicker than 3m.
-
-# %% [markdown]
 # ### QUERY POSTERIOR MODEL REALIZATIONS
 # QUERY : Probability that the cumulative thickness of lithology class 2
 # within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
 # cannot be thicker than 3m.
+
+ig.plot_data_prior_post(f_post_h5, i_plot=3000)
 
 
 # %%
