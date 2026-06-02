@@ -2190,9 +2190,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             HarmonicMean=None
         Std=f_post[Mstr+'/Std'][:].T
         try:
-            logStd=f_post[Mstr+'/logStd'][:].T
+            LogStd=f_post[Mstr+'/LogStd'][:].T
         except KeyError:
-            logStd=None
+            LogStd=None
         T=f_post['/T'][:].T
         try:
             CHI2=f_post['/CHI2'][:]
@@ -2523,7 +2523,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             fig.colorbar(im3, ax=ax[isp], label='KL Divergence (bits)')
         else:
             # STD
-            std_src = logStd if logStd is not None else Std
+            std_src = LogStd if LogStd is not None else Std
             std_data = std_src[:,ii]
             if gap_alpha is not None:
                 std_data = np.ma.masked_where(gap_alpha == 0.0, std_data)
@@ -2532,8 +2532,8 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
                         cmap=std_cmap,
                         shading='auto')
             im3.set_clim(0,1)
-            std_label = 'logStd' if logStd is not None else 'log₁₀ Std'
-            ax[isp].set_title('logStd %s' % name)
+            std_label = 'LogStd' if LogStd is not None else 'log₁₀ Std'
+            ax[isp].set_title('LogStd %s' % name)
             ax[isp].set_ylabel('Elevation (m)')
             fig.colorbar(im3, ax=ax[isp], label=std_label)
 

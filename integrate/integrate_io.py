@@ -2952,8 +2952,9 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
         filelist.append('20241210_AVG_export.xyz')
         filelist.append('20241210_InternGPS_AVG_export.xyz')
         #filelist.append('Sdr_Felding_prior_standard_N1000000_dmax90_20260417_0929.h5')
+        #filelist.append('Sdr_Felding_prior_240426_N1000000_dmax90_20260424_1521.h5')
         filelist.append('SdrFelding_boreholes.json')
-        filelist.append('Sdr_Felding_prior_240426_N1000000_dmax90_20260424_1521.h5')
+        filelist.append('Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616.h5')  
 
 
         
@@ -4845,7 +4846,7 @@ def _analyze_data_file(f, print_line, load_data=False):
     print_line()
 
     # Data groups
-    data_groups = sorted([key for key in f.keys() if key.startswith('D') and len(key) == 2])
+    data_groups = sorted([key for key in f.keys() if key.startswith('D') and key[1:].isdigit()], key=lambda k: int(k[1:]))
     print_line(f"Data Groups: {len(data_groups)} found", 0)
     print_line()
 
@@ -4886,7 +4887,7 @@ def _analyze_prior_file(f, print_line, load_data=False):
 
     # Determine number of realizations
     N = None
-    model_keys = sorted([key for key in f.keys() if key.startswith('M') and len(key) == 2])
+    model_keys = sorted([key for key in f.keys() if key.startswith('M') and key[1:].isdigit()], key=lambda k: int(k[1:]))
     if model_keys:
         N = f[model_keys[0]].shape[0]
 
@@ -4946,7 +4947,7 @@ def _analyze_prior_file(f, print_line, load_data=False):
         print_line()
 
     # Data groups
-    data_groups = sorted([key for key in f.keys() if key.startswith('D') and len(key) == 2])
+    data_groups = sorted([key for key in f.keys() if key.startswith('D') and key[1:].isdigit()], key=lambda k: int(k[1:]))
     print_line(f"Data Realizations: {len(data_groups)} found", 0)
     print_line()
 
@@ -5032,7 +5033,7 @@ def _analyze_post_file(f, print_line, load_data=False):
     print_line()
 
     # Model statistics
-    model_keys = sorted([key for key in f.keys() if key.startswith('M') and len(key) == 2])
+    model_keys = sorted([key for key in f.keys() if key.startswith('M') and key[1:].isdigit()], key=lambda k: int(k[1:]))
     print_line(f"Model Parameter Statistics: {len(model_keys)} found", 0)
     print_line()
 

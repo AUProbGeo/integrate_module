@@ -337,7 +337,8 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     - ``/Mx/Mean``          [Np, Nm]  Arithmetic mean of posterior realizations.
     - ``/Mx/LogMean``       [Np, Nm]  Geometric mean (exp of mean of log values).
     - ``/Mx/Median``        [Np, Nm]  Median of posterior realizations.
-    - ``/Mx/Std``           [Np, Nm]  Standard deviation of log10(posterior).
+    - ``/Mx/Std``           [Np, Nm]  Standard deviation of posterior realizations.
+    - ``/Mx/LogStd``        [Np, Nm]  Standard deviation of log10(posterior realizations).
     - ``/Mx/HarmonicMean``  [Np, Nm]  Trimmed harmonic mean: conductivity samples
       are trimmed 10% each tail, averaged, then inverted back to resistivity.
     - ``/Mx/KL``            [Np, Nm]  KL divergence in bits. Only written when
@@ -565,7 +566,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         # Geometric Mean: exp(mean(log(x)))
                         M_logmean[current_iids, :] = np.exp(np.mean(log_cube, axis=1))
                         
-                        # logStd: std(log10(x)) = std(ln(x)) * (1/ln(10)); reuse log_cube for speed
+                        # LogStd: std(log10(x)) = std(ln(x)) * (1/ln(10)); reuse log_cube for speed
                         M_logstd[current_iids, :] = np.std(log_cube, axis=1) * INV_LOG_10
                         M_std[current_iids, :] = np.std(m_cube, axis=1)
 
@@ -580,7 +581,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
 
 
                 # Create datasets
-                for stat in ['Mean', 'Median', 'Std', 'logStd', 'LogMean', 'HarmonicMean']:
+                for stat in ['Mean', 'Median', 'Std', 'LogStd', 'LogMean', 'HarmonicMean']:
                     if stat not in f_post:
                         dset = '/%s/%s' % (name,stat)
                         if dset not in f_post:
@@ -592,7 +593,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 f_post['/%s/%s' % (name,'Mean')][:] = M_mean
                 f_post['/%s/%s' % (name,'Median')][:] = M_median
                 f_post['/%s/%s' % (name,'Std')][:] = M_std
-                f_post['/%s/%s' % (name,'logStd')][:] = M_logstd
+                f_post['/%s/%s' % (name,'LogStd')][:] = M_logstd
                 f_post['/%s/%s' % (name,'HarmonicMean')][:] = M_harmonicmean
                 if computeKL_continuous:
                     dset = '/%s/KL' % name

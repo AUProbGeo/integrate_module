@@ -29,13 +29,13 @@ import copy
 
 # %% Parameters for the workflow
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 10_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
 # %% load the data from the server
 case = 'SOENDER_FELDING'
-files = ig.get_case_data(case=case, showInfo = -1)
+files = ig.get_case_data(case=case, showInfo = 1)
 
 
 # %% [markdown]
@@ -55,8 +55,8 @@ else:
         file_xlsx = 'Sddr_Felding_prior_standard.xlsx'
         f_prior_h5, flags  = geoprior1d(file_xlsx, Nreals=N, dz=1, dmax =90, output_file='%s_prior_N%d.h5' % (fname, N))
     else:
-        #f_prior_h5 = 'Sdr_Felding_prior_standard_N1000000_dmax90_20260417_0929.h5'
-        f_prior_h5 = 'Sdr_Felding_prior_240426_N1000000_dmax90_20260424_1521.h5'
+        f_prior_h5 = 'Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616.h5'
+        f_prior_h5 = files[-1]
 
 
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
@@ -165,7 +165,7 @@ if usePartOfData:
 
 
 # %% Merge data?
-# Optionally merge alla data
+# Optionally merge all data
 mergeData = True
 if mergeData:
     f_gex = 'TX07_20240802_2x4_RC20-39.gex'
@@ -209,9 +209,9 @@ for i in range(0, len(BHOLES), 10):
     ig.plot_boreholes(BHOLES[i:i+10], hardcopy=hardcopy)
 
 
-# %% Prior data tTEM data
+# %% Compute and save Prior tTEM data
 
-# ## the PRIOR data for all data subsets (with unique gex files):
+# ## Compute the PRIOR data for all data subsets (with unique gex files):
 f_prior_sub = []
 for i in range(len(f_data_sub)):
     file_gex = ig.get_gex_file_from_data(f_data_sub[i])
@@ -221,7 +221,7 @@ for i in range(len(f_data_sub)):
 
 
 
-# %%
+# %% Compute and save Prior BOREHOLE data
 #
 # For each borehole BH in BHOLES:
 #   1. Compute prior borehole data (mode class per interval per realization)
@@ -247,7 +247,7 @@ for i in range(len(f_data_sub)):
             f_prior_h5, f_data_h5, BH,
             im_prior=im_prior, r_data=r_data, r_dis=r_dis,
             doPlot=True,
-            showInfo=1)
+            showInfo=11)
         id_borehole_list.append(id_out)
 
 
@@ -278,31 +278,37 @@ id_use_arr.append([1]) # tTEM
 id_use_arr.append(list(range(2, len(BHOLES)+2))) # ONLY BORREHOLES
 id_use_arr.append(list(range(1, len(BHOLES)+2))) # ALL data
 
-id_use = id_use_arr[-1]
+#id_use = id_use_arr[0]
+#id_use = id_use_arr[1]
+#id_use = id_use_arr[-1]
 
 f_post_sub = []
-for i in range(len(f_prior_sub)):
-
-    f_prior_h5 = f_prior_sub[i]
-    f_data_h5 = f_data_sub[i]
-
-    N_use = N
     
-    # get string from id_use
-    fileparts = os.path.splitext(f_data_h5)
-    id_use_str = '_'.join(map(str, id_use))
-    f_post_h5 = 'post_%s_id%s.h5' % (fileparts[0], id_use_str)
-    f_post_h5 = ig.integrate_rejection(f_prior_h5, 
-                                    f_data_h5, 
-                                    f_post_h5, 
-                                    showInfo=1, 
-                                    N_use = N_use,
-                                    id_use = id_use,
-                                    nr=nr,
-                                    T_N_above = T_N_above,
-                                    T_P_acc_level = T_P_acc_level,
-                                    updatePostStat=True)
-    f_post_sub.append(f_post_h5)
+for id_use in id_use_arr:
+    print("Using data types with id in %s" % id_use)
+
+    for i in range(len(f_prior_sub)):
+
+        f_prior_h5 = f_prior_sub[i]
+        f_data_h5 = f_data_sub[i]
+
+        N_use = N
+        
+        # get string from id_use
+        fileparts = os.path.splitext(f_data_h5)
+        id_use_str = '_'.join(map(str, id_use))
+        f_post_h5 = 'post_%s_id%s.h5' % (fileparts[0], id_use_str)
+        f_post_h5 = ig.integrate_rejection(f_prior_h5, 
+                                        f_data_h5, 
+                                        f_post_h5, 
+                                        showInfo=1, 
+                                        N_use = N_use,
+                                        id_use = id_use,
+                                        nr=nr,
+                                        T_N_above = T_N_above,
+                                        T_P_acc_level = T_P_acc_level,
+                                        updatePostStat=True)
+        f_post_sub.append(f_post_h5)
 
 
 # %% Optionally merge all output posterior files into one file (if they are based on different data subsets, this will not be a true merge since the data subsets are different, but it can be useful for plotting and analysis to have all posterior realizations in one file)
@@ -348,18 +354,10 @@ for BH in BHOLES:
 #BHOLES = BHOLES_filtered
 #print("Using %d boreholes within %.1f m of a data point" % (len(BHOLES), dist_max))
 
-X1 = BHOLES[23]['X']
-Y1 = BHOLES[23]['Y']
-X2 = BHOLES[7]['X']
-Y2 = BHOLES[7]['Y']
-X3 = BHOLES[4]['X']
-Y3 = BHOLES[4]['Y']
-X4 = BHOLES[11]['X']
-Y4 = BHOLES[11]['Y']
-    
+ibh_use = [23, 7, 4, 11]
+Xl = np.array([BHOLES[i]['X'] for i in ibh_use])
+Yl = np.array([BHOLES[i]['Y'] for i in ibh_use])
 
-Xl = np.array([X1, X2, X3, X4])
-Yl = np.array([Y1, Y2, Y3, Y4])
 buffer = 15.0
 indices, distances, segment_ids = ig.find_points_along_line_segments(
     X, Y, Xl, Yl, tolerance=buffer
@@ -389,7 +387,7 @@ plt.show()
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
-ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
+ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy)
 ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=.5, entropy_min =0.7, entropy_max=0.8)
 
 # %%

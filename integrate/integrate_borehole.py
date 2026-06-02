@@ -763,8 +763,8 @@ def get_weight_from_position(f_data_h5,x_well=0,y_well=0, i_ref=-1, r_dis = 400,
     w_data = np.exp(-1*sum_dd**2/r_data**2)
     
 
-    # COmpute the distance from d_ref to all other points
-    dis = np.sqrt((X-X[i_ref])**2 + (Y-Y[i_ref])**2)
+    # Compute the distance from each data point to the actual borehole location
+    dis = np.sqrt((X-x_well)**2 + (Y-y_well)**2)
     w_dis = np.exp(-1*dis**2/r_dis**2)
 
     w_combined = w_data * w_dis
