@@ -479,7 +479,7 @@ Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
      - [Np, Nm]
      - always
      - Standard deviation of the posterior realizations in linear (parameter) space. Units match the parameter (e.g. Ohm-m for resistivity).
-   * - /Mx/logStd
+   * - /Mx/LogStd
      - [Np, Nm]
      - always
      - Standard deviation of log10(posterior). Dimensionless measure of spread on the logarithmic scale. Use this for visualisation of uncertainty in log-normally distributed parameters such as resistivity.

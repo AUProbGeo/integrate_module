@@ -22,6 +22,8 @@ import os
 import integrate as ig
 from geoprior1d import geoprior1d
 
+from integrate import integrate_query
+
 hardcopy = True
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,7 +31,7 @@ import copy
 
 # %% Parameters for the workflow
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 10_000 # Smaller N for testing
+#N = 10_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -243,6 +245,7 @@ for i in range(len(f_data_sub)):
 
     id_borehole_list = []
     for BH in tqdm.tqdm(BHOLES, desc="Processing boreholes"):
+#    for BH in [BHOLES[0]]:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
             im_prior=im_prior, r_data=r_data, r_dis=r_dis,
@@ -312,7 +315,7 @@ for id_use in id_use_arr:
 
 
 # %% Optionally merge all output posterior files into one file (if they are based on different data subsets, this will not be a true merge since the data subsets are different, but it can be useful for plotting and analysis to have all posterior realizations in one file)
-mergePost = True
+mergePost = False
 if len(f_post_sub) ==1:
     mergePost = False
 
@@ -325,10 +328,20 @@ else:
 
 
 #%%  SELECT WHICH DATA TO USE FOR ANLAYSIS
+# use merged
 f_post_h5 = f_post_merged_h5
 f_data_h5 = f_data_merged_h5
 
+# %% For workshop
+f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
+f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
+#f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
 
+import h5py
+with h5py.File(f_post_h5, 'r') as f:
+    f_prior_h5 = str(f.attrs.get('f5_prior', ''))
+    f_data_h5 = str(f.attrs.get('f5_data', ''))
+    
 # %% [markdown]
 # ### Select a profile
 
