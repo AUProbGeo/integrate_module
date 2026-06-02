@@ -47,6 +47,7 @@ Repository = "https://github.com/cultpenguin/integrate_module"
 Issues = "https://github.com/cultpenguin/integrate_module/issues"
 
 [project.scripts]
+integrate = "integrate.integrate_www_cli:main"
 integrate_timing = "integrate.integrate_timing_cli:main"
 integrate_rejection = "integrate.integrate_rejection_cli:main"
 hdf5_info = "integrate.integrate_hdf5_info_cli:main"
