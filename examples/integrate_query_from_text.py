@@ -26,13 +26,24 @@ import integrate as ig
 # automatically and used to inject model metadata into the LLM prompt.
 
 # %%
-ig.get_case_data(case='DAUGAARD', loadType='post')
-f_post_h5 = 'POST_DAUGAARD_AVG_prior_detailed_general_N2000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu2000000_aT1.h5'
+useDaugaard = False
+if useDaugaard:
+    ig.get_case_data(case='DAUGAARD', loadType='post')
+    f_post_h5 = 'POST_DAUGAARD_AVG_prior_detailed_general_N2000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu2000000_aT1.h5'
 
-with h5py.File(f_post_h5, 'r') as f:
-    f_prior_h5 = str(f.attrs.get('f5_prior', ''))
+    with h5py.File(f_post_h5, 'r') as f:
+        f_prior_h5 = str(f.attrs.get('f5_prior', ''))
 
-print(f"Prior file: {f_prior_h5}")
+    print(f"Prior file: {f_prior_h5}")
+else:
+    # Use generic f_post_h5  
+    f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
+    #f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
+    #f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
+
+    with h5py.File(f_post_h5, 'r') as f:
+        f_prior_h5 = str(f.attrs.get('f5_prior', ''))
+        f_data_h5 = str(f.attrs.get('f5_data', ''))
 
 # %% [markdown]
 # ## Available models
@@ -67,11 +78,13 @@ for key in model_keys:
 
 # %%
 usellm = 'ollama'  # 'claude' or 'ollama'
-#usellm = 'claude'  # 'claude' or 'ollama'
+usellm = 'claude'  # 'claude' or 'ollama'
 
 if usellm == 'claude':
     MODEL = 'anthropic/claude-sonnet-4-6'
-    API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+    # Only set API_KEY if it is not already defined as a variable
+    if 'API_KEY' not in dir():
+        API_KEY = os.environ.get('ANTHROPIC_API_KEY')
 elif usellm == 'ollama':
     #MODEL = 'ollama_chat/phi4:latest'
     #MODEL = 'ollama_chat/gemma4:latest'

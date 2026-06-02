@@ -334,7 +334,7 @@ f_data_h5 = f_data_merged_h5
 
 # %% For workshop
 f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
-f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
+#f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
 #f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
 
 import h5py
@@ -393,7 +393,7 @@ plt.title('Survey Points Colored by Number of Non-NaN Data Points')
 plt.axis('equal')
 #plt.legend()
 if hardcopy:
-    plt.savefig('DAUGAARD_survey_points_nonnan.png', dpi=300)
+    plt.savefig('SDR_FELDING_survey_points_nonnan.png', dpi=300)
 plt.show()
 # %%
 
