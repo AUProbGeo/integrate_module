@@ -85,6 +85,20 @@ Boreholes are represented as Python dictionaries containing lithology observatio
     at its surface elevation.  Boreholes without this key (or with ``elevation=0``) are placed at
     elevation 0 m a.s.l. in the plot.  This field has **no effect on inversion**.
 
+``range_data``
+    **Optional.** Data-space similarity radius used when calling
+    :func:`save_borehole_data` without an explicit ``r_data`` argument.
+    Survey points whose EM data response is similar to the borehole location
+    receive higher weight; more dissimilar points are down-weighted.
+    Default: 1,000,000 (effectively no data-similarity cutoff).
+
+``range_dis``
+    **Optional.** Geographic XY fade-out distance [m] used when calling
+    :func:`save_borehole_data` without an explicit ``r_dis`` argument.
+    Survey points further than this distance from the borehole location
+    are effectively unaffected by the borehole observation.
+    Default: 300 m.
+
 JSON File Format
 ~~~~~~~~~~~~~~~~
 
@@ -136,6 +150,24 @@ Multi-borehole file (``all_boreholes.json``):
         "elevation": 38.1
       }
     ]
+
+Borehole with explicit distance-weighting radii (``borehole_65.795_local.json``):
+
+.. code-block:: json
+
+    {
+      "name": "65.795",
+      "X": 498832.5,
+      "Y": 6250843.1,
+      "depth_top":    [0, 8, 12, 16, 34],
+      "depth_bottom": [8, 12, 16, 28, 36],
+      "class_obs":    [1, 2, 1, 5, 4],
+      "class_prob":   [0.9, 0.9, 0.9, 0.9, 0.9],
+      "method": "mode_probability",
+      "elevation": 42.5,
+      "range_data": 4,
+      "range_dis": 150
+    }
 
 ``ig.read_borehole()`` automatically detects the format: it returns a single dict
 for a single-borehole file, or a list of dicts for a multi-borehole file.
@@ -313,16 +345,22 @@ processing in a single call per borehole:
 ``save_borehole_data`` Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+``r_data`` and ``r_dis`` are resolved in this priority order:
+
+1. Explicit keyword argument passed to ``save_borehole_data()`` *(highest priority)*
+2. ``BH['range_data']`` / ``BH['range_dis']`` from the borehole dict
+3. Built-in defaults: ``r_data = 1,000,000``, ``r_dis = 300`` *(lowest priority)*
+
 .. code-block:: python
 
     id_prior, id_out = ig.save_borehole_data(
         f_prior_h5,          # Path to prior HDF5 file
         f_data_h5,           # Path to observed-data HDF5 file
-        BH,                  # Borehole dictionary
+        BH,                  # Borehole dictionary (may include range_data / range_dis)
         im_prior=2,          # Model parameter index (e.g. 2 → /M2)
         parallel=False,      # Parallel mode extraction
-        r_data=2,            # Full-strength radius (m)
-        r_dis=300,           # Fade-out radius (m)
+        r_data=2,            # Data-space similarity radius (overrides BH['range_data'])
+        r_dis=300,           # Geographic XY fade-out distance [m] (overrides BH['range_dis'])
         doPlot=False,        # Plot distance-weight maps
         showInfo=1           # Verbosity (0=silent, 1=summary line)
     )

@@ -990,7 +990,17 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
         Path to the observed-data HDF5 file.
     BH : dict
         Borehole dictionary with keys depth_top, depth_bottom, class_obs,
-        class_prob, X, Y, name, method.
+        class_prob, X, Y, name, method. Two optional keys control the
+        distance-weighting radii when r_data / r_dis are not passed as
+        explicit kwargs:
+
+        * ``range_data`` (float, optional) — data-space similarity radius.
+          Survey points whose EM data response is similar to the borehole
+          location receive higher weight; points that are more dissimilar are
+          down-weighted. Default: 1,000,000 (effectively no cutoff).
+        * ``range_dis`` (float, optional) — geographic XY distance [m] beyond
+          which the borehole exerts no influence on nearby survey points.
+          Default: 300 m.
     **kwargs
         im_prior : int, optional
             Index of the discrete model parameter in f_prior_h5 (e.g. 2 for /M2).
@@ -998,11 +1008,13 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
         parallel : bool, optional
             Enable parallel mode computation. Default is False.
         r_data : float, optional
-            Inner radius (m) within which observations have full strength.
-            Default is 2.
+            Data-space similarity radius. Overrides ``BH['range_data']`` when
+            provided. Resolution order: explicit kwarg > BH['range_data'] >
+            1,000,000 (no cutoff).
         r_dis : float, optional
-            Outer radius (m) at which observations fade to zero influence.
-            Default is 300.
+            Geographic XY fade-out distance [m]. Overrides ``BH['range_dis']``
+            when provided. Resolution order: explicit kwarg > BH['range_dis'] >
+            300 m.
         doPlot : bool, optional
             Plot distance-weight maps. Default is False.
         showInfo : int, optional
@@ -1034,8 +1046,8 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
 
     im_prior = kwargs.get('im_prior', 2)
     parallel = kwargs.get('parallel', False)
-    r_data   = kwargs.get('r_data', 2)
-    r_dis    = kwargs.get('r_dis', 300)
+    r_data   = kwargs.get('r_data', BH.get('range_data', 1_000_000))
+    r_dis    = kwargs.get('r_dis',  BH.get('range_dis',  300))
     doPlot   = kwargs.get('doPlot', False)
     showInfo = kwargs.get('showInfo', 1)
 

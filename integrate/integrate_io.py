@@ -5178,6 +5178,12 @@ def write_borehole(W, filename, **kwargs):
         * ``elevation`` (float, optional) – ground-surface elevation (m a.s.l.).
           Used only by :func:`plot_boreholes` to place the well on a shared
           elevation axis.  Has no effect on inversion.
+        * ``range_data`` (float, optional) – data-space similarity radius used by
+          :func:`save_borehole_data` when ``r_data`` is not passed explicitly.
+          Default: 1,000,000 (no cutoff).
+        * ``range_dis`` (float, optional) – geographic XY fade-out distance [m]
+          used by :func:`save_borehole_data` when ``r_dis`` is not passed explicitly.
+          Default: 300 m.
 
         numpy arrays and scalars are automatically converted to plain
         Python lists/numbers so the file is human-readable JSON.
