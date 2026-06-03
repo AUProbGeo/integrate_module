@@ -29,13 +29,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-# %% Parameters for the workflow
+# %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-#N = 10_000 # Smaller N for testing
+N = 1_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
-# %% load the data from the server
+# %%
 case = 'SOENDER_FELDING'
 files = ig.get_case_data(case=case, showInfo = 1)
 
@@ -44,7 +44,7 @@ files = ig.get_case_data(case=case, showInfo = 1)
 # ## A : the PRIOR model(s) :
 # First a prior model needs to be defined, create, or loaded
 
-# %% Prior model parameters
+# %%
 
 useGeneric = False 
 if useGeneric:  
@@ -58,7 +58,7 @@ else:
         f_prior_h5, flags  = geoprior1d(file_xlsx, Nreals=N, dz=1, dmax =90, output_file='%s_prior_N%d.h5' % (fname, N))
     else:
         f_prior_h5 = 'Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616.h5'
-        f_prior_h5 = files[-1]
+        #f_prior_h5 = files[-1]
 
 
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
@@ -77,11 +77,15 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 # This function will read the XYZ file, extract the relevant data channels, and save them in an HDF5 file along with the metadata from the GEX file.
 
 
-# %%  GETTING THE DATA AND GEX FILE for the chosen area
+# %%
 files_xyz = [f for f in files if f.endswith('.xyz')]
 files_gex = [f for f in files if f.endswith('.gex')]
 
-# %% Create a data file for each GEX file . This is boring handwork, but it is just an example, and it is not expected that users will do this manually in the future. In the future we will probably have a more automated way to link the XYZ files to the GEX files, e.g. by using a naming convention or by reading the GEX file to see which XYZ files are associated with it.
+# %%
+print(files_xyz)
+print(files_gex)
+
+# %%
 # 
 # Read @README_SOENDER_FELDING, and create a an f_data_h5 for each 
 # gex filem, using the XYZ files as indicate by the readme file
@@ -130,12 +134,12 @@ fname = file_gex.split('.')[0]
 f_data_sub.append(ig.xyz_to_h5(file_xyz, file_gex, f_data_h5='%s_data.h5' % fname, showInfo=showInfo))
 
 
-# %% plot alld prior data files
+# %%
 for id in range(len(f_data_sub)):
     f_data_h5 = f_data_sub[id]
     ig.plot_data(f_data_h5, hardcopy=hardcopy, showInfo = -1)
     ig.plot_data_xy(f_data_h5, data_channel=20, cmap='jet')
-    
+
 # %%
 # Read the number of d_obs data in f_data_h5 and print to screen
 for id in range(len(f_data_sub)):
@@ -146,7 +150,7 @@ for id in range(len(f_data_sub)):
     n_gates = DATA['d_obs'][0].shape[1]
     print("id=%d %10d  data points [%2d gates] in %s"   % (id, n_data, n_gates, f_data_h5))
 
-# %% 
+# %%
 # Use subset of available data only?
 usePartOfData = True
 if usePartOfData:
@@ -166,7 +170,7 @@ if usePartOfData:
     f_data_sub = f_data_sub_new
 
 
-# %% Merge data?
+# %%
 # Optionally merge all data
 mergeData = True
 if mergeData:
@@ -182,7 +186,7 @@ if mergeData:
     f_data_sub.append(f_data_all_h5)
 
 
-# %% Load Borehole 
+# %%
 
 X, Y, LINE, ELEVATION = ig.get_geometry(f_data_sub[0])
 
@@ -211,10 +215,11 @@ for i in range(0, len(BHOLES), 10):
     ig.plot_boreholes(BHOLES[i:i+10], hardcopy=hardcopy)
 
 
-# %% Compute and save Prior tTEM data
+# %%
 
 # ## Compute the PRIOR data for all data subsets (with unique gex files):
 f_prior_sub = []
+#N=100
 for i in range(len(f_data_sub)):
     file_gex = ig.get_gex_file_from_data(f_data_sub[i])
     f_prior_sub_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N, doMakePriorCopy=True, )
@@ -223,7 +228,13 @@ for i in range(len(f_data_sub)):
 
 
 
-# %% Compute and save Prior BOREHOLE data
+# %%
+# COPY FROM FREF, FOR WORKSHOP
+f_prior_sub = []
+f_prior_sub.append('Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616_TX07_20240802_2x4_RC20-39_Nh280_Nf12.h5')
+f_prior_h5 = f_prior_sub[0]
+
+# %%
 #
 # For each borehole BH in BHOLES:
 #   1. Compute prior borehole data (mode class per interval per realization)
@@ -238,7 +249,8 @@ r_data   = 4       # tTEMN data based radius (db/dT) — If this is very high it
 r_dis    = 300     # fade-out radius (m) — weight approaches zero at this distance
 
 # Compute and save prior + observed data for all boreholes in one step per borehole
-for i in range(len(f_data_sub)):
+#for i in range(len(f_data_sub)):
+for i in [0]:
     f_data_h5 = f_data_sub[i]
     file_gex = ig.get_gex_file_from_data(f_data_h5)
     f_prior_h5 = f_prior_sub[i]
@@ -314,7 +326,7 @@ for id_use in id_use_arr:
         f_post_sub.append(f_post_h5)
 
 
-# %% Optionally merge all output posterior files into one file (if they are based on different data subsets, this will not be a true merge since the data subsets are different, but it can be useful for plotting and analysis to have all posterior realizations in one file)
+# %%
 mergePost = False
 if len(f_post_sub) ==1:
     mergePost = False
@@ -327,12 +339,12 @@ else:
 
 
 
-#%%  SELECT WHICH DATA TO USE FOR ANLAYSIS
+# %%
 # use merged
 f_post_h5 = f_post_merged_h5
 f_data_h5 = f_data_merged_h5
 
-# %% For workshop
+# %%
 f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
 #f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
 #f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
@@ -341,8 +353,8 @@ import h5py
 with h5py.File(f_post_h5, 'r') as f:
     f_prior_h5 = str(f.attrs.get('f5_prior', ''))
     f_data_h5 = str(f.attrs.get('f5_data', ''))
-    
-# %%    
+
+# %%
 # PLot prior and observed data 
 ig.plot_data_prior(f_prior_h5, f_data_h5, hardcopy=hardcopy, showInfo=-1)
 
@@ -351,7 +363,7 @@ ig.plot_data_prior(f_prior_h5, f_data_h5, hardcopy=hardcopy, showInfo=-1)
 
 # %%
 
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_merged_h5)
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
 
 # find the index of the [X,Y] points closest to each borehole, keep only those within dist_max
 dist_max = 1000
@@ -400,19 +412,32 @@ if hardcopy:
     plt.savefig('SDR_FELDING_survey_points_nonnan.png', dpi=300)
 plt.show()
 # %%
+#ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
+ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, iz=10, plotPoints=True, clim=[.1,3000])
+plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
+#plt.legend()    
+plt.show()
 
 
 # %% [markdown]
 # ### POSTERIOR ANALYSIS
-ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy)
-ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=.5, entropy_min =0.7, entropy_max=0.8)
+# ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy)
+# ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=.5, entropy_min =0.7, entropy_max=0.8)
 
 # %%
 for elevation in [40, 20, 0, -20]:
+    #ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
     ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     #plt.legend()    
     plt.show()
+
+# %%
+#ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
+ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
+plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
+#plt.legend()    
+plt.show()
 
 # %%
 for elevation in range(40, -41, -5):
@@ -422,13 +447,21 @@ for elevation in range(40, -41, -5):
     plt.show()
 
 
+# %%
+ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy) 
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=.5, entropy_min =0.7, entropy_max=0.8)
+
+# %%
+ig.plot_feature_2d(f_post_h5, key='Mean', im=3, plotPoints=True, uselog=False, hardcopy=hardcopy)
+
+
 # %% [markdown]
 # ### QUERY POSTERIOR MODEL REALIZATIONS
 # QUERY : Probability that the cumulative thickness of lithology class 2
 # within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
 # cannot be thicker than 3m.
-
-ig.plot_data_prior_post(f_post_h5, i_plot=3000)
+#
+# ig.plot_data_prior_post(f_post_h5, i_plot=3000)
 
 
 # %%
