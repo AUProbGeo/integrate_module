@@ -39,7 +39,7 @@ else:
     # Use generic f_post_h5  
     f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
     f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
-    #f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
+    f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
 
     with h5py.File(f_post_h5, 'r') as f:
         f_prior_h5 = str(f.attrs.get('f5_prior', ''))
@@ -100,11 +100,18 @@ ig.query_test_llm(model=MODEL, api_key=API_KEY)
 # ## Example 1: Simple discrete query
 
 # %%
-text1 = "What is the probability that the cumulative thickness of ANY clay exceeds 10 m within 0 to 30 m depth?"
+text1 = "What is the probability that Waterlevel is less than 8m"
+#text1 = "What is the probability that the cumulative thickness of ANY clay exceeds 10 m within 0 to 30 m depth. Also, the clay MUST be located below the Waterlevel"
 #text1 = "What is the probability that the cumulative thickness of meltwater clay exceeds 10 m within 0 to 30 m depth?"
 
-query1, interp1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
 print(json.dumps(query1, indent=2))
+print(interp1)
+
+# save the prompt for reference
+with open('query1_prompt.md', 'w') as f:
+    f.write(prompt1)
+
 
 P1, meta1 = ig.query(f_post_h5, query1)
 print(f"N_data={meta1['N_data']}, mean P={P1.mean():.3f}")
@@ -118,7 +125,7 @@ ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
 # %%
 text2 = "Probability that resistivity is below 100 ohm-m for a cumulative thickness of at least 25 m within 0 to 50 m depth."
 
-query2, interp2 = ig.query_from_text(text2, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+query2, interp2, prompt2 = ig.query_from_text(text2, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
 print(json.dumps(query2, indent=2))
 
 P2, meta2 = ig.query(f_post_h5, query2)
@@ -133,7 +140,7 @@ ig.query_plot(P2, meta2, query_text=text2, interpretation=interp2,
 text3 = ("Probability that sand and gravel together have a cumulative thickness above 20 m "
          "within 0 to 30 m depth, AND the first non-sand/gravel layer at the top is less than 3 m thick.")
 
-query3, interp3 = ig.query_from_text(text3, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+query3, interp3, prompt3 = ig.query_from_text(text3, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
 print(json.dumps(query3, indent=2))
 
 P3, meta3 = ig.query(f_post_h5, query3)
@@ -161,7 +168,7 @@ print(f"Reloaded query | mean P={P_loaded.mean():.3f}")
 # Useful for debugging or understanding what context the model receives.
 
 # %%
-query5, interp5 = ig.query_from_text(
+query5, interp5, prompt5 = ig.query_from_text(
     "Probability that any type of clay is present for more than 5 m within 0 to 20 m depth.",
     f_prior_h5=f_prior_h5,
     model=MODEL,
@@ -178,7 +185,7 @@ print(json.dumps(query5, indent=2))
 
 # %%
 try:
-    query_bad, _ = ig.query_from_text(
+    query_bad, _, _ = ig.query_from_text(
         "What is the spatial correlation length of resistivity?",
         f_prior_h5=f_prior_h5,
         model=MODEL,

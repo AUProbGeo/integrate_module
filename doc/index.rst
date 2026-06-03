@@ -92,6 +92,7 @@ The manual
    gettingstarted
    format
    format_wells
+   format_query
    workflow
    notebooks
    contributions

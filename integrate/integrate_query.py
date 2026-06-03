@@ -21,26 +21,33 @@ def _get_clipped_thickness(z, depth_min, depth_max):
     ----------
     z : ndarray (N_depth,)
         Depth values [m] at layer interfaces.
-    depth_min : float or None
-        Lower depth bound [m].
-    depth_max : float or None
-        Upper depth bound [m].
+    depth_min : float, None, or ndarray (N_samples,)
+        Lower depth bound [m]. Array triggers per-sample mode.
+    depth_max : float, None, or ndarray (N_samples,)
+        Upper depth bound [m]. Array triggers per-sample mode.
 
     Returns
     -------
-    t : ndarray (N_depth - 1,)
-        Clipped thickness for each layer [m].
-    mask : ndarray (N_depth - 1,) bool
-        True where clipped thickness > 0.
+    t : ndarray (N_depth - 1,) or (N_samples, N_depth - 1)
+        Clipped thickness per layer. 2-D when bounds are per-sample.
+    mask : ndarray (N_depth - 1,) bool or None
+        True where clipped thickness > 0 (scalar bounds). None when 2-D.
     """
     n_layers = len(z) - 1
     top = z[:n_layers]
     bot = z[1:]
     lo = depth_min if depth_min is not None else -np.inf
     hi = depth_max if depth_max is not None else np.inf
-    t = np.minimum(bot, hi) - np.maximum(top, lo)
-    t = np.maximum(t, 0.0)
-    return t, t > 0
+
+    if np.ndim(lo) > 0 or np.ndim(hi) > 0:
+        # Per-sample bounds: broadcast (N_samples,1) against (N_layers,)
+        lo2 = np.asarray(lo)[:, np.newaxis] if np.ndim(lo) > 0 else lo
+        hi2 = np.asarray(hi)[:, np.newaxis] if np.ndim(hi) > 0 else hi
+        t = np.maximum(np.minimum(bot, hi2) - np.maximum(top, lo2), 0.0)
+        return t, None      # 2-D t; mask handled downstream
+    else:
+        t = np.maximum(np.minimum(bot, hi) - np.maximum(top, lo), 0.0)
+        return t, t > 0
 
 
 def _first_occurrence_thickness(condition, t):
@@ -59,15 +66,16 @@ def _first_occurrence_thickness(condition, t):
     metric = np.zeros(condition.shape[0])
     has_true = condition.any(axis=1)
     first_idx = np.argmax(condition, axis=1)
+    t_2d = t.ndim == 2
     for i in np.where(has_true)[0]:
         j = first_idx[i]
         while j < condition.shape[1] and condition[i, j]:
-            metric[i] += t[j]
+            metric[i] += t[i, j] if t_2d else t[j]
             j += 1
     return metric
 
 
-def _evaluate_constraint(M_samples, z, constraint):
+def _evaluate_constraint(M_samples, z, constraint, scalar_model_values=None):
     """
     Evaluate one constraint for a batch of realizations.
 
@@ -79,6 +87,9 @@ def _evaluate_constraint(M_samples, z, constraint):
         Depth values [m].
     constraint : dict
         Constraint definition.
+    scalar_model_values : dict {im: ndarray (N_samples,)}, optional
+        Per-sample values of scalar models. Used to resolve `depth_max_im`
+        and `depth_min_im` constraint fields into per-sample depth bounds.
 
     Returns
     -------
@@ -87,12 +98,38 @@ def _evaluate_constraint(M_samples, z, constraint):
     """
     depth_min = constraint.get('depth_min', None)
     depth_max = constraint.get('depth_max', None)
+
+    # Dynamic depth bounds: replace fixed scalar with per-sample values
+    if scalar_model_values:
+        if 'depth_max_im' in constraint:
+            depth_max = scalar_model_values.get(constraint['depth_max_im'], depth_max)
+        if 'depth_min_im' in constraint:
+            depth_min = scalar_model_values.get(constraint['depth_min_im'], depth_min)
+
     t, layer_mask = _get_clipped_thickness(z, depth_min, depth_max)
 
     # Property values per layer (column i = layer top z[i] to z[i+1])
     n_layers = len(z) - 1
-    M_sel = M_samples[:, :n_layers][:, layer_mask]   # (N_samples, N_sel)
-    t_sel = t[layer_mask]                             # (N_sel,)
+
+    # Scalar model: depth range is zero (e.g. a water-table value — single number
+    # per realization, no thickness concept). Compare the value directly.
+    if (z[-1] - z[0]) == 0 or n_layers == 0:
+        M_val = M_samples[:, 0]
+        if 'classes' in constraint:
+            valid = np.isin(np.round(M_val).astype(int), constraint['classes'])
+        else:
+            v_cmp = constraint.get('value_comparison', '<')
+            v_thr = constraint.get('value_threshold', 0.0)
+            valid = M_val < v_thr if v_cmp == '<' else M_val > v_thr
+        return ~valid if constraint.get('negate', False) else valid
+
+    if layer_mask is None:
+        # Per-sample depth bounds → 2-D t; use all layers
+        M_sel = M_samples[:, :n_layers]   # (N_samples, N_layers)
+        t_sel = t                          # (N_samples, N_layers)
+    else:
+        M_sel = M_samples[:, :n_layers][:, layer_mask]   # (N_samples, N_sel)
+        t_sel = t[layer_mask]                             # (N_sel,)
 
     # Per-layer boolean condition
     if 'classes' in constraint:
@@ -212,6 +249,16 @@ def query(f_post_h5, query_dict):
                 z = f[key].attrs['x'].astype(float)
                 is_discrete = bool(f[key].attrs.get('is_discrete', 0))
             prior_models[im] = (M, z, is_discrete)
+        # Also load any scalar models referenced as dynamic depth bounds
+        for field in ('depth_max_im', 'depth_min_im'):
+            im_ref = c.get(field)
+            if im_ref is not None and im_ref not in prior_models:
+                key = f'M{im_ref}'
+                with h5py.File(f_prior_h5, 'r') as f:
+                    M_ref = f[key][:]
+                    z_ref = f[key].attrs['x'].astype(float)
+                    is_discrete_ref = bool(f[key].attrs.get('is_discrete', 0))
+                prior_models[im_ref] = (M_ref, z_ref, is_discrete_ref)
 
     # Evaluate constraints for each data location
     P = np.zeros(N_data)
@@ -219,9 +266,16 @@ def query(f_post_h5, query_dict):
     for i in tqdm(range(N_data), desc='Evaluating query', unit='location'):
         idx = i_use[i]                             # (N_post,) indices into prior
         valid = np.ones(N_post, dtype=bool)
+
+        # Build per-sample values for scalar models (used as dynamic depth bounds)
+        scalar_vals = {}
+        for im_s, (M_s, z_s, _) in prior_models.items():
+            if (z_s[-1] - z_s[0]) == 0 or len(z_s) - 1 == 0:
+                scalar_vals[im_s] = M_s[idx, 0]   # (N_post,)
+
         for c in constraints:
             M, z, _ = prior_models[c['im']]
-            valid &= _evaluate_constraint(M[idx, :], z, c)
+            valid &= _evaluate_constraint(M[idx, :], z, c, scalar_model_values=scalar_vals)
         P[i] = valid.mean()
         i_use_query.append(idx[valid])             # Store matching indices
 
@@ -586,7 +640,19 @@ def _build_llm_system_prompt(f_prior_h5):
         depth_max = float(z[-1])
         name = info['name'] if info['name'] != key else key
 
-        if info['is_discrete']:
+        is_scalar = (depth_max - depth_min) == 0 or n_layers == 0
+
+        if is_scalar:
+            kind = 'SCALAR-DISCRETE' if info['is_discrete'] else 'SCALAR'
+            lines = [f"  Model im={im}: {name} ({kind}) — single value per realization, no depth profile"]
+            lines.append("    Use only 'value_comparison' and 'value_threshold'. Do NOT include any thickness fields.")
+            if info['is_discrete'] and info['class_id'] is not None and info['class_name'] is not None:
+                lines.append("    Classes (use these integer IDs in the 'classes' field):")
+                ids = info['class_id'].flatten()
+                names = info['class_name'].flatten()
+                for cid, cname in zip(ids, names):
+                    lines.append(f"      {int(cid)} = {cname}")
+        elif info['is_discrete']:
             lines = [f"  Model im={im}: {name} (DISCRETE), depth {depth_min:.1f}–{depth_max:.1f} m, {n_layers} layers"]
             if info['class_id'] is not None and info['class_name'] is not None:
                 lines.append("    Classes (use these integer IDs in the 'classes' field):")
@@ -636,16 +702,29 @@ A constraint list contains one or more constraint objects combined with logical 
 | classes              | list[int]   | discrete only     | class IDs from the model            | Match any of these class IDs (discrete models)   |
 | value_comparison     | str         | continuous only   | "<" or ">"                          | Compare model value against threshold            |
 | value_threshold      | float       | continuous only   | any float                           | Threshold for continuous value comparison        |
-| thickness_mode       | str         | always            | "cumulative" or "first_occurrence"  | How to aggregate thickness of matching layers    |
-| thickness_comparison | str         | always            | ">", "<", ">=", "<="                | Operator applied to the computed thickness       |
-| thickness_threshold  | float       | always            | any float (meters)                  | Thickness threshold in meters                    |
+| thickness_mode       | str         | depth models only | "cumulative" or "first_occurrence"  | How to aggregate thickness of matching layers    |
+| thickness_comparison | str         | depth models only | ">", "<", ">=", "<="                | Operator applied to the computed thickness       |
+| thickness_threshold  | float       | depth models only | any float (meters)                  | Thickness threshold in meters                    |
 | depth_min            | float       | optional          | any float                           | Upper boundary of depth interval [m]             |
 | depth_max            | float       | optional          | any float                           | Lower boundary of depth interval [m]             |
+| depth_max_im         | int         | optional          | SCALAR model im                     | Per-realization depth_max from a scalar model    |
+| depth_min_im         | int         | optional          | SCALAR model im                     | Per-realization depth_min from a scalar model    |
 | negate               | bool        | optional          | true or false (default: false)      | If true, invert the constraint result            |
+
+> **Cross-model depth bounds:** `depth_max_im` / `depth_min_im` take the `im` index of a
+> SCALAR model and use its per-realization value as the depth boundary. This enables
+> queries like "Sand above the water table" where the cutoff depth varies per realization.
+> Use `depth_max_im` to cut at the scalar model's value from above; use `depth_min_im`
+> to cut from below. These may be combined with fixed `depth_min` / `depth_max`.
 
 ### thickness_mode explained
 - "cumulative": sum the thickness of ALL matching layers within the depth interval
 - "first_occurrence": thickness of the FIRST contiguous block of matching layers
+
+### Scalar models (marked SCALAR or SCALAR-DISCRETE above)
+These store a single value per realization, not a depth profile. For scalar models:
+- Omit ALL thickness fields (`thickness_mode`, `thickness_comparison`, `thickness_threshold`, `depth_min`, `depth_max`).
+- Use only `im`, `value_comparison`, `value_threshold`, and optionally `negate`.
 
 ## Available Prior Models
 
@@ -745,6 +824,42 @@ Query: "Probability that the first occurrence of clay at the surface is less tha
 }}
 ```
 
+### Example 5: Scalar model query (no thickness fields)
+Query: "Probability that the water table is shallower than 5 m"
+```json
+{{
+  "interpretation": "Probability that the water table depth (im=3, SCALAR) is less than 5 m.",
+  "constraints": [
+    {{
+      "im": 3,
+      "value_comparison": "<",
+      "value_threshold": 5.0,
+      "negate": false
+    }}
+  ]
+}}
+```
+
+### Example 6: Cross-model depth constraint (dynamic depth bound from scalar model)
+Query: "Probability that Sand and Grus have a cumulative thickness above the water table exceeding 5 m"
+```json
+{{
+  "interpretation": "Probability that Sand (class 1) and Grus (class 2) have a cumulative thickness exceeding 5 m within the zone above the water table (im=3), starting from the surface.",
+  "constraints": [
+    {{
+      "im": 2,
+      "classes": [1, 2],
+      "thickness_mode": "cumulative",
+      "thickness_comparison": ">",
+      "thickness_threshold": 5.0,
+      "depth_min": 0.0,
+      "depth_max_im": 3,
+      "negate": false
+    }}
+  ]
+}}
+```
+
 ## Instructions
 
 - Respond with ONLY a valid JSON object with keys "interpretation" and "constraints". No markdown fences, no extra commentary.
@@ -797,6 +912,8 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
     interpretation : str
         Plain English confirmation of what the LLM understood the query to mean.
         Check this before running ig.query() to catch misunderstandings cheaply.
+    system_prompt : str
+        The full system prompt sent to the LLM. Useful for inspection and debugging.
 
     Raises
     ------
@@ -814,7 +931,7 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
     Examples
     --------
     >>> import integrate as ig
-    >>> query_dict, interpretation = ig.query_from_text(
+    >>> query_dict, interpretation, system_prompt = ig.query_from_text(
     ...     "Probability that cumulative clay thickness > 10 m within 0-30 m",
     ...     f_prior_h5='prior.h5',
     ...     api_key='sk-ant-...',
@@ -906,7 +1023,7 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
     interpretation = parsed.pop('interpretation', '')
     print(f"Interpretation: {interpretation}")
 
-    return parsed, interpretation
+    return parsed, interpretation, system_prompt
 
 
 def query_test_llm(model='anthropic/claude-sonnet-4-6', api_key=None, verbose=1):

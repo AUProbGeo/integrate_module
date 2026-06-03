@@ -29,6 +29,7 @@ dependencies = [
     "pandas",
     "pyvista",
     "litellm",
+    "streamlit"
     # libaarhusxyz must be installed manually (see README) — PyPI does not allow git dependencies.
     # pip install git+https://github.com/cultpenguin/libaarhusxyz
 ]

@@ -159,7 +159,7 @@ def run_query_app():
 
         with st.spinner("Translating query with LLM…"):
             try:
-                query_dict, interp = ig.query_from_text(
+                query_dict, interp, sys_prompt = ig.query_from_text(
                     query_text, f_prior_h5, model=model, api_key=api_key
                 )
             except Exception as e:
@@ -191,6 +191,9 @@ def run_query_app():
         import json
         with st.expander("Query JSON"):
             st.code(json.dumps(query_dict, indent=2), language="json")
+
+        with st.expander("System Prompt"):
+            st.text(sys_prompt)
 
 
 if __name__ == "__main__":
