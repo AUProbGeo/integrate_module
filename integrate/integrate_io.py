@@ -5184,6 +5184,10 @@ def write_borehole(W, filename, **kwargs):
         * ``range_dis`` (float, optional) – geographic XY fade-out distance [m]
           used by :func:`save_borehole_data` when ``r_dis`` is not passed explicitly.
           Default: 300 m.
+        * ``nan_freq`` (float, optional) – NaN-frequency threshold for automatic
+          data-gate selection in :func:`save_borehole_data`. Default: 0.8.
+        * ``r_data_i_use`` (list of int, optional) – explicit gate/channel indices
+          for data-distance computation; overrides ``nan_freq`` when provided.
 
         numpy arrays and scalars are automatically converted to plain
         Python lists/numbers so the file is human-readable JSON.

@@ -572,7 +572,8 @@ def rescale_P_obs_temperature(P_obs, T=1.0):
 
     return P_obs_scaled
 
-def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False):
+def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
+                     nan_freq=0.8, r_data_i_use=None):
     """
     Convert point-based discrete probability observations to gridded data with distance-based weighting.
 
@@ -602,6 +603,15 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False)
     doPlot : bool, optional
         If True, creates diagnostic plots showing weight distributions.
         Default is False.
+    nan_freq : float, optional
+        NaN-frequency threshold for automatic data-gate selection inside
+        :func:`get_weight_from_position`. Gates where the fraction of
+        non-NaN values is below this threshold are excluded. Default 0.8.
+        Ignored when ``r_data_i_use`` is provided.
+    r_data_i_use : array-like of int or None, optional
+        Explicit gate/channel indices to use for data-distance computation
+        inside :func:`get_weight_from_position`. Overrides ``nan_freq`` when
+        provided. Default None.
 
     Returns
     -------
@@ -663,7 +673,8 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False)
 
     # Compute distance-based weights for all grid points
     w_combined, w_dis, w_data, i_use_from_func = ig.get_weight_from_position(
-        f_data_h5, X, Y, r_data=r_data, r_dis=r_dis, doPlot=doPlot
+        f_data_h5, X, Y, r_data=r_data, r_dis=r_dis, doPlot=doPlot,
+        nan_freq=nan_freq, r_data_i_use=r_data_i_use
     )
 
     # Convert distance weight to temperature
@@ -692,7 +703,9 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False)
 
 
 
-def get_weight_from_position(f_data_h5,x_well=0,y_well=0, i_ref=-1, r_dis = 400, r_data=2, useLog=True, doPlot=False, plFile=None, showInfo=0):
+def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400, r_data=2,
+                             useLog=True, doPlot=False, plFile=None, showInfo=0,
+                             nan_freq=0.8, r_data_i_use=None):
     """Calculate weights based on distance and data similarity to a reference point.
 
     This function computes three sets of weights:
@@ -703,32 +716,53 @@ def get_weight_from_position(f_data_h5,x_well=0,y_well=0, i_ref=-1, r_dis = 400,
     Parameters
     ----------
     f_data_h5 : str
-        Path to HDF5 file containing geometry and observed data
+        Path to HDF5 file containing geometry and observed data.
     x_well : float, optional
-        X coordinate of reference point (well), by default 0
-    y_well : float, optional 
-        Y coordinate of reference point (well), by default 0
+        X coordinate of reference point (well). Default 0.
+    y_well : float, optional
+        Y coordinate of reference point (well). Default 0.
     i_ref : int, optional
-        Index of reference point, by default -1 (auto-calculated as closest to x_well,y_well)
+        Index of reference point. Default -1 (auto-calculated as closest to x_well, y_well).
     r_dis : float, optional
-        Distance range parameter for spatial weighting, by default 400
+        Geographic XY distance range [m] for spatial weighting. Default 400.
     r_data : float, optional
-        Data similarity range parameter for data weighting, by default 2
+        Data-space similarity range parameter for data weighting. Default 2.
+    useLog : bool, optional
+        Apply log10 transform to data before computing similarity. Default True.
+    doPlot : bool, optional
+        Create diagnostic weight plots. Default False.
+    plFile : str or None, optional
+        Output filename for the diagnostic plot. Auto-generated if None.
+    showInfo : int, optional
+        Verbosity level. Default 0.
+    nan_freq : float, optional
+        NaN-frequency threshold for automatic gate selection. Gates where the
+        fraction of non-NaN values across all soundings is below this threshold
+        are excluded from the data-distance computation. Default 0.8.
+        Ignored when ``r_data_i_use`` is provided.
+    r_data_i_use : array-like of int or None, optional
+        Explicit gate/channel indices to use for the data-distance computation.
+        When provided, overrides the ``nan_freq`` automatic selection.
+        A NaN check at the reference sounding is still applied.
+        Default None (use ``nan_freq`` threshold).
 
     Returns
     -------
-    tuple
-        (w_combined, w_dis, w_data) where:
-        - w_combined: Combined weights from distance and data similarity
-        - w_dis: Distance-based weights
-        - w_data: Data similarity-based weights
+    w_combined : ndarray (N_data,)
+        Combined weights from spatial distance and data similarity.
+    w_dis : ndarray (N_data,)
+        Geographic distance-based weights.
+    w_data : ndarray (N_data,)
+        Data similarity-based weights.
+    i_ref : int
+        Index of the reference sounding used.
 
     Notes
     -----
-    The weights are calculated using Gaussian functions:
-    - Distance weights use exp(-dis²/r_dis²)
-    - Data weights use exp(-sum_dd²/r_data²)
-    where dis is spatial distance and sum_dd is cumulative data difference
+    Weights are calculated using Gaussian functions:
+    - Distance weights: exp(-dis² / r_dis²)
+    - Data weights:     exp(-sum_dd² / r_data²)
+    where dis is geographic distance and sum_dd is cumulative data difference.
     """
     import integrate as ig
     import numpy as np
@@ -742,15 +776,16 @@ def get_weight_from_position(f_data_h5,x_well=0,y_well=0, i_ref=-1, r_dis = 400,
     if i_ref == -1:
         i_ref = np.argmin((X-x_well)**2 + (Y-y_well)**2)
 
-    # select gates to use 
-    # find the number of data points for each gate that has non-nan values
-    n_not_nan = np.sum(~np.isnan(d_obs), axis=0)
-    n_not_nan_freq = n_not_nan/d_obs.shape[0]
-    # use the data for which n_not_nan_freq>0.7
-    # 0.7 should be an option to select!
-    i_use = np.where(n_not_nan_freq>0.8)[0]
-    # only use i_use values that are not nan
-    i_use = i_use[~np.isnan(d_obs[i_ref,i_use])]
+    # Select gates to use for data-distance computation
+    if r_data_i_use is not None:
+        gates = np.asarray(r_data_i_use, dtype=int)
+    else:
+        n_not_nan = np.sum(~np.isnan(d_obs), axis=0)
+        n_not_nan_freq = n_not_nan / d_obs.shape[0]
+        gates = np.where(n_not_nan_freq > nan_freq)[0]
+    # Remove gates that are NaN at the reference sounding
+    gates = gates[~np.isnan(d_obs[i_ref, gates])]
+    i_use = gates
     # select gates to use, manually
     if useLog:
         d_ref = np.log10(d_obs[i_ref,i_use])
@@ -1001,6 +1036,10 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
         * ``range_dis`` (float, optional) — geographic XY distance [m] beyond
           which the borehole exerts no influence on nearby survey points.
           Default: 300 m.
+        * ``nan_freq`` (float, optional) — NaN-frequency threshold for automatic
+          data-gate selection. Default: 0.8.
+        * ``r_data_i_use`` (list of int, optional) — explicit gate indices for
+          data-distance computation; overrides ``nan_freq`` when provided.
     **kwargs
         im_prior : int, optional
             Index of the discrete model parameter in f_prior_h5 (e.g. 2 for /M2).
@@ -1015,6 +1054,15 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
             Geographic XY fade-out distance [m]. Overrides ``BH['range_dis']``
             when provided. Resolution order: explicit kwarg > BH['range_dis'] >
             300 m.
+        nan_freq : float, optional
+            NaN-frequency threshold for automatic data-gate selection. Gates
+            where the fraction of non-NaN soundings is below this threshold are
+            excluded from data-distance computation. Resolution order: explicit
+            kwarg > BH['nan_freq'] > 0.8. Ignored when ``r_data_i_use`` is set.
+        r_data_i_use : list of int or None, optional
+            Explicit gate/channel indices to use for data-distance computation.
+            Overrides ``nan_freq`` when provided. Resolution order: explicit
+            kwarg > BH['r_data_i_use'] > None.
         doPlot : bool, optional
             Plot distance-weight maps. Default is False.
         showInfo : int, optional
@@ -1046,8 +1094,10 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
 
     im_prior = kwargs.get('im_prior', 2)
     parallel = kwargs.get('parallel', False)
-    r_data   = kwargs.get('r_data', BH.get('range_data', 1_000_000))
-    r_dis    = kwargs.get('r_dis',  BH.get('range_dis',  300))
+    r_data       = kwargs.get('r_data',       BH.get('range_data',   1_000_000))
+    r_dis        = kwargs.get('r_dis',        BH.get('range_dis',    300))
+    nan_freq     = kwargs.get('nan_freq',     BH.get('nan_freq',     0.8))
+    r_data_i_use = kwargs.get('r_data_i_use', BH.get('r_data_i_use', None))
     doPlot   = kwargs.get('doPlot', False)
     showInfo = kwargs.get('showInfo', 1)
 
@@ -1059,7 +1109,8 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
     # Step 2: extrapolate point observations to the survey grid
     d_obs, i_use, T_use = Pobs_to_datagrid(
         P_obs, BH['X'], BH['Y'], f_data_h5,
-        r_data=r_data, r_dis=r_dis, doPlot=doPlot)
+        r_data=r_data, r_dis=r_dis, doPlot=doPlot,
+        nan_freq=nan_freq, r_data_i_use=r_data_i_use)
 
     # Step 3: save gridded observations to f_data_h5
     id_out, _ = ig.save_data_multinomial(

@@ -31,7 +31,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 1_000 # Smaller N for testing
+#N = 1_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -211,22 +211,19 @@ for ibh in range(len(BHOLES)):
 # Plot without prior info – classes labelled by numeric ID, default colours
 # plt borholes in sets of 10, 0:10, 10:20, etc. if there are more than 10 boreholes
 for i in range(0, len(BHOLES), 10):
-    #ig.plot_boreholes(BHOLES[i:i+10], f_prior_h5, hardcopy=hardcopy)
-    ig.plot_boreholes(BHOLES[i:i+10], hardcopy=hardcopy)
+    ig.plot_boreholes(BHOLES[i:i+10], f_prior_h5, hardcopy=hardcopy)
+    #ig.plot_boreholes(BHOLES[i:i+10], hardcopy=hardcopy)
 
 
 # %%
 
 # ## Compute the PRIOR data for all data subsets (with unique gex files):
 f_prior_sub = []
-#N=100
 for i in range(len(f_data_sub)):
     file_gex = ig.get_gex_file_from_data(f_data_sub[i])
     f_prior_sub_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N, doMakePriorCopy=True, )
     f_prior_sub.append(f_prior_sub_h5)
-
-
-
+f_prior_h5 = f_prior_sub[0]    
 
 # %%
 # COPY FROM FREF, FOR WORKSHOP
@@ -256,16 +253,17 @@ for i in [0]:
     f_prior_h5 = f_prior_sub[i]
 
     id_borehole_list = []
-    for BH in tqdm.tqdm(BHOLES, desc="Processing boreholes"):
-#    for BH in [BHOLES[0]]:
+    #for BH in tqdm.tqdm(BHOLES, desc="Processing boreholes"):
+    for BH in [BHOLES[25]]:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
-            im_prior=im_prior, r_data=r_data, r_dis=r_dis,
+            im_prior=im_prior, 
+            #r_data=r_data, r_dis=r_dis,
+            #r_data = 1, r_dis = 1000,
+            nan_freq = .8, r_data = 1, r_dis = 1000,
             doPlot=True,
             showInfo=11)
         id_borehole_list.append(id_out)
-
-
 
 
 # %% [markdown]

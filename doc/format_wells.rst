@@ -99,6 +99,19 @@ Boreholes are represented as Python dictionaries containing lithology observatio
     are effectively unaffected by the borehole observation.
     Default: 300 m.
 
+``nan_freq``
+    **Optional.** NaN-frequency threshold (0–1) for automatic data-gate selection
+    when computing data-space similarity inside :func:`get_weight_from_position`.
+    Gates where fewer than this fraction of soundings have non-NaN values are
+    excluded from the data-distance computation.
+    Default: 0.8. Ignored when ``r_data_i_use`` is also set.
+
+``r_data_i_use``
+    **Optional.** Explicit list of gate/channel indices (integers) to use for the
+    data-distance computation, e.g. ``[0, 1, 2, 3]``. When provided, overrides the
+    ``nan_freq`` automatic gate selection entirely. A NaN check at the reference
+    sounding is still applied. Default: not set (use ``nan_freq``).
+
 JSON File Format
 ~~~~~~~~~~~~~~~~
 
@@ -166,7 +179,9 @@ Borehole with explicit distance-weighting radii (``borehole_65.795_local.json``)
       "method": "mode_probability",
       "elevation": 42.5,
       "range_data": 4,
-      "range_dis": 150
+      "range_dis": 150,
+      "nan_freq": 0.7,
+      "r_data_i_use": [0, 1, 2, 3]
     }
 
 ``ig.read_borehole()`` automatically detects the format: it returns a single dict
@@ -361,6 +376,8 @@ processing in a single call per borehole:
         parallel=False,      # Parallel mode extraction
         r_data=2,            # Data-space similarity radius (overrides BH['range_data'])
         r_dis=300,           # Geographic XY fade-out distance [m] (overrides BH['range_dis'])
+        nan_freq=0.8,        # NaN-freq threshold for gate selection (overrides BH['nan_freq'])
+        r_data_i_use=None,   # Explicit gate indices (overrides nan_freq and BH['r_data_i_use'])
         doPlot=False,        # Plot distance-weight maps
         showInfo=1           # Verbosity (0=silent, 1=summary line)
     )
