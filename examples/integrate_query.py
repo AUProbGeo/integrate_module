@@ -485,4 +485,109 @@ q = ig.load_query('query_ex1.json')
 P, meta = ig.query(f_post_h5, q)
 ig.query_plot(P, meta, title='Loaded Query Example 1')
 
+# %% Query for watertable
+f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
+
+with h5py.File(f_post_h5, 'r') as f:
+    f_prior_h5 = str(f.attrs.get('f5_prior', ''))
+    f_data_h5 = str(f.attrs.get('f5_data', ''))
+
+#%%
+
+query_ex = {
+    "constraints": [
+        {
+            "im": 3,
+            "value_comparison": ">",
+            "value_threshold": 8.0,
+            "negate": False
+        }
+    ]
+}
+
+query_ex = {
+    "constraints": [
+        {
+            "im": 2,
+            "classes": [0,1, 2,3,4,5,6,7,8],
+            "thickness_mode": "cumulative",
+            "thickness_comparison": ">",
+            "thickness_threshold": 5.0,
+            "depth_min": 0.0,
+            "depth_max_im": 3
+        }
+    ]
+}
+
+
+P, meta = ig.query(f_post_h5, query_ex)
+ig.query_plot(P, meta, title='Water Table')
+
+
+# %% [markdown]
+# ### Example 6: Percentile query — cumulative thickness distribution
+#
+# Instead of asking "what is the *probability* that Sand+Grus exceeds X m?",
+# ask "what are the *p5, p50, p95* of the cumulative Sand+Grus thickness?".
+#
+# The query dict uses a `"metric"` key instead of `"constraints"`.
+# The thickness comparison fields are omitted — we want the raw distribution.
+
+# %%
+query_pct = {
+    "metric": {
+        "im": 2,
+        "classes": [1, 2],          # Sand and Grus
+        "thickness_mode": "cumulative",
+        "depth_min": 0.0,
+        "depth_max": 30.0
+    },
+    "percentiles": [5, 50, 95]
+}
+
+ig.save_query(query_pct, 'query_pct.json')
+
+pct_values, meta_pct = ig.query_percentile(f_post_h5, query_pct)
+# pct_values shape: (N_data, 3) — columns are P5, P50, P95
+
+p5  = pct_values[:, 0]
+p50 = pct_values[:, 1]
+p95 = pct_values[:, 2]
+print(f"Sand+Grus thickness (0-30 m) | "
+      f"P5={p5.mean():.1f} m  P50={p50.mean():.1f} m  P95={p95.mean():.1f} m  (spatial mean)")
+
+ig.query_percentile_plot(pct_values, meta_pct,
+                         query_text="Cumulative Sand+Grus thickness within 0-30 m",
+                         hardcopy='query_pct_sand_grus')
+
+
+# %% [markdown]
+# ### Example 7: Percentile query — cross-model depth bound
+#
+# P5/P50/P95 of the cumulative Sand+Grus thickness **above the water table**
+# (im=3 is a scalar model storing the water-table depth per realization).
+# `depth_max_im: 3` sets the upper depth cutoff to the water-table value of
+# each realization individually.
+
+# %%
+query_pct_wl = {
+    "metric": {
+        "im": 2,
+        "classes": [1, 2],          # Sand and Grus
+        "thickness_mode": "cumulative",
+        "depth_min": 0.0,
+        "depth_max_im": 3           # per-realization depth cutoff = Waterlevel
+    },
+    "percentiles": [5, 50, 95]
+}
+
+pct_wl, meta_pct_wl = ig.query_percentile(f_post_h5, query_pct_wl)
+
+p50_wl = pct_wl[:, 1]
+print(f"Sand+Grus above water table | P50 spatial mean = {p50_wl.mean():.1f} m")
+
+ig.query_percentile_plot(pct_wl, meta_pct_wl,
+                         query_text="Cumulative Sand+Grus thickness above water table",
+                         hardcopy='query_pct_sand_grus_above_wl')
+
 # %%

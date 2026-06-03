@@ -6,29 +6,37 @@ Query Tool
 Overview
 --------
 
-The INTEGRATE query tool computes, for each survey data point, the probability
-that the posterior realizations at that location satisfy a user-defined
-geological constraint.  Constraints express conditions such as:
+The INTEGRATE query tool evaluates geological queries against a posterior
+ensemble, returning either a **probability** or a set of **percentiles** for
+each survey data point.
 
-* *Cumulative thickness of clay exceeds 10 m within 0–30 m depth*
-* *Resistivity is below 100 Ω·m for at least 25 m within 0–50 m depth*
-* *Water table (scalar model) is shallower than 5 m*
-* *Sand and gravel above the water table together exceed 5 m*
+Two query types are supported:
 
-Queries can be written by hand as Python dicts / JSON files, or translated
-automatically from plain English using an LLM via :func:`ig.query_from_text`.
+**Probability queries** answer *"what fraction of realizations satisfy condition X?"*
 
-The primary output is a probability array ``P`` of shape ``(N_data,)`` —
-one value per survey location — together with a ``meta`` dict containing
-coordinates and the indices of matching posterior realizations.
+* *Probability that cumulative clay thickness exceeds 10 m within 0–30 m*
+* *Probability that resistivity is below 100 Ω·m for at least 25 m*
+* *Probability that the water table is shallower than 5 m*
+
+**Percentile queries** answer *"what is the p5/p50/p95 of metric X?"*
+
+* *P5/P50/P95 of cumulative Sand+Grus thickness within 0–30 m*
+* *Median thickness of Sand above the water table*
+
+Both query types can be written by hand as Python dicts / JSON files, or
+translated automatically from plain English using an LLM via
+:func:`ig.query_from_text`.
 
 
 Core Functions
 --------------
 
-* ``ig.query()`` — evaluate a query dict against a posterior file
+* ``ig.query()`` — dispatcher: routes to probability or percentile function based on dict structure
+* ``ig.query_probability()`` — probability query (fraction of realizations satisfying constraints)
+* ``ig.query_percentile()`` — percentile query (p5/p50/p95 of a metric across realizations)
 * ``ig.query_from_text()`` — translate a plain-English query to a query dict using an LLM
-* ``ig.query_plot()`` — plot the resulting probability map
+* ``ig.query_plot()`` — plot the probability map from a probability query
+* ``ig.query_percentile_plot()`` — plot one map per percentile from a percentile query
 * ``ig.save_query()`` / ``ig.load_query()`` — persist a query dict to/from JSON
 * ``ig.get_prior_model_info()`` — inspect model names, types, depth ranges, and class labels
 * ``ig.query_test_llm()`` — verify that an LLM model and API key are working
@@ -161,6 +169,39 @@ Cross-model depth bounds
     These may be combined with fixed ``depth_min`` / ``depth_max``.
 
 
+Percentile Query Format
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A percentile query has a ``"metric"`` key (instead of ``"constraints"``) and
+an optional ``"percentiles"`` key.  The metric defines *what to measure* per
+realization — the same fields as a constraint, minus the comparison fields
+(``thickness_comparison``, ``thickness_threshold``, ``negate``).
+
+.. code-block:: python
+
+    query = {
+        "metric": {
+            "im": 2,
+            "classes": [1, 2],        # Sand or Grus
+            "thickness_mode": "cumulative",
+            "depth_max": 30.0         # measure within 0–30 m
+            # depth_max_im also supported for cross-model depth bounds
+        },
+        "percentiles": [5, 50, 95]    # optional; default [5, 50, 95]
+    }
+
+:func:`ig.query()` auto-detects the query type: dicts with ``"metric"`` are
+routed to :func:`ig.query_percentile`; dicts with ``"constraints"`` are routed
+to :func:`ig.query_probability`.
+
+**Metric fields** (same as constraint fields minus comparisons):
+
+``im``, ``classes``, ``value_comparison``, ``value_threshold``,
+``thickness_mode``, ``depth_min``, ``depth_max``, ``depth_max_im``,
+``depth_min_im``.  For SCALAR models, only ``im`` is needed (no thickness
+fields).
+
+
 Saving and Loading Queries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -174,9 +215,9 @@ repeating an LLM call:
     # Save
     ig.save_query(query, 'clay_10m.json')
 
-    # Load and execute
+    # Load and execute (dispatcher routes automatically)
     query = ig.load_query('clay_10m.json')
-    P, meta = ig.query(f_post_h5, query)
+    result, meta = ig.query(f_post_h5, query)
 
 
 Running Queries
@@ -224,13 +265,15 @@ Example output::
     im=3: Waterlevel   (CONTINUOUS)  depth 0.0–0.0 m
 
 
-Executing a Query
-~~~~~~~~~~~~~~~~~
+Executing a Probability Query
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
     import integrate as ig
 
+    P, meta = ig.query_probability(f_post_h5, query)
+    # or equivalently, using the dispatcher:
     P, meta = ig.query(f_post_h5, query)
 
     print(f"N locations : {meta['N_data']}")
@@ -243,13 +286,32 @@ Executing a Query
     data point.
 
 ``meta``
-    Dict with keys:
+    Dict with keys ``'X'``, ``'Y'``, ``'N_data'``, ``'N_post'``,
+    ``'i_use'`` (all posterior indices), ``'i_use_query'`` (matching indices
+    per location).
 
-    * ``'X'``, ``'Y'`` — coordinate arrays (or ``None``)
-    * ``'N_data'``, ``'N_post'`` — number of locations and samples per location
-    * ``'i_use'`` — ``ndarray (N_data, N_post)``, all posterior indices
-    * ``'i_use_query'`` — list of ``N_data`` arrays, the subset of indices that
-      satisfy the query at each location
+
+Executing a Percentile Query
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    pct_values, meta = ig.query_percentile(f_post_h5, query)
+    # or equivalently:
+    pct_values, meta = ig.query(f_post_h5, query)
+
+    print(f"Median Sand+Grus thickness: {pct_values[:, 1].mean():.1f} m")
+
+**Returns:**
+
+``pct_values``
+    ``ndarray`` of shape ``(N_data, n_percentiles)`` — one column per
+    requested percentile, one row per survey location.
+
+``meta``
+    Dict with keys ``'X'``, ``'Y'``, ``'N_data'``, ``'N_post'``,
+    ``'i_use'``, and ``'percentiles'`` (the list of requested percentile
+    values, e.g. ``[5, 50, 95]``).
 
 
 Visualising Results
@@ -257,22 +319,27 @@ Visualising Results
 
 .. code-block:: python
 
-    # Simple probability map
+    # Probability map
     ig.query_plot(P, meta)
 
     # With query text and LLM interpretation in a side panel
-    ig.query_plot(P, meta,
-                  query_text=text,
-                  interpretation=interp,
-                  text_panel=True)
+    ig.query_plot(P, meta, query_text=text, interpretation=interp, text_panel=True)
 
-    # Save figure to disk
-    ig.query_plot(P, meta, hardcopy='clay_query')   # saves clay_query.png
+    # Save to disk
+    ig.query_plot(P, meta, hardcopy='clay_query')
 
-    # Detailed view for one data point (shows posterior models)
-    ig.query_plot(P, meta, ip=1000,
-                  query_dict=query,
-                  f_post_h5=f_post_h5)
+    # Detailed view for one data point
+    ig.query_plot(P, meta, ip=1000, query_dict=query, f_post_h5=f_post_h5)
+
+    # Percentile maps — one subplot per percentile
+    ig.query_percentile_plot(pct_values, meta)
+
+    # With text panel and hardcopy
+    ig.query_percentile_plot(pct_values, meta,
+                             query_text=text,
+                             interpretation=interp,
+                             text_panel=True,
+                             hardcopy='sand_percentiles')
 
 
 Examples
@@ -438,6 +505,58 @@ Use ``depth_min_im`` symmetrically to set a lower bound from a scalar model
 (e.g. "below the water table").
 
 
+Example 6: Percentile Query — Thickness Distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*P5, P50, P95 of the cumulative thickness of Sand and Grus within 0–30 m.*
+
+.. code-block:: python
+
+    query = {
+        "metric": {
+            "im": 2,
+            "classes": [1, 2],          # Sand or Grus
+            "thickness_mode": "cumulative",
+            "depth_min": 0.0,
+            "depth_max": 30.0
+        },
+        "percentiles": [5, 50, 95]
+    }
+
+    pct_values, meta = ig.query_percentile(f_post_h5, query)
+    # pct_values shape: (N_data, 3) — columns are P5, P50, P95
+
+    ig.query_percentile_plot(pct_values, meta)
+
+    # Access individual percentile maps
+    p50 = pct_values[:, 1]   # median cumulative thickness
+    print(f"Median Sand+Grus thickness — spatial mean: {p50.mean():.1f} m")
+
+
+Example 7: Percentile Query — Cross-Model Depth Bound
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*P5, P50, P95 of the cumulative Sand+Grus thickness above the water table.*
+
+.. code-block:: python
+
+    query = {
+        "metric": {
+            "im": 2,
+            "classes": [1, 2],
+            "thickness_mode": "cumulative",
+            "depth_min": 0.0,
+            "depth_max_im": 3           # per-realization upper bound = Waterlevel
+        },
+        "percentiles": [5, 50, 95]
+    }
+
+    pct_values, meta = ig.query_percentile(f_post_h5, query)
+    ig.query_percentile_plot(pct_values, meta,
+                             query_text="Sand+Grus thickness above water table",
+                             text_panel=True)
+
+
 LLM-Powered Query Translation
 ------------------------------
 
@@ -448,10 +567,19 @@ Overview
 translate a plain-English geological question into a valid query dict.  The
 LLM receives a structured system prompt that describes:
 
-* the constraint schema (all fields and their semantics)
+* both query types (probability and percentile) and when to use each
+* the constraint and metric field schemas
 * the available prior models for the specific prior file (names, types, depth
   ranges, class IDs)
-* worked examples covering all constraint types
+* worked examples covering all query types
+
+The LLM **auto-detects** the query type from the text:
+
+* "What is the probability that …" → probability query (returns ``"constraints"``)
+* "What are the p5/p50/p95 of …" → percentile query (returns ``"metric"`` + ``"percentiles"``)
+
+The returned ``query_dict`` is ready to pass directly to :func:`ig.query`,
+which dispatches to the correct function automatically.
 
 Any LiteLLM-supported model works: Claude, GPT-4, or a locally running Ollama
 model.
@@ -618,36 +746,49 @@ Quick Reference
 .. code-block:: python
 
     from integrate import (
-        query,               # Execute a query dict against a posterior file
-        query_from_text,     # Translate plain English → query dict via LLM
-        query_plot,          # Plot the probability map (and optional detail panel)
-        save_query,          # Save a query dict to a JSON file
-        load_query,          # Load a query dict from a JSON file
-        get_prior_model_info,# Return metadata for one prior model (name, z, classes)
-        query_test_llm,      # Verify LLM model + API key connectivity
+        query,                  # Dispatcher: routes to probability or percentile
+        query_probability,      # Probability query (fraction satisfying constraints)
+        query_percentile,       # Percentile query (p5/p50/p95 of a metric)
+        query_from_text,        # Translate plain English to query dict via LLM
+        query_plot,             # Plot probability map
+        query_percentile_plot,  # Plot one map per percentile
+        save_query,             # Save a query dict to a JSON file
+        load_query,             # Load a query dict from a JSON file
+        get_prior_model_info,   # Return metadata for one prior model
+        query_test_llm,         # Verify LLM model + API key connectivity
     )
 
 **Key signatures:**
 
 .. code-block:: python
 
-    P, meta = ig.query(f_post_h5, query_dict)
+    # Probability query
+    P, meta = ig.query_probability(f_post_h5, query_dict)
+    # meta keys: 'X', 'Y', 'N_data', 'N_post', 'i_use', 'i_use_query'
 
+    # Percentile query
+    pct_values, meta = ig.query_percentile(f_post_h5, query_dict)
+    # pct_values shape: (N_data, n_percentiles)
+    # meta adds 'percentiles' key
+
+    # Dispatcher (auto-detects from dict structure)
+    result, meta = ig.query(f_post_h5, query_dict)
+
+    # LLM translation (auto-detects probability vs percentile from text)
     query_dict, interpretation, system_prompt = ig.query_from_text(
         text, f_prior_h5,
         model='anthropic/claude-sonnet-4-6',
-        api_key=None,
-        verbose=False,
+        api_key=None, verbose=False,
     )
 
     ig.query_plot(P, meta,
-                  ip=None,
-                  query_dict=None,
-                  f_post_h5=None,
-                  query_text=None,
-                  interpretation=None,
-                  text_panel=False,
-                  hardcopy=False)
+                  ip=None, query_dict=None, f_post_h5=None,
+                  query_text=None, interpretation=None,
+                  text_panel=False, hardcopy=False)
+
+    ig.query_percentile_plot(pct_values, meta,
+                             query_text=None, interpretation=None,
+                             text_panel=False, hardcopy=False)
 
     ig.save_query(query_dict, path)
     query_dict = ig.load_query(path)

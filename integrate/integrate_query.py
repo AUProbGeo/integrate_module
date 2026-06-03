@@ -75,6 +75,67 @@ def _first_occurrence_thickness(condition, t):
     return metric
 
 
+def _compute_metric(M_samples, z, metric_def, scalar_model_values=None):
+    """
+    Compute the raw per-realization metric value for a model.
+
+    Parameters
+    ----------
+    M_samples : ndarray (N_samples, N_depth)
+        Model values for the sampled realizations.
+    z : ndarray (N_depth,)
+        Depth values [m].
+    metric_def : dict
+        Metric definition — same fields as a constraint minus comparison fields.
+        Supports: im, classes, value_comparison, value_threshold, thickness_mode,
+        depth_min, depth_max, depth_max_im, depth_min_im.
+    scalar_model_values : dict {im: ndarray (N_samples,)}, optional
+        Per-sample scalar model values for dynamic depth bounds.
+
+    Returns
+    -------
+    metric : ndarray (N_samples,)
+        For scalar models: raw model value per realization.
+        For depth models: cumulative or first-occurrence thickness [m] of
+        layers satisfying the class/value condition.
+    """
+    depth_min = metric_def.get('depth_min', None)
+    depth_max = metric_def.get('depth_max', None)
+
+    if scalar_model_values:
+        if 'depth_max_im' in metric_def:
+            depth_max = scalar_model_values.get(metric_def['depth_max_im'], depth_max)
+        if 'depth_min_im' in metric_def:
+            depth_min = scalar_model_values.get(metric_def['depth_min_im'], depth_min)
+
+    t, layer_mask = _get_clipped_thickness(z, depth_min, depth_max)
+    n_layers = len(z) - 1
+
+    # Scalar model: return the single value directly (no thickness concept)
+    if (z[-1] - z[0]) == 0 or n_layers == 0:
+        return M_samples[:, 0].copy()
+
+    if layer_mask is None:
+        M_sel = M_samples[:, :n_layers]
+        t_sel = t
+    else:
+        M_sel = M_samples[:, :n_layers][:, layer_mask]
+        t_sel = t[layer_mask]
+
+    if 'classes' in metric_def:
+        condition = np.isin(np.round(M_sel).astype(int), metric_def['classes'])
+    else:
+        v_cmp = metric_def.get('value_comparison', '<')
+        v_thr = metric_def.get('value_threshold', 0.0)
+        condition = M_sel < v_thr if v_cmp == '<' else M_sel > v_thr
+
+    mode = metric_def.get('thickness_mode', 'cumulative')
+    if mode == 'cumulative':
+        return (condition * t_sel).sum(axis=1)
+    else:
+        return _first_occurrence_thickness(condition, t_sel)
+
+
 def _evaluate_constraint(M_samples, z, constraint, scalar_model_values=None):
     """
     Evaluate one constraint for a batch of realizations.
@@ -96,128 +157,65 @@ def _evaluate_constraint(M_samples, z, constraint, scalar_model_values=None):
     valid : ndarray (N_samples,) bool
         True for each realization that satisfies the constraint.
     """
-    depth_min = constraint.get('depth_min', None)
-    depth_max = constraint.get('depth_max', None)
-
-    # Dynamic depth bounds: replace fixed scalar with per-sample values
-    if scalar_model_values:
-        if 'depth_max_im' in constraint:
-            depth_max = scalar_model_values.get(constraint['depth_max_im'], depth_max)
-        if 'depth_min_im' in constraint:
-            depth_min = scalar_model_values.get(constraint['depth_min_im'], depth_min)
-
-    t, layer_mask = _get_clipped_thickness(z, depth_min, depth_max)
-
-    # Property values per layer (column i = layer top z[i] to z[i+1])
     n_layers = len(z) - 1
+    is_scalar = (z[-1] - z[0]) == 0 or n_layers == 0
 
-    # Scalar model: depth range is zero (e.g. a water-table value — single number
-    # per realization, no thickness concept). Compare the value directly.
-    if (z[-1] - z[0]) == 0 or n_layers == 0:
-        M_val = M_samples[:, 0]
+    raw = _compute_metric(M_samples, z, constraint, scalar_model_values)
+
+    if is_scalar:
         if 'classes' in constraint:
-            valid = np.isin(np.round(M_val).astype(int), constraint['classes'])
+            valid = np.isin(np.round(raw).astype(int), constraint['classes'])
         else:
             v_cmp = constraint.get('value_comparison', '<')
             v_thr = constraint.get('value_threshold', 0.0)
-            valid = M_val < v_thr if v_cmp == '<' else M_val > v_thr
-        return ~valid if constraint.get('negate', False) else valid
-
-    if layer_mask is None:
-        # Per-sample depth bounds → 2-D t; use all layers
-        M_sel = M_samples[:, :n_layers]   # (N_samples, N_layers)
-        t_sel = t                          # (N_samples, N_layers)
+            valid = raw < v_thr if v_cmp == '<' else raw > v_thr
     else:
-        M_sel = M_samples[:, :n_layers][:, layer_mask]   # (N_samples, N_sel)
-        t_sel = t[layer_mask]                             # (N_sel,)
-
-    # Per-layer boolean condition
-    if 'classes' in constraint:
-        # Discrete: match any of the specified class IDs
-        condition = np.isin(np.round(M_sel).astype(int), constraint['classes'])
-    else:
-        # Continuous: compare value against threshold
-        v_cmp = constraint.get('value_comparison', '<')
-        v_thr = constraint.get('value_threshold', 0.0)
-        condition = M_sel < v_thr if v_cmp == '<' else M_sel > v_thr
-
-    # Compute thickness metric
-    mode = constraint.get('thickness_mode', 'cumulative')
-    if mode == 'cumulative':
-        metric = (condition * t_sel).sum(axis=1)      # (N_samples,)
-    else:  # first_occurrence
-        metric = _first_occurrence_thickness(condition, t_sel)
-
-    # Apply thickness comparison
-    t_cmp = constraint.get('thickness_comparison', '>')
-    t_thr = constraint.get('thickness_threshold', 0.0)
-    _ops = {
-        '>':  lambda m: m > t_thr,
-        '<':  lambda m: m < t_thr,
-        '>=': lambda m: m >= t_thr,
-        '<=': lambda m: m <= t_thr,
-    }
-    valid = _ops.get(t_cmp, _ops['>'])(metric)
+        t_cmp = constraint.get('thickness_comparison', '>')
+        t_thr = constraint.get('thickness_threshold', 0.0)
+        _ops = {
+            '>':  lambda m: m > t_thr,
+            '<':  lambda m: m < t_thr,
+            '>=': lambda m: m >= t_thr,
+            '<=': lambda m: m <= t_thr,
+        }
+        valid = _ops.get(t_cmp, _ops['>'])(raw)
 
     return ~valid if constraint.get('negate', False) else valid
 
 
-def query(f_post_h5, query_dict):
+def _collect_needed_ims(items):
+    """Return the set of model indices (im) referenced in a constraint list or metric dict."""
+    needed = set()
+    if isinstance(items, dict):
+        items = [items]
+    for c in items:
+        needed.add(c['im'])
+        for field in ('depth_max_im', 'depth_min_im'):
+            if field in c:
+                needed.add(c[field])
+    return needed
+
+
+def _load_query_inputs(f_post_h5, needed_ims):
     """
-    Compute per-data-point probability that posterior realizations satisfy a query.
+    Load posterior indices, coordinates, and prior model arrays.
 
     Parameters
     ----------
     f_post_h5 : str
-        Path to the posterior HDF5 file (output of integrate_rejection).
-    query_dict : str or dict
-        Path to a JSON file, or a dict defining the query.
+        Path to the posterior HDF5 file.
+    needed_ims : set of int
+        Model indices to pre-load from the prior file.
 
     Returns
     -------
-    P : ndarray (N_data,)
-        Probability [0, 1] for each data location.
-    meta : dict
-        Metadata with keys:
-
-        - 'X', 'Y' : coordinate arrays (or None)
-        - 'N_data', 'N_post' : data location count and samples per location
-        - 'i_use' : ndarray (N_data, N_post), all posterior indices from f_post_h5
-        - 'i_use_query' : list of N_data arrays, indices that match the query
-          for each data location
-
-    Notes
-    -----
-    Constraints are applied sequentially (logical AND). A realization is
-    counted as satisfying the query only if it passes every constraint.
-    The probability is the fraction of accepted realizations.
-
-    The prior file path is read from the 'f5_prior' attribute of the
-    posterior file. Coordinates (UTMX, UTMY) are read from the posterior
-    file if present, otherwise from the data file ('f5_data' attribute).
-
-    Examples
-    --------
-    >>> query_def = {
-    ...     "constraints": [{
-    ...         "im": 2, "classes": [2],
-    ...         "thickness_mode": "cumulative",
-    ...         "thickness_comparison": ">",
-    ...         "thickness_threshold": 10.0,
-    ...         "depth_min": 0.0, "depth_max": 30.0, "negate": False
-    ...     }]
-    ... }
-    >>> P, meta = query('f_post.h5', query_def)
+    i_use : ndarray (N_data, N_post)
+    X, Y : ndarray or None
+    prior_models : dict {im: (M, z, is_discrete)}
+    N_data, N_post : int
     """
-    if isinstance(query_dict, str):
-        with open(query_dict, 'r') as fh:
-            query_dict = json.load(fh)
-
-    constraints = query_dict['constraints']
-
-    # Load posterior metadata and acceptance indices
     with h5py.File(f_post_h5, 'r') as f:
-        i_use = f['i_use'][:]                          # (N_data, N_post)
+        i_use = f['i_use'][:]
         f_prior_h5 = str(f.attrs.get('f5_prior', ''))
         f_data_h5 = str(f.attrs.get('f5_data', ''))
         X = f['UTMX'][:] if 'UTMX' in f else None
@@ -228,7 +226,6 @@ def query(f_post_h5, query_dict):
     if not os.path.isfile(f_prior_h5):
         raise FileNotFoundError(f"Prior file not found: {f_prior_h5}")
 
-    # Fall back to data file for coordinates if needed
     if (X is None or Y is None) and f_data_h5 and os.path.isfile(f_data_h5):
         with h5py.File(f_data_h5, 'r') as f:
             if X is None and 'UTMX' in f:
@@ -238,56 +235,179 @@ def query(f_post_h5, query_dict):
 
     N_data, N_post = i_use.shape
 
-    # Pre-load all required prior model arrays (once per model index)
     prior_models = {}
-    for c in constraints:
-        im = c['im']
-        if im not in prior_models:
-            key = f'M{im}'
-            with h5py.File(f_prior_h5, 'r') as f:
-                M = f[key][:]
-                z = f[key].attrs['x'].astype(float)
-                is_discrete = bool(f[key].attrs.get('is_discrete', 0))
-            prior_models[im] = (M, z, is_discrete)
-        # Also load any scalar models referenced as dynamic depth bounds
-        for field in ('depth_max_im', 'depth_min_im'):
-            im_ref = c.get(field)
-            if im_ref is not None and im_ref not in prior_models:
-                key = f'M{im_ref}'
-                with h5py.File(f_prior_h5, 'r') as f:
-                    M_ref = f[key][:]
-                    z_ref = f[key].attrs['x'].astype(float)
-                    is_discrete_ref = bool(f[key].attrs.get('is_discrete', 0))
-                prior_models[im_ref] = (M_ref, z_ref, is_discrete_ref)
+    for im in needed_ims:
+        key = f'M{im}'
+        with h5py.File(f_prior_h5, 'r') as f:
+            M = f[key][:]
+            z = f[key].attrs['x'].astype(float)
+            is_discrete = bool(f[key].attrs.get('is_discrete', 0))
+        prior_models[im] = (M, z, is_discrete)
 
-    # Evaluate constraints for each data location
+    return i_use, X, Y, prior_models, N_data, N_post
+
+
+def _build_scalar_vals(prior_models, idx):
+    """Return per-sample values for all scalar models in prior_models."""
+    scalar_vals = {}
+    for im_s, (M_s, z_s, _) in prior_models.items():
+        if (z_s[-1] - z_s[0]) == 0 or len(z_s) - 1 == 0:
+            scalar_vals[im_s] = M_s[idx, 0]
+    return scalar_vals
+
+
+def query_probability(f_post_h5, query_dict):
+    """
+    Compute per-data-point probability that posterior realizations satisfy a query.
+
+    Parameters
+    ----------
+    f_post_h5 : str
+        Path to the posterior HDF5 file.
+    query_dict : str or dict
+        Path to a JSON file, or a dict with a ``"constraints"`` key.
+
+    Returns
+    -------
+    P : ndarray (N_data,)
+        Probability [0, 1] for each data location.
+    meta : dict
+        Keys: 'X', 'Y', 'N_data', 'N_post', 'i_use', 'i_use_query'.
+
+    Examples
+    --------
+    >>> query_def = {
+    ...     "constraints": [{
+    ...         "im": 2, "classes": [2],
+    ...         "thickness_mode": "cumulative",
+    ...         "thickness_comparison": ">",
+    ...         "thickness_threshold": 10.0,
+    ...         "depth_min": 0.0, "depth_max": 30.0
+    ...     }]
+    ... }
+    >>> P, meta = query_probability('f_post.h5', query_def)
+    """
+    if isinstance(query_dict, str):
+        with open(query_dict, 'r') as fh:
+            query_dict = json.load(fh)
+
+    constraints = query_dict['constraints']
+    needed_ims = _collect_needed_ims(constraints)
+    i_use, X, Y, prior_models, N_data, N_post = _load_query_inputs(f_post_h5, needed_ims)
+
     P = np.zeros(N_data)
     i_use_query = []
-    for i in tqdm(range(N_data), desc='Evaluating query', unit='location'):
-        idx = i_use[i]                             # (N_post,) indices into prior
+    for i in tqdm(range(N_data), desc='Evaluating probability query', unit='location'):
+        idx = i_use[i]
         valid = np.ones(N_post, dtype=bool)
-
-        # Build per-sample values for scalar models (used as dynamic depth bounds)
-        scalar_vals = {}
-        for im_s, (M_s, z_s, _) in prior_models.items():
-            if (z_s[-1] - z_s[0]) == 0 or len(z_s) - 1 == 0:
-                scalar_vals[im_s] = M_s[idx, 0]   # (N_post,)
-
+        scalar_vals = _build_scalar_vals(prior_models, idx)
         for c in constraints:
             M, z, _ = prior_models[c['im']]
             valid &= _evaluate_constraint(M[idx, :], z, c, scalar_model_values=scalar_vals)
         P[i] = valid.mean()
-        i_use_query.append(idx[valid])             # Store matching indices
+        i_use_query.append(idx[valid])
 
     meta = {
-        'X': X,
-        'Y': Y,
-        'N_data': N_data,
-        'N_post': N_post,
-        'i_use': i_use,
-        'i_use_query': i_use_query
+        'X': X, 'Y': Y,
+        'N_data': N_data, 'N_post': N_post,
+        'i_use': i_use, 'i_use_query': i_use_query,
     }
     return P, meta
+
+
+def query_percentile(f_post_h5, query_dict):
+    """
+    Compute per-data-point percentiles of a metric over posterior realizations.
+
+    Rather than asking "what fraction of realizations satisfy condition X?", this
+    asks "what is the p5/p50/p95 of metric X across realizations?".  The metric
+    is defined by the same fields as a probability constraint, minus the comparison
+    fields (``thickness_comparison``, ``thickness_threshold``, ``negate``).
+
+    Parameters
+    ----------
+    f_post_h5 : str
+        Path to the posterior HDF5 file.
+    query_dict : str or dict
+        Path to a JSON file, or a dict with a ``"metric"`` key and an optional
+        ``"percentiles"`` key (default ``[5, 50, 95]``).
+
+    Returns
+    -------
+    percentile_values : ndarray (N_data, n_percentiles)
+        Requested percentile values for each data location.
+    meta : dict
+        Keys: 'X', 'Y', 'N_data', 'N_post', 'i_use', 'percentiles'.
+
+    Examples
+    --------
+    >>> query_def = {
+    ...     "metric": {
+    ...         "im": 2, "classes": [1, 2],
+    ...         "thickness_mode": "cumulative",
+    ...         "depth_max": 30.0
+    ...     },
+    ...     "percentiles": [5, 50, 95]
+    ... }
+    >>> pct_values, meta = query_percentile('f_post.h5', query_def)
+    >>> # pct_values shape: (N_data, 3) — p5, p50, p95 per location
+    """
+    if isinstance(query_dict, str):
+        with open(query_dict, 'r') as fh:
+            query_dict = json.load(fh)
+
+    metric_def = query_dict['metric']
+    percentiles = query_dict.get('percentiles', [5, 50, 95])
+    needed_ims = _collect_needed_ims(metric_def)
+    i_use, X, Y, prior_models, N_data, N_post = _load_query_inputs(f_post_h5, needed_ims)
+
+    M_main, z_main, _ = prior_models[metric_def['im']]
+    n_pct = len(percentiles)
+    result = np.zeros((N_data, n_pct))
+
+    for i in tqdm(range(N_data), desc='Evaluating percentile query', unit='location'):
+        idx = i_use[i]
+        scalar_vals = _build_scalar_vals(prior_models, idx)
+        values = _compute_metric(M_main[idx, :], z_main, metric_def,
+                                 scalar_model_values=scalar_vals)
+        result[i, :] = np.percentile(values, percentiles)
+
+    meta = {
+        'X': X, 'Y': Y,
+        'N_data': N_data, 'N_post': N_post,
+        'i_use': i_use,
+        'percentiles': percentiles,
+    }
+    return result, meta
+
+
+def query(f_post_h5, query_dict):
+    """
+    Dispatcher: route to query_probability() or query_percentile() based on query_dict.
+
+    If ``query_dict`` contains a ``"metric"`` key, calls :func:`query_percentile`.
+    Otherwise calls :func:`query_probability` (backward compatible with all existing
+    ``"constraints"``-based dicts).
+
+    Parameters
+    ----------
+    f_post_h5 : str
+        Path to the posterior HDF5 file.
+    query_dict : str or dict
+        Query definition.  See :func:`query_probability` and
+        :func:`query_percentile` for the respective schemas.
+
+    Returns
+    -------
+    result, meta
+        See the delegated function for details.
+    """
+    if isinstance(query_dict, str):
+        with open(query_dict, 'r') as fh:
+            query_dict = json.load(fh)
+    if 'metric' in query_dict:
+        return query_percentile(f_post_h5, query_dict)
+    return query_probability(f_post_h5, query_dict)
 
 
 def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=None, title=None,
@@ -549,6 +669,91 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     plt.show()
 
 
+def query_percentile_plot(percentile_values, meta, query_text=None, interpretation=None,
+                          text_panel=False, hardcopy=False):
+    """
+    Plot one probability map per requested percentile as side-by-side subplots.
+
+    Parameters
+    ----------
+    percentile_values : ndarray (N_data, n_percentiles)
+        Output of query_percentile().
+    meta : dict
+        Metadata dict from query_percentile() containing 'X', 'Y', 'percentiles'.
+    query_text : str, optional
+        Original query string — shown as figure suptitle.
+    interpretation : str, optional
+        LLM interpretation string — shown below query_text if provided.
+    text_panel : bool, optional
+        If True, add a narrow text column to the right of the maps.
+    hardcopy : bool or str, optional
+        Save figure to disk.  True → 'query_percentile_plot.png'; a string is
+        used as the filename (.png appended if no extension).
+
+    Returns
+    -------
+    fig : matplotlib Figure
+    """
+    import matplotlib.pyplot as plt
+
+    percentiles = meta.get('percentiles', [5, 50, 95])
+    n_pct = len(percentiles)
+    X = meta.get('X')
+    Y = meta.get('Y')
+
+    ncols = n_pct + (1 if text_panel else 0)
+    width_ratios = [4] * n_pct + ([1.5] if text_panel else [])
+    fig, axes = plt.subplots(1, ncols, figsize=(4.5 * n_pct + (1.5 if text_panel else 0), 5),
+                             gridspec_kw={'width_ratios': width_ratios} if text_panel else {},
+                             squeeze=False)
+
+    map_axes = axes[0, :n_pct]
+    vmin = percentile_values.min()
+    vmax = percentile_values.max()
+
+    for k, (pct, ax) in enumerate(zip(percentiles, map_axes)):
+        vals = percentile_values[:, k]
+        if X is not None and Y is not None:
+            sc = ax.scatter(X, Y, c=vals, s=5, cmap='viridis', vmin=vmin, vmax=vmax)
+            plt.colorbar(sc, ax=ax, shrink=0.8, label='[m]')
+            ax.set_aspect('equal', 'datalim')
+            ax.set_xlabel('UTMX')
+            if k == 0:
+                ax.set_ylabel('UTMY')
+        else:
+            ax.plot(vals)
+            ax.set_xlabel('Location index')
+        ax.set_title(f'P{pct}  (median={np.median(vals):.1f})')
+
+    if text_panel:
+        tax = axes[0, n_pct]
+        tax.axis('off')
+        txt = ''
+        if query_text:
+            txt += f'Query:\n{query_text}\n\n'
+        if interpretation:
+            txt += f'Interpretation:\n{interpretation}'
+        if txt:
+            tax.text(0.05, 0.95, txt, transform=tax.transAxes,
+                     fontsize=7, va='top', wrap=True)
+
+    suptitle_parts = [t for t in [query_text, interpretation] if t]
+    if suptitle_parts and not text_panel:
+        fig.suptitle('\n'.join(suptitle_parts), fontsize=8, y=1.01)
+
+    plt.tight_layout()
+
+    if hardcopy:
+        fname = hardcopy if isinstance(hardcopy, str) else 'query_percentile_plot'
+        if '.' not in os.path.basename(fname):
+            fname += '.png'
+        plt.savefig(fname, bbox_inches='tight', dpi=150)
+        print(f"Figure saved to {fname}")
+
+    plt.show()
+    return fig
+
+
 def save_query(query, path):
     """
     Save a query dict to a JSON file.
@@ -674,18 +879,43 @@ def _build_llm_system_prompt(f_prior_h5):
 Your task is to translate a natural-language query about geological or geophysical properties
 into a valid JSON query dict that can be executed by the query() function.
 
+## Query types
+
+Choose the query type based on the user's intent:
+
+**"probability"** — the user asks for a probability, likelihood, or yes/no fraction.
+  Example: "What is the probability that clay thickness exceeds 10 m?"
+  Response includes "query_type": "probability" and a "constraints" list.
+
+**"percentile"** — the user asks for a distribution, typical value, or p5/p50/p95.
+  Example: "What are the p5, p50, p95 of the cumulative thickness of sand above 10 m depth?"
+  Response includes "query_type": "percentile", a single "metric" object, and a "percentiles" list.
+
 ## Response format
 
-You must always respond with a single JSON object containing exactly two top-level keys:
-- "interpretation": a one- or two-sentence plain English confirmation of what you understood
-  the query to mean and how you translated it. Be specific: name the classes/thresholds used.
-- "constraints": the list of constraint objects (see below).
+You must always respond with a single JSON object. Required top-level keys:
+- "interpretation": 1–2 sentence plain-English confirmation of what you understood.
+- "query_type": either "probability" or "percentile".
+- For probability: "constraints" (list of constraint objects — see below).
+- For percentile: "metric" (a single metric object — see below) and "percentiles" (list of ints,
+  default [5, 50, 95] if not specified by the user).
 
-Example response structure:
+Probability response structure:
 ```json
 {{
-  "interpretation": "Probability that the cumulative thickness of clay (class 2) exceeds 10 m within 0–30 m depth.",
+  "interpretation": "...",
+  "query_type": "probability",
   "constraints": [ {{ ... }} ]
+}}
+```
+
+Percentile response structure:
+```json
+{{
+  "interpretation": "...",
+  "query_type": "percentile",
+  "metric": {{ ... }},
+  "percentiles": [5, 50, 95]
 }}
 ```
 
@@ -732,11 +962,31 @@ These store a single value per realization, not a depth profile. For scalar mode
 
 ## Examples
 
+## Metric fields (for percentile queries)
+
+A metric object defines WHAT to measure per realization (no comparison or threshold).
+It uses the same fields as a constraint, minus: thickness_comparison, thickness_threshold, negate.
+
+| Field            | Type      | Required          | Valid values                        | Description                                   |
+|------------------|-----------|-------------------|-------------------------------------|-----------------------------------------------|
+| im               | int       | always            | 1, 2, 3, ...                        | Prior model index                             |
+| classes          | list[int] | DISCRETE only     | class IDs from the model            | Thickness of these classes is measured        |
+| value_comparison | str       | CONTINUOUS only   | "<" or ">"                          | Condition on value before measuring thickness |
+| value_threshold  | float     | CONTINUOUS only   | any float                           | Threshold for the value condition             |
+| thickness_mode   | str       | depth models only | "cumulative" or "first_occurrence"  | How to aggregate thickness                    |
+| depth_min        | float     | optional          | any float                           | Upper depth boundary [m]                      |
+| depth_max        | float     | optional          | any float                           | Lower depth boundary [m]                      |
+| depth_max_im     | int       | optional          | SCALAR model im                     | Per-realization depth_max from scalar model   |
+| depth_min_im     | int       | optional          | SCALAR model im                     | Per-realization depth_min from scalar model   |
+
+For SCALAR models used as a metric: returns the raw scalar value; no thickness fields needed.
+
 ### Example 1: Discrete cumulative constraint
 Query: "Probability that cumulative clay thickness exceeds 10 m within 0–30 m depth"
 ```json
 {{
   "interpretation": "Probability that the cumulative thickness of clay (class 2) exceeds 10 m within 0–30 m depth.",
+  "query_type": "probability",
   "constraints": [
     {{
       "im": 2,
@@ -757,6 +1007,7 @@ Query: "Probability that resistivity is below 100 ohm-m for at least 25 m within
 ```json
 {{
   "interpretation": "Probability that resistivity (im=1) is below 100 ohm-m for a cumulative thickness of at least 25 m within 0–50 m depth.",
+  "query_type": "probability",
   "constraints": [
     {{
       "im": 1,
@@ -778,6 +1029,7 @@ Query: "Probability that clay > 5 m within 0–20 m AND resistivity > 500 ohm-m 
 ```json
 {{
   "interpretation": "Probability that cumulative clay (class 2) thickness exceeds 5 m within 0–20 m AND resistivity (im=1) exceeds 500 ohm-m for at least 1 m within 20–60 m. Both constraints must hold simultaneously.",
+  "query_type": "probability",
   "constraints": [
     {{
       "im": 2,
@@ -809,6 +1061,7 @@ Query: "Probability that the first occurrence of clay at the surface is less tha
 ```json
 {{
   "interpretation": "Probability that the first contiguous block of clay (class 2) starting from the surface is less than 3 m thick, within 0–30 m depth.",
+  "query_type": "probability",
   "constraints": [
     {{
       "im": 2,
@@ -829,6 +1082,7 @@ Query: "Probability that the water table is shallower than 5 m"
 ```json
 {{
   "interpretation": "Probability that the water table depth (im=3, SCALAR) is less than 5 m.",
+  "query_type": "probability",
   "constraints": [
     {{
       "im": 3,
@@ -845,6 +1099,7 @@ Query: "Probability that Sand and Grus have a cumulative thickness above the wat
 ```json
 {{
   "interpretation": "Probability that Sand (class 1) and Grus (class 2) have a cumulative thickness exceeding 5 m within the zone above the water table (im=3), starting from the surface.",
+  "query_type": "probability",
   "constraints": [
     {{
       "im": 2,
@@ -860,10 +1115,44 @@ Query: "Probability that Sand and Grus have a cumulative thickness above the wat
 }}
 ```
 
+### Example 7: Percentile query — thickness distribution
+Query: "What are the p5, p50, and p95 of the cumulative thickness of Sand and Grus within 0 to 30 m depth?"
+```json
+{{
+  "interpretation": "P5/P50/P95 of the cumulative thickness of Sand (class 1) and Grus (class 2) within 0–30 m depth.",
+  "query_type": "percentile",
+  "metric": {{
+    "im": 2,
+    "classes": [1, 2],
+    "thickness_mode": "cumulative",
+    "depth_min": 0.0,
+    "depth_max": 30.0
+  }},
+  "percentiles": [5, 50, 95]
+}}
+```
+
+### Example 8: Percentile query — cross-model depth bound
+Query: "What is the typical (median) thickness of Sand and Grus above the water table?"
+```json
+{{
+  "interpretation": "P5/P50/P95 of the cumulative thickness of Sand (class 1) and Grus (class 2) above the water table (depth bounded per realization by im=3).",
+  "query_type": "percentile",
+  "metric": {{
+    "im": 2,
+    "classes": [1, 2],
+    "thickness_mode": "cumulative",
+    "depth_min": 0.0,
+    "depth_max_im": 3
+  }},
+  "percentiles": [5, 50, 95]
+}}
+```
+
 ## Instructions
 
-- Respond with ONLY a valid JSON object with keys "interpretation" and "constraints". No markdown fences, no extra commentary.
-- Keep the "interpretation" field to 1–2 sentences.
+- Respond with ONLY a valid JSON object. No markdown fences, no extra commentary.
+- Always include "interpretation" (1–2 sentences) and "query_type" ("probability" or "percentile").
 - Use only the model indices (im) and class IDs listed under Available Prior Models above.
 - If the query cannot be expressed with the available schema and models, respond with exactly:
   UNSUPPORTED: <brief reason>
@@ -1021,9 +1310,20 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
             )
 
     interpretation = parsed.pop('interpretation', '')
+    query_type = parsed.pop('query_type', 'probability')
     print(f"Interpretation: {interpretation}")
 
-    return parsed, interpretation, system_prompt
+    # Build the canonical query dict based on query_type
+    if query_type == 'percentile':
+        query_dict = {
+            'metric': parsed.get('metric', {}),
+            'percentiles': parsed.get('percentiles', [5, 50, 95]),
+        }
+    else:
+        # probability (default, backward compatible)
+        query_dict = {'constraints': parsed.get('constraints', [])}
+
+    return query_dict, interpretation, system_prompt
 
 
 def query_test_llm(model='anthropic/claude-sonnet-4-6', api_key=None, verbose=1):

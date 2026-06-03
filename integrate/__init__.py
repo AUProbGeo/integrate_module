@@ -120,7 +120,10 @@ from integrate.integrate_borehole import save_borehole_data
 
 # Import query functions
 from integrate.integrate_query import query
+from integrate.integrate_query import query_probability
+from integrate.integrate_query import query_percentile
 from integrate.integrate_query import query_plot
+from integrate.integrate_query import query_percentile_plot
 from integrate.integrate_query import save_query
 from integrate.integrate_query import load_query
 from integrate.integrate_query import get_prior_model_info
