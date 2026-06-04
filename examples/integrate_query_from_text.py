@@ -355,7 +355,7 @@ ig.query_percentile_plot(pct10b, meta10b, query_text=text10b, interpretation=int
 thick95 = pct10b[:, 2] - pct10b[:, 0]
 ig.plot_xy(thick95, f_data_h5=f_data_h5,
            cmap='hot_r',
-           title='P97.5 − P2.5 raw-material thickness above water table (m)',
+           title='95\\% confidence raw-material thickness above water table (m)',
            colorbar_label='Thickness uncertainty [m]', s=1)
 
 # %%

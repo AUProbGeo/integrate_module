@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 2_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 
 # %% [markdown]
@@ -80,6 +80,7 @@ for file_xlsx in f_xlsx_files:
 f_prior_h5 = ig.merge_prior(f_prior_h5_list, f_prior_merged_h5='daugaard_merged_prior_N%d.h5' % N)
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 
+# %% 
 ig.prior_describe(f_prior_h5)
 
 # %% [markdown]
@@ -317,12 +318,12 @@ for id_use in id_use_arr:
 
 # %%
 for f_post_h5 in f_post_h5_list:
-    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,std_min = 0.5, std_max = 0.6)
+    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,logstd_min = 0.5, logstd_max = 0.6)
     ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
 
 # %%
 for f_post_h5 in f_post_h5_list:
-    ig.plot_feature_2d(f_post_h5, key='Median', im=1, elevation=40)
+    ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=40)
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     plt.legend()    
     plt.show()
@@ -333,6 +334,7 @@ for f_post_h5 in f_post_h5_list:
     plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     plt.legend()    
     plt.show()
+
 
 
 # %% [markdown]
