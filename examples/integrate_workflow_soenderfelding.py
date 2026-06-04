@@ -31,7 +31,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-#N = 1_000 # Smaller N for testing
+#2N = 1_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -253,8 +253,8 @@ for i in [0]:
     f_prior_h5 = f_prior_sub[i]
 
     id_borehole_list = []
-    #for BH in tqdm.tqdm(BHOLES, desc="Processing boreholes"):
-    for BH in [BHOLES[25]]:
+    for BH in tqdm.tqdm(BHOLES, desc="Processing boreholes"):
+    #for BH in [BHOLES[25]]:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
             im_prior=im_prior, 
@@ -281,7 +281,7 @@ for i in [0]:
 #
 
 # %%
-# This prt of the can be rerun using different selection of data types without rerunning the abobe parts
+# 
 nr=1000
 T_N_above=50
 T_P_acc_level=0.2 
