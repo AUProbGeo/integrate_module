@@ -290,8 +290,8 @@ id_use_arr.append([1]) # tTEM
 #id_use_arr.append([2,3]) # Well 1,2
 #id_use_arr.append([2,3]) # Well 1,2
 #id_use_arr.append([1,2,3]) # tTEM, Well 1,2
-id_use_arr.append([2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels
 id_use_arr.append([1,2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels + tTEM
+id_use_arr.append([2,3,4,5,6,7,8,9,10,11,12,13]) # All 12 borehole data channels
 
 N_use = N
 f_post_h5_list = []
@@ -393,6 +393,10 @@ else:
 for f_post_h5 in f_post_h5_list:
     # Compute the probability of the query being satisfied for each model realization in the posterior, and get metadata about the query results (e.g. which realizations satisfy the query, etc.)
     P, meta = ig.query(f_post_h5, query)
+    query_title = ig.title_from_json(query, f_prior_h5)
     #  Plot the predicted probability map, and the the outcome at the borehole locations (which should be close to 1 since the query is based on the borehole data)
-    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5)
-    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5)
+    ig.query_plot(P, meta, query_dict=query, title = query_title, f_post_h5=f_post_h5)
+    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, title = query_title, f_post_h5=f_post_h5)
+    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, title = query_title, f_post_h5=f_post_h5)
+
+# %%
