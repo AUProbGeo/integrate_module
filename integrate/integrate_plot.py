@@ -2187,6 +2187,15 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     std_max : float, optional
         Maximum std for transparency normalization; values above render with maximum
         transparency. Default is ``0.6 * np.nanmax(Std)``.
+    logstd_min : float, optional
+        Like ``std_min`` but in log10(Std) space. When provided (together with or
+        instead of ``logstd_max``), the normalisation is performed on ``log10(Std)``
+        rather than raw ``Std``. Useful for log-scale data such as resistivity where
+        the std spans several orders of magnitude.
+        Example: ``logstd_min=1.0`` → opaque below std=10.
+    logstd_max : float, optional
+        Like ``std_max`` but in log10(Std) space.
+        Example: ``logstd_max=2.5`` → fully transparent above std=316.
     show_n_unique : bool, optional
         If True, adds a plot of unique realizations in the stats panel (default False).
     plot_kl : bool, optional
@@ -2369,27 +2378,26 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     # Then apply alpha scaling: alpha * normalized_Std
     A = np.ones(Std.shape)  # Start with fully opaque (alpha=1)
     if alpha > 0:
-        # Normalize Std to [0, 1] based on min/max of Std values
-        std_min = kwargs.get('std_min',np.nanmin(Std))
-        std_max = kwargs.get('std_max',0.6*np.nanmax(Std))
-        #std_min = np.nanmin(Std)
-        #std_max = 0.6*np.nanmax(Std)
-        #std_max = 1
-        #std_max = .5
-        if std_max > std_min:
-            Std_normalized = (Std - std_min) / (std_max - std_min)
-        else:
-            Std_normalized = np.zeros_like(Std)
+        logstd_min = kwargs.get('logstd_min', None)
+        logstd_max = kwargs.get('logstd_max', None)
 
-        Std_normalized[Std_normalized<0]=0
-        Std_normalized[Std_normalized>1]=1
+        if logstd_min is not None or logstd_max is not None:
+            # Normalise using the LogStd already stored in the posterior file
+            # (same values shown in the second subplot) — values are typically 0–1
+            _log_std = LogStd if LogStd is not None else np.log10(np.where(Std > 0, Std, np.nan))
+            lo = logstd_min if logstd_min is not None else np.nanmin(_log_std)
+            hi = logstd_max if logstd_max is not None else np.nanmax(_log_std)
+            Std_normalized = (_log_std - lo) / (hi - lo) if hi > lo else np.zeros_like(_log_std)
+        else:
+            # Normalise in linear Std space (default)
+            std_min = kwargs.get('std_min', np.nanmin(Std))
+            std_max = kwargs.get('std_max', 0.6 * np.nanmax(Std))
+            Std_normalized = (Std - std_min) / (std_max - std_min) if std_max > std_min else np.zeros_like(Std)
+
+        Std_normalized = np.clip(Std_normalized, 0, 1)
 
         # Apply alpha scaling: higher uncertainty = more transparent
-        # A = 1 - alpha * Std_normalized
-        # When Std=std_min (low uncertainty): A=1 (opaque)
-        # When Std=std_max (high uncertainty): A=1-alpha (transparent)
         A = 1 - alpha * Std_normalized
-        print(np.nanmin(A))
         print(np.nanmax(A))
     
     nm = Mean.shape[0]
