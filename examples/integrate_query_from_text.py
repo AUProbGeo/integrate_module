@@ -351,3 +351,11 @@ print(f"Percentiles: {meta10b['percentiles']}  —  result shape: {pct10b.shape}
 ig.query_percentile_plot(pct10b, meta10b, query_text=text10b, interpretation=interp10b,
                          text_panel=True,
                          hardcopy="query10b_%s" % MODEL.replace("/", "_"))
+
+thick95 = pct10b[:, 2] - pct10b[:, 0]
+ig.plot_xy(thick95, f_data_h5=f_data_h5,
+           cmap='hot_r',
+           title='P97.5 − P2.5 raw-material thickness above water table (m)',
+           colorbar_label='Thickness uncertainty [m]', s=1)
+
+# %%

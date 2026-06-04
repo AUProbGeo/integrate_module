@@ -486,30 +486,33 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     else:
         fig, ax = plt.subplots(figsize=(8, 6))
 
-    # Plot black dots underneath to make P=0 (white) visible
-    ax.scatter(X, Y, c='black', s=2, alpha=0.5)
-    sc = ax.scatter(X, Y, c=P, cmap='hot_r', vmin=0, vmax=1, s=1)
-    if ip is not None and X is not None and Y is not None:
-        ax.plot(X[ip], Y[ip], 'kx', markersize=12, markeredgewidth=2, label=f'Point {ip}')
-        ax.legend()
-    plt.colorbar(sc, ax=ax, label='Probability')
-    ax.set_xlabel('UTMX [m]')
-    ax.set_ylabel('UTMY [m]')
+    # Determine title
     if has_text:
-        ax.set_title('Query Probability Map')
+        _title = 'Query Probability Map'
     elif title is not None:
-        ax.set_title(title)
+        _title = title
     elif query_text is not None or interpretation is not None:
         parts = []
         if query_text is not None:
             parts.append(f"Query: {query_text}")
         if interpretation is not None:
             parts.append(f"Interpreted as: {interpretation}")
-        ax.set_title('\n'.join(parts), fontsize=9)
+        _title = '\n'.join(parts)
     else:
-        ax.set_title('Query Probability Map')
-    ax.set_aspect('equal')
-    ax.grid(True, linestyle='--', alpha=0.5)
+        _title = 'Query Probability Map'
+
+    # Background dots so P=0 (white) areas are visible, then probability scatter
+    from integrate.integrate_plot import plot_xy
+    ax.scatter(X, Y, c='black', s=2, alpha=0.5)
+    _, ax, sc = plot_xy(P, X=X, Y=Y,
+                        cmap='hot_r', clim=[0, 1],
+                        title=_title, colorbar=True, colorbar_label='Probability',
+                        ax=ax, s=1)
+    ax.set_xlabel('UTMX [m]')
+    ax.set_ylabel('UTMY [m]')
+    if ip is not None and X is not None and Y is not None:
+        ax.plot(X[ip], Y[ip], 'kx', markersize=12, markeredgewidth=2, label=f'Point {ip}')
+        ax.legend()
 
     if has_text:
         import textwrap
@@ -711,12 +714,14 @@ def query_percentile_plot(percentile_values, meta, query_text=None, interpretati
     vmin = percentile_values.min()
     vmax = percentile_values.max()
 
+    from integrate.integrate_plot import plot_xy
     for k, (pct, ax) in enumerate(zip(percentiles, map_axes)):
         vals = percentile_values[:, k]
         if X is not None and Y is not None:
-            sc = ax.scatter(X, Y, c=vals, s=5, cmap='viridis', vmin=vmin, vmax=vmax)
-            plt.colorbar(sc, ax=ax, shrink=0.8, label='[m]')
-            ax.set_aspect('equal', 'datalim')
+            _, ax, _ = plot_xy(vals, X=X, Y=Y,
+                               cmap='viridis', clim=[vmin, vmax],
+                               colorbar=True, colorbar_label='[m]',
+                               ax=ax, s=5)
             ax.set_xlabel('UTMX')
             if k == 0:
                 ax.set_ylabel('UTMY')

@@ -244,6 +244,171 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
     return cmap, clim
 
 
+def plot_xy(values, X=None, Y=None,
+            f_data_h5=None, f_post_h5=None,
+            im=None, f_prior_h5=None,
+            cmap=None, clim=None, uselog=False,
+            title=None, colorbar=True, colorbar_label=None,
+            colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
+            ax=None, s=5, hardcopy=False, **kwargs):
+    """
+    Core 2D scatter map: plot any array of values at survey (X, Y) locations.
+
+    This is the backbone for all 2D spatial scatter plots in INTEGRATE.
+    X and Y are resolved from keyword arguments in priority order:
+
+    1. ``X`` / ``Y`` passed directly.
+    2. ``f_data_h5`` → ``get_geometry(f_data_h5)``.
+    3. ``f_post_h5`` → ``get_geometry(f_post_h5)`` (auto-follows ``f5_data`` attr).
+
+    Colormap and color limits are resolved in priority order:
+
+    1. Explicit ``cmap`` / ``clim`` parameters.
+    2. ``im`` + ``f_prior_h5`` → read from ``/M{im}`` attributes via
+       :func:`h5_get_clim_cmap`.
+    3. Fallback: :func:`get_colormap_and_limits` ``('default')`` / matplotlib
+       auto-scale.
+
+    Parameters
+    ----------
+    values : array-like, shape (N,)
+        Per-location colour values.
+    X : array-like, optional
+        UTM-X coordinates (m). Required unless ``f_data_h5`` or ``f_post_h5``
+        is provided.
+    Y : array-like, optional
+        UTM-Y coordinates (m). Required unless ``f_data_h5`` or ``f_post_h5``
+        is provided.
+    f_data_h5 : str, optional
+        Path to DATA.h5; X/Y extracted via :func:`get_geometry`.
+    f_post_h5 : str, optional
+        Path to POST.h5; X/Y extracted via :func:`get_geometry` (follows the
+        ``f5_data`` attribute to the source data file).
+    im : int, optional
+        Model parameter index (e.g. 1 for ``/M1``). Used together with
+        ``f_prior_h5`` to read colormap and limits from the prior model.
+    f_prior_h5 : str, optional
+        Path to PRIOR.h5. Used together with ``im`` to read ``cmap``/``clim``.
+    cmap : colormap, optional
+        Matplotlib colormap. Overrides prior-model lookup.
+    clim : list [min, max], optional
+        Color limits. Overrides prior-model lookup.
+    uselog : bool, optional
+        Apply ``LogNorm`` normalisation (default ``False``).
+    title : str, optional
+        Axes title.
+    colorbar : bool, optional
+        Add a colorbar (default ``True``).
+    colorbar_label : str, optional
+        Label for the colorbar.
+    colorbar_ticks : array-like, optional
+        Custom tick positions on the colorbar (useful for discrete data).
+    colorbar_ticklabels : array-like, optional
+        Custom tick labels matching ``colorbar_ticks``.
+    colorbar_invert : bool, optional
+        Invert the colorbar y-axis (default ``False``).
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. If ``None``, a new figure is created sized to the
+        aspect ratio of the data extent.
+    s : float, optional
+        Marker size for scatter (default 5).
+    hardcopy : bool or str, optional
+        If ``True``, save to an auto-named PNG. If a string, use it as the
+        filename (extension added if missing).
+    **kwargs
+        Forwarded to ``ax.scatter()``.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    ax : matplotlib.axes.Axes
+    sc : matplotlib.collections.PathCollection
+        The scatter collection returned by ``ax.scatter()``.
+
+    Examples
+    --------
+    >>> fig, ax, sc = ig.plot_xy(P, f_post_h5='POST.h5')
+    >>> fig, ax, sc = ig.plot_xy(rho[:, 5], f_data_h5='DATA.h5',
+    ...                          im=1, f_prior_h5='PRIOR.h5', uselog=True)
+    """
+    import numpy as np
+    from matplotlib.colors import LogNorm
+    import matplotlib.pyplot as plt
+    import os
+
+    # --- Resolve X, Y ---
+    if X is None or Y is None:
+        src = f_post_h5 or f_data_h5
+        if src is None:
+            raise ValueError(
+                "X and Y must be provided directly, or supply f_data_h5 or "
+                "f_post_h5 so that coordinates can be extracted via get_geometry()."
+            )
+        X, Y, _, _ = get_geometry(src)
+    X = np.asarray(X).ravel()
+    Y = np.asarray(Y).ravel()
+    values = np.asarray(values).ravel()
+
+    # --- Resolve cmap / clim from prior model ---
+    if (cmap is None or clim is None) and (im is not None) and (f_prior_h5 is not None):
+        _clim, _cmap = h5_get_clim_cmap(f_prior_h5, '/M%d' % im)
+        if cmap is None:
+            cmap = _cmap
+        if clim is None:
+            clim = list(_clim)
+
+    # --- Fallback cmap ---
+    if cmap is None:
+        cmap, _ = get_colormap_and_limits('default')
+
+    # --- Create figure / axes ---
+    if ax is None:
+        x_range = float(np.max(X) - np.min(X))
+        y_range = float(np.max(Y) - np.min(Y))
+        wx = 10
+        wy = (y_range / x_range * wx) if (x_range > 0 and y_range > 0) else wx
+        fig, ax = plt.subplots(figsize=(wx, wy))
+    else:
+        fig = ax.get_figure()
+
+    # --- Scatter ---
+    vmin = clim[0] if clim is not None else None
+    vmax = clim[1] if clim is not None else None
+    if uselog:
+        norm = LogNorm(vmin=vmin, vmax=vmax) if clim is not None else LogNorm()
+        sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, norm=norm, **kwargs)
+    else:
+        sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, vmin=vmin, vmax=vmax, **kwargs)
+
+    # --- Colorbar ---
+    if colorbar:
+        cbar = fig.colorbar(sc, ax=ax, label=colorbar_label or '')
+        if colorbar_ticks is not None:
+            cbar.set_ticks(colorbar_ticks)
+        if colorbar_ticklabels is not None:
+            cbar.set_ticklabels(colorbar_ticklabels)
+        if colorbar_invert:
+            cbar.ax.invert_yaxis()
+
+    # --- Decoration ---
+    if title:
+        ax.set_title(title)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_aspect('equal')
+    ax.grid(True, linestyle='--', alpha=0.5)
+
+    # --- Hardcopy ---
+    if hardcopy:
+        fname = hardcopy if isinstance(hardcopy, str) else 'plot_xy.png'
+        if '.' not in os.path.basename(fname):
+            fname += '.png'
+        fig.savefig(fname, dpi=200, bbox_inches='tight')
+        print(f"Figure saved to {fname}")
+
+    return fig, ax, sc
+
+
 def plot_posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], property='median', usePrior=False, **kwargs):
     """
     Plot posterior cumulative thickness for specified categories.
@@ -683,67 +848,46 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
                 return
 
     # Plot the data
-    fig = plt.figure(1, figsize=(wx, wy))
-
     plotPoints = kwargs.pop('plotPoints', False)
-    if plotPoints:
-        plt.plot(X[i1:i2], Y[i1:i2], 'k.', markersize=.2)
+    s_val = kwargs.pop('s', 1)
 
-    # For discrete Mode statistics, always use linear scale (not log)
-    if is_discrete_stat:
-        # Apply color limits directly to scatter plot for discrete data
-        sc = plt.scatter(X[i1:i2], Y[i1:i2], c=D[i1:i2],
-                    cmap=cmap,
-                    vmin=clim[0] if clim is not None else None,
-                    vmax=clim[1] if clim is not None else None,
-                    **kwargs)
-    elif uselog:
-        sc = plt.scatter(X[i1:i2], Y[i1:i2], c=D[i1:i2],
-                    cmap=cmap,
-                    norm=LogNorm(),
-                    **kwargs)
-    else:
-        sc = plt.scatter(X[i1:i2], Y[i1:i2], c=D[i1:i2],
-                    cmap=cmap,
-                    **kwargs)
+    use_discrete_cbar = (is_discrete_stat and not clim_user_provided
+                         and class_id is not None and class_name is not None)
 
-    plt.grid()
-    plt.xlabel('X')
+    fig, ax, sc = plot_xy(
+        D[i1:i2], X=X[i1:i2], Y=Y[i1:i2],
+        cmap=cmap, clim=clim,
+        uselog=(bool(uselog) and not is_discrete_stat),
+        title=title,
+        colorbar=not use_discrete_cbar,
+        s=s_val,
+        **kwargs,
+    )
 
-    # Create colorbar with class labels for discrete data
-    # Only use discrete colorbar if clim was not explicitly set by user
-    if is_discrete_stat and not clim_user_provided and class_id is not None and class_name is not None:
-        cbar = plt.colorbar(sc)
+    # Discrete colorbar with class tick labels
+    if use_discrete_cbar:
+        cbar = fig.colorbar(sc, ax=ax)
         cbar.set_ticks(class_id)
         cbar.set_ticklabels(class_name)
         cbar.ax.invert_yaxis()
-    else:
-        plt.colorbar(sc)
+
+    if plotPoints:
+        ax.plot(X[i1:i2], Y[i1:i2], 'k.', markersize=.2)
 
     print(title)
-    plt.title(title)
-    plt.axis('equal')
-
-    # Only apply clim after colorbar for continuous data
-    # For discrete data, clim was already applied to scatter plot
-    if not is_discrete_stat:
-        plt.clim(clim)
 
     if hardcopy:
         if elevation is not None:
-            # Use elevation in filename
             if key == 'P' and ic is not None:
                 f_png = '%s_%d_%d_%d_%s_ic%d_elev%.0f_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, elevation)
             else:
                 f_png = '%s_%d_%d_%d_%s_elev%.0f_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, elevation)
         else:
-            # Use iz in filename
             if key == 'P' and ic is not None:
                 f_png = '%s_%d_%d_%d_%s_ic%d_iz%02d_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, iz)
             else:
                 f_png = '%s_%d_%d_%d_%s%02d_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, iz)
-        plt.savefig(f_png)
-    #plt.show()
+        fig.savefig(f_png)
     return
 
 
@@ -1131,23 +1275,11 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
             current_ax = ax
         
         current_ax.plot(X,Y,'.',color='lightgray', zorder=-1, markersize=1)
-        scatter = current_ax.scatter(X[ii],Y[ii],c=LINE[ii],**kwargs)            
-        current_ax.grid()
-        current_ax.set_xlabel('X')
-        current_ax.set_ylabel('Y')
-        
-        if ax is None:
-            plt.colorbar(scatter, label='LINE')
-            plt.title('LINE')
-            plt.axis('equal')
-            if hardcopy:
-                # get filename without extension        
-                f_png = '%s_%d_%d_LINE.png' % (os.path.splitext(f_data_h5)[0],i1,i2)
-                plt.savefig(f_png)
-            #plt.show()
-        else:
-            current_ax.set_title('LINE')
-            current_ax.set_aspect('equal')
+        _, _, scatter = plot_xy(LINE[ii], X=X[ii], Y=Y[ii],
+                                cmap=kwargs.get('cmap','jet'), s=kwargs.get('s',1),
+                                title='LINE', colorbar=(ax is None), colorbar_label='LINE',
+                                ax=current_ax,
+                                hardcopy='%s_%d_%d_LINE.png' % (os.path.splitext(f_data_h5)[0],i1,i2) if (hardcopy and ax is None) else False)
         if pl == 'all':
             plt.show()
 
@@ -1155,13 +1287,10 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
         plt.figure(figsize=(wx,wy))
         current_ax = plt.gca()
             
-        scatter = current_ax.scatter(X[ii],Y[ii],c=ELEVATION[ii],**kwargs)            
-        current_ax.grid()
-        current_ax.set_xlabel('X')
-        current_ax.set_ylabel('Y')
-        plt.colorbar(scatter, label='ELEVATION')
-        plt.title('ELEVATION')
-        plt.axis('equal')
+        _, _, scatter = plot_xy(ELEVATION[ii], X=X[ii], Y=Y[ii],
+                                cmap=kwargs.get('cmap','jet'), s=kwargs.get('s',1),
+                                title='ELEVATION', colorbar=True, colorbar_label='ELEVATION',
+                                ax=current_ax)
         if hardcopy:
             # get filename without extension        
             f_png = '%s_%d_%d_ELEVATION.png' % (os.path.splitext(f_data_h5)[0],i1,i2)
@@ -1172,12 +1301,9 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
     
 
     elif ax is not None and pl == 'ELEVATION':
-        scatter = ax.scatter(X[ii],Y[ii],c=ELEVATION[ii],**kwargs)            
-        ax.grid()
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_title('ELEVATION')
-        ax.set_aspect('equal')
+        plot_xy(ELEVATION[ii], X=X[ii], Y=Y[ii],
+                cmap=kwargs.get('cmap','jet'), s=kwargs.get('s',1),
+                title='ELEVATION', colorbar=False, ax=ax)
 
         if pl == 'all':
             plt.show()
@@ -1186,28 +1312,19 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
         plt.figure(figsize=(wx,wy))
         current_ax = plt.gca()
             
-        scatter = current_ax.scatter(X[ii],Y[ii],c=ii,**kwargs)  
-        current_ax.grid()
-        current_ax.set_xlabel('X')
-        current_ax.set_ylabel('Y')
-        plt.colorbar(scatter, label='id')
-        plt.title('id')
-        plt.axis('equal')
-        if hardcopy:
-            # get filename without extension        
-            f_png = '%s_%d_%d_id.png' % (os.path.splitext(f_data_h5)[0],i1,i2)
-            plt.savefig(f_png)
+        _, _, scatter = plot_xy(ii, X=X[ii], Y=Y[ii],
+                                cmap=kwargs.get('cmap','jet'), s=kwargs.get('s',1),
+                                title='id', colorbar=True, colorbar_label='id',
+                                ax=current_ax,
+                                hardcopy='%s_%d_%d_id.png' % (os.path.splitext(f_data_h5)[0],i1,i2) if hardcopy else False)
 
         if pl == 'all':
             plt.show()
 
     elif ax is not None and pl == 'id':
-        scatter = ax.scatter(X[ii],Y[ii],c=ii,**kwargs)
-        ax.grid()
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_title('id')
-        ax.set_aspect('equal')
+        plot_xy(ii, X=X[ii], Y=Y[ii],
+                cmap=kwargs.get('cmap','jet'), s=kwargs.get('s',1),
+                title='id', colorbar=False, ax=ax)
 
         if pl == 'all':
             plt.show()
@@ -1225,17 +1342,12 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
 
             plt.figure(figsize=(wx,wy))
             current_ax = plt.gca()            
-            scatter = current_ax.scatter(X[ii],Y[ii],c=n_data_per_location[ii],**kwargs)
-            current_ax.grid()
-            current_ax.set_xlabel('X')
-            current_ax.set_ylabel('Y')
-            plt.colorbar(scatter, label='Number of valid data points')
-            plt.title('Number of Data (non-NaN)')
-            plt.axis('equal')
-            if hardcopy:
-                # get filename without extension
-                f_png = '%s_%d_%d_NDATA.png' % (os.path.splitext(f_data_h5)[0],i1,i2)
-                plt.savefig(f_png)
+            _, _, scatter = plot_xy(n_data_per_location[ii], X=X[ii], Y=Y[ii],
+                                    cmap=kwargs.get('cmap','jet'), s=kwargs.get('s',1),
+                                    title='Number of Data (non-NaN)',
+                                    colorbar=True, colorbar_label='Number of valid data points',
+                                    ax=current_ax,
+                                    hardcopy='%s_%d_%d_NDATA.png' % (os.path.splitext(f_data_h5)[0],i1,i2) if hardcopy else False)
             plt.show()
         except Exception as e:
             print(f"Warning: Could not plot number of data: {e}")
@@ -2741,32 +2853,25 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
     
     ax.set_title(title)
     
-    # Create scatter plot
+    # Sanitise values for log scale (must be positive finite)
     if uselog:
-        # Handle NaN and non-positive values for log scaling
-        plot_data_clean = plot_data.copy()
-        plot_data_clean[~np.isfinite(plot_data_clean) | (plot_data_clean <= 0)] = 1e-12
-        scatter = ax.scatter(X/1000, Y/1000, c=plot_data_clean, s=kwargs['s'], cmap=kwargs['cmap'], 
-                           norm=matplotlib.colors.LogNorm())
-    else:
-        scatter = ax.scatter(X/1000, Y/1000, c=plot_data, s=kwargs['s'], cmap=kwargs['cmap'])
-    
-    # Apply colorbar limits if provided
-    if len(clim) == 2:
-        scatter.set_clim(clim[0], clim[1])
-    
-    cbar = plt.colorbar(scatter)
-    cbar.set_label(f"{data_key}")
-    
+        plot_data = plot_data.copy()
+        plot_data[~np.isfinite(plot_data) | (plot_data <= 0)] = 1e-12
+
+    # X/Y in km for this function
+    clim_kw = list(clim) if len(clim) == 2 else None
+    fig, ax, _ = plot_xy(
+        plot_data, X=X/1000, Y=Y/1000,
+        cmap=kwargs['cmap'], clim=clim_kw,
+        uselog=uselog, title=title,
+        colorbar=True, colorbar_label=data_key,
+        ax=ax, s=kwargs['s'],
+        hardcopy=f"{os.path.splitext(f_data_h5)[0]}_{Dkey}_{data_key}_ch{data_channel}.png"
+                 if kwargs['hardcopy'] else False,
+    )
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
-    ax.axis('equal')
-    ax.grid()
 
-    if kwargs['hardcopy']:
-        f_png = f"{os.path.splitext(f_data_h5)[0]}_{Dkey}_{data_key}_ch{data_channel}.png"
-        plt.savefig(f_png)
-    
     return fig
 
 def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwargs):
