@@ -35,7 +35,8 @@ Core Functions
 * ``ig.query_probability()`` — probability query (fraction of realizations satisfying constraints)
 * ``ig.query_percentile()`` — percentile query (p5/p50/p95 of a metric across realizations)
 * ``ig.query_from_text()`` — translate a plain-English query to a query dict using an LLM
-* ``ig.query_plot()`` — plot the probability map from a probability query
+* ``ig.title_from_json()`` — generate a plain-English title/description from an existing query dict using an LLM
+* ``ig.query_plot()`` — plot the probability map *or* single-point detail view from a probability query
 * ``ig.query_percentile_plot()`` — plot one map per percentile from a percentile query
 * ``ig.save_query()`` / ``ig.load_query()`` — persist a query dict to/from JSON
 * ``ig.get_prior_model_info()`` — inspect model names, types, depth ranges, and class labels
@@ -317,19 +318,31 @@ Executing a Percentile Query
 Visualising Results
 ~~~~~~~~~~~~~~~~~~~
 
+``ig.query_plot()`` produces **one figure** depending on whether ``ip`` is set:
+
+* **No** ``ip`` → XY probability map across all survey locations.
+* **With** ``ip`` → single-point detail view (all posterior realizations + query-matching subset) for that data-point index.  The XY map is **not** shown.
+
+This means ``hardcopy`` always saves exactly one figure regardless of which mode is used.
+
 .. code-block:: python
 
-    # Probability map
+    # XY probability map (no ip)
     ig.query_plot(P, meta)
+
+    # With a custom title (auto-wrapped at 60 characters per line)
+    ig.query_plot(P, meta, title='My Query Title')
+
+    # With LLM-generated title from the query dict
+    title = ig.title_from_json(query, f_prior_h5=f_prior_h5)
+    ig.query_plot(P, meta, title=title, hardcopy='clay_query')
 
     # With query text and LLM interpretation in a side panel
     ig.query_plot(P, meta, query_text=text, interpretation=interp, text_panel=True)
 
-    # Save to disk
-    ig.query_plot(P, meta, hardcopy='clay_query')
-
-    # Detailed view for one data point
-    ig.query_plot(P, meta, ip=1000, query_dict=query, f_post_h5=f_post_h5)
+    # Single-point detail view — XY map is skipped
+    ig.query_plot(P, meta, ip=1000, query_dict=query, f_post_h5=f_post_h5,
+                  title=title, hardcopy='clay_query_ip1000')
 
     # Percentile maps — one subplot per percentile
     ig.query_percentile_plot(pct_values, meta)
@@ -557,11 +570,59 @@ Example 7: Percentile Query — Cross-Model Depth Bound
                              text_panel=True)
 
 
-LLM-Powered Query Translation
-------------------------------
+LLM-Powered Query Tools
+-----------------------
 
-Overview
-~~~~~~~~
+Generating a Description from an Existing Query
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:func:`ig.title_from_json` uses an LLM to produce a short plain-English
+sentence describing what an existing query dict computes.  This is useful for
+automatically labelling figures or log output without writing titles by hand.
+
+.. code-block:: python
+
+    import integrate as ig
+
+    query = ig.load_query('clay_10m.json')
+
+    # From a file path
+    title = ig.title_from_json('clay_10m.json', f_prior_h5=f_prior_h5)
+
+    # From a dict (e.g. returned by ig.load_query())
+    title = ig.title_from_json(query, f_prior_h5=f_prior_h5)
+
+    # Use as a figure title
+    ig.query_plot(P, meta, title=title, hardcopy='clay_10m')
+
+**Parameters:**
+
+``file_json``
+    Path to a JSON file **or** a query dict directly (e.g. from
+    :func:`ig.load_query`).
+
+``f_prior_h5`` *(optional)*
+    Path to the prior HDF5 file.  When supplied, real model names, depth
+    ranges, and class labels are included in the LLM prompt so the description
+    uses geological names (e.g. "clay") rather than numeric IDs (e.g. "class 3").
+
+``model``, ``api_key``
+    Same as :func:`ig.query_from_text`.
+
+``showInfo`` *(int, default 1)*
+    Controls feedback when the LLM cannot be reached:
+
+    * ``0`` — silent; empty string returned with no output.
+    * ``1`` — one-line message including a hint to run :func:`ig.query_test_llm` *(default)*.
+    * ``2`` — message plus full exception detail.
+
+If the LLM is unavailable for any reason (missing ``litellm`` package, no API
+key, network error) the function always returns an empty string — it never
+raises — so it is safe to use in a pipeline without extra error handling.
+
+
+Translating Plain English to a Query Dict
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`ig.query_from_text` uses `LiteLLM <https://docs.litellm.ai>`_ to
 translate a plain-English geological question into a valid query dict.  The
@@ -750,7 +811,8 @@ Quick Reference
         query_probability,      # Probability query (fraction satisfying constraints)
         query_percentile,       # Percentile query (p5/p50/p95 of a metric)
         query_from_text,        # Translate plain English to query dict via LLM
-        query_plot,             # Plot probability map
+        title_from_json,        # Generate a plain-English description from a query dict via LLM
+        query_plot,             # XY probability map or single-point detail view
         query_percentile_plot,  # Plot one map per percentile
         save_query,             # Save a query dict to a JSON file
         load_query,             # Load a query dict from a JSON file
@@ -781,8 +843,20 @@ Quick Reference
         api_key=None, verbose=False,
     )
 
+    # Plain-English description of an existing query dict (returns '' on LLM failure)
+    description = ig.title_from_json(
+        file_json,              # str path or dict (e.g. from ig.load_query())
+        f_prior_h5=None,        # optional: adds real model/class names to prompt
+        model='anthropic/claude-sonnet-4-6',
+        api_key=None,
+        showInfo=1,             # 0=silent, 1=warn on failure (default), 2=full detail
+    )
+
+    # query_plot: ip=None → XY probability map; ip=<int> → single-point detail only
     ig.query_plot(P, meta,
-                  ip=None, query_dict=None, f_post_h5=None,
+                  ip=None, query_dict=None,
+                  f_prior_h5=None, f_post_h5=None,
+                  title=None,            # auto-wrapped at 60 chars per line
                   query_text=None, interpretation=None,
                   text_panel=False, hardcopy=False)
 
@@ -795,6 +869,9 @@ Quick Reference
 
     info = ig.get_prior_model_info(f_prior_h5, im)
     # info keys: 'name', 'is_discrete', 'z', 'class_id', 'class_name'
+
+    # ig.query() returns (None, {}) with a printed message if f_post_h5 is missing
+    result, meta = ig.query(f_post_h5, query_dict)
 
     result = ig.query_test_llm(model, api_key=None, verbose=1)
     # result keys: 'ok', 'model', 'response', 'error'

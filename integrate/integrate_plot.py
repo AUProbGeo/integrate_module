@@ -4718,7 +4718,7 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
 
     showInfo  = kwargs.get('showInfo', 0)
     figsize_w = kwargs.get('figsize', (2, 8))
-    fname     = kwargs.get('name', 'boreholes')
+    _fname_kw = kwargs.get('name', None)
     depth_max = kwargs.get('depth_max', None)
     title     = kwargs.get('title', None)
 
@@ -4730,6 +4730,17 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
         W = [W]
 
     n_wells = len(W)
+
+    # Build filename: use caller-supplied name, or auto-generate
+    if _fname_kw is not None:
+        fname = _fname_kw
+    elif n_wells == 1:
+        bh_name = W[0].get('name', '0').replace(' ', '_')
+        fname = 'borehole_%s' % bh_name
+    else:
+        i_start = kwargs.get('i_start', 0)
+        i_end   = i_start + n_wells - 1
+        fname   = 'boreholes_%d_%d' % (i_start, i_end)
 
     # --- resolve per-borehole elevations ---
     elevations    = [float(bh.get('elevation', 0)) for bh in W]
@@ -4902,10 +4913,15 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
                        label=label_map.get(int(cid), str(cid)))
         for cid in legend_classes
     ]
-    fig.legend(handles=patches, loc='lower center',
-               ncol=min(len(patches), 6),
-               fontsize=8, frameon=True,
-               bbox_to_anchor=(0.5, 0.0))
+    if n_wells == 1:
+        fig.legend(handles=patches, loc='center left',
+                   fontsize=8, frameon=True,
+                   bbox_to_anchor=(1.0, 0.5))
+    else:
+        fig.legend(handles=patches, loc='lower center',
+                   ncol=min(len(patches), 6),
+                   fontsize=8, frameon=True,
+                   bbox_to_anchor=(0.5, 0.0))
 
     if title:
         fig.suptitle(title, fontsize=10, y=1.01)

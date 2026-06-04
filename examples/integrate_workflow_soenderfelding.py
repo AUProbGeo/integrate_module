@@ -31,7 +31,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-#2N = 1_000 # Smaller N for testing
+N = 10_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -62,7 +62,8 @@ else:
 
 
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
-
+prior_info = ig.hdf5_info(f_prior_h5)
+print(prior_info)
 
 # %% [markdown]
 # ## B: Setup the data 
@@ -134,11 +135,22 @@ fname = file_gex.split('.')[0]
 f_data_sub.append(ig.xyz_to_h5(file_xyz, file_gex, f_data_h5='%s_data.h5' % fname, showInfo=showInfo))
 
 
-# %%
+# %% plot data for each f_data_h5
+colors = plt.cm.tab10.colors
+fig, ax = plt.subplots(figsize=(10, 6))
 for id in range(len(f_data_sub)):
     f_data_h5 = f_data_sub[id]
-    ig.plot_data(f_data_h5, hardcopy=hardcopy, showInfo = -1)
-    ig.plot_data_xy(f_data_h5, data_channel=20, cmap='jet')
+    X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+    label = os.path.splitext(os.path.basename(f_data_h5))[0]
+    ax.plot(X, Y, '.', markersize=1, color=colors[id % len(colors)], label=label)
+ax.legend(markerscale=10, loc='lower right', fontsize=7)
+ax.set_xlabel('X (m)')
+ax.set_ylabel('Y (m)')
+ax.set_aspect('equal')
+ax.grid(True, linestyle='--', alpha=0.5)
+if hardcopy:
+    fig.savefig('data_subsets_xy.png', dpi=200, bbox_inches='tight')
+
 
 # %%
 # Read the number of d_obs data in f_data_h5 and print to screen
@@ -154,7 +166,7 @@ for id in range(len(f_data_sub)):
 # Use subset of available data only?
 usePartOfData = True
 if usePartOfData:
-    i_sub_use = [0,2] # only use first subsets
+    i_sub_use = [0,1,2] # only use first subsets
     # use all subsets
     # i_sub_use = list(range(len(f_data_sub)))
 
@@ -164,8 +176,8 @@ if usePartOfData:
         print("-- using data file %s" % f_data_sub[i])
         f_data_sub_new.append(f_data_sub[i])
 
-        ig.plot_data(f_data_sub[i], hardcopy=hardcopy, showInfo = -1)
-        ig.plot_data_xy(f_data_sub[i], data_channel=20, cmap='jet')
+        #ig.plot_data(f_data_sub[i], hardcopy=hardcopy, showInfo = -1)
+        #ig.plot_data_xy(f_data_sub[i], data_channel=20, cmap='jet')
 
     f_data_sub = f_data_sub_new
 
@@ -192,7 +204,7 @@ X, Y, LINE, ELEVATION = ig.get_geometry(f_data_sub[0])
 
 BHOLES = ig.read_borehole('SdrFelding_boreholes.json', showInfo=1)
 
-# Go trhoug the boreholes. and if elevation is set at -9999 replace it with the elevation from the geometry of the tTEM data at the 
+    # Go trhoug the boreholes. and if elevation is set at -9999 replace it with the elevation from the geometry of the tTEM data at the 
 # borehole location. This is just to have a more correct elevation for plotting, and it does not affect the inversion since the elevation is not used in the inversion (the depth intervals are defined relative to the borehole top, which is at depth 0).
 for ibh in range(len(BHOLES)):
     d = np.sqrt((X-BHOLES[ibh]['X'])**2 + (Y-BHOLES[ibh]['Y'])**2)
@@ -210,9 +222,15 @@ for ibh in range(len(BHOLES)):
 
 # Plot without prior info – classes labelled by numeric ID, default colours
 # plt borholes in sets of 10, 0:10, 10:20, etc. if there are more than 10 boreholes
-for i in range(0, len(BHOLES), 10):
-    ig.plot_boreholes(BHOLES[i:i+10], f_prior_h5, hardcopy=hardcopy)
-    #ig.plot_boreholes(BHOLES[i:i+10], hardcopy=hardcopy)
+n_plots_per_figure = 8
+for i in range(0, len(BHOLES), n_plots_per_figure):
+    ig.plot_boreholes(BHOLES[i:i+n_plots_per_figure], f_prior_h5, hardcopy=hardcopy, i_start=i)
+    #ig.plot_boreholes(BHOLES[i:i+n_plots_per_figure], hardcopy=hardcopy)
+
+# Plot a single borehole with prior info, classes labelled by numeric ID, default colours
+#for i in range(0, len(BHOLES)):
+#    ig.plot_boreholes(BHOLES[i], f_prior_h5, hardcopy=hardcopy, i_start=i)
+
 
 
 # %%
@@ -225,11 +243,6 @@ for i in range(len(f_data_sub)):
     f_prior_sub.append(f_prior_sub_h5)
 f_prior_h5 = f_prior_sub[0]    
 
-# %%
-# COPY FROM FREF, FOR WORKSHOP
-f_prior_sub = []
-f_prior_sub.append('Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616_TX07_20240802_2x4_RC20-39_Nh280_Nf12.h5')
-f_prior_h5 = f_prior_sub[0]
 
 # %%
 #
@@ -266,6 +279,15 @@ for i in [0]:
         id_borehole_list.append(id_out)
 
 
+# %%
+# COPY FROM FREF, FOR WORKSHOP
+usePrecomp = False
+if usePrecomp:
+    f_prior_sub = []
+    f_prior_sub.append('Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616_TX07_20240802_2x4_RC20-39_Nh280_Nf12.h5')
+    f_prior_h5 = f_prior_sub[0]
+
+
 # %% [markdown]
 # ### INVERSION
 # The data is now ready for inversion with the rejection sampler.
@@ -287,9 +309,9 @@ T_N_above=50
 T_P_acc_level=0.2 
 autoT = 1 # We need minium of T_N_above realizations with an acceptance probability above T_P_acc_level
 id_use_arr = []
-id_use_arr.append([1]) # tTEM 
+#id_use_arr.append([1]) # tTEM 
 id_use_arr.append(list(range(2, len(BHOLES)+2))) # ONLY BORREHOLES
-id_use_arr.append(list(range(1, len(BHOLES)+2))) # ALL data
+#id_use_arr.append(list(range(1, len(BHOLES)+2))) # ALL data
 
 #id_use = id_use_arr[0]
 #id_use = id_use_arr[1]
@@ -517,14 +539,16 @@ else:
         ]
     }
 
-
     ig.save_query(query, 'query_daugaard.json')
 
 for f_post_h5 in f_post_sub:
     # Compute the probability of the query being satisfied for each model realization in the posterior, and get metadata about the query results (e.g. which realizations satisfy the query, etc.)
     P, meta = ig.query(f_post_h5, query)
+    query_title = ig.title_from_json(query)
+    query_title = ig.title_from_json(query, f_prior_h5)
     #  Plot the predicted probability map, and the the outcome at the borehole locations
-    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5)
-    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5)
+    ig.query_plot(P, meta, query_dict=query, f_post_h5=f_post_h5, title = query_title)
+    #ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5, title = query_title)
+    #ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5, title = query_title)
 
 # %%

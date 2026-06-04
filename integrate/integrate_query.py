@@ -402,6 +402,9 @@ def query(f_post_h5, query_dict):
     result, meta
         See the delegated function for details.
     """
+    if not os.path.isfile(str(f_post_h5)):
+        print(f"[ig.query] Posterior file not found: {f_post_h5}")
+        return None, {}
     if isinstance(query_dict, str):
         with open(query_dict, 'r') as fh:
             query_dict = json.load(fh)
@@ -415,9 +418,10 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     """
     Plot query results and optionally detailed model visualization for a data point.
 
-    Always displays a probability map showing P(x, y). If ip is provided along with
-    query_dict and (f_prior_h5 or f_post_h5), also displays a detailed visualization of
-    the posterior models and query-matching models for that specific data location.
+    If ip is None, displays the XY probability map showing P(x, y).
+    If ip is provided (together with query_dict and f_prior_h5/f_post_h5), skips the
+    probability map and shows only the detailed single-point visualization of all
+    posterior realizations and the query-matching subset.
 
     Parameters
     ----------
@@ -476,73 +480,77 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
     X = meta['X']
     Y = meta['Y']
 
-    # Always plot probability map
-    has_text = text_panel and (query_text is not None or interpretation is not None)
-    if has_text:
-        fig = plt.figure(figsize=(11, 6))
-        gs = fig.add_gridspec(1, 2, width_ratios=[3, 1], wspace=0.05)
-        ax = fig.add_subplot(gs[0])
-        ax_text = fig.add_subplot(gs[1])
-    else:
-        fig, ax = plt.subplots(figsize=(8, 6))
+    # Plot XY probability map only when no specific point is requested
+    if ip is None:
+        has_text = text_panel and (query_text is not None or interpretation is not None)
+        if has_text:
+            fig = plt.figure(figsize=(11, 6))
+            gs = fig.add_gridspec(1, 2, width_ratios=[3, 1], wspace=0.05)
+            ax = fig.add_subplot(gs[0])
+            ax_text = fig.add_subplot(gs[1])
+        else:
+            fig, ax = plt.subplots(figsize=(8, 6))
 
-    # Determine title
-    if has_text:
-        _title = 'Query Probability Map'
-    elif title is not None:
-        _title = title
-    elif query_text is not None or interpretation is not None:
-        parts = []
-        if query_text is not None:
-            parts.append(f"Query: {query_text}")
-        if interpretation is not None:
-            parts.append(f"Interpreted as: {interpretation}")
-        _title = '\n'.join(parts)
-    else:
-        _title = 'Query Probability Map'
+        # Determine title
+        if has_text:
+            _title = 'Query Probability Map'
+        elif title is not None:
+            _title = title
+        elif query_text is not None or interpretation is not None:
+            parts = []
+            if query_text is not None:
+                parts.append(f"Query: {query_text}")
+            if interpretation is not None:
+                parts.append(f"Interpreted as: {interpretation}")
+            _title = '\n'.join(parts)
+        else:
+            _title = 'Query Probability Map'
 
-    # Background dots so P=0 (white) areas are visible, then probability scatter
-    from integrate.integrate_plot import plot_xy
-    ax.scatter(X, Y, c='black', s=2, alpha=0.5)
-    _, ax, sc = plot_xy(P, X=X, Y=Y,
-                        cmap='hot_r', clim=[0, 1],
-                        title=_title, colorbar=True, colorbar_label='Probability',
-                        ax=ax, s=1)
-    ax.set_xlabel('UTMX [m]')
-    ax.set_ylabel('UTMY [m]')
-    if ip is not None and X is not None and Y is not None:
-        ax.plot(X[ip], Y[ip], 'kx', markersize=12, markeredgewidth=2, label=f'Point {ip}')
-        ax.legend()
-
-    if has_text:
         import textwrap
-        ax_text.set_axis_off()
-        CHARS = 36       # characters per wrapped line
-        LH = 0.062       # axes-fraction height per text line (fontsize 8)
-        LABEL_GAP = 0.03 # gap between bold label and text box
-        SECTION_GAP = 0.07  # gap between sections
+        _title = '\n'.join(
+            '\n'.join(textwrap.wrap(line, width=60)) if len(line) > 60 else line
+            for line in _title.splitlines()
+        )
 
-        y = 0.97
-        if query_text is not None:
-            ax_text.text(0.02, y, "Query:", transform=ax_text.transAxes,
-                         fontsize=8, fontweight='bold', va='top')
-            y -= LH + LABEL_GAP
-            wrapped_q = textwrap.fill(query_text, CHARS)
-            n_q = wrapped_q.count('\n') + 1
-            ax_text.text(0.02, y, wrapped_q, transform=ax_text.transAxes,
-                         fontsize=7.5, va='top',
-                         bbox=dict(boxstyle='round,pad=0.4', facecolor='#f0f0f0', edgecolor='none'))
-            y -= n_q * LH + SECTION_GAP
-        if interpretation is not None:
-            ax_text.text(0.02, y, "Interpretation:", transform=ax_text.transAxes,
-                         fontsize=8, fontweight='bold', va='top')
-            y -= LH + LABEL_GAP
-            wrapped_i = textwrap.fill(interpretation, CHARS)
-            ax_text.text(0.02, y, wrapped_i, transform=ax_text.transAxes,
-                         fontsize=7.5, va='top',
-                         bbox=dict(boxstyle='round,pad=0.4', facecolor='#e8f4e8', edgecolor='none'))
+        # Background dots so P=0 (white) areas are visible, then probability scatter
+        from integrate.integrate_plot import plot_xy
+        ax.scatter(X, Y, c='black', s=2, alpha=0.5)
+        _, ax, sc = plot_xy(P, X=X, Y=Y,
+                            cmap='hot_r', clim=[0, 1],
+                            title=_title, colorbar=True, colorbar_label='Probability',
+                            ax=ax, s=1)
+        ax.set_xlabel('UTMX [m]')
+        ax.set_ylabel('UTMY [m]')
 
-    plt.tight_layout()
+        if has_text:
+            import textwrap
+            ax_text.set_axis_off()
+            CHARS = 36       # characters per wrapped line
+            LH = 0.062       # axes-fraction height per text line (fontsize 8)
+            LABEL_GAP = 0.03 # gap between bold label and text box
+            SECTION_GAP = 0.07  # gap between sections
+
+            y = 0.97
+            if query_text is not None:
+                ax_text.text(0.02, y, "Query:", transform=ax_text.transAxes,
+                             fontsize=8, fontweight='bold', va='top')
+                y -= LH + LABEL_GAP
+                wrapped_q = textwrap.fill(query_text, CHARS)
+                n_q = wrapped_q.count('\n') + 1
+                ax_text.text(0.02, y, wrapped_q, transform=ax_text.transAxes,
+                             fontsize=7.5, va='top',
+                             bbox=dict(boxstyle='round,pad=0.4', facecolor='#f0f0f0', edgecolor='none'))
+                y -= n_q * LH + SECTION_GAP
+            if interpretation is not None:
+                ax_text.text(0.02, y, "Interpretation:", transform=ax_text.transAxes,
+                             fontsize=8, fontweight='bold', va='top')
+                y -= LH + LABEL_GAP
+                wrapped_i = textwrap.fill(interpretation, CHARS)
+                ax_text.text(0.02, y, wrapped_i, transform=ax_text.transAxes,
+                             fontsize=7.5, va='top',
+                             bbox=dict(boxstyle='round,pad=0.4', facecolor='#e8f4e8', edgecolor='none'))
+
+        plt.tight_layout()
 
     # If ip provided and we have necessary data, plot detailed model view
     if ip is not None and query_dict is not None and f_prior_h5 is not None:
@@ -1329,6 +1337,134 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
         query_dict = {'constraints': parsed.get('constraints', [])}
 
     return query_dict, interpretation, system_prompt
+
+
+def title_from_json(file_json, f_prior_h5=None, model='anthropic/claude-sonnet-4-6',
+                    api_key=None, showInfo=1):
+    """
+    Return a plain-language description of what a query JSON dict will do.
+
+    Uses an LLM to produce a short human-readable summary suitable for a figure
+    title or log message. If the LLM is unavailable (missing package, no API key,
+    network error), returns an empty string.
+
+    Parameters
+    ----------
+    file_json : str or dict
+        Path to a query JSON file, or a query dict directly (e.g. from
+        ``ig.load_query()``).
+    f_prior_h5 : str, optional
+        Path to the prior HDF5 file. When provided, real model names, depth
+        ranges, and class labels are included in the prompt so the description
+        uses geological names instead of numeric model/class IDs.
+    model : str, optional
+        LiteLLM model string (default: 'anthropic/claude-sonnet-4-6').
+    api_key : str, optional
+        Provider API key. If None, the relevant environment variable is used.
+    showInfo : int, optional
+        0 = silent; 1 = print a message when the LLM cannot be reached (default);
+        2 = also print the exception detail.
+
+    Returns
+    -------
+    description : str
+        One-sentence plain-English summary of the query, or an empty string if
+        the LLM could not be reached.
+
+    Examples
+    --------
+    >>> description = ig.title_from_json('my_query.json')
+    >>> description = ig.title_from_json('my_query.json', f_prior_h5='prior.h5')
+    >>> query = ig.load_query('query_ex1.json')
+    >>> title = ig.title_from_json(query, f_prior_h5='prior.h5')
+    >>> title = ig.title_from_json(query, showInfo=0)  # silent on failure
+    """
+    try:
+        import litellm
+    except ImportError:
+        if showInfo >= 1:
+            print("[ig.title_from_json] LLM unavailable: 'litellm' package not installed "
+                  "(pip install litellm). Returning empty description.")
+        return ''
+
+    if isinstance(file_json, str):
+        try:
+            with open(file_json, 'r') as fh:
+                query_dict = json.load(fh)
+        except Exception as e:
+            if showInfo >= 1:
+                print(f"[ig.title_from_json] Could not read query file: {e}")
+            return ''
+    else:
+        query_dict = dict(file_json)
+
+    # Collect the im indices referenced by this query
+    if 'constraints' in query_dict:
+        items = query_dict['constraints']
+    elif 'metric' in query_dict:
+        items = [query_dict['metric']]
+    else:
+        items = []
+    needed_ims = _collect_needed_ims(items) if items else set()
+
+    # Build an optional model-context block from the prior file
+    model_context = ''
+    if f_prior_h5 and needed_ims:
+        try:
+            lines = ['Available models referenced in this query:']
+            for im in sorted(needed_ims):
+                info = get_prior_model_info(f_prior_h5, im)
+                z = info['z']
+                depth_min, depth_max = float(z[0]), float(z[-1])
+                is_scalar = (depth_max - depth_min) == 0 or len(z) - 1 == 0
+                name = info['name']
+                if is_scalar:
+                    kind = 'scalar-discrete' if info['is_discrete'] else 'scalar'
+                    lines.append(f"  im={im}: '{name}' ({kind})")
+                elif info['is_discrete']:
+                    lines.append(f"  im={im}: '{name}' (discrete), depth {depth_min:.1f}–{depth_max:.1f} m")
+                    if info['class_id'] is not None and info['class_name'] is not None:
+                        ids = info['class_id'].flatten()
+                        names = info['class_name'].flatten()
+                        for cid, cname in zip(ids, names):
+                            lines.append(f"    class {int(cid)} = {cname}")
+                else:
+                    lines.append(f"  im={im}: '{name}' (continuous), depth {depth_min:.1f}–{depth_max:.1f} m")
+            model_context = '\n'.join(lines)
+        except Exception:
+            model_context = ''
+
+    system_prompt = (
+        "You are a geophysics assistant for the INTEGRATE probabilistic inversion module. "
+        "The user will provide a query dict in JSON format. "
+        "Suggest a short figure title (max ~10 words) for the result this query produces. "
+        "Use geological language and real model/class names where available. "
+        "Write the title in title case. Do not start with 'Computes', 'Shows', or 'Displays'. "
+        "Do not include JSON syntax. Reply with only the title — no preamble, no full stop."
+    )
+    if model_context:
+        system_prompt += f"\n\n{model_context}"
+
+    try:
+        response_obj = litellm.completion(
+            model=model,
+            max_tokens=128,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(query_dict)},
+            ],
+            api_key=api_key,
+            **_litellm_extra(model),
+        )
+        description = (response_obj.choices[0].message.content or '').strip()
+        return description
+    except Exception as e:
+        if showInfo >= 1:
+            print(f"[ig.title_from_json] LLM call failed — returning empty description. "
+                  f"Use ig.query_test_llm() to diagnose. (model='{model}')")
+        if showInfo >= 2:
+            print(f"  Detail: {e}")
+        return ''
 
 
 def query_test_llm(model='anthropic/claude-sonnet-4-6', api_key=None, verbose=1):
