@@ -514,11 +514,10 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
 
         # Background dots so P=0 (white) areas are visible, then probability scatter
         from integrate.integrate_plot import plot_xy
-        ax.scatter(X, Y, c='black', s=2, alpha=0.5)
         _, ax, sc = plot_xy(P, X=X, Y=Y,
                             cmap='hot_r', clim=[0, 1],
                             title=_title, colorbar=True, colorbar_label='Probability',
-                            ax=ax, s=1)
+                            ax=ax, s=1, plotPoints=True)
         ax.set_xlabel('UTMX [m]')
         ax.set_ylabel('UTMY [m]')
 
@@ -828,6 +827,58 @@ def get_prior_model_info(f_prior_h5, im):
             'class_name':  ds.attrs.get('class_name', None),
         }
     return info
+
+
+def prior_describe(f_prior_h5):
+    """
+    Print a human-readable summary of all models in a prior HDF5 file.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+
+    Examples
+    --------
+    >>> ig.prior_describe('prior.h5')
+    Prior file: prior.h5
+    N realizations: 1000000
+      im=1  Resistivity   CONTINUOUS   depth 0–89 m  (89 layers)
+      im=2  Lithology     DISCRETE     depth 0–89 m  (89 layers)
+              class 1 = Sand
+              class 2 = Grus
+      im=3  Waterlevel    SCALAR
+    """
+    with h5py.File(f_prior_h5, 'r') as f:
+        model_keys = sorted(
+            [k for k in f.keys() if k.startswith('M') and k[1:].isdigit()],
+            key=lambda k: int(k[1:])
+        )
+        N = f[model_keys[0]].shape[0] if model_keys else 0
+
+    print(f"Prior file: {f_prior_h5}")
+    print(f"N realizations: {N}")
+
+    for key in model_keys:
+        im = int(key[1:])
+        info = get_prior_model_info(f_prior_h5, im)
+        z = info['z']
+        depth_min, depth_max = float(z[0]), float(z[-1])
+        n_layers = len(z) - 1
+        is_scalar = (depth_max - depth_min) == 0 or n_layers == 0
+        name = info['name']
+
+        if is_scalar:
+            kind = 'SCALAR-DISCRETE' if info['is_discrete'] else 'SCALAR'
+            print(f"  im={im}  {name:<20s}  {kind}")
+        elif info['is_discrete']:
+            print(f"  im={im}  {name:<20s}  DISCRETE     depth {depth_min:.0f}–{depth_max:.0f} m  ({n_layers} layers)")
+        else:
+            print(f"  im={im}  {name:<20s}  CONTINUOUS   depth {depth_min:.0f}–{depth_max:.0f} m  ({n_layers} layers)")
+
+        if info['is_discrete'] and info['class_id'] is not None and info['class_name'] is not None:
+            for cid, cname in zip(info['class_id'].flatten(), info['class_name'].flatten()):
+                print(f"          class {int(cid):>3} = {cname}")
 
 
 def _build_llm_system_prompt(f_prior_h5):

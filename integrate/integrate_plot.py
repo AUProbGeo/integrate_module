@@ -250,7 +250,7 @@ def plot_xy(values, X=None, Y=None,
             cmap=None, clim=None, uselog=False,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
-            ax=None, s=5, hardcopy=False, **kwargs):
+            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', **kwargs):
     """
     Core 2D scatter map: plot any array of values at survey (X, Y) locations.
 
@@ -315,6 +315,13 @@ def plot_xy(values, X=None, Y=None,
     hardcopy : bool or str, optional
         If ``True``, save to an auto-named PNG. If a string, use it as the
         filename (extension added if missing).
+    plotPoints : bool, optional
+        If ``True``, draw all survey locations as small background dots before
+        the coloured scatter, making the full coverage visible and showing
+        locations with no valid data (NaN) in a neutral colour (default ``False``).
+    plotPoints_color : str or colour, optional
+        Colour for the background dots when ``plotPoints=True`` (default ``'0.7'``
+        — light grey). Using a neutral grey avoids confusion with class colours.
     **kwargs
         Forwarded to ``ax.scatter()``.
 
@@ -371,17 +378,36 @@ def plot_xy(values, X=None, Y=None,
     else:
         fig = ax.get_figure()
 
+    # --- Background points ---
+    if plotPoints:
+        ax.scatter(X, Y, color=plotPoints_color, s=max(0.3, s * 0.4), marker=plotPoints_marker, alpha=0.6, zorder=1)
+
     # --- Scatter ---
     vmin = clim[0] if clim is not None else None
     vmax = clim[1] if clim is not None else None
     if uselog:
-        norm = LogNorm(vmin=vmin, vmax=vmax) if clim is not None else LogNorm()
+        # LogNorm requires strictly positive bounds — derive from data if needed
+        pos = values[np.isfinite(values) & (values > 0)]
+        if vmin is None or vmin <= 0:
+            vmin = float(pos.min()) if pos.size > 0 else 1e-10
+        if vmax is None:
+            vmax = float(pos.max()) if pos.size > 0 else 1.0
+        norm = LogNorm(vmin=vmin, vmax=vmax)
         sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, norm=norm, **kwargs)
     else:
         sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, vmin=vmin, vmax=vmax, **kwargs)
 
     # --- Colorbar ---
     if colorbar:
+        if colorbar_label is None and (f_prior_h5 is not None) and (im is not None):
+            try:
+                with h5py.File(f_prior_h5, 'r') as f_prior:
+                    prior_name = f_prior['/M%d' % im].attrs.get('name', None)
+                if prior_name is not None and prior_name != '':
+                    colorbar_label = str(prior_name)
+            except Exception:
+                pass
+
         cbar = fig.colorbar(sc, ax=ax, label=colorbar_label or '')
         if colorbar_ticks is not None:
             cbar.set_ticks(colorbar_ticks)
@@ -736,13 +762,14 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         print("f_prior_h5 = %s" % f_prior_h5)
 
 
-    cmap_ref, clim_ref = get_colormap_and_limits('resistivity')
-    if cmap is None:
-        # Check prior file for colormap
-        cmap = cmap_ref
-
-    if clim_ref is None:
-        clim = clim_ref
+    # For continuous models, read cmap/clim from the prior file if not user-provided
+    if not is_discrete:
+        if not cmap_user_provided or clim is None:
+            _clim_prior, _cmap_prior = h5_get_clim_cmap(f_prior_h5, dstr)
+            if not cmap_user_provided:
+                cmap = _cmap_prior
+            if clim is None:
+                clim = list(_clim_prior)
 
     if showInfo>2:
         print("clim=%s" % str(clim))
@@ -849,7 +876,9 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
 
     # Plot the data
     plotPoints = kwargs.pop('plotPoints', False)
-    s_val = kwargs.pop('s', 1)
+    plotPoints_color = kwargs.pop('plotPoints_color', '0.7')
+    plotPoints_marker = kwargs.pop('marker', '.')   # marker controls background dots
+    s_val = kwargs.pop('s', 1)  # keep default s=1 for feature maps
 
     use_discrete_cbar = (is_discrete_stat and not clim_user_provided
                          and class_id is not None and class_name is not None)
@@ -860,7 +889,11 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         uselog=(bool(uselog) and not is_discrete_stat),
         title=title,
         colorbar=not use_discrete_cbar,
+        colorbar_label=None if use_discrete_cbar else str(name),
         s=s_val,
+        plotPoints=plotPoints,
+        plotPoints_color=plotPoints_color,
+        plotPoints_marker=plotPoints_marker,
         **kwargs,
     )
 
@@ -870,9 +903,6 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         cbar.set_ticks(class_id)
         cbar.set_ticklabels(class_name)
         cbar.ax.invert_yaxis()
-
-    if plotPoints:
-        ax.plot(X[i1:i2], Y[i1:i2], 'k.', markersize=.2)
 
     print(title)
 
@@ -2964,8 +2994,11 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
             non_nan = np.sum(~np.isnan(d_obs), axis=1)
 
             # Calculate the extent
+            # extent = [left, right, bottom, top]; imshow row 0 maps to top,
+            # so bottom=N_gates and top=0 gives gate 0 at the top of the plot
+            # with the y-axis label reading 0→N_gates from top to bottom.
             xlim = [i_plot.min(), i_plot.max()]
-            extent = [xlim[0], xlim[1], 0, d_obs.shape[1]]
+            extent = [xlim[0], xlim[1], d_obs.shape[1], 1]
 
             # plot figure with data
 
@@ -2981,35 +3014,42 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
                 else:
                     im1 = ax[0].plot(d_obs[i_plot,:], linewidth=.5)
                     im2 = ax[1].plot(d_std[i_plot,:], linewidth=.5)
-                    im3 = ax[2].plot((d_obs[i_plot,:]/d_std[i_plot,:]), linewidth=.5)
+                    im3 = ax[2].plot(100.0 * d_std[i_plot,:]/d_obs[i_plot,:], linewidth=.5)
                 ax[0].set_xlim(xlim)
                 ax[1].set_xlim(xlim)
                 ax[2].set_xlim(xlim)
-                ax[2].set_ylim([.5, 50])
+                ax[2].set_ylim([0, 20])
                 ax[0].set_ylabel('d_obs')
                 ax[1].set_ylabel('d_std')
-                ax[2].set_ylabel('S/N (d_obs/d_std)')
+                ax[2].set_ylabel('Relative noise [%] (d_std/d_obs × 100)')
 
             elif plType=='imshow':
+                def _masked(arr):
+                    """Mask NaN, inf, and non-positive values; leave positives intact."""
+                    return np.ma.masked_where(~np.isfinite(arr) | (arr <= 0), arr)
+
+                def _cmap_white_bad(name):
+                    cmap = matplotlib.cm.get_cmap(name).copy()
+                    cmap.set_bad('white')
+                    return cmap
+
                 if uselog:
-                    # Handle NaN and invalid values for LogNorm
-                    d_obs_clean = d_obs[i_plot,:].copy()
-                    d_std_clean = d_std[i_plot,:].copy()
-
-                    # Replace NaN/inf/zero values with small positive values for LogNorm
-                    d_obs_clean[~np.isfinite(d_obs_clean) | (d_obs_clean <= 0)] = 1e-12
-                    d_std_clean[~np.isfinite(d_std_clean) | (d_std_clean <= 0)] = 1e-12
-
-                    im1 = ax[0].imshow(d_obs_clean.T, aspect='auto', cmap='jet_r', norm=matplotlib.colors.LogNorm(), extent=extent)
-                    im2 = ax[1].imshow(d_std_clean.T, aspect='auto', cmap='hot_r', norm=matplotlib.colors.LogNorm(), extent=extent)
+                    im1 = ax[0].imshow(_masked(d_obs[i_plot,:]).T, aspect='auto',
+                                       cmap=_cmap_white_bad('jet_r'),
+                                       norm=matplotlib.colors.LogNorm(), extent=extent)
+                    im2 = ax[1].imshow(_masked(d_std[i_plot,:]).T, aspect='auto',
+                                       cmap=_cmap_white_bad('hot_r'),
+                                       norm=matplotlib.colors.LogNorm(), extent=extent)
                 else:
-                    im1 = ax[0].imshow(d_obs[i_plot,:].T, aspect='auto', cmap='jet_r', extent=extent)
-                    im2 = ax[1].imshow(d_std[i_plot,:].T, aspect='auto', cmap='hot_r', extent=extent)
+                    im1 = ax[0].imshow(np.ma.masked_invalid(d_obs[i_plot,:]).T,
+                                       aspect='auto', cmap=_cmap_white_bad('jet_r'), extent=extent)
+                    im2 = ax[1].imshow(np.ma.masked_invalid(d_std[i_plot,:]).T,
+                                       aspect='auto', cmap=_cmap_white_bad('hot_r'), extent=extent)
 
-                # For signal-to-noise ratio, handle division by zero and set reasonable limits
-                snr_data = d_obs[i_plot,:] / d_std[i_plot,:]
-                snr_data = np.where(np.isfinite(snr_data), snr_data, 1.0)
-                im3 = ax[2].imshow(snr_data.T, aspect='auto', vmin = 0.5, vmax = 50, extent=extent)
+                # Relative noise in % — mask invalid entries
+                rel_noise = np.ma.masked_invalid(100.0 * d_std[i_plot,:] / d_obs[i_plot,:])
+                im3 = ax[2].imshow(rel_noise.T, aspect='auto', vmin=0, vmax=20,
+                                   cmap=_cmap_white_bad('turbo'), extent=extent)
 
                 fig.colorbar(im1, ax=ax[0])
                 fig.colorbar(im2, ax=ax[1])
@@ -3021,7 +3061,7 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
 
                 ax[0].set_title('d_obs: observed data')
                 ax[1].set_title('d_std: standard deviation')
-                #ax[2].set_title('d_std/d_obs: relative standard deviation')
+                ax[2].set_title('Relative noise, % (d_std / d_obs × 100)')
 
 
             im4 = ax[3].plot(i_plot,non_nan[i_plot], 'k.', markersize=.5)

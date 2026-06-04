@@ -485,70 +485,78 @@ ig.plot_feature_2d(f_post_h5, key='Mean', im=3, plotPoints=True, uselog=False, h
 
 
 # %%
-doLoadQuery = False
-if doLoadQuery:
-    query = ig.load_query('query_ex1.json')
+import os
+query_json = 'query_daugaard_P.json'
+# if exist file_json, then set doLoadQueery = True
+if os.path.exists(query_json):
+    print("Found existing query file %s, loading query from file" % query_json)
+    doLoadQuery = True
 else:
-    query = {
-        "constraints": [
-            {
-                "im": 2,
-                "classes": [1,2, 4],
-                "thickness_mode": "cumulative",
-                "thickness_comparison": ">",
-                "thickness_threshold": 5.0,
-                "depth_min": 0.0,
-                "depth_max": 30.0,
-                "negate": False
-            },
-            {
-                "im": 2,
-                "classes": [3,5],  # All classes except sand (2) and gravel (5)
-                "thickness_mode": "first_occurrence",
-                "thickness_comparison": "<",
-                "thickness_threshold": 3.0,
-                "depth_min": 0.0,
-                "depth_max": 30.0,
-                "negate": False
-            }
-        ]
-    }
+    doLoadQuery = False
 
-    query = {
-        "constraints": [
-            {
-                "im": 2,
-                "classes": [1],
-                "thickness_mode": "cumulative",
-                "thickness_comparison": ">",
-                "thickness_threshold": 10.0,
-                "depth_min": 0.0,
-                "depth_max": 80.0,
-                "negate": False
-            },
-            {
-                "im": 2,
-                "classes": [1],
-                "thickness_mode": "cumulative",
-                "thickness_comparison": "<",
-                "thickness_threshold": 20.0,
-                "depth_min": 0.0,
-                "depth_max": 80.0,
-                "negate": False
-            }
-        ]
-    }
-
+if doLoadQuery:
+    query = ig.load_query(query_json)
+else:
+    text = "What is the probability that the cumulative thickness of sand or gravel, above the watertable is above 4"
+    #    API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+    #    MODEL = 'anthropic/claude-sonnet-4-6'
+    #query, interp, prompt = ig.query_from_text(text, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+    query, interp, prompt = ig.query_from_text(text, f_prior_h5=f_prior_h5)
+          
     ig.save_query(query, 'query_daugaard.json')
 
 for f_post_h5 in f_post_sub:
     # Compute the probability of the query being satisfied for each model realization in the posterior, and get metadata about the query results (e.g. which realizations satisfy the query, etc.)
     P, meta = ig.query(f_post_h5, query)
-    query_title = ig.title_from_json(query)
+    #query_title = ig.title_from_json(query)
     query_title = ig.title_from_json(query, f_prior_h5)
     #  Plot the predicted probability map, and the the outcome at the borehole locations
     ig.query_plot(P, meta, query_dict=query, f_post_h5=f_post_h5, title = query_title)
-    #ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5, title = query_title)
-    #ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5, title = query_title)
+    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, f_post_h5=f_post_h5, title = query_title)
+    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, f_post_h5=f_post_h5, title = query_title)
+
+# %% Same as above but compute percentiles instead of probability
+query_json = 'query_daugaard_percentile.json'
+
+# If the file exists, load a previously saved percentile query; otherwise
+# create a metric-based query that returns thickness percentiles.
+if os.path.exists(query_json):
+    print("Found existing query file %s, loading query from file" % query_json)
+    doLoadQuery = True
+else:
+    doLoadQuery = False
+
+if doLoadQuery:
+    query = ig.load_query(query_json)
+else:
+    query = {
+        "metric": {
+            "im": 2,                    # lithology model
+            #"classes": [1, 2],          # sand + gravel
+            "classes": [2],          # gravel
+            "thickness_mode": "cumulative",
+            "depth_min": 0.0,
+            "depth_max_im": 3           # above the water table
+        },
+        "percentiles": [5, 50, 95]
+    }
+    ig.save_query(query, query_json)
+
+for f_post_h5 in f_post_sub:
+    # Compute thickness percentiles for each posterior realization and plot
+    pct_values, meta = ig.query(f_post_h5, query)
+    query_title = ig.title_from_json(query, f_prior_h5)
+
+    ig.query_percentile_plot(
+        pct_values, meta,
+        query_text=query_title,
+        hardcopy=(f"query_daugaard_percentile_{os.path.splitext(os.path.basename(f_post_h5))[0]}"
+                  if hardcopy else False)
+    )
+
+    thick90 = pct_values[:,2]-pct_values[:,0] # 90% percentile range
+    ig.plot_xy(thick90, f_data_h5 = f_data_h5, f_prior_h5 = f_prior_h5, im=3, clim=[0,11])
+
+
 
 # %%

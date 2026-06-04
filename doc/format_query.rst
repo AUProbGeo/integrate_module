@@ -39,7 +39,8 @@ Core Functions
 * ``ig.query_plot()`` — plot the probability map *or* single-point detail view from a probability query
 * ``ig.query_percentile_plot()`` — plot one map per percentile from a percentile query
 * ``ig.save_query()`` / ``ig.load_query()`` — persist a query dict to/from JSON
-* ``ig.get_prior_model_info()`` — inspect model names, types, depth ranges, and class labels
+* ``ig.get_prior_model_info()`` — inspect model names, types, depth ranges, and class labels for one model
+* ``ig.prior_describe()`` — print a human-readable summary of all models in a prior HDF5 file
 * ``ig.query_test_llm()`` — verify that an LLM model and API key are working
 
 
@@ -817,6 +818,7 @@ Quick Reference
         save_query,             # Save a query dict to a JSON file
         load_query,             # Load a query dict from a JSON file
         get_prior_model_info,   # Return metadata for one prior model
+        prior_describe,         # Print a summary of all models in a prior file
         query_test_llm,         # Verify LLM model + API key connectivity
     )
 
