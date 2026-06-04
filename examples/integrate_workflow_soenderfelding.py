@@ -31,7 +31,7 @@ import copy
 
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
-N = 10_000 # Smaller N for testing
+#N = 10_000 # Smaller N for testing
 
 showInfo = -1 # Determines how much nfo to print to screen
 
@@ -365,7 +365,7 @@ f_post_h5 = f_post_merged_h5
 f_data_h5 = f_data_merged_h5
 
 # %%
-f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
+#f_post_h5 = 'post_SDR_FEDL_ALL_id2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
 #f_post_h5 = 'post_SDR_FEDL_ALL_id1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16_17_18_19_20_21_22_23_24_25_26_27_28_29_30_31_32_33_34_35_36_37.h5'
 #f_post_h5 = 'post_SDR_FEDL_ALL_id1.h5'
 
@@ -431,6 +431,8 @@ plt.axis('equal')
 if hardcopy:
     plt.savefig('SDR_FELDING_survey_points_nonnan.png', dpi=300)
 plt.show()
+
+
 # %%
 #ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
 ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, iz=10, plotPoints=True, clim=[.1,3000])
@@ -452,24 +454,25 @@ for elevation in [40, 20, 0, -20]:
     #plt.legend()    
     plt.show()
 
-# %%
-#ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
-ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, elevation=elevation, plotPoints=True)
+# %% PLot resistivity a dpeth 0m
+ig.plot_feature_2d(f_post_h5, key='HarmonicMean', im=1, iz=2, plotPoints=True)
 plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
-#plt.legend()    
 plt.show()
 
 # %%
 for elevation in range(40, -41, -5):
-    ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=elevation, plotPoints=True, hardcopy=hardcopy)
+    ig.plot_feature_2d(f_post_h5, key='Mode', im=2, s=.1, elevation=elevation, plotPoints=True, hardcopy=hardcopy)
     #plt.plot(X[i_bh], Y[i_bh], 'k*', markersize=10, label='Boreholes')
     #plt.legend()    
     plt.show()
 
 
-# %%
-ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy) 
-ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=.5, entropy_min =0.7, entropy_max=0.8)
+# %% Continous profile of resistivity along the line defined by the boreholes
+ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy,
+                alpha=.9, logstd_min =.3, logstd_max=.5) 
+# %% Discrete profile of lithology along the line defined by the boreholes, with transparency based on entropy (more transparent where more uncertain)
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, 
+                alpha=.9, entropy_min =0.5, entropy_max=1.0)
 
 # %%
 ig.plot_feature_2d(f_post_h5, key='Mean', im=3, plotPoints=True, uselog=False, hardcopy=hardcopy)
@@ -477,11 +480,9 @@ ig.plot_feature_2d(f_post_h5, key='Mean', im=3, plotPoints=True, uselog=False, h
 
 # %% [markdown]
 # ### QUERY POSTERIOR MODEL REALIZATIONS
-# QUERY : Probability that the cumulative thickness of lithology class 2
-# within 0–30 m depth is greater than 10 m, and with an additional constraint: any top layer that is NOT sand/gravel
-# cannot be thicker than 3m.
 #
-# ig.plot_data_prior_post(f_post_h5, i_plot=3000)
+
+ig.prior_describe(f_prior_h5)
 
 
 # %%
@@ -554,8 +555,13 @@ for f_post_h5 in f_post_sub:
                   if hardcopy else False)
     )
 
+#%%
     thick90 = pct_values[:,2]-pct_values[:,0] # 90% percentile range
-    ig.plot_xy(thick90, f_data_h5 = f_data_h5, f_prior_h5 = f_prior_h5, im=3, clim=[0,11])
+    ig.plot_xy(thick90, f_data_h5 = f_data_h5, f_prior_h5 = f_prior_h5, 
+               clim=[0,11], cmap='hot', plotPoints=True, uselog=False,
+               title=f"90% percentile range of gravel thickness above water table\n{query_title}",
+               hardcopy=(f"query_daugaard_percentile_range90_{os.path.splitext(os.path.basename(f_post_h5))[0]}" if hardcopy else False)
+              )
 
 
 

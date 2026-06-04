@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 100_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 10_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 
 # %% [markdown]
@@ -80,6 +80,7 @@ for file_xlsx in f_xlsx_files:
 f_prior_h5 = ig.merge_prior(f_prior_h5_list, f_prior_merged_h5='daugaard_merged_prior_N%d.h5' % N)
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 
+ig.prior_describe(f_prior_h5)
 
 # %% [markdown]
 # ## the tTEM DATA
