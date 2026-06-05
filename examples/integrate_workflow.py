@@ -89,7 +89,7 @@ ig.prior_describe(f_prior_h5)
 # %%
 useLogData = False # Whether to transform data to log10 space (recommended for resistivity data)
 useCorrleatedNoise = False # Whether to use correlated noise (instead of uncorrelated) when generating the prior data. This can be more realistic for geophysical data, but it also increases the computational cost.
-inflateNoise = 2 # Factor to increase noise level (std) in the data, to
+inflateNoise = 4 # Factor to increase noise level (std) in the data, to
 
 
 # %%
