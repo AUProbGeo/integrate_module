@@ -414,7 +414,7 @@ def query(f_post_h5, query_dict):
 
 
 def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=None, title=None,
-               query_text=None, interpretation=None, text_panel=False, hardcopy=False):
+               query_text=None, interpretation=None, text_panel=False, hardcopy=False, **kwargs):
     """
     Plot query results and optionally detailed model visualization for a data point.
 
@@ -455,6 +455,12 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
         Save the probability map figure. If True, saves as 'query_plot.png'.
         If a string, uses that as the filename (a '.png' extension is appended
         if the string has no extension). Default False.
+    **kwargs
+        All remaining keyword arguments are forwarded to :func:`plot_xy`, giving
+        full control over ``cmap``, ``clim``, ``uselog``, ``colorbar``,
+        ``colorbar_label``, ``plotPoints``, ``plotPoints_color``,
+        ``plotPoints_marker``, ``s``, etc.
+        ``cmap`` defaults to ``'hot_r'`` and ``clim`` defaults to ``[0, 1]``.
 
     Examples
     --------
@@ -513,11 +519,17 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
         )
 
         # Background dots so P=0 (white) areas are visible, then probability scatter
+        _cmap = kwargs.pop('cmap', 'hot_r')
+        _clim = kwargs.pop('clim', [0, 1])
+        _s = kwargs.pop('s', 1)
+        _colorbar = kwargs.pop('colorbar', True)
+        _colorbar_label = kwargs.pop('colorbar_label', 'Probability')
+        _plotPoints = kwargs.pop('plotPoints', True)
         from integrate.integrate_plot import plot_xy
         _, ax, sc = plot_xy(P, X=X, Y=Y,
-                            cmap='hot_r', clim=[0, 1],
-                            title=_title, colorbar=True, colorbar_label='Probability',
-                            ax=ax, s=1, plotPoints=True)
+                            cmap=_cmap, clim=_clim,
+                            title=_title, colorbar=_colorbar, colorbar_label=_colorbar_label,
+                            ax=ax, s=_s, plotPoints=_plotPoints, **kwargs)
         ax.set_xlabel('UTMX [m]')
         ax.set_ylabel('UTMY [m]')
 
@@ -680,7 +692,7 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
 
 
 def query_percentile_plot(percentile_values, meta, query_text=None, interpretation=None,
-                          text_panel=False, hardcopy=False):
+                          text_panel=False, hardcopy=False, **kwargs):
     """
     Plot one probability map per requested percentile as side-by-side subplots.
 
@@ -699,6 +711,14 @@ def query_percentile_plot(percentile_values, meta, query_text=None, interpretati
     hardcopy : bool or str, optional
         Save figure to disk.  True → 'query_percentile_plot.png'; a string is
         used as the filename (.png appended if no extension).
+    **kwargs
+        All remaining keyword arguments are forwarded to :func:`plot_xy`, giving
+        full control over ``cmap``, ``clim``, ``uselog``, ``colorbar``,
+        ``colorbar_label``, ``plotPoints``, ``plotPoints_color``,
+        ``plotPoints_marker``, ``s``, etc.
+        ``clim`` defaults to ``[percentile_values.min(), percentile_values.max()]``
+        so that all subplots share the same colour scale.
+        ``cmap`` defaults to ``'viridis'``.
 
     Returns
     -------
@@ -711,6 +731,10 @@ def query_percentile_plot(percentile_values, meta, query_text=None, interpretati
     X = meta.get('X')
     Y = meta.get('Y')
 
+    # Shared colour scale across all subplots unless caller overrides.
+    cmap = kwargs.pop('cmap', 'viridis')
+    clim = kwargs.pop('clim', [float(percentile_values.min()), float(percentile_values.max())])
+
     ncols = n_pct + (1 if text_panel else 0)
     width_ratios = [4] * n_pct + ([1.5] if text_panel else [])
     fig, axes = plt.subplots(1, ncols, figsize=(4.5 * n_pct + (1.5 if text_panel else 0), 5),
@@ -718,17 +742,14 @@ def query_percentile_plot(percentile_values, meta, query_text=None, interpretati
                              squeeze=False)
 
     map_axes = axes[0, :n_pct]
-    vmin = percentile_values.min()
-    vmax = percentile_values.max()
 
     from integrate.integrate_plot import plot_xy
     for k, (pct, ax) in enumerate(zip(percentiles, map_axes)):
         vals = percentile_values[:, k]
         if X is not None and Y is not None:
             _, ax, _ = plot_xy(vals, X=X, Y=Y,
-                               cmap='viridis', clim=[vmin, vmax],
-                               colorbar=True, colorbar_label='[m]',
-                               ax=ax, s=5)
+                               cmap=cmap, clim=clim,
+                               ax=ax, **kwargs)
             ax.set_xlabel('UTMX')
             if k == 0:
                 ax.set_ylabel('UTMY')
