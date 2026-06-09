@@ -2976,7 +2976,7 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
     if showInfo>-1:
         print('--> Got data for case: %s' % case)
 
-    return [os.path.basename(f) for f in filelist]
+    return [f.replace('\\', '/').split('/')[-1] for f in filelist]
 
 
 
