@@ -15,7 +15,10 @@ import h5py
 import numpy as np
 
 # Add the parent directory to Python path to import integrate module
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ig_style import apply_style, page_header
 
 try:
     import integrate as ig
@@ -60,12 +63,9 @@ def get_h5_files():
     return [f for f in os.listdir('.') if f.endswith('.h5')]
 
 def run_prior_app():
-    st.header("Prior Model Generation")
-    
-    st.markdown("""
-    Generate prior model ensembles for Bayesian inversion. Choose from different
-    prior model types based on your geological assumptions.
-    """)
+    page_header("Prior Model Generation",
+                "Generate prior model ensembles for Bayesian inversion, based on "
+                "your geological assumptions.")
     
     # Model selection
     model_type = st.selectbox(
@@ -305,4 +305,7 @@ def run_prior_app():
                     st.error(f"Error generating model: {str(e)}")
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="INTEGRATE - Prior Models",
+                       page_icon=":material/casino:", layout="wide")
+    apply_style()
     run_prior_app()

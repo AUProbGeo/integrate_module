@@ -76,8 +76,17 @@ if [ -f "$(python3 -c "import sys; print(sys.prefix)")/lib/python3."*"/EXTERNALL
 		. venv/bin/activate
 fi
 
-# Check if pip is available
-if command -v pip >/dev/null 2>&1; then
+# Prefer uv pip if available, fall back to pip
+if command -v uv >/dev/null 2>&1; then
+	echo "uv detected - using 'uv pip install'"
+	if uv pip install -e .; then
+		echo "Python module installed successfully"
+		PYTHON_INSTALL_SUCCESS=true
+	else
+		echo "Python module installation failed"
+		PYTHON_INSTALL_SUCCESS=false
+	fi
+elif command -v pip >/dev/null 2>&1; then
 	if pip install -e .; then
 		echo "Python module installed successfully"
 		PYTHON_INSTALL_SUCCESS=true
@@ -86,10 +95,11 @@ if command -v pip >/dev/null 2>&1; then
 		PYTHON_INSTALL_SUCCESS=false
 	fi
 else
-	echo "ERROR: pip is not installed. Please install Python and pip to complete the installation."
-	echo "On Ubuntu/Debian, you can install with:"
+	echo "ERROR: neither uv nor pip is installed. Please install Python and pip to complete the installation."
+	echo "On Ubuntu/Debian, you can install pip with:"
 	echo "  apt-get install python3 python3-pip"
-	echo "Or use your system's package manager to install Python and pip."
+	echo "Or install uv with:"
+	echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
 	PYTHON_INSTALL_SUCCESS=false
 fi
 

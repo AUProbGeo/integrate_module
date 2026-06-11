@@ -12,7 +12,10 @@ import h5py
 import matplotlib.pyplot as plt
 import streamlit as st
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ig_style import apply_style, page_header
 
 try:
     import integrate as ig
@@ -75,11 +78,9 @@ def show_prior_model_info(f_prior_h5):
 
 
 def run_query_app():
-    st.header("Query Tool")
-    st.markdown(
-        "Compute per-data-point probabilities that posterior realizations satisfy "
-        "a plain-English geological query, translated by an LLM."
-    )
+    page_header("Query Tool",
+                "Compute per-data-point probabilities that posterior realizations satisfy "
+                "a plain-English geological query, translated by an LLM.")
 
     # --- LLM configuration (always first) ---
     st.subheader("LLM")
@@ -197,4 +198,7 @@ def run_query_app():
 
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="INTEGRATE - Query Tool",
+                       page_icon=":material/search:", layout="wide")
+    apply_style()
     run_query_app()

@@ -19,8 +19,11 @@ import os
 import sys
 import matplotlib.pyplot as plt
 
+from ig_style import apply_style, page_header, file_type_badge
+
 # Add the parent directory to Python path to import integrate module
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     import integrate as ig
@@ -303,12 +306,8 @@ def display_h5_info(info):
     # File metadata
     col1, col2, col3 = st.columns(3)
     with col1:
-        # Add color coding for file type
-        type_color = {
-            'DATA': '🟢', 'PRIOR': '🔵', 'POSTERIOR': '🟡', 
-            'FORWARD': '🟠', 'UNKNOWN': '⚪', 'ERROR': '🔴'
-        }
-        st.metric("File Type", f"{type_color.get(info['type'], '⚪')} {info['type']}")
+        st.caption("File Type")
+        st.markdown(file_type_badge(info['type']), unsafe_allow_html=True)
     with col2:
         st.metric("File Size", f"{info['size_mb']:.2f} MB")
     with col3:
@@ -484,8 +483,8 @@ def run_data_app():
     """
     Main function to run the data analysis Streamlit app.
     """
-    st.header("📊 HDF5 Data Analysis")
-    st.markdown("Analyze and inspect HDF5 files used in the INTEGRATE workflow.")
+    page_header("HDF5 Data Analysis",
+                "Analyze and inspect HDF5 files used in the INTEGRATE workflow.")
     
     # Get list of H5 files in current directory
     current_dir = os.getcwd()
@@ -588,4 +587,7 @@ def run_data_app():
                     st.error(f"Error previewing dataset: {str(e)}")
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="INTEGRATE - Data Analysis",
+                       page_icon=":material/database:", layout="wide")
+    apply_style()
     run_data_app()

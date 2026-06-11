@@ -13,11 +13,13 @@ import sys
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
-import io
 import base64
 
 # Add the parent directory to Python path to import integrate module
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ig_style import apply_style, page_header
 
 try:
     import integrate as ig
@@ -89,20 +91,23 @@ def get_prior_files():
             prior_files.append(f)
     return prior_files if prior_files else h5_files
 
-def capture_plot():
-    """Capture current matplotlib plot as image for Streamlit display"""
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-    buf.seek(0)
-    return buf
+def show_new_figures(fignums_before):
+    """Display all matplotlib figures created since fignums_before, then close them.
+
+    Plot functions like plot_profile(im=0) or plot_T_EV(pl='all') create
+    several figures; this captures all of them, not just the current one.
+    """
+    new_figs = sorted(set(plt.get_fignums()) - fignums_before)
+    if not new_figs:
+        st.warning("No figure was produced.")
+    for num in new_figs:
+        st.pyplot(plt.figure(num))
+    plt.close('all')
 
 def run_plot_app():
-    st.header("Visualization & Plotting")
-    
-    st.markdown("""
-    Create publication-quality visualizations of INTEGRATE results including
-    profiles, 2D maps, data comparisons, and statistical plots.
-    """)
+    page_header("Visualization & Plotting",
+                "Create publication-quality visualizations of INTEGRATE results: "
+                "profiles, 2D maps, data comparisons, and statistical plots.")
     
     # Plot type selection
     plot_type = st.selectbox(
@@ -133,31 +138,33 @@ def run_plot_app():
                 i1 = st.number_input("Start data point", value=1, min_value=1)
                 i2 = st.number_input("End data point (large number = all)", value=100, min_value=1)
                 im = st.number_input("Model index (0 = all models)", value=1, min_value=0)
-            
+                xaxis = st.selectbox("X-axis", ["index", "id", "x", "y"])
+
             with col2:
+                alpha = st.slider("Uncertainty transparency (alpha)", 0.0, 1.0, 0.0)
                 hardcopy = st.checkbox("Save plot to file", value=False)
                 txt = st.text_input("Additional text for filename", "")
                 showInfo = st.selectbox("Verbosity level", [0, 1, 2], index=0)
-            
+
             if st.button("Generate Profile Plot"):
                 try:
                     plt.ioff()  # Turn off interactive mode
-                    fig = plt.figure(figsize=(12, 8))
-                    
+                    fignums_before = set(plt.get_fignums())
+
                     igp.plot_profile(
                         f_post_h5=f_post_h5,
                         i1=i1,
                         i2=i2,
                         im=im,
+                        xaxis=xaxis,
+                        alpha=alpha,
                         hardcopy=hardcopy,
                         txt=txt,
                         showInfo=showInfo
                     )
-                    
-                    buf = capture_plot()
-                    st.image(buf, caption=f"Profile plot from {os.path.basename(f_post_h5)}")
-                    plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
         else:
@@ -173,38 +180,51 @@ def run_plot_app():
             col1, col2 = st.columns(2)
             with col1:
                 im = st.number_input("Model index", value=1, min_value=1)
+                key = st.selectbox(
+                    "Dataset key",
+                    ["(auto)", "Mean", "Median", "Std", "Mode", "P", "Entropy"],
+                    help="Auto selects 'Median' for continuous and 'Mode' for discrete parameters."
+                )
                 iz = st.number_input("Feature/layer index", value=0, min_value=0)
-                key = st.text_input("Dataset key (empty = auto-detect)", "")
-                
+                elevation_text = st.text_input("Elevation in m (empty = use layer index)", "")
+
             with col2:
                 i1 = st.number_input("Start data point", value=1, min_value=1)
                 i2 = st.number_input("End data point", value=1000, min_value=1)
+                ic = st.number_input("Class index (used when key = 'P')", value=0, min_value=0)
                 uselog = st.checkbox("Use logarithmic color scale", value=True)
                 hardcopy = st.checkbox("Save plot to file", value=False)
-            
-            title_text = st.text_input("Additional title text", "")
-            
+
+            title_text = st.text_input("Custom plot title (empty = auto)", "")
+
             if st.button("Generate 2D Feature Map"):
+                elevation = None
+                if elevation_text.strip():
+                    try:
+                        elevation = float(elevation_text)
+                    except ValueError:
+                        st.error("Invalid elevation value")
+                        st.stop()
                 try:
                     plt.ioff()
-                    fig = plt.figure(figsize=(12, 8))
-                    
+                    fignums_before = set(plt.get_fignums())
+
                     igp.plot_feature_2d(
                         f_post_h5=f_post_h5,
-                        key=key,
+                        key='' if key == "(auto)" else key,
                         i1=i1,
                         i2=i2,
                         im=im,
                         iz=iz,
+                        elevation=elevation,
+                        ic=ic if key == "P" else None,
                         uselog=int(uselog),
-                        title_text=title_text,
+                        title=title_text if title_text else None,
                         hardcopy=hardcopy
                     )
-                    
-                    buf = capture_plot()
-                    st.image(buf, caption=f"2D feature map from {os.path.basename(f_post_h5)}")
-                    plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
         else:
@@ -224,15 +244,16 @@ def run_plot_app():
                 s = st.number_input("Marker size", value=5, min_value=1)
                 
             with col2:
-                pl = st.selectbox("Plot type", ["all", "T", "EV", "ND"])
+                pl = st.selectbox("Plot type", ["all", "T", "EV", "ND", "CHI2", "N_UNIQUE"])
                 T_min = st.number_input("Min temperature", value=1, min_value=1)
                 T_max = st.number_input("Max temperature", value=100, min_value=1)
                 hardcopy = st.checkbox("Save plot to file", value=False)
-            
+
             if st.button("Generate T/EV Plot"):
                 try:
                     plt.ioff()
-                    
+                    fignums_before = set(plt.get_fignums())
+
                     igp.plot_T_EV(
                         f_post_h5=f_post_h5,
                         i1=i1,
@@ -243,11 +264,9 @@ def run_plot_app():
                         pl=pl,
                         hardcopy=hardcopy
                     )
-                    
-                    buf = capture_plot()
-                    st.image(buf, caption=f"Temperature/Evidence from {os.path.basename(f_post_h5)}")
-                    plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
         else:
@@ -264,35 +283,36 @@ def run_plot_app():
             with col1:
                 plType = st.selectbox("Plot style", ["imshow", "plot"])
                 Dkey = st.text_input("Data key (empty = auto-detect)", "")
-                
+
             with col2:
                 i_plot_text = st.text_input("Data indices to plot (comma-separated, empty = all)", "")
+                uselog = st.checkbox("Use logarithmic scaling", value=True)
                 hardcopy = st.checkbox("Save plot to file", value=False)
-            
-            # Parse data indices
-            i_plot = []
+
+            # Parse data indices (plot_data expects a numpy array for indexing)
+            i_plot = np.array([], dtype=int)
             if i_plot_text:
                 try:
-                    i_plot = [int(x.strip()) for x in i_plot_text.split(',')]
+                    i_plot = np.array([int(x.strip()) for x in i_plot_text.split(',')], dtype=int)
                 except:
                     st.error("Invalid data index format")
-            
+
             if st.button("Generate Data Plot"):
                 try:
                     plt.ioff()
-                    
+                    fignums_before = set(plt.get_fignums())
+
                     igp.plot_data(
                         f_data_h5=f_data_h5,
                         i_plot=i_plot,
                         Dkey=Dkey,
                         plType=plType,
+                        uselog=uselog,
                         hardcopy=hardcopy
                     )
-                    
-                    buf = capture_plot()
-                    st.image(buf, caption=f"Data plot from {os.path.basename(f_data_h5)}")
-                    plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
         else:
@@ -307,18 +327,19 @@ def run_plot_app():
             
             col1, col2 = st.columns(2)
             with col1:
-                pl = st.selectbox("Geometry type", ["all", "LINE", "ELEVATION", "id"])
+                pl = st.selectbox("Geometry type", ["all", "LINE", "ELEVATION", "id", "NDATA"])
                 s = st.number_input("Marker size", value=5, min_value=1)
-                
+
             with col2:
                 i1 = st.number_input("Start index", value=0, min_value=0)
                 i2 = st.number_input("End index (0 = all)", value=0, min_value=0)
                 hardcopy = st.checkbox("Save plot to file", value=False)
-            
+
             if st.button("Generate Geometry Plot"):
                 try:
                     plt.ioff()
-                    
+                    fignums_before = set(plt.get_fignums())
+
                     igp.plot_geometry(
                         f_data_h5=f_data_h5,
                         i1=i1,
@@ -327,11 +348,9 @@ def run_plot_app():
                         pl=pl,
                         hardcopy=hardcopy
                     )
-                    
-                    buf = capture_plot()
-                    st.image(buf, caption=f"Geometry plot from {os.path.basename(f_data_h5)}")
-                    plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
         else:
@@ -346,27 +365,31 @@ def run_plot_app():
             
             col1, col2 = st.columns(2)
             with col1:
-                Mkey = st.text_input("Model key (empty = all models)", "")
+                Mkey = st.text_input("Model key, e.g. M1 (empty = all models)", "")
                 nr = st.number_input("Number of realizations to show", value=100, min_value=10)
-                
+
             with col2:
+                use_log_choice = st.selectbox(
+                    "Scale", ["Auto", "Log", "Linear"],
+                    help="Auto: log10 if the parameter spans more than 2 orders of magnitude."
+                )
                 hardcopy = st.checkbox("Save plot to file", value=True)
-            
+
             if st.button("Generate Prior Statistics"):
                 try:
                     plt.ioff()
-                    
+                    fignums_before = set(plt.get_fignums())
+
                     igp.plot_prior_stats(
                         f_prior_h5=f_prior_h5,
-                        Mkey=Mkey,
+                        Mkey=Mkey if Mkey.strip() else [],
                         nr=nr,
+                        use_log={"Auto": None, "Log": True, "Linear": False}[use_log_choice],
                         hardcopy=hardcopy
                     )
-                    
-                    buf = capture_plot()
-                    st.image(buf, caption=f"Prior statistics from {os.path.basename(f_prior_h5)}")
-                    plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
         else:
@@ -399,14 +422,15 @@ def run_plot_app():
             col1, col2 = st.columns(2)
             with col1:
                 nr = st.number_input("Number of realizations", value=1000, min_value=10)
-                id = st.number_input("Data identifier", value=1, min_value=1)
+                id = st.number_input("Prior data identifier", value=1, min_value=1)
+                id_data = st.number_input("Observed data identifier (0 = same as prior)", value=0, min_value=0)
                 alpha = st.slider("Line transparency", 0.1, 1.0, 0.5)
-                
+
             with col2:
                 d_str = st.selectbox("Data array", ["d_obs", "d_std"])
                 hardcopy = st.checkbox("Save plot to file", value=True)
                 ylim_text = st.text_input("Y-axis limits (min,max)", "")
-            
+
             # Parse y limits
             ylim = None
             if ylim_text:
@@ -416,27 +440,26 @@ def run_plot_app():
                         ylim = None
                 except:
                     st.error("Invalid y-limit format")
-            
+
             if st.button("Generate Data-Model Comparison"):
                 try:
                     plt.ioff()
-                    
-                    result = igp.plot_data_prior(
+                    fignums_before = set(plt.get_fignums())
+
+                    igp.plot_data_prior(
                         f_prior_data_h5=f_prior_data_h5,
                         f_data_h5=f_data_h5,
                         nr=nr,
                         id=id,
+                        id_data=id_data if id_data > 0 else None,
                         d_str=d_str,
                         alpha=alpha,
                         ylim=ylim,
                         hardcopy=hardcopy
                     )
-                    
-                    if result:
-                        buf = capture_plot()
-                        st.image(buf, caption="Data-Model Comparison")
-                        plt.close()
-                    
+
+                    show_new_figures(fignums_before)
+
                 except Exception as e:
                     st.error(f"Error generating plot: {str(e)}")
     
@@ -457,6 +480,8 @@ def run_plot_app():
         **Temperature & Evidence**: Quality control plots
         - Temperature: sampling efficiency (lower = better convergence)
         - Evidence: data fit quality (higher = better fit)
+        - CHI2: reduced chi-squared goodness of fit
+        - N_UNIQUE: number of unique accepted realizations per location
         
         **Data Visualization**: Observational data analysis
         - Time series, image displays, signal-to-noise ratios
@@ -468,4 +493,7 @@ def run_plot_app():
         """)
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="INTEGRATE - Visualization",
+                       page_icon=":material/monitoring:", layout="wide")
+    apply_style()
     run_plot_app()

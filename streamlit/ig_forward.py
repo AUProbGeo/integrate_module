@@ -14,7 +14,10 @@ import h5py
 import numpy as np
 
 # Add the parent directory to Python path to import integrate module
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ig_style import apply_style, page_header
 
 try:
     import integrate as ig
@@ -67,12 +70,9 @@ def get_stm_files():
     return [f for f in os.listdir('.') if f.endswith('.stm')]
 
 def run_forward_app():
-    st.header("Forward Modeling with GA-AEM")
-    
-    st.markdown("""
-    Compute electromagnetic forward modeling using the GA-AEM method. 
-    This generates synthetic data from prior model realizations.
-    """)
+    page_header("Forward Modeling with GA-AEM",
+                "Compute electromagnetic forward modeling using the GA-AEM method. "
+                "This generates synthetic data from prior model realizations.")
     
     # File selection
     st.subheader("File Selection")
@@ -224,4 +224,7 @@ def run_forward_app():
     """)
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="INTEGRATE - Forward Modeling",
+                       page_icon=":material/bolt:", layout="wide")
+    apply_style()
     run_forward_app()

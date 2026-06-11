@@ -16,7 +16,10 @@ import time
 import threading
 
 # Add the parent directory to Python path to import integrate module
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ig_style import apply_style, page_header
 
 try:
     import integrate as ig
@@ -81,12 +84,9 @@ def get_data_files():
     return data_files if data_files else h5_files
 
 def run_rejection_app():
-    st.header("Rejection Sampling Inversion")
-    
-    st.markdown("""
-    Perform Bayesian inversion using rejection sampling with temperature annealing.
-    This process finds model parameters that best fit the observed data.
-    """)
+    page_header("Rejection Sampling Inversion",
+                "Perform Bayesian inversion using rejection sampling with temperature "
+                "annealing, finding model parameters that best fit the observed data.")
     
     # File selection
     st.subheader("File Selection")
@@ -313,4 +313,7 @@ def run_rejection_app():
     """)
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="INTEGRATE - Rejection Sampling",
+                       page_icon=":material/target:", layout="wide")
+    apply_style()
     run_rejection_app()
