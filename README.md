@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/AUProbGeo/integrate_module/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/AUProbGeo/integrate_module/actions/workflows/docs.yml)
 [![PyPI](https://badge.fury.io/py/integrate-module.svg)](https://badge.fury.io/py/integrate-module)
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://cultpenguin.github.io/integrate_module/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://auprobgeo.github.io/integrate_module/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 

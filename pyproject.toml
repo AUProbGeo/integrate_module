@@ -53,7 +53,7 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/AUProbGeo/integrate_module"
-Documentation = "https://cultpenguin.github.io/integrate_module/"
+Documentation = "https://auprobgeo.github.io/integrate_module/"
 Repository = "https://github.com/AUProbGeo/integrate_module"
 Issues = "https://github.com/AUProbGeo/integrate_module/issues"
 
