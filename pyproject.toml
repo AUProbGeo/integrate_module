@@ -30,9 +30,8 @@ dependencies = [
     "pandas",
     "pyvista",
     "litellm",
-    "streamlit"
-    # libaarhusxyz must be installed manually (see README) — PyPI does not allow git dependencies.
-    # pip install git+https://github.com/cultpenguin/libaarhusxyz
+    "streamlit",
+    "libaarhusxyz",
 ]
 
 [project.optional-dependencies]
@@ -40,13 +39,23 @@ dev = [
     "pytest",
     "black",
 ]
+docs = [
+    "sphinx",
+    "nbsphinx",
+    "sphinx-gallery",
+    "pandoc",
+    "myst-parser",
+    "sphinx-rtd-theme",
+    "furo",
+    "tomli; python_version < '3.11'",
+]
 
 
 [project.urls]
-Homepage = "https://github.com/cultpenguin/integrate_module"
+Homepage = "https://github.com/AUProbGeo/integrate_module"
 Documentation = "https://cultpenguin.github.io/integrate_module/"
-Repository = "https://github.com/cultpenguin/integrate_module"
-Issues = "https://github.com/cultpenguin/integrate_module/issues"
+Repository = "https://github.com/AUProbGeo/integrate_module"
+Issues = "https://github.com/AUProbGeo/integrate_module/issues"
 
 [project.scripts]
 integrate = "integrate.integrate_www_cli:main"

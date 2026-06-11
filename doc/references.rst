@@ -11,10 +11,14 @@ References
 
 .. [FALK2025] Falk, Frederik Alexander, Anders Vest Christiansen, and Thomas Mejer Hansen. "Comparison of three one-dimensional time-domain electromagnetic forward algorithms." Applied Computing and Geosciences (2025): 100243. [https://doi.org/10.1016/j.acags.2025.100243]
 
-.. [GEOPRIOR1D] Nørgaard, Jesper, Rasmus Bødker Madsen, Anne-Sophie Høyer, Ingelise Møller, and Thomas Mejer Hansen. "GeoPrior1D: An application for generating 1D geological and geophysical realizations of the subsurface." In Review [https://github.com/GEUSjesper/geoprior1d]
+.. [NORGAARD2026] Nørgaard, Jesper, Rasmus Bødker Madsen, Anne-Sophie Høyer, Ingelise Møller, and Thomas Mejer Hansen. "Quantifying and Incorporating Lithological Well Logging as Uncertain Data in Probabilistic Inverse Problems." Mathematical Geosciences (2026): 1-26. [https://doi.org/10.1007/s11004-026-10298-6]
+
+.. [GEOPRIOR1D] Nørgaard, Jesper, Rasmus Bødker Madsen, Ingelise Møller, Thomas Mejer Hansen, and Anne-Sophie Høyer. "GeoPrior1D: An application for generating 1D geological and geophysical realizations of the subsurface." Available at SSRN 6148572 (2026). [https://doi.org/10.1016/j.softx.2026.102654]
 
 
 .. [GA-AEM] https://github.com/GeoscienceAustralia/ga-aem
+
+.. [libaarhusxyz] https://github.com/emerald-geomodelling/libaarhusxyz
 
 .. [SimPEG] Cockett, Rowan, Seogi Kang, Lindsey J. Heagy, Adam Pidlisecky, and Douglas W. Oldenburg. "SimPEG: An open source framework for simulation and gradient based parameter estimation in geophysical applications." Computers & Geosciences 85 (2015): 142-154. [https://simpeg.xyz/]
 

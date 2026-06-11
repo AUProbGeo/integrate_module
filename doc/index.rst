@@ -54,7 +54,7 @@ Source Code
 ===========
 
    The latest stable code is available on GitHub at
-   https://github.com/cultpenguin/integrate_module
+   https://github.com/AUProbGeo/integrate_module
 
 
 License (MIT)

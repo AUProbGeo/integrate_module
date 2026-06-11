@@ -17,38 +17,94 @@ On Windows, this will also install the Python wrapper for GA-AEM (1D EM forward 
 
 On Linux/macOS, you will need to install GA-AEM manually.
 
-Using pip (from PyPI, on Ubuntu)
-=================================
+Using uv (recommended, from PyPI)
+==================================
+
+`uv <https://github.com/astral-sh/uv>`_ is a fast Python package manager. Install it first if needed:
 
 ::
 
-    # Install python3 venv
+    # Install uv (Linux/macOS)
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # or: pip install uv
+
+    # Create virtual environment in .venv/ inside the module root
+    cd path/to/integrate_module
+    uv venv .venv --python 3.11
+
+    # Activate
+    source .venv/bin/activate      # Linux/macOS
+    .venv\Scripts\activate         # Windows
+
+    # Install integrate module
+    uv pip install integrate_module
+
+Using uv (from source)
+=======================
+
+::
+
+    # Install uv (Linux/macOS)
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # or: pip install uv
+
+    # Create .venv and install all dependencies in one step (recommended for development)
+    cd path/to/integrate_module
+    uv sync
+
+    # Activate
+    source .venv/bin/activate      # Linux/macOS
+    .venv\Scripts\activate         # Windows
+
+Using pip + venv (from PyPI, on Ubuntu)
+========================================
+
+::
+
+    # Install python3-venv
     sudo apt install python3-venv
-    
-    # Create virtual environment
-    python3 -m venv ~/integrate
-    source ~/integrate/bin/activate
+
+    # Create virtual environment in .venv/ inside the module root
+    cd path/to/integrate_module
+    python3 -m venv .venv
+    source .venv/bin/activate
     pip install --upgrade pip
-    
+
     # Install integrate module
     pip install integrate_module
-    
-Using pip (from source, on Ubuntu)
-===================================
+
+Using pip + venv (from source, on Ubuntu)
+==========================================
 
 ::
 
-    # Install python3 venv
+    # Install python3-venv
     sudo apt install python3-venv
 
-    # Create virtual environment
-    python3 -m venv ~/integrate
-    source ~/integrate/bin/activate
+    # Create virtual environment in .venv/ inside the module root
+    cd path/to/integrate_module
+    python3 -m venv .venv
+    source .venv/bin/activate
     pip install --upgrade pip
 
-    # Install integrate module
-    cd path/to/integrate_module
+    # Install integrate module from source
     pip install -e .
+
+Installing documentation dependencies
+======================================
+
+To also install the packages needed to build the Sphinx documentation, use the ``docs`` extra:
+
+::
+
+    # With uv (from source)
+    uv sync --extra docs
+
+    # With uv pip (from source)
+    uv pip install -e ".[docs]"
+
+    # With pip (from source)
+    pip install -e ".[docs]"
 
 Using Conda + pip (from PyPI)
 ==============================
@@ -152,7 +208,7 @@ Please ask the developers for access to this branch if needed. To clone the main
 
 ::
 
-    git clone --recurse-submodules git@github.com:cultpenguin/integrate_module.git
+    git clone --recurse-submodules git@github.com:AUProbGeo/integrate_module.git
 
 You may need to run the following command to update the submodules:
 
