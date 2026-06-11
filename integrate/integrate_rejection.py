@@ -338,8 +338,12 @@ def integrate_rejection(f_prior_h5='prior.h5',
         # Split the ip_range into Nchunks
         if Nchunks==0:
             if parallel:
-                Nchunks = Ncpu
-            else:   
+                if progress_callback is not None:
+                    # Finer chunking gives smoother live progress updates
+                    Nchunks = min(len(ip_range), Ncpu * 4)
+                else:
+                    Nchunks = Ncpu
+            else:
                 Nchunks = 1
         ip_range_shuffled = ip_range.copy()
         np.random.shuffle(ip_range_shuffled)
@@ -362,14 +366,12 @@ def integrate_rejection(f_prior_h5='prior.h5',
             use_N_best=use_N_best,
             T_N_above=_T_N_above,
             T_P_acc_level=_T_P_acc_level,
+            progress_callback=update_progress if progress_callback else None,
         )
 
 
     else:
 
-            # Extract progress_callback for non-parallel execution
-            progress_callback = kwargs.get('progress_callback', None)
-            
             i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(D=D,
                                         DATA = DATA,
                                         idx = idx,
@@ -625,9 +627,18 @@ def integrate_rejection_range(D,
         print('class_id_list',class_id_list)
         print('len(class_id_list)',len(class_id_list))
 
-    #print(ip_range)    
+    #print(ip_range)
+    # Throttle callback to ~100 updates so it does not dominate runtime
+    progress_step = max(1, nump // 100)
     #tqdm(range(nd), mininterval=1, disable=disableTqdm, desc='gatdaem1d', leave=False):
     for j in tqdm(range(len(ip_range)), disable=disableTqdm, desc='Rejection Sampling', leave=False):
+        if progress_callback and ((j + 1) % progress_step == 0 or j + 1 == nump):
+            try:
+                progress_callback(j + 1, nump,
+                                  {'phase': 'sampling',
+                                   'status': 'Rejection sampling (%d/%d data points)' % (j + 1, nump)})
+            except Exception:
+                pass
         ip = ip_range[j] # This is the index of the data point to invert
   
         t=[]
@@ -844,7 +855,7 @@ def integrate_rejection_range(D,
 
 
 
-def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2):
+def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, progress_callback=None):
     """
     Coordinate parallel processing of posterior sampling across multiple chunks.
     
@@ -930,7 +941,22 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     try:
         with ctx.Pool(Ncpu) as p:
             # New implementation with shared memory
-            results = p.map(integrate_posterior_chunk, [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level) for i in range(len(ip_chunks))])
+            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level) for i in range(len(ip_chunks))]
+            if progress_callback is None:
+                results = p.map(integrate_posterior_chunk, chunk_args)
+            else:
+                # imap_unordered yields per finished chunk, enabling live
+                # progress. Result order does not matter: each result carries
+                # its own ip_range used for aggregation below.
+                results = []
+                total_dp = sum(len(c) for c in ip_chunks)
+                done_dp = 0
+                for res in p.imap_unordered(integrate_posterior_chunk, chunk_args):
+                    results.append(res)
+                    done_dp += len(res[-1])  # last element is the chunk's ip_range
+                    progress_callback(done_dp, total_dp,
+                                      {'phase': 'sampling',
+                                       'status': 'Rejection sampling (%d/%d data points)' % (done_dp, total_dp)})
             # Old implementation where D was copied to each process
             #results = p.map(integrate_posterior_chunk, [(i, ip_chunks, D, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best) for i in range(len(ip_chunks))])
     finally:

@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ig_style import apply_style, page_header
+from ig_progress import make_progress_callback
 
 try:
     import integrate as ig
@@ -190,105 +191,82 @@ def run_rejection_app():
             return
         
         # Create progress tracking
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        callback, finish = make_progress_callback()
         time_text = st.empty()
-        info_text = st.empty()
-        
-        # Progress callback function
-        def progress_callback(current, total, info_dict=None):
-            if total > 0:
-                progress = min(current / total, 1.0)
-                progress_bar.progress(progress)
-            
-            if info_dict:
-                phase = info_dict.get('phase', 'processing')
-                status = info_dict.get('status', '')
-                status_text.text(f"Phase: {phase} - {status}")
-                
-                if 'current_ip' in info_dict:
-                    info_text.text(f"Processing data point: {info_dict['current_ip']}")
-            else:
-                status_text.text(f"Progress: {current}/{total}")
-        
+
         start_time = time.time()
-        
-        with st.spinner("Running rejection sampling inversion... This may take a long time."):
-            try:
-                status_text.text("Starting inversion...")
+
+        try:
+            # Prepare arguments
+            kwargs = {
+                'showInfo': showInfo,
+                'updatePostStat': updatePostStat,
+                'progress_callback': callback,
+                'console_progress': False  # Disable console progress for cleaner Streamlit output
+            }
+
+            # Run inversion
+            f_post_result = ig.integrate_rejection(
+                f_prior_h5=f_prior_h5,
+                f_data_h5=f_data_h5,
+                f_post_h5=f_post_h5,
+                N_use=N_use,
+                id_use=id_use,
+                ip_range=ip_range,
+                nr=nr,
+                autoT=autoT,
+                T_base=T_base,
+                Nchunks=Nchunks,
+                Ncpu=Ncpu,
+                parallel=parallel,
+                use_N_best=use_N_best,
+                **kwargs
+            )
+
+            elapsed_time = time.time() - start_time
+
+            finish("Inversion completed!")
+            time_text.text(f"Total time: {elapsed_time:.1f} seconds")
+
+            st.success(f"✅ Rejection sampling completed successfully!")
+            st.info(f"Results saved as: {f_post_result}")
+            
+            # Show basic statistics
+            if os.path.exists(f_post_result):
+                st.markdown("---")
+                display_h5_info(f_post_result)
                 
-                # Prepare arguments
-                kwargs = {
-                    'showInfo': showInfo,
-                    'updatePostStat': updatePostStat,
-                    'progress_callback': progress_callback,
-                    'console_progress': False  # Disable console progress for cleaner Streamlit output
-                }
-                
-                # Run inversion
-                f_post_result = ig.integrate_rejection(
-                    f_prior_h5=f_prior_h5,
-                    f_data_h5=f_data_h5,
-                    f_post_h5=f_post_h5,
-                    N_use=N_use,
-                    id_use=id_use,
-                    ip_range=ip_range,
-                    nr=nr,
-                    autoT=autoT,
-                    T_base=T_base,
-                    Nchunks=Nchunks,
-                    Ncpu=Ncpu,
-                    parallel=parallel,
-                    use_N_best=use_N_best,
-                    **kwargs
-                )
-                
-                elapsed_time = time.time() - start_time
-                
-                progress_bar.progress(1.0)
-                status_text.text("Inversion completed!")
-                time_text.text(f"Total time: {elapsed_time:.1f} seconds")
-                
-                st.success(f"✅ Rejection sampling completed successfully!")
-                st.info(f"Results saved as: {f_post_result}")
-                
-                # Show basic statistics
-                if os.path.exists(f_post_result):
-                    st.markdown("---")
-                    display_h5_info(f_post_result)
-                    
-                    # Try to show some basic inversion statistics
-                    try:
-                        with h5py.File(f_post_result, 'r') as f:
-                            if 'T' in f:
-                                T_values = f['T'][:]
-                                T_mean = np.nanmean(T_values)
-                                st.metric("Average Temperature", f"{T_mean:.2f}")
+                # Try to show some basic inversion statistics
+                try:
+                    with h5py.File(f_post_result, 'r') as f:
+                        if 'T' in f:
+                            T_values = f['T'][:]
+                            T_mean = np.nanmean(T_values)
+                            st.metric("Average Temperature", f"{T_mean:.2f}")
+                        
+                        if 'EV' in f:
+                            EV_values = f['EV'][:]
+                            EV_mean = np.nanmean(EV_values)
+                            st.metric("Average Log Evidence", f"{EV_mean:.2f}")
                             
-                            if 'EV' in f:
-                                EV_values = f['EV'][:]
-                                EV_mean = np.nanmean(EV_values)
-                                st.metric("Average Log Evidence", f"{EV_mean:.2f}")
-                                
-                            if 'N_UNIQUE' in f:
-                                N_unique = f['N_UNIQUE'][:]
-                                N_unique_mean = np.nanmean(N_unique)
-                                st.metric("Average Unique Samples", f"{N_unique_mean:.1f}")
-                    except:
-                        pass
-                    
-            except Exception as e:
-                elapsed_time = time.time() - start_time
-                status_text.text("Inversion failed!")
-                time_text.text(f"Time elapsed: {elapsed_time:.1f} seconds")
+                        if 'N_UNIQUE' in f:
+                            N_unique = f['N_UNIQUE'][:]
+                            N_unique_mean = np.nanmean(N_unique)
+                            st.metric("Average Unique Samples", f"{N_unique_mean:.1f}")
+                except:
+                    pass
                 
-                st.error(f"Error during inversion: {str(e)}")
-                st.error("Common issues:")
-                st.error("1. Incompatible file formats between prior and data")
-                st.error("2. Insufficient memory for large datasets")
-                st.error("3. Data/model dimension mismatches")
-                st.error("4. Corrupted H5 files")
-    
+        except Exception as e:
+            elapsed_time = time.time() - start_time
+            time_text.text(f"Time elapsed: {elapsed_time:.1f} seconds")
+            
+            st.error(f"Error during inversion: {str(e)}")
+            st.error("Common issues:")
+            st.error("1. Incompatible file formats between prior and data")
+            st.error("2. Insufficient memory for large datasets")
+            st.error("3. Data/model dimension mismatches")
+            st.error("4. Corrupted H5 files")
+
     # Information section
     st.markdown("---")
     st.subheader("About Rejection Sampling")

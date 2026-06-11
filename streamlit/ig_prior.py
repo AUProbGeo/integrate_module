@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ig_style import apply_style, page_header
+from ig_progress import make_progress_callback
 
 try:
     import integrate as ig
@@ -125,37 +126,39 @@ def run_prior_app():
                                       placeholder="Leave empty for auto-generated name")
         
         if st.button("Generate Layered Model"):
-            with st.spinner("Generating prior model..."):
-                try:
-                    kwargs = {}
-                    if output_filename:
-                        kwargs['f_prior_h5'] = output_filename
-                    
-                    f_prior_h5 = ig.prior_model_layered(
-                        lay_dist=lay_dist,
-                        dz=dz,
-                        z_max=z_max,
-                        NLAY_min=NLAY_min,
-                        NLAY_max=NLAY_max,
-                        NLAY_deg=NLAY_deg,
-                        RHO_dist=RHO_dist,
-                        RHO_min=RHO_min,
-                        RHO_max=RHO_max,
-                        RHO_MEAN=RHO_MEAN,
-                        RHO_std=RHO_std,
-                        N=N,
-                        **kwargs
-                    )
-                    
-                    st.success(f"✅ Prior model generated successfully!")
-                    st.info(f"Saved as: {f_prior_h5}")
-                    
-                    # Show info about generated file
-                    if os.path.exists(f_prior_h5):
-                        display_h5_info(f_prior_h5)
-                        
-                except Exception as e:
-                    st.error(f"Error generating model: {str(e)}")
+            callback, finish = make_progress_callback()
+            try:
+                kwargs = {}
+                if output_filename:
+                    kwargs['f_prior_h5'] = output_filename
+
+                f_prior_h5 = ig.prior_model_layered(
+                    lay_dist=lay_dist,
+                    dz=dz,
+                    z_max=z_max,
+                    NLAY_min=NLAY_min,
+                    NLAY_max=NLAY_max,
+                    NLAY_deg=NLAY_deg,
+                    RHO_dist=RHO_dist,
+                    RHO_min=RHO_min,
+                    RHO_max=RHO_max,
+                    RHO_MEAN=RHO_MEAN,
+                    RHO_std=RHO_std,
+                    N=N,
+                    progress_callback=callback,
+                    **kwargs
+                )
+                finish(f"Prior model saved to {f_prior_h5}")
+
+                st.success(f"✅ Prior model generated successfully!")
+                st.info(f"Saved as: {f_prior_h5}")
+
+                # Show info about generated file
+                if os.path.exists(f_prior_h5):
+                    display_h5_info(f_prior_h5)
+
+            except Exception as e:
+                st.error(f"Error generating model: {str(e)}")
     
     elif model_type == "prior_model_workbench":
         st.subheader("Workbench Model Parameters")
@@ -205,41 +208,43 @@ def run_prior_app():
                                       placeholder="Leave empty for auto-generated name")
         
         if st.button("Generate Workbench Model"):
-            with st.spinner("Generating prior model..."):
-                try:
-                    kwargs = {}
-                    if output_filename:
-                        kwargs['f_prior_h5'] = output_filename
-                    
-                    f_prior_h5 = ig.prior_model_workbench(
-                        N=N,
-                        p=p,
-                        z1=z1,
-                        z_max=z_max,
-                        dz=dz,
-                        lay_dist=lay_dist,
-                        nlayers=nlayers,
-                        NLAY_min=NLAY_min,
-                        NLAY_max=NLAY_max,
-                        NLAY_deg=NLAY_deg,
-                        RHO_dist=RHO_dist,
-                        RHO_min=RHO_min,
-                        RHO_max=RHO_max,
-                        RHO_mean=RHO_mean,
-                        RHO_std=RHO_std,
-                        chi2_deg=chi2_deg,
-                        **kwargs
-                    )
-                    
-                    st.success(f"✅ Prior model generated successfully!")
-                    st.info(f"Saved as: {f_prior_h5}")
-                    
-                    # Show info about generated file
-                    if os.path.exists(f_prior_h5):
-                        display_h5_info(f_prior_h5)
-                        
-                except Exception as e:
-                    st.error(f"Error generating model: {str(e)}")
+            callback, finish = make_progress_callback()
+            try:
+                kwargs = {}
+                if output_filename:
+                    kwargs['f_prior_h5'] = output_filename
+
+                f_prior_h5 = ig.prior_model_workbench(
+                    N=N,
+                    p=p,
+                    z1=z1,
+                    z_max=z_max,
+                    dz=dz,
+                    lay_dist=lay_dist,
+                    nlayers=nlayers,
+                    NLAY_min=NLAY_min,
+                    NLAY_max=NLAY_max,
+                    NLAY_deg=NLAY_deg,
+                    RHO_dist=RHO_dist,
+                    RHO_min=RHO_min,
+                    RHO_max=RHO_max,
+                    RHO_mean=RHO_mean,
+                    RHO_std=RHO_std,
+                    chi2_deg=chi2_deg,
+                    progress_callback=callback,
+                    **kwargs
+                )
+                finish(f"Prior model saved to {f_prior_h5}")
+
+                st.success(f"✅ Prior model generated successfully!")
+                st.info(f"Saved as: {f_prior_h5}")
+
+                # Show info about generated file
+                if os.path.exists(f_prior_h5):
+                    display_h5_info(f_prior_h5)
+
+            except Exception as e:
+                st.error(f"Error generating model: {str(e)}")
     
     elif model_type == "prior_model_workbench_direct":
         st.subheader("Workbench Direct Model Parameters")
@@ -273,36 +278,38 @@ def run_prior_app():
                                       placeholder="Leave empty for auto-generated name")
         
         if st.button("Generate Workbench Direct Model"):
-            with st.spinner("Generating prior model..."):
-                try:
-                    kwargs = {}
-                    if output_filename:
-                        kwargs['f_prior_h5'] = output_filename
-                    
-                    f_prior_h5 = ig.prior_model_workbench_direct(
-                        N=N,
-                        RHO_dist=RHO_dist,
-                        z1=z1,
-                        z_max=z_max,
-                        nlayers=nlayers,
-                        p=p,
-                        RHO_min=RHO_min,
-                        RHO_max=RHO_max,
-                        RHO_mean=RHO_mean,
-                        RHO_std=RHO_std,
-                        chi2_deg=chi2_deg,
-                        **kwargs
-                    )
-                    
-                    st.success(f"✅ Prior model generated successfully!")
-                    st.info(f"Saved as: {f_prior_h5}")
-                    
-                    # Show info about generated file
-                    if os.path.exists(f_prior_h5):
-                        display_h5_info(f_prior_h5)
-                        
-                except Exception as e:
-                    st.error(f"Error generating model: {str(e)}")
+            callback, finish = make_progress_callback()
+            try:
+                kwargs = {}
+                if output_filename:
+                    kwargs['f_prior_h5'] = output_filename
+
+                f_prior_h5 = ig.prior_model_workbench_direct(
+                    N=N,
+                    RHO_dist=RHO_dist,
+                    z1=z1,
+                    z_max=z_max,
+                    nlayers=nlayers,
+                    p=p,
+                    RHO_min=RHO_min,
+                    RHO_max=RHO_max,
+                    RHO_mean=RHO_mean,
+                    RHO_std=RHO_std,
+                    chi2_deg=chi2_deg,
+                    progress_callback=callback,
+                    **kwargs
+                )
+                finish(f"Prior model saved to {f_prior_h5}")
+
+                st.success(f"✅ Prior model generated successfully!")
+                st.info(f"Saved as: {f_prior_h5}")
+
+                # Show info about generated file
+                if os.path.exists(f_prior_h5):
+                    display_h5_info(f_prior_h5)
+
+            except Exception as e:
+                st.error(f"Error generating model: {str(e)}")
 
 if __name__ == "__main__":
     st.set_page_config(page_title="INTEGRATE - Prior Models",

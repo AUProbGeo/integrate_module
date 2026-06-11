@@ -895,6 +895,7 @@ def forward_gaaem(C=np.array(()),
     from tqdm import tqdm
 
     showInfo = kwargs.get('showInfo', 0)
+    progress_callback = kwargs.get('progress_callback', None)
     if (showInfo<0):
         disableTqdm=True
     else:
@@ -1067,7 +1068,13 @@ def forward_gaaem(C=np.array(()),
 
     # Compute forward data
     t1=time.time()
+    # Throttle callback to ~100 updates so it does not dominate runtime
+    progress_step = max(1, nd // 100)
+
     for i in tqdm(range(nd), mininterval=1, disable=disableTqdm, desc='gatdaem1d', leave=False):
+        if progress_callback and ((i + 1) % progress_step == 0 or i + 1 == nd):
+            _report_progress(progress_callback, i + 1, nd,
+                             'computing', 'Forward modeling (%d/%d soundings)' % (i + 1, nd))
         if C.ndim==1:
             # Only one model
             conductivity = C
@@ -1255,6 +1262,8 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     Ncpu = kwargs.get('Ncpu', 0)
     # of 'Nproc' is set in kwargs use it
     Ncpu = kwargs.get('Nproc', Ncpu)
+    # Pop (not get): the callback must never be pickled to worker processes
+    progress_callback = kwargs.pop('progress_callback', None)
 
     if showInfo>0:
         print('prior_data_gaaem: %s/%s -- starting' % (type, method))
@@ -1349,22 +1358,24 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         if im_height>0:
             if (showInfo>0):
                 print('Using tx_height')
-            D = ig.forward_gaaem(C=C, 
-                                 thickness=thickness, 
-                                 tx_height=tx_height, 
-                                 file_gex=file_gex, 
+            D = ig.forward_gaaem(C=C,
+                                 thickness=thickness,
+                                 tx_height=tx_height,
+                                 file_gex=file_gex,
                                  stmfiles=stmfiles,
-                                 Nhank=Nhank, 
-                                 Nfreq=Nfreq, 
-                                 parallel=parallel, **kwargs)
+                                 Nhank=Nhank,
+                                 Nfreq=Nfreq,
+                                 parallel=parallel,
+                                 progress_callback=progress_callback, **kwargs)
         else:
-            D = ig.forward_gaaem(C=C, 
-                                 thickness=thickness, 
-                                 file_gex=file_gex, 
+            D = ig.forward_gaaem(C=C,
+                                 thickness=thickness,
+                                 file_gex=file_gex,
                                  stmfiles=stmfiles,
-                                 Nhank=Nhank, 
-                                 Nfreq=Nfreq, 
-                                 parallel=parallel, **kwargs)
+                                 Nhank=Nhank,
+                                 Nfreq=Nfreq,
+                                 parallel=parallel,
+                                 progress_callback=progress_callback, **kwargs)
         if is_log:
             D = np.log10(D)
     else:
@@ -1384,14 +1395,19 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         # 1: Define a function to compute a chunk
         ## OUTSIDE
         # 2: Create chunks
-        C_chunks = np.array_split(C, Ncpu)
-        
-        if im_height>0:    
-            tx_height_chunks = np.array_split(tx_height, Ncpu)
-            
+        if progress_callback is None:
+            n_chunks = Ncpu
         else:
-            # create tx_height_chunks as a list of length Ncpu, where each entry is tx_height=np.array(())
-            tx_height_chunks = [np.array(())]*Ncpu
+            # Finer chunking gives smoother live progress updates
+            n_chunks = min(C.shape[0], Ncpu * 4)
+        C_chunks = np.array_split(C, n_chunks)
+
+        if im_height>0:
+            tx_height_chunks = np.array_split(tx_height, n_chunks)
+
+        else:
+            # create tx_height_chunks as a list of length n_chunks, where each entry is tx_height=np.array(())
+            tx_height_chunks = [np.array(())]*n_chunks
 
 
         import os
@@ -1421,7 +1437,22 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
             else:
                 ctx = multiprocessing.get_context('fork')
             with ctx.Pool(processes=Ncpu) as p:
-                D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
+                if progress_callback is None:
+                    D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
+                else:
+                    # apply_async + ordered get() keeps chunk order for the
+                    # concatenate below while reporting per finished chunk
+                    async_results = [p.apply_async(forward_gaaem_chunk_partial, args=(Cc, th))
+                                     for Cc, th in zip(C_chunks, tx_height_chunks)]
+                    D_chunks = []
+                    n_total = C.shape[0]
+                    n_done = 0
+                    for r in async_results:
+                        D_chunk = r.get()
+                        D_chunks.append(D_chunk)
+                        n_done += D_chunk.shape[0]
+                        _report_progress(progress_callback, n_done, n_total,
+                                         'computing', 'Forward modeling (%d/%d soundings)' % (n_done, n_total))
         finally:
             if _spec_patched:
                 _main_module.__spec__ = None
@@ -1444,7 +1475,10 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     t_elapsed = t2 - t1
     if (showInfo>-1):
         print('prior_data_gaaem: Time=%5.1fs/%d soundings. %4.1fms/sounding, %3.1fit/s' % (t_elapsed, N, 1000*t_elapsed/N,N/t_elapsed))
-    
+
+    _report_progress(progress_callback, N, N,
+                     'saving', 'Saving forward data to %s' % f_prior_data_h5)
+
     # Write D to f_prior['/D1']
     with h5py.File(f_prior_data_h5, 'a') as f_prior:
         if Dname in f_prior:
@@ -1463,7 +1497,10 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         f_prior[Dname].attrs['Nfreq'] = Nfreq
 
     integrate_update_prior_attributes(f_prior_data_h5)
-    
+
+    _report_progress(progress_callback, N, N,
+                     'completed', 'Forward data saved to %s' % f_prior_data_h5)
+
     return f_prior_data_h5
 
 
@@ -1567,6 +1604,21 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
     return f_prior_data_h5, id
 
 # %% PRIOR MODEL GENERATORS
+def _report_progress(progress_callback, current, total, phase, status):
+    """Invoke an optional progress callback as progress_callback(current, total, info_dict).
+
+    Follows the same convention as integrate_rejection(): info_dict carries
+    'phase' and 'status' keys, and errors raised by the callback are ignored
+    so they can never break the computation.
+    """
+    if progress_callback is None:
+        return
+    try:
+        progress_callback(current, total, {'phase': phase, 'status': status})
+    except Exception:
+        pass
+
+
 def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
                         NLAY_min=3, NLAY_max=6, NLAY_deg=6,
                         RHO_dist='log-uniform', RHO_min=0.1, RHO_max=5000, RHO_mean=100, RHO_std=80,
@@ -1642,6 +1694,7 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
 
     showInfo = kwargs.get('showInfo', 0)
     f_prior_h5 = kwargs.get('f_prior_h5', '')
+    progress_callback = kwargs.get('progress_callback', None)
 
     if NLAY_max < NLAY_min:
         NLAY_max = NLAY_min
@@ -1715,7 +1768,13 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
     else:
         iterator = range(N)
 
+    # Throttle callback to ~100 updates so it does not dominate runtime
+    progress_step = max(1, N // 100)
+
     for i in iterator:
+        if progress_callback and ((i + 1) % progress_step == 0 or i + 1 == N):
+            _report_progress(progress_callback, i + 1, N,
+                             'generating', 'Generating prior realizations')
         n_lay = NLAY[i]
         n_boundaries = n_lay - 1
 
@@ -1739,6 +1798,8 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
 
     if showInfo > 0:
         print("prior_model_layered: Saving prior model to %s" % f_prior_h5)
+    _report_progress(progress_callback, N, N,
+                     'saving', 'Saving prior model to %s' % f_prior_h5)
 
     # Save to HDF5 file
     im = 0
@@ -1795,6 +1856,9 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
                         showInfo=showInfo,
                         **save_kwargs,
                 )
+
+    _report_progress(progress_callback, N, N,
+                     'completed', 'Prior model saved to %s' % f_prior_h5)
 
     return f_prior_h5
 
@@ -1862,6 +1926,11 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
 
     showInfo = kwargs.get('showInfo', 0)
     f_prior_h5 = kwargs.get('f_prior_h5', '')
+    progress_callback = kwargs.get('progress_callback', None)
+
+    # Fully vectorized: only coarse phase updates are possible
+    _report_progress(progress_callback, 0, 100,
+                     'generating', 'Generating prior realizations')
 
     if nlayers<1:
         nlayers = 30
@@ -1905,13 +1974,15 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
     
     if (showInfo>0):
         print("prior_model_workbench_direct: Saving prior model to %s" % f_prior_h5)
+    _report_progress(progress_callback, 80, 100,
+                     'saving', 'Saving prior model to %s' % f_prior_h5)
 
     if (showInfo>1):
         print("Saving '/M1' prior model  %s" % f_prior_h5)
     ig.save_prior_model(f_prior_h5,M_rho.astype(np.float32),
                 im=1,
                 name='Resistivity',
-                is_discrete = 0, 
+                is_discrete = 0,
                 x = z,
                 z = z,
                 delete_if_exist = True,
@@ -1919,6 +1990,8 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
                 showInfo=showInfo,
                 )
 
+    _report_progress(progress_callback, 100, 100,
+                     'completed', 'Prior model saved to %s' % f_prior_h5)
 
     return f_prior_h5
 
@@ -1996,6 +2069,7 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
 
     f_prior_h5 = kwargs.get('f_prior_h5', '')
     showInfo = kwargs.get('showInfo', 0)
+    progress_callback = kwargs.get('progress_callback', None)
     if nlayers>0:
         NLAY_min = nlayers
         NLAY_max = nlayers
@@ -2046,7 +2120,13 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     M_rho_sparse = np.ones((N, nm_sparse))*np.nan
     
 
+    # Throttle callback to ~100 updates so it does not dominate runtime
+    progress_step = max(1, N // 100)
+
     for i in tqdm(range(N), mininterval=1, disable=(showInfo<0), desc='prior_workbench', leave=False):
+        if progress_callback and ((i + 1) % progress_step == 0 or i + 1 == N):
+            _report_progress(progress_callback, i + 1, N,
+                             'generating', 'Generating prior realizations')
         nlayers = NLAY[i][0]
         #print(nlayers)
         z2=z_max
@@ -2086,6 +2166,8 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
 
     if (showInfo>0):
         print("prior_model_workbench: Saving prior model to %s" % f_prior_h5)
+    _report_progress(progress_callback, N, N,
+                     'saving', 'Saving prior model to %s' % f_prior_h5)
 
     if (showInfo>1):
         print("Saving '/M1' prior model  %s" % f_prior_h5)
@@ -2117,12 +2199,15 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     ig.save_prior_model(f_prior_h5,NLAY.astype(np.float32),
                         im=3,
                         name = 'Number of layers',
-                        is_discrete=0, 
-                        x=np.array([0]), 
+                        is_discrete=0,
+                        x=np.array([0]),
                         z=np.array([0]),
-                        force_replace=True, 
+                        force_replace=True,
                         showInfo=showInfo,
                 )
+
+    _report_progress(progress_callback, N, N,
+                     'completed', 'Prior model saved to %s' % f_prior_h5)
 
     # return the full filepath to f_prior_h5
     return f_prior_h5

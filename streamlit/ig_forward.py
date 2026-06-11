@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ig_style import apply_style, page_header
+from ig_progress import make_progress_callback
 
 try:
     import integrate as ig
@@ -154,50 +155,42 @@ def run_forward_app():
             st.error(f"GEX file {file_gex} not found")
             return
         
-        with st.spinner("Running forward modeling... This may take several minutes."):
-            try:
-                # Prepare progress display
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                status_text.text("Starting forward modeling...")
-                progress_bar.progress(10)
-                
-                # Run forward modeling
-                f_prior_data_h5 = ig.prior_data_gaaem(
-                    f_prior_h5=f_prior_h5,
-                    file_gex=file_gex,
-                    N=N,
-                    doMakePriorCopy=doMakePriorCopy,
-                    im=im,
-                    id=id,
-                    im_height=im_height,
-                    Nhank=Nhank,
-                    Nfreq=Nfreq,
-                    is_log=is_log,
-                    parallel=parallel,
-                    Ncpu=Ncpu,
-                    showInfo=showInfo
-                )
-                
-                progress_bar.progress(100)
-                status_text.text("Forward modeling completed!")
-                
-                st.success(f"✅ Forward modeling completed successfully!")
-                st.info(f"Output saved as: {f_prior_data_h5}")
-                
-                # Show info about generated file
-                if os.path.exists(f_prior_data_h5):
-                    st.markdown("---")
-                    display_h5_info(f_prior_data_h5)
-                    
-            except Exception as e:
-                st.error(f"Error during forward modeling: {str(e)}")
-                st.error("This could be due to:")
-                st.error("1. GA-AEM not properly installed")
-                st.error("2. Invalid GEX file format")
-                st.error("3. Incompatible prior model structure")
-                st.error("4. System configuration issues")
+        callback, finish = make_progress_callback()
+        try:
+            # Run forward modeling
+            f_prior_data_h5 = ig.prior_data_gaaem(
+                f_prior_h5=f_prior_h5,
+                file_gex=file_gex,
+                N=N,
+                doMakePriorCopy=doMakePriorCopy,
+                im=im,
+                id=id,
+                im_height=im_height,
+                Nhank=Nhank,
+                Nfreq=Nfreq,
+                is_log=is_log,
+                parallel=parallel,
+                Ncpu=Ncpu,
+                showInfo=showInfo,
+                progress_callback=callback
+            )
+            finish("Forward modeling completed!")
+
+            st.success(f"✅ Forward modeling completed successfully!")
+            st.info(f"Output saved as: {f_prior_data_h5}")
+
+            # Show info about generated file
+            if os.path.exists(f_prior_data_h5):
+                st.markdown("---")
+                display_h5_info(f_prior_data_h5)
+
+        except Exception as e:
+            st.error(f"Error during forward modeling: {str(e)}")
+            st.error("This could be due to:")
+            st.error("1. GA-AEM not properly installed")
+            st.error("2. Invalid GEX file format")
+            st.error("3. Incompatible prior model structure")
+            st.error("4. System configuration issues")
     
     # Additional information
     st.markdown("---")
