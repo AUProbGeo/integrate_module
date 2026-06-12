@@ -111,6 +111,7 @@ def setup_matplotlib_backend():
 import os
 import numpy as np
 import h5py
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from integrate.integrate import integrate_posterior_stats
@@ -3037,7 +3038,7 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
                     return np.ma.masked_where(~np.isfinite(arr) | (arr <= 0), arr)
 
                 def _cmap_white_bad(name):
-                    cmap = matplotlib.cm.get_cmap(name).copy()
+                    cmap = matplotlib.colormaps[name].copy()
                     cmap.set_bad('white')
                     return cmap
 
@@ -3784,7 +3785,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         # Convert string colormap name to actual colormap object
         if isinstance(cmap, str):
             import matplotlib.pyplot as plt
-            cmap = plt.get_cmap(cmap)
+            cmap = matplotlib.colormaps[cmap]
 
         is_discrete = f_prior['/%s'%Mkey].attrs['is_discrete']
 
@@ -3793,7 +3794,10 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         else:
             _class_id = None
         if 'class_name' in f_prior[Mkey].attrs.keys():
-            _class_name = f_prior[Mkey].attrs['class_name'][:].flatten()
+            _class_name = [
+                r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                for r in f_prior[Mkey].attrs['class_name'][:].flatten()
+            ]
         else:
             _class_name = []
 
@@ -4251,7 +4255,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
 
         # Convert string colormap name to actual colormap object
         if isinstance(cmap, str):
-            cmap = plt.get_cmap(cmap)
+            cmap = matplotlib.colormaps[cmap]
 
         # Check if discrete
         is_discrete = f_prior['/%s' % Mkey].attrs['is_discrete']
@@ -4842,7 +4846,7 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
         color_map = {cid: cmap_lc(i / max(len(class_id) - 1, 1))
                      for i, cid in enumerate(class_id)}
     else:
-        tab10 = plt.get_cmap('tab10')
+        tab10 = matplotlib.colormaps['tab10']
         color_map = {cid: tab10(i % 10) for i, cid in enumerate(all_classes)}
 
     # --- class labels for legend ---
