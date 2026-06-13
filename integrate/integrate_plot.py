@@ -749,7 +749,8 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
             if 'class_id' in f_prior[dstr].attrs.keys():
                 class_id = f_prior[dstr].attrs['class_id'][:].flatten()
             if 'class_name' in f_prior[dstr].attrs.keys():
-                class_name = f_prior[dstr].attrs['class_name'][:].flatten()
+                class_name = [r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                              for r in f_prior[dstr].attrs['class_name'][:].flatten()]
             if 'cmap' in f_prior[dstr].attrs.keys():
                 discrete_cmap_array = f_prior[dstr].attrs['cmap'][:]
                 from matplotlib.colors import ListedColormap
@@ -1716,7 +1717,8 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         else:   
             print('No class_id found')
         if 'class_name' in f_prior[Mstr].attrs.keys():
-            class_name = f_prior[Mstr].attrs['class_name'][:].flatten()
+            class_name = [r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                          for r in f_prior[Mstr].attrs['class_name'][:].flatten()]
         else:
             class_name = []
         n_class = len(class_name)
@@ -4266,7 +4268,8 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         else:
             _ps_class_id = None
         if 'class_name' in f_prior[Mkey].attrs.keys():
-            _ps_class_name = f_prior[Mkey].attrs['class_name'][:].flatten()
+            _ps_class_name = [r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                              for r in f_prior[Mkey].attrs['class_name'][:].flatten()]
         else:
             _ps_class_name = []
 

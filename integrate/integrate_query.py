@@ -13,6 +13,13 @@ import h5py
 from tqdm import tqdm
 
 
+def _decode_hdf5_strings(arr):
+    if arr is None:
+        return None
+    return np.array([r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                     for r in np.asarray(arr).flatten()])
+
+
 def _get_clipped_thickness(z, depth_min, depth_max):
     """
     Compute per-layer thickness clipped to a depth interval.
@@ -590,7 +597,7 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
                 if 'class_id' in f[f'M{im}'].attrs.keys():
                     class_id = f[f'M{im}'].attrs['class_id'][:].flatten()
                 if 'class_name' in f[f'M{im}'].attrs.keys():
-                    class_name = f[f'M{im}'].attrs['class_name'][:].flatten()
+                    class_name = _decode_hdf5_strings(f[f'M{im}'].attrs['class_name'])
 
         # Get posterior and query-matching indices
         i_use = meta['i_use'][ip, :]
@@ -845,7 +852,7 @@ def get_prior_model_info(f_prior_h5, im):
             'is_discrete': bool(ds.attrs.get('is_discrete', 0)),
             'z':           ds.attrs['x'].astype(float),
             'class_id':    ds.attrs.get('class_id', None),
-            'class_name':  ds.attrs.get('class_name', None),
+            'class_name':  _decode_hdf5_strings(ds.attrs.get('class_name', None)),
         }
     return info
 
