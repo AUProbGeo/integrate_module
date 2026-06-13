@@ -296,9 +296,9 @@ N_use = N
 f_post_h5_list = []
 for id_use in id_use_arr:
     # get string from id_use
-    fileparts = os.path.splitext(f_data_h5)
+    fileparts = os.path.splitext(f_prior_h5)
     id_use_str = '_'.join(map(str, id_use))
-    f_post_h5 = 'post_%s_id%s.h5' % (fileparts[0], id_use_str)
+    f_post_h5 = 'post_%s_gf%d_log%d_id%s.h5' % (fileparts[0], inflateNoise, useLogData, id_use_str)
     f_post_h5 = ig.integrate_rejection(f_prior_h5, 
                                     f_data_h5, 
                                     f_post_h5, 

@@ -691,7 +691,14 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
             safe = hardcopy.replace(':', '_').replace('/', '_')
             f_png = safe if os.path.splitext(safe)[1].lower() in _VALID_EXTS else safe + '.png'
         else:
-            f_png = 'query_plot.png'
+            if f_post_h5 is not None:
+                base = os.path.splitext(os.path.basename(f_post_h5))[0]
+            elif f_prior_h5 is not None:
+                base = os.path.splitext(os.path.basename(f_prior_h5))[0]
+            else:
+                base = 'query'
+            suffix = f'_ip{ip}' if ip is not None else '_map'
+            f_png = f'{base}_query_plot{suffix}.png'
         plt.savefig(f_png)
         print(f"Figure saved to {f_png}")
 
