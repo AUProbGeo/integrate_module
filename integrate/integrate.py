@@ -3773,7 +3773,7 @@ def timing_plot(f_timing=''):
         plt.stackplot(N_arr, T, labels=['Prior', 'Forward', 'Rejection', 'PostStat'])
         plt.plot(N_arr, T_total[:, i_proc], 'k--')
         plt.xscale('log')
-        #plt.yscale('log')
+        plt.yscale('log')
         plt.xlabel('$N_{lookup}$')
         plt.ylabel('Time [$s$]')
         plt.title('Cumulative time, using %d processors' % Nproc_arr[i_proc])

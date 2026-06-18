@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 # %% Setup
 try:
     get_ipython().run_line_magic('load_ext', 'autoreload')
