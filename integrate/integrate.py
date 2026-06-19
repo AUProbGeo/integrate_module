@@ -287,6 +287,131 @@ def integrate_update_prior_attributes(f_prior_h5, **kwargs):
 
 
 
+def prior_set(f_prior_h5, im=1, **kwargs):
+    """
+    Update attributes of a model parameter in a prior HDF5 file.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file to update.
+    im : int
+        Model parameter index (e.g., 1 for /M1, 2 for /M2, default is 1).
+    name : str, optional
+        Display name of the model parameter (e.g., 'Resistivity', 'Lithology').
+    class_name : list of str, optional
+        Class names for discrete parameters. If fewer names than existing classes
+        are given, only the first N entries are updated and the rest are kept.
+    color : list of str or RGBA tuples, optional
+        Per-class colors (e.g., ['blue', 'red']). Converted to RGBA and stored
+        as the ``cmap`` attribute. If fewer colors than existing classes are given,
+        only the first N entries are updated and the rest are kept.
+    class_id : array-like, optional
+        Class ID values for discrete parameters.
+    clim : list of float, optional
+        Color scale limits [min, max].
+    is_discrete : int or bool, optional
+        Whether the parameter is discrete (1) or continuous (0).
+    cmap : str or array-like, optional
+        Colormap. Either a matplotlib colormap name (colors are sampled to match
+        the number of classes) or an RGBA array of shape (4, N).
+
+    Examples
+    --------
+    >>> ig.prior_set('PRIOR.h5', im=1, name='Resistivity', clim=[1, 2600])
+    >>> ig.prior_set('PRIOR.h5', im=2, class_name=['Sand', 'Clay', 'Gravel'])
+    >>> ig.prior_set('PRIOR.h5', im=2, class_name=['inside valley', 'outside valley'],
+    ...              color=['blue', 'red'])
+    """
+    import matplotlib.colors as mcolors
+    import matplotlib
+
+    def _set_attr(ds, key, value):
+        # Delete first to avoid h5py silently failing on dtype/shape changes
+        if key in ds.attrs:
+            del ds.attrs[key]
+        ds.attrs[key] = value
+
+    def _decode(v):
+        return v.decode('utf-8') if isinstance(v, bytes) else str(v)
+
+    Mstr = 'M%d' % im
+
+    if not os.path.exists(f_prior_h5):
+        print('prior_set: File %s does not exist (will not create)' % f_prior_h5)
+        return
+
+    with h5py.File(f_prior_h5, 'a') as f:
+        if Mstr not in f:
+            print('prior_set: %s not found in %s' % (Mstr, f_prior_h5))
+            return
+
+        ds = f[Mstr]
+
+        if 'name' in kwargs:
+            _set_attr(ds, 'name', str(kwargs['name']))
+            print('prior_set: %s/name = %r' % (Mstr, kwargs['name']))
+
+        if 'class_name' in kwargs:
+            new_names = [str(n) for n in kwargs['class_name']]
+            if 'class_name' in ds.attrs:
+                existing = [_decode(n) for n in ds.attrs['class_name']]
+                for i, n in enumerate(new_names):
+                    if i < len(existing):
+                        existing[i] = n
+                    else:
+                        existing.append(n)
+                final = existing
+            else:
+                final = new_names
+            _set_attr(ds, 'class_name', [str(n) for n in final])
+            print('prior_set: %s/class_name = %s' % (Mstr, list(ds.attrs['class_name'])))
+
+        if 'color' in kwargs:
+            new_colors = [np.array(mcolors.to_rgba(c)) for c in kwargs['color']]
+            n_new = len(new_colors)
+            if 'cmap' in ds.attrs:
+                existing_rgba = ds.attrs['cmap'].T  # (N, 4)
+                existing_list = [existing_rgba[i] for i in range(len(existing_rgba))]
+                for i, c in enumerate(new_colors):
+                    if i < len(existing_list):
+                        existing_list[i] = c
+                    else:
+                        existing_list.append(c)
+                rgba = np.array(existing_list)
+            else:
+                rgba = np.array(new_colors)
+            _set_attr(ds, 'cmap', rgba.T)  # stored as (4, N)
+            print('prior_set: %s/cmap updated from color list (%d colors)' % (Mstr, n_new))
+
+        if 'class_id' in kwargs:
+            _set_attr(ds, 'class_id', np.array(kwargs['class_id']))
+            print('prior_set: %s/class_id = %s' % (Mstr, ds.attrs['class_id']))
+
+        if 'clim' in kwargs:
+            _set_attr(ds, 'clim', np.array(kwargs['clim'], dtype=float))
+            print('prior_set: %s/clim = %s' % (Mstr, ds.attrs['clim']))
+
+        if 'is_discrete' in kwargs:
+            _set_attr(ds, 'is_discrete', int(kwargs['is_discrete']))
+            print('prior_set: %s/is_discrete = %d' % (Mstr, ds.attrs['is_discrete']))
+
+        if 'cmap' in kwargs:
+            cmap_val = kwargs['cmap']
+            if isinstance(cmap_val, str):
+                if 'class_id' in ds.attrs:
+                    n_colors = len(ds.attrs['class_id'])
+                elif 'class_name' in ds.attrs:
+                    n_colors = len(ds.attrs['class_name'])
+                else:
+                    n_colors = 10
+                rgba = matplotlib.colormaps[cmap_val](np.linspace(0, 1, n_colors))
+            else:
+                rgba = np.array(cmap_val)
+            _set_attr(ds, 'cmap', rgba.T)  # stored as (4, N)
+            print('prior_set: %s/cmap updated' % Mstr)
+
+
 def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     """
     Compute posterior statistics for all model parameters in a POST HDF5 file.

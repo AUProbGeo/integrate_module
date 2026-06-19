@@ -48,6 +48,14 @@ doPlotAll=True
 doTestInversion = False
 doSamplePrior = False # Load prior model and data? (True) or load precomputed prior data realizations (False)
 
+useTestMode = False
+if useTestMode:
+    N_use = 30_000
+    useGenericPrior=False
+    doEffectSize = False
+    doTbase = False
+
+
 # Load the data from DAUGAARD
 ig.get_case_data(case='DAUGAARD')
 
@@ -517,67 +525,362 @@ f_post_h5_all_list = f_post_h5_list + f_post_h5_N_list + f_post_h5_T_list
 if doPlotAll:
 
     plLevel=2
-    
+    nr=1000
+    cmap, clim = ig.get_colormap_and_limits('resistivity')
+    fontsize = 16
+
     #f_post_h5_all_list = f_post_h5_T_list
 
     for i_post in range(len(f_post_h5_all_list)):
         f_post_h5 = f_post_h5_all_list[i_post]
-        #%
+
         with h5py.File(f_post_h5,'r') as f:
             f_prior_h5 = f.attrs['f5_prior']
+        with h5py.File(f_post_h5,'r') as f:
+            f_data_h5 = f.attrs['f5_data']
 
-        ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy)
+        if 'merged' in f_prior_h5:
+            ig.prior_set(f_prior_h5, im=3, name='Prior type', class_name=['inside valley', 'outside valley'], color=['black', 'green'])
+            ig.prior_describe(f_prior_h5)
+
+
+
+        print("="*80)
+        print("  i_post = %d, f_post_h5=%s, f_prior_h5=%s, f_data_h5=%s" % (i_post, f_post_h5, f_prior_h5, f_data_h5))
+        print("="*80)
+
+        ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', cmap=cmap, clim=clim,hardcopy=hardcopy, fontsize=fontsize)
 
         ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', 
                     cmap=cmap, 
                     clim=clim,
                     hardcopy=hardcopy,
                     panels = ['Median','Mode'],
-                    alpha=0)
+                    alpha=0, fontsize=fontsize)
         
         ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y', 
                     cmap=cmap, 
                     clim=clim,
                     hardcopy=hardcopy,
                     panels = ['std','entropy'],
-                    alpha=0)
+                    alpha=0, fontsize=fontsize)
 
         ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
             
         if plLevel>0:
-            ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_1, hardcopy=hardcopy, title='a) P1')
-            ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_2, hardcopy=hardcopy, title='b) P2')
+            ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_1, hardcopy=hardcopy, title='a) P1', fontsize=fontsize)
+            ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_2, hardcopy=hardcopy, title='b) P2', fontsize=fontsize)
     
         if plLevel>1:
-            ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy, plot_data_locations=True)
-            ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
-            ig.plot_T_EV(f_post_h5, pl='EV', hardcopy=hardcopy)
-            ig.plot_T_EV(f_post_h5, pl='ND', hardcopy=hardcopy)
-            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=nr, plot_data_locations=True)
+            ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy, plot_data_locations=True, fontsize = fontsize)
+            ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy, fontsize = fontsize)
+            ig.plot_T_EV(f_post_h5, pl='EV', hardcopy=hardcopy, fontsize = fontsize)
+            ig.plot_T_EV(f_post_h5, pl='ND', hardcopy=hardcopy, fontsize = fontsize)
+            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=nr, plot_data_locations=True, fontsize = fontsize)
 
-            ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' )
+            ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' , fontsize = fontsize)
             plt.show()
-            ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median' )
+            ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
             plt.show()
-            ig.plot_feature_2d(f_post_h5,im=2,iz=15, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' )
+            ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
             plt.show()
-            ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median' )
-            plt.show()
-            ig.plot_feature_2d(f_post_h5,im=2,iz=5, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' )
-            plt.show()
-
+           
             try:
-                ig.plot_feature_2d(f_post_h5,im=3, key='Mode', uselog=1, cmap='jet', hardcopy=hardcopy)
+
+                ig.plot_feature_2d(f_post_h5,im=2,iz=5, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' , fontsize = fontsize )
+                plt.show()
+                ig.plot_feature_2d(f_post_h5,im=2,iz=15, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' , fontsize = fontsize)
+                plt.show()
+
+            except:
+                pass
+            try:
+                ig.plot_feature_2d(f_post_h5,im=3, key='Mode', uselog=1, hardcopy=hardcopy, fontsize = fontsize)
             except:
                 pass
 
             # Plot prior and post model parameter stats
-            ig.plot_prior_stats(f_prior_h5)
-            ig.plot_post_stats(f_post_h5, i_plot = i_plot_1)
-            ig.plot_post_stats(f_post_h5, i_plot = i_plot_2)
+            ig.plot_prior_stats(f_prior_h5, fontsize = fontsize, title='')
+            ig.plot_post_stats(f_post_h5, i_plot = i_plot_1, fontsize = fontsize, title='')
+            ig.plot_post_stats(f_post_h5, i_plot = i_plot_2, fontsize = fontsize, title='')
 
             if 'post_PRIOR' in f_post_h5:
-                ig.plot_feature_2d(f_post_h5,im=3,iz=0, key='HarmonicMean', uselog=0, hardcopy=hardcopy, title = 'Posterior Mean number of layers', cmap='hot_r' )
+                ig.plot_feature_2d(f_post_h5,im=3,iz=0, key='HarmonicMean', uselog=0, hardcopy=hardcopy, title = 'Posterior Mean number of layers', 
+                                   cmap='hot_r', 
+                                   clim=[1,8], 
+                                   fontsize = fontsize )
+
+
+
+# %%
+if doPlotAll:
+    f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
+    
+    with open(f_txt, 'w') as f:
+        for item in f_post_h5_all_list:
+            f.write("%s\n" % item)
+
+# %%
+doReadList = True
+if doReadList:
+    #f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
+
+    f_txt_list=[]
+    # if exist
+    # f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt')
+    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt')
+    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt')
+   
+#    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt' 
+#    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt'
+#    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt'
+
+
+    f_post_h5_all_list = []
+    for f_txt in f_txt_list:
+        if os.path.exists(f_txt):
+            with open(f_txt, 'r') as f:
+                for line in f:
+                    f_post_h5_all_list.append(line.strip())
+
+
+
+# %%
+# TEST INVERSION
+# #################################################################################################
+
+# %%
+
+#f_prior_data_h5_list = ['daugaard_valley_new_N1000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5',
+# 'daugaard_standard_new_N1000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5',
+# 'daugaard_merged.h5']
+
+if doTestInversion:
+    D_D = []
+    D_idx = []
+    D_M = []
+
+    for i in np.arange(len(f_prior_data_h5_list)):
+        D_t, idx = ig.load_prior_data(f_prior_data_h5_list[i], Randomize=True, showInfo=1)
+        D_D.append(D_t)
+        D_idx.append(idx)
+        M_t, idx=ig.load_prior_model(f_prior_data_h5_list[i])
+        D_M.append(M_t)
+
+    DATA = ig.load_data(f_data_h5, id_arr = [1])
+        
+    # The data point to invert
+    ip = 1000 # Phyp=30,60
+    ip = 100 # Phyp=3,97
+
+    N=D_D[0][0].shape[0]
+    ipd=0    
+    print('data ipd=%d in first [%g,%g]' %  (ipd,D_D[0][0][ipd][0],D_D[2][0][ipd][0]))
+    print('data ipd=%d in 2nd dset [%g,%g]' % (ipd,D_D[1][0][ipd][0],D_D[2][0][ipd+N][0]))
+
+    d_obs = DATA['d_obs'][0][ip]
+    d_std = DATA['d_std'][0][ip]
+
+    # now invert data sat id
+    autoT=False
+    T_base = 1
+    nr=4000
+    EV_est=[]
+    EV_rej=[]
+    i_use_man=[]
+    i_use_rej=[]
+    for i in np.arange(len(D_D)):
+    #for i in np.arange(1):
+        OUT = ig.integrate_rejection_range(D=D_D[i], 
+                                        DATA = DATA,
+                                        idx = idx,                                                                   
+                                        autoT=autoT,
+                                        T_base = T_base,
+                                        ip_range = [ip],
+                                        useRandomData=True,
+                                        nr=nr,
+                                        showInfo=1)
+        i_use, T, EV, EV_post, EV_post_mean, LOGL_mean, N_UNIQUE, ip_range = OUT
+        i_use_rej.append(i_use.flatten())
+        
+        # compute logL manually
+        Ns = len(D_D[i][0])
+        logL_manual = np.zeros(Ns)
+        #print("Computing logL manually for %d samples" % Ns)
+        for j in range(Ns):
+            dd = D_D[i][0][j]-d_obs
+            logL_manual[j]   = -0.5 * np.nansum((dd / d_std)**2)
+
+        # compute logL using likelihood function
+        logL = ig.likelihood_gaussian_diagonal(D_D[i][0],d_obs,d_std)
+        P_acc = np.exp(logL-logL.max())
+        r = np.random.rand(len(logL))
+        i_use_temp = np.where(r < P_acc)[0]
+        i_use_man.append(i_use_temp)
+        #p=P_acc/np.sum(P_acc)
+        #i_use_temp2 = np.random.choice(len(P_acc), nr, p=p)
+        #i_use_man.append(i_use_temp2)
+
+        #print('logL manual = ')
+        #print(logL[0:3])
+
+        EV_est_single=np.log(np.mean(np.exp(logL)))
+        EV_est.append(EV_est_single.flatten())
+        EV_rej.append(EV.flatten())
+
+        print("logL (likelihood)=%g, logL(manual)=%g" % (logL[0],logL_manual[0]))
+        for k in np.arange(i):
+            print("EV(rej)=%g, EV(mix)=%g" % (EV_rej[k],EV_est[k]))
+
+        doPlot=True
+        if doPlot:
+            plt.figure(figsize=(4,3))
+            plt.semilogy(D_D[i][0][i_use_rej[i],:].T,'g-',linewidth=1,alpha=0.3)
+            plt.semilogy(D_D[i][0][i_use_man[i],:].T,'k-',linewidth=.5,alpha=0.3)
+            plt.semilogy(d_obs,'r:')
+            plt.title(f_prior_data_h5_list[i])
+            plt.show()  
+    
+
+
+# %% 
+ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y')
+
+
+# %% 
+cmap, clim = ig.get_colormap_and_limits('evidence', custom_clim=[0, 1])
+f_post_h5='post_daugaard_merged_N2000000_Nuse1000000_T1_inflateNoise2.h5'
+ele=-20
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+nd = len(X)
+
+class_id, class_name = ig.get_discrete_classes(f_post_h5, im=2)
+nclass = len(class_id)
+
+#E = ig.extract_feature_at_elevation(f_post_h5, elevation=ele)
+POST_MODE = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='Mode')
+POST_ENTROPY = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='Entropy')
+
+
+#%% Make a movie of class probabilities at different elevations
+
+POST_P_CLASS = np.zeros( (nd, nclass) )
+i=0
+for ele in np.arange(80,-51,-1):
+    i=i+1 
+    for ic in range(nclass):
+        POST_P_CLASS[:, ic] = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=ic)
+
+    plt.figure()
+    for ic in range(nclass):
+        plt.subplot(3,3,ic+1)
+        plt.plot(X, Y, 'k.', markersize=.01)
+        plt.scatter(X, Y, c=POST_P_CLASS[:, ic], s=.2, cmap='magma_r', vmin=0, vmax=1)
+        #plt.colorbar(label='P(Class %d: %s) at %d m elevation' % (class_id[ic], class_name[ic], ele));plt.axis('equal')
+        #plt.colorbar()
+        # Remove axis labels for clarity
+        plt.xticks([])
+        plt.yticks([])
+        plt.title('P(Class %d: %s)' % (class_id[ic], class_name[ic]), fontsize=5)
+        
+    plt.suptitle('Class probabilities at %3.1f m elevation' % ele)
+    plt.axis('equal')
+    plt.savefig('PROB_CLASS_%04d.png' % i, dpi=300)
+
+# %% 
+# ffmpeg -framerate 4 -pattern_type glob -i "PROB_CLASS_*.png" -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p output.mp4
+
+# ffmpeg -f concat -safe 0 -i files.txt -c:v libx264 -pix_fmt yuv420p output.mp4
+
+
+
+#%% Example use og  ig.plot_feature_2d() 
+
+# %%
+# Plot Median resistivity ad 10m Depth.
+ig.plot_feature_2d(f_post_h5, im=1, iz=10)
+plt.show()
+
+# Plot Median resistivity at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=1, elevation=-10)
+plt.show()
+
+# Plot Mean, Mode, Std
+# Plot Media resistivity at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=1, elevation=-10, key='Mean')
+plt.show()
+# Plot Median resistivity at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=1, elevation=-10, key='Median')
+plt.show()
+# Plot Median resistivity at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=1, elevation=-10, key='Std', uselog=0)
+plt.show()
+
+
+
+# %%
+# Plot Mode lithology at 10m Depth.
+ig.plot_feature_2d(f_post_h5, im=2, iz=10)
+plt.show()
+
+# Plot Mode lithology at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=2, elevation=-10)
+plt.show()
+
+# Plot Mode lithology at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=2, elevation=-10, key='Mode')
+plt.show()
+
+# Plot Mode lithology at elevation -10 Depth.
+ig.plot_feature_2d(f_post_h5, im=2, elevation=-10, key='Entropy', clim=[0,1])
+plt.show()
+
+# plot class probability of ic=7
+ig.plot_feature_2d(f_post_h5, im=2, iz=80, key='P', ic=7, uselog=0, clim=[0,1])
+
+# Plot class probability
+ig.plot_feature_2d(f_post_h5, im=2, iz=80, key='P', ic=7, uselog=0, clim=[0,1])
+plt.show()
+
+ig.plot_feature_2d(f_post_h5, im=2, elevation=-30, key='P', ic=6, uselog=0, clim=[0,1], cmap='magma_r')
+plt.show()
+
+# same as above, but the position of data points are plotted as well
+ig.plot_feature_2d(f_post_h5, im=2, elevation=-30, key='P', ic=5, uselog=0, clim=[0,1], cmap='magma_r', plotPoints=True)
+plt.show()
+
+
+# %% 
+
+#POST_P0 = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=0)
+#POST_P1 = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=1)#
+#POST_P2 = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=2)
+
+#P1 = ig.extract_feature_at_elevation(f_post_h5, im=2, ic=1, elevation=ele)
+#P1 = ig.extract_feature_at_elevation(f_post_h5, im=2, ic=1, elevation=ele)
+
+plt.subplot(2,2,1)
+plt.plot(X, Y, 'k.', markersize=.1)
+plt.scatter(X, Y, c=POST_MODE, s=.2, cmap='jet')
+plt.colorbar(label='Feature at 10 m elevation');plt.axis('equal')
+
+plt.subplot(2,2,2)
+plt.plot(X, Y, 'k.', markersize=.1)
+plt.scatter(X, Y, c=POST_ENTROPY, s=.2, cmap='jet', vmin=0, vmax=1)
+plt.colorbar(label='Feature at 10 m elevation');plt.axis('equal')
+
+
+#%% 
+ig.plot_feature_2d(f_post_h5, key='Mode', im=2)
+plt.show()
+ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=0)
+plt.show()
+ig.plot_feature_2d(f_post_h5, elevation = 0, key='P', ic=1, im=2)
+plt.show()
+ig.plot_feature_2d(f_post_h5, elevation = 0, key='P', ic=2, im=2)
+
+
+
 
 # %% TEST 
 doTest=True
@@ -702,133 +1005,9 @@ if doTest:
             plt.savefig('scatter_T_CHI2_%s.png' % fname, dpi=300)
             plt.show()
 
+plt.show()
 
 
-
-# %%
-if doPlotAll:
-    f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
-
-    with open(f_txt, 'w') as f:
-        for item in f_post_h5_all_list:
-            f.write("%s\n" % item)
-
-# %%
-doReadList = True
-if doReadList:
-    #f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
-
-    f_txt_list=[]
-    # if exist
-    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt')
-    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt')
-    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt')
-    
-    f_post_h5_all_list = []
-    for f_txt in f_txt_list:
-        if os.path.exists(f_txt):
-            with open(f_txt, 'r') as f:
-                for line in f:
-                    f_post_h5_all_list.append(line.strip())
-
-
-
-# %%
-# TEST INVERSION
-# #################################################################################################
-
-# %%
-
-#f_prior_data_h5_list = ['daugaard_valley_new_N1000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5',
-# 'daugaard_standard_new_N1000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5',
-# 'daugaard_merged.h5']
-
-if doTestInversion:
-    D_D = []
-    D_idx = []
-    D_M = []
-
-    for i in np.arange(len(f_prior_data_h5_list)):
-        D_t, idx = ig.load_prior_data(f_prior_data_h5_list[i], Randomize=True, showInfo=1)
-        D_D.append(D_t)
-        D_idx.append(idx)
-        M_t, idx=ig.load_prior_model(f_prior_data_h5_list[i])
-        D_M.append(M_t)
-
-    DATA = ig.load_data(f_data_h5, id_arr = [1])
-        
-    # The data point to invert
-    ip = 1000 # Phyp=30,60
-    ip = 100 # Phyp=3,97
-
-    N=D_D[0][0].shape[0]
-    ipd=0    
-    print('data ipd=%d in first [%g,%g]' %  (ipd,D_D[0][0][ipd][0],D_D[2][0][ipd][0]))
-    print('data ipd=%d in 2nd dset [%g,%g]' % (ipd,D_D[1][0][ipd][0],D_D[2][0][ipd+N][0]))
-
-    d_obs = DATA['d_obs'][0][ip]
-    d_std = DATA['d_std'][0][ip]
-
-    # now invert data sat id
-    autoT=False
-    T_base = 1
-    nr=4000
-    EV_est=[]
-    EV_rej=[]
-    i_use_man=[]
-    i_use_rej=[]
-    for i in np.arange(len(D_D)):
-    #for i in np.arange(1):
-        OUT = ig.integrate_rejection_range(D=D_D[i], 
-                                        DATA = DATA,
-                                        idx = idx,                                                                   
-                                        autoT=autoT,
-                                        T_base = T_base,
-                                        ip_range = [ip],
-                                        useRandomData=True,
-                                        nr=nr,
-                                        showInfo=1)
-        i_use, T, EV, EV_post, EV_post_mean, LOGL_mean, N_UNIQUE, ip_range = OUT
-        i_use_rej.append(i_use.flatten())
-        
-        # compute logL manually
-        Ns = len(D_D[i][0])
-        logL_manual = np.zeros(Ns)
-        #print("Computing logL manually for %d samples" % Ns)
-        for j in range(Ns):
-            dd = D_D[i][0][j]-d_obs
-            logL_manual[j]   = -0.5 * np.nansum((dd / d_std)**2)
-
-        # compute logL using likelihood function
-        logL = ig.likelihood_gaussian_diagonal(D_D[i][0],d_obs,d_std)
-        P_acc = np.exp(logL-logL.max())
-        r = np.random.rand(len(logL))
-        i_use_temp = np.where(r < P_acc)[0]
-        i_use_man.append(i_use_temp)
-        #p=P_acc/np.sum(P_acc)
-        #i_use_temp2 = np.random.choice(len(P_acc), nr, p=p)
-        #i_use_man.append(i_use_temp2)
-
-        #print('logL manual = ')
-        #print(logL[0:3])
-
-        EV_est_single=np.log(np.mean(np.exp(logL)))
-        EV_est.append(EV_est_single.flatten())
-        EV_rej.append(EV.flatten())
-
-        print("logL (likelihood)=%g, logL(manual)=%g" % (logL[0],logL_manual[0]))
-        for k in np.arange(i):
-            print("EV(rej)=%g, EV(mix)=%g" % (EV_rej[k],EV_est[k]))
-
-        doPlot=True
-        if doPlot:
-            plt.figure(figsize=(4,3))
-            plt.semilogy(D_D[i][0][i_use_rej[i],:].T,'g-',linewidth=1,alpha=0.3)
-            plt.semilogy(D_D[i][0][i_use_man[i],:].T,'k-',linewidth=.5,alpha=0.3)
-            plt.semilogy(d_obs,'r:')
-            plt.title(f_prior_data_h5_list[i])
-            plt.show()  
-    
 
 # %%%
 #a ** a
@@ -943,146 +1122,3 @@ if doTestInversion:
     plt.ylabel('EV [] from integrate_rejection()');plt.axis('equal' )
     plt.title('EV1 (Valley) - %s' % f_prior_data_h5_list[0][0:19])
     plt.grid(True, which='both', alpha=0.3)
-
-
-# %% 
-ig.plot_profile(f_post_h5, ii=id_line, gap_threshold=50, xaxis='y')
-
-
-# %% 
-cmap, clim = ig.get_colormap_and_limits('evidence', custom_clim=[0, 1])
-f_post_h5='post_daugaard_merged_N2000000_Nuse1000000_T1_inflateNoise2.h5'
-ele=-20
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
-nd = len(X)
-
-class_id, class_name = ig.get_discrete_classes(f_post_h5, im=2)
-nclass = len(class_id)
-
-#E = ig.extract_feature_at_elevation(f_post_h5, elevation=ele)
-POST_MODE = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='Mode')
-POST_ENTROPY = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='Entropy')
-
-
-#%% Make a movie of class probabilities at different elevations
-
-POST_P_CLASS = np.zeros( (nd, nclass) )
-i=0
-for ele in np.arange(80,-51,-1):
-    i=i+1 
-    for ic in range(nclass):
-        POST_P_CLASS[:, ic] = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=ic)
-
-    plt.figure()
-    for ic in range(nclass):
-        plt.subplot(3,3,ic+1)
-        plt.plot(X, Y, 'k.', markersize=.01)
-        plt.scatter(X, Y, c=POST_P_CLASS[:, ic], s=.2, cmap='magma_r', vmin=0, vmax=1)
-        #plt.colorbar(label='P(Class %d: %s) at %d m elevation' % (class_id[ic], class_name[ic], ele));plt.axis('equal')
-        #plt.colorbar()
-        # Remove axis labels for clarity
-        plt.xticks([])
-        plt.yticks([])
-        plt.title('P(Class %d: %s)' % (class_id[ic], class_name[ic]), fontsize=5)
-        
-    plt.suptitle('Class probabilities at %3.1f m elevation' % ele)
-    plt.axis('equal')
-    plt.savefig('PROB_CLASS_%04d.png' % i, dpi=300)
-
-# %% 
-# ffmpeg -framerate 4 -pattern_type glob -i "PROB_CLASS_*.png" -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p output.mp4
-
-# ffmpeg -f concat -safe 0 -i files.txt -c:v libx264 -pix_fmt yuv420p output.mp4
-
-
-
-#%% Example use og  ig.plot_feature_2d() 
-
-# %%
-# Plot Median resistivity ad 10m Depth.
-ig.plot_feature_2d(f_post_h5, im=1, iz=10)
-plt.show()
-
-# Plot Median resistivity at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=1, elevation=-10)
-plt.show()
-
-# Plot Mean, Mode, Std
-# Plot Media resistivity at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=1, elevation=-10, key='Mean')
-plt.show()
-# Plot Median resistivity at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=1, elevation=-10, key='Median')
-plt.show()
-# Plot Median resistivity at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=1, elevation=-10, key='Std', uselog=0)
-plt.show()
-
-
-
-# %%
-# Plot Mode lithology at 10m Depth.
-ig.plot_feature_2d(f_post_h5, im=2, iz=10)
-plt.show()
-
-# Plot Mode lithology at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=2, elevation=-10)
-plt.show()
-
-# Plot Mode lithology at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=2, elevation=-10, key='Mode')
-plt.show()
-
-# Plot Mode lithology at elevation -10 Depth.
-ig.plot_feature_2d(f_post_h5, im=2, elevation=-10, key='Entropy', clim=[0,1])
-plt.show()
-
-# plot class probability of ic=7
-ig.plot_feature_2d(f_post_h5, im=2, iz=80, key='P', ic=7, uselog=0, clim=[0,1])
-
-# Plot class probability
-ig.plot_feature_2d(f_post_h5, im=2, iz=80, key='P', ic=7, uselog=0, clim=[0,1])
-plt.show()
-
-ig.plot_feature_2d(f_post_h5, im=2, elevation=-30, key='P', ic=6, uselog=0, clim=[0,1], cmap='magma_r')
-plt.show()
-
-# same as above, but the position of data points are plotted as well
-ig.plot_feature_2d(f_post_h5, im=2, elevation=-30, key='P', ic=5, uselog=0, clim=[0,1], cmap='magma_r', plotPoints=True)
-plt.show()
-
-
-
-
-
-
-
-# %% 
-
-#POST_P0 = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=0)
-#POST_P1 = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=1)#
-#POST_P2 = ig.extract_feature_at_elevation(f_post_h5, im=2, elevation=ele, key='P', ic=2)
-
-#P1 = ig.extract_feature_at_elevation(f_post_h5, im=2, ic=1, elevation=ele)
-#P1 = ig.extract_feature_at_elevation(f_post_h5, im=2, ic=1, elevation=ele)
-
-plt.subplot(2,2,1)
-plt.plot(X, Y, 'k.', markersize=.1)
-plt.scatter(X, Y, c=POST_MODE, s=.2, cmap='jet')
-plt.colorbar(label='Feature at 10 m elevation');plt.axis('equal')
-
-plt.subplot(2,2,2)
-plt.plot(X, Y, 'k.', markersize=.1)
-plt.scatter(X, Y, c=POST_ENTROPY, s=.2, cmap='jet', vmin=0, vmax=1)
-plt.colorbar(label='Feature at 10 m elevation');plt.axis('equal')
-
-
-#%% 
-ig.plot_feature_2d(f_post_h5, key='Mode', im=2)
-plt.show()
-ig.plot_feature_2d(f_post_h5, key='Mode', im=2, elevation=0)
-plt.show()
-ig.plot_feature_2d(f_post_h5, elevation = 0, key='P', ic=1, im=2)
-plt.show()
-ig.plot_feature_2d(f_post_h5, elevation = 0, key='P', ic=2, im=2)
-plt.show()

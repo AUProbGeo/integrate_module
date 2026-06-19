@@ -251,7 +251,7 @@ def plot_xy(values, X=None, Y=None,
             cmap=None, clim=None, uselog=False,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
-            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', **kwargs):
+            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', fontsize=None, **kwargs):
     """
     Core 2D scatter map: plot any array of values at survey (X, Y) locations.
 
@@ -409,19 +409,31 @@ def plot_xy(values, X=None, Y=None,
             except Exception:
                 pass
 
-        cbar = fig.colorbar(sc, ax=ax, label=colorbar_label or '')
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.1)
+        cbar = fig.colorbar(sc, cax=cax, label=colorbar_label or '')
         if colorbar_ticks is not None:
             cbar.set_ticks(colorbar_ticks)
         if colorbar_ticklabels is not None:
             cbar.set_ticklabels(colorbar_ticklabels)
         if colorbar_invert:
             cbar.ax.invert_yaxis()
+        if fontsize is not None:
+            cbar.set_label(colorbar_label or '', fontsize=fontsize)
+            cbar.ax.tick_params(labelsize=fontsize)
 
     # --- Decoration ---
-    if title:
-        ax.set_title(title)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    if fontsize is not None:
+        ax.set_title(title, fontsize=fontsize + 2) if title else None
+        ax.set_xlabel('X', fontsize=fontsize)
+        ax.set_ylabel('Y', fontsize=fontsize)
+        ax.tick_params(labelsize=fontsize)
+    else:
+        if title:
+            ax.set_title(title)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
     ax.set_aspect('equal')
     ax.grid(True, linestyle='--', alpha=0.5)
 
@@ -901,10 +913,16 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
 
     # Discrete colorbar with class tick labels
     if use_discrete_cbar:
-        cbar = fig.colorbar(sc, ax=ax)
+        fontsize = kwargs.get('fontsize', None)
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.1)
+        cbar = fig.colorbar(sc, cax=cax)
         cbar.set_ticks(class_id)
         cbar.set_ticklabels(class_name)
         cbar.ax.invert_yaxis()
+        if fontsize is not None:
+            cbar.ax.tick_params(labelsize=fontsize)
 
     print(title)
 
@@ -991,6 +1009,9 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     CHI2_max = kwargs.pop('CHI2_max', 5)
     N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
     N_UNIQUE_max = kwargs.pop('N_UNIQUE_max', None)
+    fontsize = kwargs.pop('fontsize', None)
+    fs_kw = {'fontsize': fontsize} if fontsize is not None else {}
+    title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
 
     with h5py.File(f_post_h5,'r') as f_post:
         f_prior_h5 = f_post['/'].attrs['f5_prior']
@@ -1043,11 +1064,14 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
         plt.scatter(X[i1:i2],Y[i1:i2],c=np.log10(T[i1:i2]),cmap='jet',**kwargs)
         plt.grid()
-        plt.xlabel('X')
-        plt.ylabel('Y')
+        plt.xlabel('X', **fs_kw)
+        plt.ylabel('Y', **fs_kw)
         plt.clim(np.log10(clim))
-        plt.colorbar(label='log10(T)')
-        plt.title('Temperature')
+        cb = plt.colorbar(label='log10(T)')
+        if fontsize is not None:
+            cb.set_label('log10(T)', **fs_kw)
+            cb.ax.tick_params(labelsize=fontsize)
+        plt.title('Temperature', **title_fs_kw)
         plt.axis('equal')
         if hardcopy:
             # get filename without extension
@@ -1073,10 +1097,12 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
         plt.scatter(X[i1:i2],Y[i1:i2],c=EV[i1:i2],cmap=cmap_ev, vmin=clim[0], vmax=clim[1], **kwargs)
         plt.grid()
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.colorbar()
-        plt.title('log(EV)')
+        plt.xlabel('X', **fs_kw)
+        plt.ylabel('Y', **fs_kw)
+        cb = plt.colorbar()
+        if fontsize is not None:
+            cb.ax.tick_params(labelsize=fontsize)
+        plt.title('log(EV)', **title_fs_kw)
         plt.axis('equal')
         if hardcopy:
             # get filename without extension
@@ -1097,10 +1123,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
         plt.scatter(X[i1:i2],Y[i1:i2],c=non_nan[i1:i2],cmap='jet', **kwargs)
         plt.grid()
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.colorbar(label='Number of Data')
-        plt.title('N data')
+        plt.xlabel('X', **fs_kw)
+        plt.ylabel('Y', **fs_kw)
+        cb = plt.colorbar(label='Number of Data')
+        if fontsize is not None:
+            cb.set_label('Number of Data', **fs_kw)
+            cb.ax.tick_params(labelsize=fontsize)
+        plt.title('N data', **title_fs_kw)
         plt.axis('equal')
         if hardcopy:
             # get filename without extension
@@ -1148,10 +1177,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=CHI2_plot[i1:i2],
                                 cmap=custom_cmap, norm=norm, **kwargs)
             plt.grid()
-            plt.xlabel('X')
-            plt.ylabel('Y')
-            plt.colorbar(scatter, label='CHI2 (Reduced χ²)')
-            plt.title('Reduced Chi-Squared (Goodness of Fit)')
+            plt.xlabel('X', **fs_kw)
+            plt.ylabel('Y', **fs_kw)
+            cb = plt.colorbar(scatter, label='CHI2 (Reduced χ²)')
+            if fontsize is not None:
+                cb.set_label('CHI2 (Reduced χ²)', **fs_kw)
+                cb.ax.tick_params(labelsize=fontsize)
+            plt.title('Reduced Chi-Squared (Goodness of Fit)', **title_fs_kw)
             plt.axis('equal')
             if hardcopy:
                 # get filename without extension
@@ -1192,10 +1224,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE_log[i1:i2],
                                 cmap=cmap_n_unique, vmin=N_UNIQUE_min_log, vmax=N_UNIQUE_max_log, **kwargs)
             plt.grid()
-            plt.xlabel('X')
-            plt.ylabel('Y')
-            plt.colorbar(scatter, label='log10(N_UNIQUE)')
-            plt.title('N_UNIQUE (Number of Unique Realizations, log scale)')
+            plt.xlabel('X', **fs_kw)
+            plt.ylabel('Y', **fs_kw)
+            cb = plt.colorbar(scatter, label='log10(N_UNIQUE)')
+            if fontsize is not None:
+                cb.set_label('log10(N_UNIQUE)', **fs_kw)
+                cb.ax.tick_params(labelsize=fontsize)
+            plt.title('N_UNIQUE (Number of Unique Realizations, log scale)', **title_fs_kw)
             plt.axis('equal')
             if hardcopy:
                 # get filename without extension
@@ -1703,6 +1738,12 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         except:
             z = f_prior[Mstr].attrs['x'][:].flatten()
         is_discrete = f_prior[Mstr].attrs['is_discrete']
+        if 'name' in f_prior[Mstr].attrs.keys():
+            name = f_prior[Mstr].attrs['name']
+            if isinstance(name, bytes):
+                name = name.decode('utf-8')
+        else:
+            name = 'M%d' % im
         if 'clim' in f_prior[Mstr].attrs.keys():
             clim = f_prior[Mstr].attrs['clim'][:].flatten()
         else:
@@ -2002,7 +2043,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             ax[0].set_title('Mode')
 
         # Set the ticks at the center of each color band (at class_id values)
-        cbar1 = fig.colorbar(im1, ax=ax[0], label='label')
+        cbar1 = fig.colorbar(im1, ax=ax[0], label=name)
         cbar1.set_ticks(class_id)
         cbar1.set_ticklabels(class_name)
         cbar1.ax.invert_yaxis()
@@ -3331,6 +3372,9 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
     showInfo = kwargs.get('showInfo', 0)
     is_log = kwargs.get('is_log', False)
     hardcopy = kwargs.get('hardcopy', False)
+    fontsize = kwargs.get('fontsize', None)
+    fs_kw = {'fontsize': fontsize} if fontsize is not None else {}
+    title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
     
     ## Check if the data file f_data_h5 exists
     if not os.path.exists(f_post_h5):
@@ -3444,7 +3488,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                         ax.plot(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
                     except:
                         pass
-                    plt.ylabel('log10(dBDt)')
+                    plt.ylabel('log10(dBDt)', **fs_kw)
                 else:
                     ax.semilogy(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
 
@@ -3457,7 +3501,6 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                             ax.semilogy(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
                         except:
                             pass
-                        #ax.text(0.1, 0.1, 'Data set %s, Observation # %d' % (Dkey, i_plot+1), transform=ax.transAxes)
                     else:
                         # select nr random unqiue index of d_obs
                         i_d = np.random.choice(d_obs.shape[0], nr, replace=False)
@@ -3470,9 +3513,10 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
 
                     if ylim is not None:
                         plt.ylim(ylim)
-                    plt.ylabel('dBDt')
-
-                    plt.xlabel('Data #')
+                    plt.ylabel('dBDt', **fs_kw)
+                    plt.xlabel('Data #', **fs_kw)
+                    if fontsize is not None:
+                        ax.tick_params(labelsize=fontsize)
                     plt.grid()
 
 
@@ -3480,36 +3524,34 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                 # nadat=1
                 plt.hist(d_prior.flatten(), bins=50, alpha=0.5, color=cols[0], label='d_prior', density=True)
                 plt.hist(d_post.flatten(), bins=50, alpha=0.5, color=cols[1], label='d_post', density=True)
-                # plot a vertical solid line at x=d_obs[i_plot], and two dashed lines at d_obs[i_plot]-2*d_std[i_plot] and d_obs[i_plot]+2*d_std[i_plot]
                 plt.plot([d_obs[i_plot],d_obs[i_plot]], [0, plt.ylim()[1]], 'r-', label='d_obs', linewidth=2)
 
-                plt.xlabel('Value')
-                plt.ylabel('PDF')
-                plt.legend()
-
+                plt.xlabel('Value', **fs_kw)
+                plt.ylabel('PDF', **fs_kw)
+                plt.legend(**(({'fontsize': fontsize} if fontsize is not None else {})))
+                if fontsize is not None:
+                    plt.gca().tick_params(labelsize=fontsize)
                 plt.grid()
 
 
             if i_plot>-1:
 
-                ax.text(0.1, 0.1, 'T = %4.2f.' % (f_post['/T'][i_plot]), transform=ax.transAxes)
-                ax.text(0.1, 0.2, 'log(EV) = %4.2f.' % (f_post['/EV'][i_plot]), transform=ax.transAxes)
+                ax.text(0.1, 0.1, 'T = %4.2f.' % (f_post['/T'][i_plot]), transform=ax.transAxes, **fs_kw)
+                ax.text(0.1, 0.2, 'log(EV) = %4.2f.' % (f_post['/EV'][i_plot]), transform=ax.transAxes, **fs_kw)
                 try:
                     if CHI2 is not None:
-                        # Sum CHI2 across all data types if multiple types exist
                         if len(CHI2.shape) == 2:
                             CHI2_total = np.nansum(CHI2[i_plot, :])
                             n_types = np.sum(~np.isnan(CHI2[i_plot, :]))
-                            ax.text(0.1, 0.3, f'CHI2 = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes)
+                            ax.text(0.1, 0.3, f'CHI2 = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes, **fs_kw)
                         else:
-                            ax.text(0.1, 0.3, f'CHI2 = {CHI2[i_plot]:.2f}', transform=ax.transAxes)
+                            ax.text(0.1, 0.3, f'CHI2 = {CHI2[i_plot]:.2f}', transform=ax.transAxes, **fs_kw)
                 except:
                     pass
-                # Use custom title if provided, otherwise use default
                 if 'title' in kwargs:
-                    plt.title(kwargs['title'])
+                    plt.title(kwargs['title'], **title_fs_kw)
                 else:
-                    plt.title('Data set %s, Observation # %d' % (Dkey, i_plot+1))
+                    plt.title('Data set %s, Observation # %d' % (Dkey, i_plot+1), **title_fs_kw)
 
 
             #plt.legend()
@@ -3659,7 +3701,7 @@ def find_points_along_line_segments(X, Y, Xl, Yl, ID=None, tolerance=None, metho
             closest_segments[selected_indices])
 
 
-def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kwargs):
+def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=None, **kwargs):
     """
     Visualize prior model parameter distributions and sample realizations.
 
@@ -3741,6 +3783,10 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
     from matplotlib.colors import LogNorm
 
     with h5py.File(f_prior_h5,'r') as f_prior:
+
+        # Convert im to Mkey if provided
+        if im is not None and len(Mkey) == 0:
+            Mkey = 'M%d' % im
 
         # If Mkey is not set, plot for all M* keys in prior and return
         if len(Mkey)==0:
@@ -3828,105 +3874,96 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         # User explicitly set use_log
         use_log_scale = use_log
 
+    fontsize = kwargs.get('fontsize', None)
+    fs_kw = {'fontsize': fontsize} if fontsize is not None else {}
+    title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
+    legend_fs = fontsize if fontsize is not None else 8
+
     if not is_discrete:
         # CONTINUOUS
 
-        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
-        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
+        show_stats = (Nm > 1)
 
-        # Left subplot: Histogram (log or linear)
+        if show_stats:
+            fig = plt.figure(figsize=(18, 6))
+            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
+            idx_right = 2
+        else:
+            fig = plt.figure(figsize=(12, 6))
+            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2], figure=fig)
+            idx_right = 1
+
         ax_left = fig.add_subplot(gs[0])
 
-        if use_log_scale:
-            # Log10 histogram
-            M_hist = M.flatten()
-            M_hist = M_hist[M_hist > 0]  # Remove zeros and negative values
-            if len(M_hist) > 0:
-                m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+        if show_stats:
+            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            if use_log_scale:
+                M_hist = M.flatten()
+                M_hist = M_hist[M_hist > 0]
+                if len(M_hist) > 0:
+                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                else:
+                    m1 = ax_left.hist([], 101, orientation='horizontal')
+                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_yticks()
+                ax_left.set_yticks(ticks)
+                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
             else:
-                # If no positive values, create empty histogram
-                m1 = ax_left.hist([], 101, orientation='horizontal')
-
-            ax_left.set_ylabel('log10(%s)' % name)
-
-            # Set ytick labels as 10^x where x is the ytick value
-            ax_left.set_yticks(ax_left.get_yticks())  # Ensure ticks are set
-            ticks = ax_left.get_yticks()
-            ax_left.set_yticks(ticks)
-            ax_left.set_yticklabels(['$10^{%3.1f}$'%i for i in ticks])
+                M_hist = M.flatten()
+                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
+                ax_left.set_ylabel(name, **fs_kw)
+            ax_left.set_xlabel('Counts', **fs_kw)
         else:
-            # Linear histogram
+            # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M.flatten()
-            m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-            ax_left.set_ylabel(name)
+            m1 = ax_left.hist(M_hist, 101)
+            ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_ylabel('Counts', **fs_kw)
 
-        ax_left.set_xlabel('Counts')
+        if fontsize is not None:
+            ax_left.tick_params(labelsize=fontsize)
         ax_left.grid()
 
-        # Middle subplot: Statistics vs depth (Mean, Median, Std)
-        ax_middle = fig.add_subplot(gs[1])
+        if show_stats:
+            ax_middle = fig.add_subplot(gs[1])
 
-        if Nm > 1:
-            # Compute statistics across all realizations
             M_mean = np.mean(M, axis=0)
             M_median = np.median(M, axis=0)
-            # Compute 95% confidence interval (2.5th and 97.5th percentiles)
             M_p2_5 = np.percentile(M, 2.5, axis=0)
             M_p97_5 = np.percentile(M, 97.5, axis=0)
 
             ax_middle.invert_yaxis()
 
             if use_log_scale:
-                # Plot in log space
                 ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
                 ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
-                # Shade 95% confidence interval (p2.5 to p97.5)
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
                 ax_middle.set_xscale('log')
-                ax_middle.set_xlabel(name)
+                ax_middle.set_xlabel(name, **fs_kw)
             else:
-                # Plot in linear space
                 ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
                 ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
-                # Shade 95% confidence interval (p2.5 to p97.5)
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
-                ax_middle.set_xlabel(name)
+                ax_middle.set_xlabel(name, **fs_kw)
 
-            # Set x-axis limits to match colorbar in realizations panel
             if clim is not None and len(clim) == 2:
                 ax_middle.set_xlim(clim[0], clim[1])
 
-            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.set_ylabel('Depth (m)', **fs_kw)
             ax_middle.grid(True, alpha=0.3)
-            ax_middle.legend(loc='best', fontsize=8)
-        else:
-            # For single parameter, show time series statistics
-            M_mean = np.mean(M)
-            M_median = np.median(M)
-            # Compute 95% confidence interval
-            M_p2_5 = np.percentile(M, 2.5)
-            M_p97_5 = np.percentile(M, 97.5)
+            ax_middle.legend(loc='best', fontsize=legend_fs)
 
-            ax_middle.axhline(M_mean, color='r', linewidth=2, label='Mean')
-            ax_middle.axhline(M_median, color='b', linewidth=2, label='Median')
-            ax_middle.axhspan(M_p2_5, M_p97_5,
-                            alpha=0.3, color='gray', label='95% CI')
-            ax_middle.set_ylabel(name)
-            ax_middle.set_xlabel('Statistics')
-            ax_middle.legend(loc='best', fontsize=8)
-            ax_middle.grid(True, alpha=0.3)
+            if fontsize is not None:
+                ax_middle.tick_params(labelsize=fontsize)
 
-        # Right subplot: Realizations (wider)
-        ax_right = fig.add_subplot(gs[2])
+        ax_right = fig.add_subplot(gs[idx_right])
 
         X,Y = np.meshgrid(np.arange(1,nr+1),z)
         ax_right.invert_yaxis()
         if Nm>1:
-            # Apply log or linear normalization based on use_log_scale
             if use_log_scale:
                 m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
                                 cmap=cmap,
@@ -3936,60 +3973,71 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
                 m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
                                 cmap=cmap,
                                 shading='auto')
-            # set clim to clim
             m2.set_clim(clim[0],clim[1])
-            fig.colorbar(m2, ax=ax_right, label=Mkey[1::])
+            cbar_label = '%s: %s' % (Mkey[1::], name)
+            cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
+            if fontsize is not None:
+                cbar.set_label(cbar_label, **fs_kw)
+                cbar.ax.tick_params(labelsize=fontsize)
         else:
             m2 = ax_right.plot(np.arange(1,nr+1),M[0:nr,:].flatten())
             ax_right.set_xlim(1,nr)
 
-        ax_right.set_xlabel('Realization #')
-        ax_right.set_ylabel(name)
+        ax_right.set_xlabel('Realization #', **fs_kw)
+        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+        if fontsize is not None:
+            ax_right.tick_params(labelsize=fontsize)
 
-        tit = '%s - %s ' % (os.path.splitext(f_prior_h5)[0],name)
-        plt.suptitle(tit)
+        tit = kwargs.get('title', None)
+        if tit is None:
+            tit = '%s - %s' % (os.path.splitext(f_prior_h5)[0], name)
+        plt.tight_layout(rect=[0, 0, 1, 0.95] if tit else [0, 0, 1, 1])
+        plt.suptitle(tit, **title_fs_kw)
 
     else:
         # DISCRETE
 
-        # use attributes already loaded inside the with block
         class_id = _class_id
         if class_id is None:
             print('No class_id found')
         class_name = _class_name
         n_class = len(class_name)
 
-        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
-        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
+        show_histogram = (Nm > 1)
 
-        # Left subplot: Histogram (for discrete, we can show class distribution)
-        ax_left = fig.add_subplot(gs[0])
+        if show_histogram:
+            fig = plt.figure(figsize=(18, 6))
+            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
+            ax_left = fig.add_subplot(gs[0])
+            idx_middle, idx_right = 1, 2
+        else:
+            fig = plt.figure(figsize=(12, 6))
+            gs = gridspec.GridSpec(1, 2, width_ratios=[2, 3], figure=fig)
+            ax_left = None
+            idx_middle, idx_right = 0, 1
 
-        # Create histogram with class boundaries
-        m1 = ax_left.hist(M.flatten(), bins=np.arange(0.5, n_class+1.5, 1), orientation='horizontal')
-        ax_left.set_ylabel(name)
-        ax_left.set_xlabel('Counts')
-        ax_left.set_yticks(np.arange(n_class)+1)
-        ax_left.set_yticklabels(class_name)
-        ax_left.grid()
+        if show_histogram:
+            m1 = ax_left.hist(M.flatten(), bins=np.arange(0.5, n_class+1.5, 1), orientation='horizontal')
+            ax_left.set_ylabel(name, **fs_kw)
+            ax_left.set_xlabel('Counts', **fs_kw)
+            ax_left.set_yticks(np.arange(n_class)+1)
+            ax_left.set_yticklabels(class_name)
+            if fontsize is not None:
+                ax_left.tick_params(labelsize=fontsize)
+            ax_left.grid()
 
-        # Middle subplot: Mode and class probabilities vs depth
-        ax_middle = fig.add_subplot(gs[1])
+        ax_middle = fig.add_subplot(gs[idx_middle])
 
         if Nm > 1:
-            # Compute mode and class probabilities at each depth
             from scipy import stats
             import matplotlib.cm as cm
 
-            # Compute mode (most frequent class) at each depth
             M_mode = np.zeros(Nm)
             for i in range(Nm):
                 mode_result = stats.mode(M[:, i], keepdims=True)
                 M_mode[i] = mode_result[0][0]
 
-            # Compute probability of each class at each depth
             P_class = np.zeros((Nm, n_class))
             for i in range(Nm):
                 for c in range(n_class):
@@ -3998,31 +4046,18 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
 
             ax_middle.invert_yaxis()
 
-            # Get colors from the colormap to match realizations panel
-            # Map class values to colormap
             norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
 
-            # Plot probability of each class with matching colors
             for c in range(n_class):
                 class_val = class_id[c]
-                # Get color from colormap at the class value position
                 color = cmap(norm(class_val))
                 ax_middle.plot(P_class[:, c], z, linewidth=2, label=class_name[c], color=color)
 
-            # Use clim to set x-axis limits if available, otherwise use [0, 1]
-            if clim is not None and len(clim) == 2:
-                # clim represents class value range, not probability
-                # For probability, we still use [0, 1]
-                ax_middle.set_xlim([0, 1])
-            else:
-                ax_middle.set_xlim([0, 1])
-
-            ax_middle.set_xlabel('Probability')
-            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.set_xlim([0, 1])
+            ax_middle.set_xlabel('Probability', **fs_kw)
+            ax_middle.set_ylabel('Depth (m)', **fs_kw)
             ax_middle.grid(True, alpha=0.3)
-            ax_middle.legend(loc='best', fontsize=8)
         else:
-            # For single parameter, show class probabilities as bar chart
             import matplotlib.cm as cm
 
             class_counts = np.zeros(n_class)
@@ -4030,19 +4065,20 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
                 class_val = class_id[c]
                 class_counts[c] = np.sum(M == class_val) / N
 
-            # Get colors from the colormap to match realizations panel
             norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
             colors = [cmap(norm(class_id[c])) for c in range(n_class)]
 
             ax_middle.barh(np.arange(n_class) + 1, class_counts, color=colors)
             ax_middle.set_yticks(np.arange(n_class) + 1)
             ax_middle.set_yticklabels(class_name)
-            ax_middle.set_xlabel('Probability')
+            ax_middle.set_xlabel('Probability', **fs_kw)
             ax_middle.set_xlim([0, 1])
             ax_middle.grid(True, alpha=0.3)
 
-        # Right subplot: Realizations (wider)
-        ax_right = fig.add_subplot(gs[2])
+        if fontsize is not None:
+            ax_middle.tick_params(labelsize=fontsize)
+
+        ax_right = fig.add_subplot(gs[idx_right])
 
         X,Y = np.meshgrid(np.arange(1,nr+1),z)
         ax_right.invert_yaxis()
@@ -4050,21 +4086,33 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
             m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
                             cmap=cmap,
                             shading='auto')
-            # set clim to clim
             m2.set_clim(clim[0]-.5,clim[1]+.5)
             cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],name))
             cbar1.set_ticks(np.arange(n_class)+1)
             cbar1.set_ticklabels(class_name)
             cbar1.ax.invert_yaxis()
+            if fontsize is not None:
+                cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
+                cbar1.ax.tick_params(labelsize=fontsize)
         else:
-            m2 = ax_right.plot(np.arange(1,nr+1),M[0:nr,:].flatten())
+            m2 = ax_right.plot(np.arange(1,nr+1), M[0:nr,:].flatten(), '.', markersize=4)
             ax_right.set_xlim(1,nr)
+            if class_id is not None and class_name is not None:
+                ax_right.set_yticks(class_id)
+                ax_right.set_yticklabels(class_name)
+            ax_right.yaxis.tick_right()
+            ax_right.yaxis.set_label_position('right')
 
-        ax_right.set_xlabel('Realization #')
-        ax_right.set_ylabel('Depth (m)')
+        ax_right.set_xlabel('Realization #', **fs_kw)
+        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+        if fontsize is not None:
+            ax_right.tick_params(labelsize=fontsize)
 
-        tit = '%s - %s ' % (os.path.splitext(f_prior_h5)[0],name)
-        #plt.suptitle(tit)
+        tit = kwargs.get('title', None)
+        if tit is None:
+            tit = '%s - %s' % (os.path.splitext(f_prior_h5)[0], name)
+        plt.tight_layout(rect=[0, 0, 1, 0.95] if tit else [0, 0, 1, 1])
+        plt.suptitle(tit, **title_fs_kw)
 
     if 'hardcopy' not in kwargs:
         kwargs['hardcopy'] = True
@@ -4073,7 +4121,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, **kw
         plt.savefig('%s_%s.png' % (os.path.splitext(f_prior_h5)[0],Mkey[1::]))
 
 
-def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo=0, **kwargs):
+def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo=0, im=None, **kwargs):
     """
     Visualize posterior model parameter distributions and sample realizations.
 
@@ -4190,6 +4238,10 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         # Get accepted indices for this data point
         i_accepted = i_use[i_plot, :]
 
+        # Convert im to Mkey if provided
+        if im is not None and len(Mkey) == 0:
+            Mkey = 'M%d' % im
+
         # If Mkey is not set, plot for all M* keys in posterior and return
         if len(Mkey) == 0:
             for key in f_post.keys():
@@ -4298,68 +4350,80 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         # User explicitly set use_log
         use_log_scale = use_log
 
+    fontsize = kwargs.get('fontsize', None)
+    fs_kw = {'fontsize': fontsize} if fontsize is not None else {}
+    title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
+    legend_fs = fontsize if fontsize is not None else 8
+
     if not is_discrete:
         # CONTINUOUS
 
-        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
-        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
+        show_stats = (Nm > 1)
 
-        # Left subplot: Histogram (log or linear) - uses ALL accepted samples
+        if show_stats:
+            fig = plt.figure(figsize=(18, 6))
+            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
+            idx_right = 2
+        else:
+            fig = plt.figure(figsize=(12, 6))
+            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2], figure=fig)
+            idx_right = 1
+
         ax_left = fig.add_subplot(gs[0])
 
-        if use_log_scale:
-            # Log10 histogram from ALL accepted samples
-            M_hist = M_all.flatten()
-            M_hist = M_hist[M_hist > 0]  # Remove zeros and negative values
-            if len(M_hist) > 0:
-                m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+        if show_stats:
+            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            if use_log_scale:
+                M_hist = M_all.flatten()
+                M_hist = M_hist[M_hist > 0]
+                if len(M_hist) > 0:
+                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                else:
+                    m1 = ax_left.hist([], 101, orientation='horizontal')
+                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_yticks()
+                ax_left.set_yticks(ticks)
+                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                if stat_mean is not None:
+                    mean_pos = stat_mean[stat_mean > 0]
+                    if len(mean_pos) > 0:
+                        ax_left.axhline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
+                if stat_median is not None:
+                    median_pos = stat_median[stat_median > 0]
+                    if len(median_pos) > 0:
+                        ax_left.axhline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
             else:
-                # If no positive values, create empty histogram
-                m1 = ax_left.hist([], 101, orientation='horizontal')
-
-            ax_left.set_ylabel('log10(%s)' % name)
-
-            # Set ytick labels as 10^x where x is the ytick value
-            ax_left.set_yticks(ax_left.get_yticks())  # Ensure ticks are set
-            ticks = ax_left.get_yticks()
-            ax_left.set_yticks(ticks)
-            ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
-
-            # Add reference lines for statistics in log space
-            if stat_mean is not None:
-                mean_pos = stat_mean[stat_mean > 0]
-                if len(mean_pos) > 0:
-                    ax_left.axhline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
-
-            if stat_median is not None:
-                median_pos = stat_median[stat_median > 0]
-                if len(median_pos) > 0:
-                    ax_left.axhline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
+                M_hist = M_all.flatten()
+                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
+                ax_left.set_ylabel(name, **fs_kw)
+                if stat_mean is not None:
+                    ax_left.axhline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
+                if stat_median is not None:
+                    ax_left.axhline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
+            ax_left.set_xlabel('Counts', **fs_kw)
+            if stat_mean is not None or stat_median is not None:
+                ax_left.legend(loc='best', fontsize=legend_fs)
         else:
-            # Linear histogram from ALL accepted samples
+            # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M_all.flatten()
-            m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-            ax_left.set_ylabel(name)
-
-            # Add reference lines for statistics
+            m1 = ax_left.hist(M_hist, 101)
+            ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_ylabel('Counts', **fs_kw)
             if stat_mean is not None:
-                ax_left.axhline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
-
+                ax_left.axvline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
             if stat_median is not None:
-                ax_left.axhline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
+                ax_left.axvline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
+            if stat_mean is not None or stat_median is not None:
+                ax_left.legend(loc='best', fontsize=legend_fs)
 
-        ax_left.set_xlabel('Counts')
+        if fontsize is not None:
+            ax_left.tick_params(labelsize=fontsize)
         ax_left.grid()
-        if stat_mean is not None or stat_median is not None:
-            ax_left.legend(loc='best', fontsize=8)
 
-        # Middle subplot: Statistics vs depth - computed from ALL accepted samples
-        ax_middle = fig.add_subplot(gs[1])
-
-        if Nm > 1:
-            # Use pre-computed statistics if available, otherwise compute from ALL realizations
+        # Middle subplot: Statistics vs depth - only for multi-layer parameters
+        if show_stats:
+            ax_middle = fig.add_subplot(gs[1])
             if stat_mean is not None and stat_median is not None:
                 M_mean = stat_mean
                 M_median = stat_median
@@ -4367,66 +4431,40 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                 M_mean = np.mean(M_all, axis=0)
                 M_median = np.median(M_all, axis=0)
 
-            # Compute 95% confidence interval from ALL realizations (p2.5 and p97.5)
             M_p2_5 = np.percentile(M_all, 2.5, axis=0)
             M_p97_5 = np.percentile(M_all, 97.5, axis=0)
 
             ax_middle.invert_yaxis()
 
             if use_log_scale:
-                # Plot in log space
                 ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
                 ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
-                # Shade 95% confidence interval (p2.5 to p97.5)
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
                 ax_middle.set_xscale('log')
-                ax_middle.set_xlabel(name)
+                ax_middle.set_xlabel(name, **fs_kw)
             else:
-                # Plot in linear space
                 ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
                 ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
-                # Shade 95% confidence interval (p2.5 to p97.5)
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
-                ax_middle.set_xlabel(name)
+                ax_middle.set_xlabel(name, **fs_kw)
 
-            # Set x-axis limits to match colorbar in realizations panel
             if clim is not None and len(clim) == 2:
                 ax_middle.set_xlim(clim[0], clim[1])
 
-            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.set_ylabel('Depth (m)', **fs_kw)
             ax_middle.grid(True, alpha=0.3)
-            ax_middle.legend(loc='best', fontsize=8)
-        else:
-            # For single parameter, show time series statistics from ALL samples
-            if stat_mean is not None and stat_median is not None:
-                M_mean_val = np.mean(stat_mean)
-                M_median_val = np.median(stat_median)
-            else:
-                M_mean_val = np.mean(M_all)
-                M_median_val = np.median(M_all)
-
-            # Compute 95% confidence interval from ALL samples
-            M_p2_5 = np.percentile(M_all, 2.5)
-            M_p97_5 = np.percentile(M_all, 97.5)
-
-            ax_middle.axhline(M_mean_val, color='r', linewidth=2, label='Mean')
-            ax_middle.axhline(M_median_val, color='b', linewidth=2, label='Median')
-            ax_middle.axhspan(M_p2_5, M_p97_5,
-                            alpha=0.3, color='gray', label='95% CI')
-            ax_middle.set_ylabel(name)
-            ax_middle.set_xlabel('Statistics')
-            ax_middle.legend(loc='best', fontsize=8)
-            ax_middle.grid(True, alpha=0.3)
+            ax_middle.legend(loc='best', fontsize=legend_fs)
+            if fontsize is not None:
+                ax_middle.tick_params(labelsize=fontsize)
 
         # Right subplot: Realizations (wider) - displays only nr_actual for visualization
-        ax_right = fig.add_subplot(gs[2])
+        ax_right = fig.add_subplot(gs[idx_right])
 
         X, Y = np.meshgrid(np.arange(1, nr_actual + 1), z)
         ax_right.invert_yaxis()
         if Nm > 1:
-            # Apply log or linear normalization based on use_log_scale
             if use_log_scale:
                 m2 = ax_right.pcolor(X, Y, M_display[:, :].T,
                                      cmap=cmap,
@@ -4436,60 +4474,71 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                 m2 = ax_right.pcolor(X, Y, M_display[:, :].T,
                                      cmap=cmap,
                                      shading='auto')
-            # set clim to clim
             m2.set_clim(clim[0], clim[1])
-            fig.colorbar(m2, ax=ax_right, label=Mkey[1::])
+            cbar_label = '%s: %s' % (Mkey[1::], name)
+            cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
+            if fontsize is not None:
+                cbar.set_label(cbar_label, **fs_kw)
+                cbar.ax.tick_params(labelsize=fontsize)
         else:
             m2 = ax_right.plot(np.arange(1, nr_actual + 1), M_display[:, :].flatten())
             ax_right.set_xlim(1, nr_actual)
 
-        ax_right.set_xlabel('Realization #')
-        ax_right.set_ylabel(name)
+        ax_right.set_xlabel('Realization #', **fs_kw)
+        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+        if fontsize is not None:
+            ax_right.tick_params(labelsize=fontsize)
 
-        tit = '%s - %s (i_plot=%d)' % (os.path.splitext(f_post_h5)[0], name, i_plot)
-        plt.suptitle(tit)
+        tit = kwargs.get('title', None)
+        if tit is None:
+            tit = '%s - %s (i_plot=%d)' % (os.path.splitext(f_post_h5)[0], name, i_plot)
+        plt.tight_layout(rect=[0, 0, 1, 0.95] if tit else [0, 0, 1, 1])
+        plt.suptitle(tit, **title_fs_kw)
 
     else:
         # DISCRETE
 
-        # Use attributes already loaded inside the with block
         class_id = _ps_class_id
         if class_id is None:
             print('plot_post_stats: No class_id found')
         class_name = _ps_class_name
         n_class = len(class_name)
 
-        # Create figure with GridSpec for custom layout (left narrow, middle, right wide)
-        fig = plt.figure(figsize=(18, 6))
         import matplotlib.gridspec as gridspec
-        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
+        show_histogram = (Nm > 1)
 
-        # Left subplot: Histogram (for discrete, we show class distribution) - uses ALL samples
-        ax_left = fig.add_subplot(gs[0])
+        if show_histogram:
+            fig = plt.figure(figsize=(18, 6))
+            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
+            ax_left = fig.add_subplot(gs[0])
+            idx_middle, idx_right = 1, 2
+        else:
+            fig = plt.figure(figsize=(12, 6))
+            gs = gridspec.GridSpec(1, 2, width_ratios=[2, 3], figure=fig)
+            ax_left = None
+            idx_middle, idx_right = 0, 1
 
-        # Create histogram with class boundaries from ALL accepted samples
-        m1 = ax_left.hist(M_all.flatten(), bins=np.arange(0.5, n_class + 1.5, 1), orientation='horizontal')
-        ax_left.set_ylabel(name)
-        ax_left.set_xlabel('Counts')
-        ax_left.set_yticks(np.arange(n_class) + 1)
-        ax_left.set_yticklabels(class_name)
-        ax_left.grid()
+        if show_histogram:
+            m1 = ax_left.hist(M_all.flatten(), bins=np.arange(0.5, n_class + 1.5, 1), orientation='horizontal')
+            ax_left.set_ylabel(name, **fs_kw)
+            ax_left.set_xlabel('Counts', **fs_kw)
+            ax_left.set_yticks(np.arange(n_class) + 1)
+            ax_left.set_yticklabels(class_name)
+            if fontsize is not None:
+                ax_left.tick_params(labelsize=fontsize)
+            ax_left.grid()
 
-        # Middle subplot: Mode and class probabilities vs depth - computed from ALL samples
-        ax_middle = fig.add_subplot(gs[1])
+        ax_middle = fig.add_subplot(gs[idx_middle])
 
         if Nm > 1:
-            # Compute mode and class probabilities at each depth from ALL samples
             from scipy import stats
             import matplotlib.cm as cm
 
-            # Compute mode (most frequent class) at each depth
             M_mode = np.zeros(Nm)
             for i in range(Nm):
                 mode_result = stats.mode(M_all[:, i], keepdims=True)
                 M_mode[i] = mode_result[0][0]
 
-            # Compute probability of each class at each depth from ALL samples
             P_class = np.zeros((Nm, n_class))
             for i in range(Nm):
                 for c in range(n_class):
@@ -4498,31 +4547,18 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
 
             ax_middle.invert_yaxis()
 
-            # Get colors from the colormap to match realizations panel
-            # Map class values to colormap
             norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
 
-            # Plot probability of each class with matching colors
             for c in range(n_class):
                 class_val = class_id[c]
-                # Get color from colormap at the class value position
                 color = cmap(norm(class_val))
                 ax_middle.plot(P_class[:, c], z, linewidth=2, label=class_name[c], color=color)
 
-            # Use clim to set x-axis limits if available, otherwise use [0, 1]
-            if clim is not None and len(clim) == 2:
-                # clim represents class value range, not probability
-                # For probability, we still use [0, 1]
-                ax_middle.set_xlim([0, 1])
-            else:
-                ax_middle.set_xlim([0, 1])
-
-            ax_middle.set_xlabel('Probability')
-            ax_middle.set_ylabel('Depth (m)')
+            ax_middle.set_xlim([0, 1])
+            ax_middle.set_xlabel('Probability', **fs_kw)
+            ax_middle.set_ylabel('Depth (m)', **fs_kw)
             ax_middle.grid(True, alpha=0.3)
-            ax_middle.legend(loc='best', fontsize=8)
         else:
-            # For single parameter, show class probabilities as bar chart from ALL samples
             import matplotlib.cm as cm
 
             class_counts = np.zeros(n_class)
@@ -4530,19 +4566,20 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                 class_val = class_id[c]
                 class_counts[c] = np.sum(M_all == class_val) / N_all
 
-            # Get colors from the colormap to match realizations panel
             norm = plt.Normalize(vmin=clim[0]-.5, vmax=clim[1]+.5)
             colors = [cmap(norm(class_id[c])) for c in range(n_class)]
 
             ax_middle.barh(np.arange(n_class) + 1, class_counts, color=colors)
             ax_middle.set_yticks(np.arange(n_class) + 1)
             ax_middle.set_yticklabels(class_name)
-            ax_middle.set_xlabel('Probability')
+            ax_middle.set_xlabel('Probability', **fs_kw)
             ax_middle.set_xlim([0, 1])
             ax_middle.grid(True, alpha=0.3)
 
-        # Right subplot: Realizations (wider) - displays only nr_actual for visualization
-        ax_right = fig.add_subplot(gs[2])
+        if fontsize is not None:
+            ax_middle.tick_params(labelsize=fontsize)
+
+        ax_right = fig.add_subplot(gs[idx_right])
 
         X, Y = np.meshgrid(np.arange(1, nr_actual + 1), z)
         ax_right.invert_yaxis()
@@ -4550,21 +4587,33 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             m2 = ax_right.pcolor(X, Y, M_display[:, :].T,
                                  cmap=cmap,
                                  shading='auto')
-            # set clim to clim
             m2.set_clim(clim[0] - .5, clim[1] + .5)
             cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' % (Mkey[1::], name))
             cbar1.set_ticks(np.arange(n_class) + 1)
             cbar1.set_ticklabels(class_name)
             cbar1.ax.invert_yaxis()
+            if fontsize is not None:
+                cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
+                cbar1.ax.tick_params(labelsize=fontsize)
         else:
-            m2 = ax_right.plot(np.arange(1, nr_actual + 1), M_display[:, :].flatten())
+            m2 = ax_right.plot(np.arange(1, nr_actual + 1), M_display[:, :].flatten(), '.', markersize=4)
             ax_right.set_xlim(1, nr_actual)
+            if class_id is not None and class_name is not None:
+                ax_right.set_yticks(class_id)
+                ax_right.set_yticklabels(class_name)
+            ax_right.yaxis.tick_right()
+            ax_right.yaxis.set_label_position('right')
 
-        ax_right.set_xlabel('Realization #')
-        ax_right.set_ylabel('Depth (m)')
+        ax_right.set_xlabel('Realization #', **fs_kw)
+        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+        if fontsize is not None:
+            ax_right.tick_params(labelsize=fontsize)
 
-        tit = '%s - %s (i_plot=%d)' % (os.path.splitext(f_post_h5)[0], name, i_plot)
-        plt.suptitle(tit)
+        tit = kwargs.get('title', None)
+        if tit is None:
+            tit = '%s - %s (i_plot=%d)' % (os.path.splitext(f_post_h5)[0], name, i_plot)
+        plt.tight_layout(rect=[0, 0, 1, 0.95] if tit else [0, 0, 1, 1])
+        plt.suptitle(tit, **title_fs_kw)
 
     if 'hardcopy' not in kwargs:
         kwargs['hardcopy'] = True
