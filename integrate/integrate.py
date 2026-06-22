@@ -27,8 +27,10 @@ Email: tmeha@geo.au.dk
 
 import h5py
 import numpy as np
+import os
 import os.path
 import subprocess
+from tqdm import tqdm
 from sys import exit
 import sys
 import types
@@ -412,6 +414,623 @@ def prior_set(f_prior_h5, im=1, **kwargs):
             print('prior_set: %s/cmap updated' % Mstr)
 
 
+# ---------------------------------------------------------------------------
+# Posterior statistics — stat registry
+# ---------------------------------------------------------------------------
+# Stats are registered in two dictionaries.  Adding a new stat = one
+# decorated function.  The driver processes soundings in batches using
+# NumPy vectorized operations (the original code looped over ~10k soundings
+# in Python).  ``np.sort`` is computed once per batch and reused by all
+# stats that need it (Median, HarmonicMean, …).  Discrete class counts use
+# one-hot + ``np.sum`` instead of a Python loop over ``n_classes``.
+# A JAX backend (``backend='jax'``) is supported and shares the same
+# registry / driver structure.
+
+_CONTINUOUS_STATS = {}
+_DISCRETE_STATS = {}
+
+
+def _register_continuous(name, *, needs_sort=False, needs_prior=False, dtype="f4"):
+    def deco(fn):
+        _CONTINUOUS_STATS[name] = {
+            "fn": fn, "needs_sort": needs_sort,
+            "needs_prior": needs_prior, "dtype": dtype,
+        }
+        return fn
+    return deco
+
+
+def _register_discrete(name, *, needs_classes=False, needs_prior=False,
+                       dtype="f4", output_ndim=2):
+    def deco(fn):
+        _DISCRETE_STATS[name] = {
+            "fn": fn, "needs_classes": needs_classes,
+            "needs_prior": needs_prior, "dtype": dtype,
+            "output_ndim": output_ndim,
+        }
+        return fn
+    return deco
+
+
+# --- continuous stats (NumPy) -- each operates on m_cube (B, nr, nm) --------
+
+@_register_continuous("Mean")
+def _ps_mean(m_cube, axis=1):
+    return np.mean(m_cube, axis=axis)
+
+
+@_register_continuous("LogMean")
+def _ps_logmean(m_cube, axis=1):
+    return np.exp(np.mean(np.log(np.maximum(m_cube, 1e-10)), axis=axis))
+
+
+@_register_continuous("Std")
+def _ps_std(m_cube, axis=1):
+    return np.std(m_cube, axis=axis)
+
+
+@_register_continuous("LogStd")
+def _ps_logstd(m_cube, axis=1):
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.std(np.log10(np.maximum(m_cube, 1e-10)), axis=axis)
+
+
+@_register_continuous("Median", needs_sort=True)
+def _ps_median(m_sorted, axis=1):
+    return np.median(m_sorted, axis=axis)
+
+
+@_register_continuous("HarmonicMean", needs_sort=True)
+def _ps_harmonic_mean(m_sorted, axis=1):
+    """Trimmed harmonic mean: invert, sort, trim 10% each tail, mean, invert."""
+    _c = np.sort(1.0 / np.maximum(m_sorted, 1e-10), axis=axis)
+    _nr = _c.shape[axis]
+    _k = int(np.floor(0.10 * _nr))
+    sl = [slice(None)] * _c.ndim
+    sl[axis] = slice(_k, _nr - _k)
+    return 1.0 / np.mean(_c[tuple(sl)], axis=axis)
+
+
+@_register_continuous("KL", needs_prior=True)
+def _ps_kl_continuous(m_cube, axis=1, prior_hist=None, bins=None):
+    """Histogram-based KL(post||prior) in bits (log2), 50 log10 bins."""
+    B, nr, nm = m_cube.shape
+    out = np.empty((B, nm), dtype=np.float64)
+    m_log = np.log10(np.maximum(m_cube, 1e-10))
+    for j in range(nm):
+        col_bins = bins[j]
+        col_prior = prior_hist[j]
+        n_bins = len(col_prior)
+        for b in range(B):
+            h_q, _ = np.histogram(m_log[b, :, j], bins=col_bins)
+            h_q = (h_q + 1e-10) / (h_q.sum() + n_bins * 1e-10)
+            out[b, j] = np.sum(h_q * np.log2(h_q / col_prior))
+    return out
+
+
+# --- discrete stats (NumPy) -- each operates on m_cube (B, nr, nm) ----------
+
+def _ps_class_counts(m_cube, class_id, axis=1):
+    """Return counts array of shape (B, n_classes, nm)."""
+    eq = m_cube[:, None, :, :] == class_id[None, :, None, None]
+    counts = np.sum(eq, axis=2)
+    return counts.astype(np.float64)
+
+
+@_register_discrete("Mode", needs_classes=True)
+def _ps_mode(m_cube, class_id, axis=1):
+    counts = _ps_class_counts(m_cube, class_id, axis)
+    return class_id[np.argmax(counts, axis=1)]
+
+
+@_register_discrete("Entropy", needs_classes=True)
+def _ps_entropy(m_cube, class_id, axis=1):
+    counts = _ps_class_counts(m_cube, class_id, axis)
+    p = counts / m_cube.shape[axis]
+    p = np.clip(p, 1e-12, None)
+    return -np.sum(p * np.log(p), axis=1) / np.log(len(class_id))
+
+
+@_register_discrete("P", needs_classes=True, output_ndim=3)
+def _ps_prob(m_cube, class_id, axis=1):
+    counts = _ps_class_counts(m_cube, class_id, axis)
+    return counts / m_cube.shape[axis]
+
+
+@_register_discrete("KL", needs_classes=True, needs_prior=True)
+def _ps_kl_discrete(m_cube, class_id, axis=1, prior_hist=None, **_):
+    """D_KL(post||prior) normalized by log(n_classes), smoothed."""
+    counts = _ps_class_counts(m_cube, class_id, axis)
+    p = counts / m_cube.shape[axis]
+    p = (p + 1e-10) / (p.sum(axis=1, keepdims=True) + len(class_id) * 1e-10)
+    return np.sum(p * np.log(p / prior_hist), axis=1) / np.log(len(class_id))
+
+
+# --- helpers ---------------------------------------------------------------
+
+def _ps_is_continuous(dataset):
+    return (dataset.attrs.get("is_discrete") in (0, 0.0, False)
+            or str(dataset.attrs.get("is_discrete")).strip() == "0")
+
+
+def _ps_is_discrete(dataset):
+    return (dataset.attrs.get("is_discrete") in (1, 1.0, True)
+            or str(dataset.attrs.get("is_discrete")).strip() == "1")
+
+
+def _ps_compute_n_unique(i_use):
+    """Number of unique prior indices per sounding, vectorized."""
+    i_sorted = np.sort(i_use, axis=1)
+    n_unique = 1 + np.sum(i_sorted[:, 1:] != i_sorted[:, :-1], axis=1)
+    return n_unique.astype(np.float64)
+
+
+def _ps_prior_hist_continuous(M_all, nr, n_bins=50, rng=None):
+    """Pre-compute log10 prior histograms + bins for continuous KL."""
+    if rng is None:
+        rng = np.random
+    idx = rng.choice(M_all.shape[0], nr, replace=False)
+    M_prior = np.log10(np.maximum(M_all[idx, :], 1e-10))
+    nm = M_prior.shape[1]
+    bins = []
+    prior_hist = []
+    for j in range(nm):
+        col = M_prior[:, j]
+        b = np.linspace(col.min(), col.max(), n_bins + 1)
+        h, _ = np.histogram(col, bins=b)
+        h = (h + 1e-10) / (h.sum() + n_bins * 1e-10)
+        bins.append(b)
+        prior_hist.append(h)
+    return prior_hist, bins
+
+
+def _ps_prior_hist_discrete(M_all, class_id, nr, rng=None):
+    """Pre-compute prior class-probability histogram for discrete KL."""
+    if rng is None:
+        rng = np.random
+    idx = rng.choice(M_all.shape[0], nr, replace=False)
+    M_prior = M_all[idx, :]
+    nm = M_prior.shape[1]
+    n_classes = len(class_id)
+    counts = np.zeros((n_classes, nm), dtype=np.float64)
+    for ic, cid in enumerate(class_id):
+        counts[ic, :] = np.sum(M_prior == cid, axis=0)
+    counts = (counts + 1e-10) / (counts.sum(axis=0, keepdims=True) + n_classes * 1e-10)
+    return counts
+
+
+# ---------------------------------------------------------------------------
+# Posterior statistics — NumPy batched drivers
+# ---------------------------------------------------------------------------
+
+def _ps_process_continuous(name, dataset, i_use, ip_range, nr, nsounding,
+                           stat_names, batch_size, f_post, showInfo, disableTqdm,
+                           compute_kl, rng):
+    nm = dataset.shape[1]
+    M_all = dataset[:]
+    n_bins_kl = 50
+
+    sort_stats = [s for s in stat_names if _CONTINUOUS_STATS[s]["needs_sort"]]
+    plain_stats = [s for s in stat_names if not _CONTINUOUS_STATS[s]["needs_sort"]
+                   and not _CONTINUOUS_STATS[s]["needs_prior"]]
+    kl_stats = [s for s in stat_names if _CONTINUOUS_STATS[s]["needs_prior"]]
+
+    prior_hist = bins = None
+    if kl_stats:
+        if showInfo > 0:
+            print(f'  {name}: pre-computing prior KL histograms')
+        prior_hist, bins = _ps_prior_hist_continuous(M_all, nr, n_bins_kl, rng)
+
+    outputs = {s: np.full((nsounding, nm), np.nan,
+                          dtype=_CONTINUOUS_STATS[s]["dtype"])
+               for s in stat_names}
+
+    n_ip = len(ip_range)
+    for start in tqdm(range(0, n_ip, batch_size),
+                      disable=disableTqdm, mininterval=1,
+                      desc=f'{name}-continuous', leave=False):
+        end = min(start + batch_size, n_ip)
+        iids = ip_range[start:end]
+        batch_idx = i_use[iids, :].astype(np.int64)
+        m_cube = M_all[batch_idx, :]
+
+        m_sorted = np.sort(m_cube, axis=1) if sort_stats else None
+
+        for s in plain_stats:
+            outputs[s][iids] = _CONTINUOUS_STATS[s]["fn"](m_cube)
+        for s in sort_stats:
+            outputs[s][iids] = _CONTINUOUS_STATS[s]["fn"](m_sorted)
+        for s in kl_stats:
+            outputs[s][iids] = _CONTINUOUS_STATS[s]["fn"](
+                m_cube, prior_hist=prior_hist, bins=bins)
+
+    for s in stat_names:
+        dset_path = f'/{name}/{s}'
+        if dset_path not in f_post:
+            if showInfo > 0:
+                print(f'  Creating {dset_path}')
+            f_post.create_dataset(dset_path, data=outputs[s],
+                                  dtype=_CONTINUOUS_STATS[s]["dtype"])
+        else:
+            f_post[dset_path][:] = outputs[s]
+
+
+def _ps_process_discrete(name, dataset, i_use, ip_range, nr, nsounding,
+                         stat_names, batch_size, f_post, showInfo, disableTqdm,
+                         compute_kl, rng):
+    nm = dataset.shape[1]
+    M_all = dataset[:]
+    class_id = np.asarray(dataset.attrs['class_id']).ravel()
+    n_classes = len(class_id)
+
+    if showInfo > 1:
+        print(f'{name}: DISCRETE, N_classes={n_classes}')
+
+    kl_stats = [s for s in stat_names if _DISCRETE_STATS[s]["needs_prior"]]
+    prior_hist = None
+    if kl_stats:
+        prior_hist = _ps_prior_hist_discrete(M_all, class_id, nr, rng)
+
+    outputs = {}
+    for s in stat_names:
+        meta = _DISCRETE_STATS[s]
+        if meta["output_ndim"] == 3:
+            outputs[s] = np.full((nsounding, n_classes, nm), np.nan,
+                                 dtype=meta["dtype"])
+        else:
+            outputs[s] = np.full((nsounding, nm), np.nan, dtype=meta["dtype"])
+
+    n_ip = len(ip_range)
+    for start in tqdm(range(0, n_ip, batch_size),
+                      disable=disableTqdm, mininterval=1,
+                      desc=f'{name}-discrete', leave=False):
+        end = min(start + batch_size, n_ip)
+        iids = ip_range[start:end]
+        batch_idx = i_use[iids, :].astype(np.int64)
+        m_cube = M_all[batch_idx, :]
+
+        for s in stat_names:
+            meta = _DISCRETE_STATS[s]
+            fn = meta["fn"]
+            if meta["needs_prior"] and meta["needs_classes"]:
+                outputs[s][iids] = fn(m_cube, class_id, prior_hist=prior_hist)
+            elif meta["needs_classes"]:
+                outputs[s][iids] = fn(m_cube, class_id)
+            else:
+                outputs[s][iids] = fn(m_cube)
+
+    for s in stat_names:
+        dset_path = f'/{name}/{s}'
+        if dset_path not in f_post:
+            if showInfo > 0:
+                print(f'  Creating {dset_path}')
+            f_post.create_dataset(dset_path, data=outputs[s],
+                                  dtype=_DISCRETE_STATS[s]["dtype"])
+        else:
+            f_post[dset_path][:] = outputs[s]
+
+
+# ---------------------------------------------------------------------------
+# Posterior statistics — JAX backend
+# ---------------------------------------------------------------------------
+# JAX is imported lazily so the module loads without JAX installed.  The
+# stat registry below mirrors the NumPy one but uses ``jax.numpy``.
+
+_JAX_POSTSTATS_AVAILABLE = False
+_JAX_CONTINUOUS_STATS = {}
+_JAX_DISCRETE_STATS = {}
+
+try:
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+    import jax as _jax_ps
+    import jax.numpy as _jnp_ps
+    _jax_ps.config.update(
+        "jax_compilation_cache_dir",
+        os.path.expanduser("~/.cache/jax_xla_gpu_poststats"))
+    _JAX_POSTSTATS_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def _register_jax_cont(name, *, needs_sort=False, needs_prior=False, dtype="f4"):
+    def deco(fn):
+        _JAX_CONTINUOUS_STATS[name] = {"fn": fn, "needs_sort": needs_sort,
+                                       "needs_prior": needs_prior, "dtype": dtype}
+        return fn
+    return deco
+
+
+def _register_jax_disc(name, *, needs_classes=False, needs_prior=False,
+                       dtype="f4", output_ndim=2):
+    def deco(fn):
+        _JAX_DISCRETE_STATS[name] = {"fn": fn, "needs_classes": needs_classes,
+                                     "needs_prior": needs_prior, "dtype": dtype,
+                                     "output_ndim": output_ndim}
+        return fn
+    return deco
+
+
+if _JAX_POSTSTATS_AVAILABLE:
+    @_register_jax_cont("Mean")
+    def _ps_jmean(m, axis=1):
+        return _jnp_ps.mean(m, axis=axis)
+
+    @_register_jax_cont("LogMean")
+    def _ps_jlogmean(m, axis=1):
+        return _jnp_ps.exp(_jnp_ps.mean(_jnp_ps.log(_jnp_ps.maximum(m, 1e-10)), axis=axis))
+
+    @_register_jax_cont("Std")
+    def _ps_jstd(m, axis=1):
+        return _jnp_ps.std(m, axis=axis)
+
+    @_register_jax_cont("LogStd")
+    def _ps_jlogstd(m, axis=1):
+        return _jnp_ps.std(_jnp_ps.log10(_jnp_ps.maximum(m, 1e-10)), axis=axis)
+
+    @_register_jax_cont("Median", needs_sort=True)
+    def _ps_jmedian(m_sorted, axis=1):
+        return _jnp_ps.median(m_sorted, axis=axis)
+
+    @_register_jax_cont("HarmonicMean", needs_sort=True)
+    def _ps_jharmonic(m_sorted, axis=1):
+        _c = _jnp_ps.sort(1.0 / _jnp_ps.maximum(m_sorted, 1e-10), axis=axis)
+        _nr = _c.shape[axis]
+        _k = int(np.floor(0.10 * _nr))
+        sl = [slice(None)] * _c.ndim
+        sl[axis] = slice(_k, _nr - _k)
+        return 1.0 / _jnp_ps.mean(_c[tuple(sl)], axis=axis)
+
+    def _ps_jclass_counts(m, class_id, axis=1):
+        eq = m[:, None, :, :] == class_id[None, :, None, None]
+        counts = _jnp_ps.sum(eq, axis=2)
+        return counts.astype(_jnp_ps.float32)
+
+    @_register_jax_disc("Mode", needs_classes=True)
+    def _ps_jmode(m, class_id, axis=1):
+        counts = _ps_jclass_counts(m, class_id, axis)
+        return class_id[_jnp_ps.argmax(counts, axis=1)]
+
+    @_register_jax_disc("Entropy", needs_classes=True)
+    def _ps_jentropy(m, class_id, axis=1):
+        counts = _ps_jclass_counts(m, class_id, axis)
+        p = counts / m.shape[axis]
+        p = _jnp_ps.clip(p, 1e-12, None)
+        return -_jnp_ps.sum(p * _jnp_ps.log(p), axis=1) / _jnp_ps.log(len(class_id))
+
+    @_register_jax_disc("P", needs_classes=True, output_ndim=3)
+    def _ps_jprob(m, class_id, axis=1):
+        counts = _ps_jclass_counts(m, class_id, axis)
+        return counts / m.shape[axis]
+
+    @_register_jax_disc("KL", needs_classes=True, needs_prior=True)
+    def _ps_jkl_discrete(m, class_id, axis=1, prior_hist=None, **_):
+        counts = _ps_jclass_counts(m, class_id, axis)
+        p = counts / m.shape[axis]
+        p = (p + 1e-10) / (p.sum(axis=1, keepdims=True) + len(class_id) * 1e-10)
+        return _jnp_ps.sum(p * _jnp_ps.log(p / prior_hist), axis=1) / _jnp_ps.log(len(class_id))
+
+
+def _ps_jax_process_continuous(name, dataset, i_use, ip_range, nr, nsounding,
+                               stat_names, batch_size, f_post, showInfo,
+                               disableTqdm):
+    nm = dataset.shape[1]
+    M_all = np.asarray(dataset[:])
+    M_all_j = _jnp_ps.asarray(M_all)
+
+    sort_stats = [s for s in stat_names if _JAX_CONTINUOUS_STATS[s]["needs_sort"]]
+    plain_stats = [s for s in stat_names
+                   if not _JAX_CONTINUOUS_STATS[s]["needs_sort"]
+                   and not _JAX_CONTINUOUS_STATS[s]["needs_prior"]]
+
+    outputs = {s: np.full((nsounding, nm), np.nan,
+                          dtype=_JAX_CONTINUOUS_STATS[s]["dtype"])
+               for s in stat_names}
+
+    n_ip = len(ip_range)
+    for start in tqdm(range(0, n_ip, batch_size),
+                      disable=disableTqdm, mininterval=1,
+                      desc=f'{name}-continuous (jax)', leave=False):
+        end = min(start + batch_size, n_ip)
+        iids = ip_range[start:end]
+        batch_idx = i_use[iids, :].astype(np.int64)
+        m_cube = M_all_j[batch_idx, :]
+
+        m_sorted = _jnp_ps.sort(m_cube, axis=1) if sort_stats else None
+
+        for s in plain_stats:
+            outputs[s][iids] = np.asarray(_JAX_CONTINUOUS_STATS[s]["fn"](m_cube))
+        for s in sort_stats:
+            outputs[s][iids] = np.asarray(_JAX_CONTINUOUS_STATS[s]["fn"](m_sorted))
+
+    for s in stat_names:
+        dset = f'/{name}/{s}'
+        if dset not in f_post:
+            if showInfo > 0:
+                print(f'  Creating {dset}')
+            f_post.create_dataset(dset, data=outputs[s],
+                                  dtype=_JAX_CONTINUOUS_STATS[s]["dtype"])
+        else:
+            f_post[dset][:] = outputs[s]
+
+
+def _ps_jax_process_discrete(name, dataset, i_use, ip_range, nr, nsounding,
+                             stat_names, batch_size, f_post, showInfo,
+                             disableTqdm, rng_np):
+    nm = dataset.shape[1]
+    M_all = np.asarray(dataset[:])
+    M_all_j = _jnp_ps.asarray(M_all)
+    class_id = np.asarray(dataset.attrs['class_id']).ravel()
+    class_id_j = _jnp_ps.asarray(class_id)
+    n_classes = len(class_id)
+
+    kl_stats = [s for s in stat_names if _JAX_DISCRETE_STATS[s]["needs_prior"]]
+    prior_hist_j = None
+    if kl_stats:
+        prior_hist = _ps_prior_hist_discrete(M_all, class_id, nr, rng_np)
+        prior_hist_j = _jnp_ps.asarray(prior_hist)
+
+    outputs = {}
+    for s in stat_names:
+        meta = _JAX_DISCRETE_STATS[s]
+        if meta["output_ndim"] == 3:
+            outputs[s] = np.full((nsounding, n_classes, nm), np.nan,
+                                 dtype=meta["dtype"])
+        else:
+            outputs[s] = np.full((nsounding, nm), np.nan, dtype=meta["dtype"])
+
+    n_ip = len(ip_range)
+    for start in tqdm(range(0, n_ip, batch_size),
+                      disable=disableTqdm, mininterval=1,
+                      desc=f'{name}-discrete (jax)', leave=False):
+        end = min(start + batch_size, n_ip)
+        iids = ip_range[start:end]
+        batch_idx = i_use[iids, :].astype(np.int64)
+        m_cube = M_all_j[batch_idx, :]
+
+        for s in stat_names:
+            meta = _JAX_DISCRETE_STATS[s]
+            fn = meta["fn"]
+            if meta["needs_prior"] and meta["needs_classes"]:
+                outputs[s][iids] = np.asarray(
+                    fn(m_cube, class_id_j, prior_hist=prior_hist_j))
+            elif meta["needs_classes"]:
+                outputs[s][iids] = np.asarray(fn(m_cube, class_id_j))
+
+    for s in stat_names:
+        dset = f'/{name}/{s}'
+        if dset not in f_post:
+            if showInfo > 0:
+                print(f'  Creating {dset}')
+            f_post.create_dataset(dset, data=outputs[s],
+                                  dtype=_JAX_DISCRETE_STATS[s]["dtype"])
+        else:
+            f_post[dset][:] = outputs[s]
+
+
+def _ps_numpy_fallback_continuous_kl(name, dataset, i_use, ip_range, nr, nsounding,
+                                     f_post, showInfo, disableTqdm, rng):
+    """Compute continuous KL with NumPy (no JAX histogram kernel yet)."""
+    nm = dataset.shape[1]
+    M_all = dataset[:]
+    prior_hist, bins = _ps_prior_hist_continuous(M_all, nr, 50, rng)
+    kl_fn = _CONTINUOUS_STATS["KL"]["fn"]
+    out = np.full((nsounding, nm), np.nan, dtype="f4")
+    bs = 256
+    for start in tqdm(range(0, len(ip_range), bs),
+                      disable=disableTqdm, mininterval=1,
+                      desc=f'{name}-KL (numpy fallback)', leave=False):
+        end = min(start + bs, len(ip_range))
+        iids = ip_range[start:end]
+        batch_idx = i_use[iids, :].astype(np.int64)
+        m_cube = M_all[batch_idx, :]
+        out[iids] = kl_fn(m_cube, prior_hist=prior_hist, bins=bins)
+    dset = f'/{name}/KL'
+    if dset not in f_post:
+        f_post.create_dataset(dset, data=out, dtype='f4')
+    else:
+        f_post[dset][:] = out
+
+
+def _ps_integrate_posterior_stats_jax(f_post_h5, ip_range, stats, batch_size,
+                                      **kwargs):
+    """JAX backend driver for posterior statistics (GPU)."""
+    showInfo = kwargs.get('showInfo', 0)
+    disableTqdm = showInfo < 0
+    usePrior = kwargs.get('usePrior', False)
+    updateGeometryFromData = kwargs.get('updateGeometryFromData', True)
+    computeKL = kwargs.get('computeKL', False)
+    computeKL_continuous = kwargs.get('computeKL_continuous', False) or computeKL
+    computeKL_discrete = kwargs.get('computeKL_discrete', False) or computeKL
+    seed = kwargs.get('seed', None)
+    rng_np = np.random.RandomState(seed) if seed is not None else np.random
+
+    with h5py.File(f_post_h5, 'r') as f:
+        f_prior_h5 = f.attrs.get('f5_prior', None)
+        f_data_h5 = f.attrs.get('f5_data', None)
+    if f_prior_h5 is None:
+        raise ValueError(f"'f5_prior' attribute not in {f_post_h5}")
+    if f_data_h5 is None:
+        raise ValueError(f"'f5_data' attribute not in {f_post_h5}")
+
+    if updateGeometryFromData and f_data_h5 is not None:
+        with h5py.File(f_data_h5, 'r') as f_data, h5py.File(f_post_h5, 'a') as f_post:
+            for g in ('UTMX', 'UTMY', 'LINE', 'ELEVATION'):
+                if g in f_data and g not in f_post:
+                    f_data.copy('/' + g, f_post)
+
+    with h5py.File(f_post_h5, 'r') as f:
+        i_use = f['i_use'][:]
+    nsounding, nr = i_use.shape
+
+    if usePrior:
+        with h5py.File(f_prior_h5, 'r') as f_prior:
+            N = f_prior['/M1'].shape[0]
+        i_use = rng_np.randint(0, N, (nsounding, nr))
+
+    if ip_range is None or len(ip_range) == 0:
+        ip_range = np.arange(nsounding)
+        if showInfo > 0:
+            print(f'JAX: Computing posterior statistics for all {nsounding} data points')
+    else:
+        ip_range = np.asarray(ip_range)
+        if np.any(ip_range < 0) or np.any(ip_range >= nsounding):
+            raise ValueError(f"ip_range out of range [0, {nsounding-1}]")
+
+    # N_UNIQUE — on-device sort+diff
+    i_use_j = _jnp_ps.asarray(i_use)
+    i_sorted = _jnp_ps.sort(i_use_j, axis=1)
+    n_unique = 1 + _jnp_ps.sum(i_sorted[:, 1:] != i_sorted[:, :-1], axis=1)
+    N_UNIQUE = np.full(nsounding, np.nan)
+    N_UNIQUE[ip_range] = np.asarray(n_unique)[ip_range].astype(np.float64)
+    with h5py.File(f_post_h5, 'a') as f_post:
+        if '/N_UNIQUE' not in f_post:
+            f_post.create_dataset('/N_UNIQUE', data=N_UNIQUE, dtype='f4')
+        else:
+            f_post['/N_UNIQUE'][:] = N_UNIQUE
+
+    cont_names = list(_JAX_CONTINUOUS_STATS.keys())
+    disc_names = list(_JAX_DISCRETE_STATS.keys())
+    if stats is not None:
+        cont_names = [s for s in stats if s in _JAX_CONTINUOUS_STATS]
+        disc_names = [s for s in stats if s in _JAX_DISCRETE_STATS]
+    if not computeKL_continuous:
+        cont_names = [s for s in cont_names if s != 'KL']
+    if not computeKL_discrete:
+        disc_names = [s for s in disc_names if s != 'KL']
+    cont_kl_in_jax = computeKL_continuous and (stats is None or 'KL' in stats)
+    if cont_kl_in_jax:
+        if showInfo > 0:
+            print('JAX: continuous KL computed with NumPy fallback '
+                  '(no JAX histogram-KL kernel yet)')
+
+    with h5py.File(f_prior_h5, 'r') as f_prior, h5py.File(f_post_h5, 'a') as f_post:
+        for name, dataset in f_prior.items():
+            if not name.upper().startswith('M'):
+                continue
+            if 'is_discrete' not in dataset.attrs:
+                continue
+            is_disc = (dataset.attrs['is_discrete'] in (1, 1.0, True)
+                       or str(dataset.attrs['is_discrete']).strip() == '1')
+            if not is_disc:
+                _ps_jax_process_continuous(name, dataset, i_use, ip_range, nr,
+                                           nsounding, cont_names, batch_size,
+                                           f_post, showInfo, disableTqdm)
+                if cont_kl_in_jax:
+                    _ps_numpy_fallback_continuous_kl(
+                        name, dataset, i_use, ip_range, nr, nsounding,
+                        f_post, showInfo, disableTqdm, rng_np)
+            else:
+                _ps_jax_process_discrete(name, dataset, i_use, ip_range, nr,
+                                         nsounding, disc_names, batch_size,
+                                         f_post, showInfo, disableTqdm, rng_np)
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Posterior statistics — public entry point
+# ---------------------------------------------------------------------------
+
 def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     """
     Compute posterior statistics for all model parameters in a POST HDF5 file.
@@ -419,6 +1038,10 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     Reads posterior sample indices (i_use) and the corresponding prior model
     realizations, then computes per-location statistics and writes them back
     into the same POST.h5 file.
+
+    Uses a stat registry and batched NumPy (or optional JAX) for speed.
+    Adding a new stat = one decorated function (``@_register_continuous`` /
+    ``@_register_discrete``).
 
     Parameters
     ----------
@@ -448,6 +1071,17 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
             Compute KL divergence D_KL(posterior || prior) for discrete model
             parameters. Normalised to [0, 1] using log_base = number of classes
             (0 = posterior equals prior, 1 = completely certain). Default is False.
+        stats : list[str], optional
+            Subset of stat names to compute.  None = all.  Useful for quick
+            re-runs, e.g. ``stats=['Mean', 'Median']``.
+        batch_size : int, optional
+            Number of soundings per NumPy batch.  Default 256.  Memory per
+            batch ≈ ``batch_size * nr * nm * 8`` bytes.
+        backend : {'numpy', 'jax'}, optional
+            Computation backend.  ``'jax'`` requires JAX and is only beneficial
+            on GPU; on CPU it falls back to NumPy automatically.  Default 'numpy'.
+        seed : int, optional
+            Random seed for the KL prior subsampling (makes KL reproducible).
 
     Writes to POST.h5
     -----------------
@@ -482,335 +1116,124 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     None
     """
     import h5py
-    import numpy as np
-    import integrate
-    import scipy as sp
     from tqdm import tqdm
 
+    stats = kwargs.pop('stats', None)
+    batch_size = kwargs.pop('batch_size', 256)
+    backend = kwargs.pop('backend', 'numpy')
+
     showInfo = kwargs.get('showInfo', 0)
-    if showInfo<0:
-        disableTqdm=True
-    else:
-        disableTqdm=False
+    disableTqdm = showInfo < 0
     usePrior = kwargs.get('usePrior', False)
     updateGeometryFromData = kwargs.get('updateGeometryFromData', True)
     computeKL = kwargs.get('computeKL', False)
     computeKL_continuous = kwargs.get('computeKL_continuous', False) or computeKL
     computeKL_discrete = kwargs.get('computeKL_discrete', False) or computeKL
+    seed = kwargs.get('seed', None)
 
-    # Check if f_prior_h5 attribute exists in the HDF5 file
-    with h5py.File(f_post_h5, 'r') as f:
-        if 'f5_prior' in f.attrs:
-            f_prior_h5 = f.attrs['f5_prior']
+    rng = np.random.RandomState(seed) if seed is not None else np.random
+
+    # ---- Resolve backend ------------------------------------------------
+    if backend == 'jax':
+        if not _JAX_POSTSTATS_AVAILABLE:
+            if showInfo > 0:
+                print('JAX not available — falling back to NumPy backend.')
+            backend = 'numpy'
+        elif _jax_ps.local_devices()[0].platform == 'cpu':
+            if showInfo > 0:
+                print('JAX backend requested but running on CPU — '
+                      'falling back to NumPy for speed.')
+            backend = 'numpy'
         else:
-            f_prior_h5 = None
-            if showInfo>=1:
-                raise ValueError(f"'f5_prior' attribute does not exist in {f_post_h5}")
+            return _ps_integrate_posterior_stats_jax(
+                f_post_h5, ip_range, stats=stats, batch_size=batch_size,
+                **kwargs,
+            )
 
-    # Check if f5_data attribute exists in the HDF5 file
+    # ---- Resolve f_prior / f_data paths ---------------------------------
     with h5py.File(f_post_h5, 'r') as f:
-        if 'f5_data' in f.attrs:
-            f_data_h5 = f.attrs['f5_data']
-        else:
-            f_data_h5 = None
-            if showInfo>=1:
-                raise ValueError(f"'f5_data' attribute does not exist in {f_post_h5}")
+        f_prior_h5 = f.attrs.get('f5_prior', None)
+        f_data_h5 = f.attrs.get('f5_data', None)
+    if f_prior_h5 is None:
+        raise ValueError(f"'f5_prior' attribute not in {f_post_h5}")
+    if f_data_h5 is None:
+        raise ValueError(f"'f5_data' attribute not in {f_post_h5}")
 
-    # update Geometry from f_data_h5
-    if (updateGeometryFromData)&(f_data_h5 is not None):
+    # ---- Copy geometry from DATA.h5 -------------------------------------
+    if updateGeometryFromData and f_data_h5 is not None:
         with h5py.File(f_data_h5, 'r') as f_data, h5py.File(f_post_h5, 'a') as f_post:
-            if '/UTMX' in f_data:
-                if '/UTMX' not in f_post:
-                    f_data.copy('/UTMX', f_post)
-            if '/UTMY' in f_data:
-                if '/UTMY' not in f_post:
-                    f_data.copy('/UTMY', f_post)
-            if '/LINE' in f_data:
-                if '/LINE' not in f_post:
-                    f_data.copy('/LINE', f_post)
-            if '/ELEVATION' in f_data:
-                if '/ELEVATION' not in f_post:
-                    f_data.copy('/ELEVATION', f_post)
-    
-    # Load 'i_use' data from the HDF5 file
-    try:
-        with h5py.File(f_post_h5, 'r') as f:
-            i_use = f['i_use'][:]
-    except KeyError:
-        print(f"Could not read 'i_use' from {f_post_h5}")
-        #return
+            for g in ('UTMX', 'UTMY', 'LINE', 'ELEVATION'):
+                if g in f_data and g not in f_post:
+                    f_data.copy('/' + g, f_post)
+
+    # ---- Load i_use -----------------------------------------------------
+    with h5py.File(f_post_h5, 'r') as f:
+        i_use = f['i_use'][:]
+    nsounding, nr = i_use.shape
 
     if usePrior:
         with h5py.File(f_prior_h5, 'r') as f_prior:
             N = f_prior['/M1'].shape[0]
-            nr=i_use.shape[1]
-            nd=i_use.shape[0]
-            # compute i_use of  (nd,nr), with random integer numbers between 0 and N-1
-            i_use = np.random.randint(0, N, (nd,nr))
+        i_use = rng.randint(0, N, (nsounding, nr))
 
-    # Handle ip_range parameter
-    nsounding = i_use.shape[0]
+    # ---- Resolve ip_range -----------------------------------------------
     if ip_range is None or len(ip_range) == 0:
         ip_range = np.arange(nsounding)
         if showInfo > 0:
             print(f'Computing posterior statistics for all {nsounding} data points')
     else:
         ip_range = np.asarray(ip_range)
-        if showInfo > 0:
-            print(f'Computing posterior statistics for {len(ip_range)} of {nsounding} data points')
-        # Validate ip_range
         if np.any(ip_range < 0) or np.any(ip_range >= nsounding):
-            raise ValueError(f"ip_range contains indices outside valid range [0, {nsounding-1}]")
+            raise ValueError(f"ip_range out of range [0, {nsounding-1}]")
+        if showInfo > 0:
+            print(f'Computing posterior statistics for {len(ip_range)} of {nsounding}')
 
-    # Compute number of unique realizations for each data location
+    # ---- N_UNIQUE (vectorized) -----------------------------------------
     if showInfo > 0:
         print('Computing number of unique realizations (N_UNIQUE)')
-
     N_UNIQUE = np.full(nsounding, np.nan)
-    for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='N_UNIQUE', leave=False):
-        N_UNIQUE[iid] = len(np.unique(i_use[iid, :]))
-
-    # Save N_UNIQUE to the HDF5 file
+    N_UNIQUE[ip_range] = _ps_compute_n_unique(i_use[ip_range])
     with h5py.File(f_post_h5, 'a') as f_post:
         if '/N_UNIQUE' not in f_post:
-            if showInfo > 0:
-                print('Creating /N_UNIQUE in %s' % f_post_h5)
-            f_post.create_dataset('/N_UNIQUE', data=N_UNIQUE)
+            f_post.create_dataset('/N_UNIQUE', data=N_UNIQUE, dtype='f4')
         else:
-            if showInfo > 0:
-                print('Updating /N_UNIQUE in %s' % f_post_h5)
             f_post['/N_UNIQUE'][:] = N_UNIQUE
 
-    # Process each dataset in f_prior_h5
+    # ---- Resolve which stats to compute ---------------------------------
+    cont_names = list(_CONTINUOUS_STATS.keys())
+    disc_names = list(_DISCRETE_STATS.keys())
+    if stats is not None:
+        cont_names = [s for s in stats if s in _CONTINUOUS_STATS]
+        disc_names = [s for s in stats if s in _DISCRETE_STATS]
+    if not computeKL_continuous:
+        cont_names = [s for s in cont_names if s != 'KL']
+    if not computeKL_discrete:
+        disc_names = [s for s in disc_names if s != 'KL']
+
+    # ---- Process each model parameter -----------------------------------
     with h5py.File(f_prior_h5, 'r') as f_prior, h5py.File(f_post_h5, 'a') as f_post:
         for name, dataset in f_prior.items():
-            
-            if name.upper().startswith('M') and 'is_discrete' in dataset.attrs and dataset.attrs['is_discrete'] == 0:
-                if showInfo>2:
-                    print('%s: CONTINUOUS' % name)
+            if not name.upper().startswith('M'):
+                continue
+            if 'is_discrete' not in dataset.attrs:
+                if showInfo > 1:
+                    print(f'{name}: NOT RECOGNIZED (no is_discrete attr)')
+                continue
 
-                nm = dataset.shape[1]
-                nsounding, nr = i_use.shape
-                m_post = np.zeros((nm, nr))
-
-                # Initialize with NaN for all data points
-                M_logmean = np.full((nsounding, nm), np.nan)
-                M_mean = np.full((nsounding, nm), np.nan)
-                M_std = np.full((nsounding, nm), np.nan)
-                M_logstd = np.full((nsounding, nm), np.nan)
-                M_median = np.full((nsounding, nm), np.nan)
-                M_harmonicmean = np.full((nsounding, nm), np.nan)
-                if computeKL_continuous:
-                    M_KL = np.full((nsounding, nm), np.nan)
-
-                # Load all prior data into memory
-                M_all = dataset[:]
-
-                useSequential = True
-                if useSequential:
-
-                    # Precompute log10 prior histograms once — prior is fixed across all soundings.
-                    # Using histograms (O(n)) instead of KDE (O(n²)) for speed.
-                    # Log10 bins are appropriate for log-normally distributed continuous parameters.
-                    if computeKL_continuous:
-                        n_bins_kl = 50
-                        idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
-                        M_prior_kl = np.log10(np.maximum(M_all[idx_kl, :], 1e-10))
-                        kl_bins = []
-                        kl_prior_hist = []
-                        for _i in range(nm):
-                            col = M_prior_kl[:, _i]
-                            bins = np.linspace(col.min(), col.max(), n_bins_kl + 1)
-                            h, _ = np.histogram(col, bins=bins)
-                            h = (h + 1e-10) / (h.sum() + n_bins_kl * 1e-10)
-                            kl_bins.append(bins)
-                            kl_prior_hist.append(h)
-
-                    # Sequential processing - simple, fast, memory-efficient
-                    for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='%s-continuous' % name, leave=False):
-                        ir = np.int64(i_use[iid,:])
-                        m_post = M_all[ir,:]
-
-                        M_logmean[iid,:] = np.exp(np.mean(np.log(m_post), axis=0))
-                        M_mean[iid,:] = np.mean(m_post, axis=0)
-                        M_median[iid,:] = np.median(m_post, axis=0)
-                        with np.errstate(invalid='ignore', divide='ignore'):
-                            M_logstd[iid,:] = np.std(np.log10(np.maximum(m_post, 1e-10)), axis=0)
-                        M_std[iid,:] = np.std(m_post, axis=0)
-                        _c = 1.0 / np.maximum(m_post, 1e-10)
-                        _k = int(np.floor(0.10 * _c.shape[0]))
-                        _cs = np.sort(_c, axis=0)
-                        M_harmonicmean[iid, :] = 1.0 / np.mean(_cs[_k:_c.shape[0]-_k, :], axis=0)
-                        if computeKL_continuous:
-                            m_post_log = np.log10(np.maximum(m_post, 1e-10))
-                            for _i in range(nm):
-                                h_q, _ = np.histogram(m_post_log[:, _i], bins=kl_bins[_i])
-                                h_q = (h_q + 1e-10) / (h_q.sum() + n_bins_kl * 1e-10)
-                                M_KL[iid, _i] = np.sum(h_q * np.log2(h_q / kl_prior_hist[_i]))
-                elif a==1:
-
-                    # NEW Experimental METHOD
-                    # 3. Optimization Constants
-                    BATCH_SIZE = 100  # Process 1000 soundings at a time
-                    INV_LOG_10 = 1.0 / np.log(10.0) # Pre-calculate constant
-
-                    # 4. Batched Processing
-                    # Instead of 40,000 iterations, we do 40.
-                    for start_idx in tqdm(range(0, len(ip_range), BATCH_SIZE), 
-                                        disable=disableTqdm, 
-                                        desc=f'{name}-optimized', 
-                                        leave=False):
-
-                        # A. Define Batch Range
-                        end_idx = min(start_idx + BATCH_SIZE, len(ip_range))
-                        current_iids = ip_range[start_idx:end_idx]
-                        
-                        # B. Vectorized Indexing
-                        # Gather all indices for this batch at once.
-                        # Shape: (Batch_Size, K) where K is number of priors used per sounding
-                        batch_indices = np.int64(i_use[current_iids, :])
-                        
-                        # C. Create 3D Data Cube
-                        # Fetch data for 1000 soundings simultaneously.
-                        # Shape: (Batch_Size, K, nm) -> e.g., (1000, 50, 100)
-                        # This is the biggest speedup: one large memory read instead of 1000 tiny ones.
-                        m_cube = M_all[batch_indices, :]
-
-                        # D. Compute Statistics (Collapsing Axis 1)
-                        
-                        # -- Arithmetic Mean & Median --
-                        M_mean[current_iids, :] = np.mean(m_cube, axis=1)
-                        M_median[current_iids, :] = np.median(m_cube, axis=1)
-                        
-                        # -- Logarithmic Stats (Optimized) --
-                        # Calculate Log ONCE. 
-                        # Use maximum to prevent log(0) errors (NaNs)
-                        # Shape: (Batch_Size, K, nm)
-                        log_cube = np.log(np.maximum(m_cube, 1e-10))
-                        
-                        # Geometric Mean: exp(mean(log(x)))
-                        M_logmean[current_iids, :] = np.exp(np.mean(log_cube, axis=1))
-                        
-                        # LogStd: std(log10(x)) = std(ln(x)) * (1/ln(10)); reuse log_cube for speed
-                        M_logstd[current_iids, :] = np.std(log_cube, axis=1) * INV_LOG_10
-                        M_std[current_iids, :] = np.std(m_cube, axis=1)
-
-                        # Harmonic mean (trimmed 10% each tail in conductivity space)
-                        _c = 1.0 / np.maximum(m_cube, 1e-10)
-                        _nr = _c.shape[1]
-                        _k = int(np.floor(0.10 * _nr))
-                        _cs = np.sort(_c, axis=1)
-                        M_harmonicmean[current_iids, :] = 1.0 / np.mean(_cs[:, _k:_nr-_k, :], axis=1)
-
-
-
-
-                # Create datasets
-                for stat in ['Mean', 'Median', 'Std', 'LogStd', 'LogMean', 'HarmonicMean']:
-                    if stat not in f_post:
-                        dset = '/%s/%s' % (name,stat)
-                        if dset not in f_post:
-                            if (showInfo>0):
-                                print('Creating %s in %s' % (dset,f_post_h5 ))
-                            f_post.create_dataset(dset, (nsounding,nm))
-
-                f_post['/%s/%s' % (name,'LogMean')][:] = M_logmean
-                f_post['/%s/%s' % (name,'Mean')][:] = M_mean
-                f_post['/%s/%s' % (name,'Median')][:] = M_median
-                f_post['/%s/%s' % (name,'Std')][:] = M_std
-                f_post['/%s/%s' % (name,'LogStd')][:] = M_logstd
-                f_post['/%s/%s' % (name,'HarmonicMean')][:] = M_harmonicmean
-                if computeKL_continuous:
-                    dset = '/%s/KL' % name
-                    if dset not in f_post:
-                        f_post.create_dataset(dset, (nsounding, nm))
-                    f_post[dset][:] = M_KL
-
-            elif name.upper().startswith('M') and 'is_discrete' in dataset.attrs and dataset.attrs['is_discrete'] == 1:
-                if showInfo>2:
-                    print('%s: DISCRETE' % name)
-
-                nm = dataset.shape[1]
-                nsounding, nr = i_use.shape
-                # Get number of classes for name
-                class_id = f_prior[name].attrs['class_id']
-                n_classes = len(class_id)
-
-                # Determine log_base for KL: use n_classes from class_name if available
-                if 'class_name' in f_prior[name].attrs:
-                    log_base_kl = len(f_prior[name].attrs['class_name'])
-                else:
-                    log_base_kl = n_classes if n_classes > 1 else 2
-
-                if showInfo>1:
-                    print('%s: DISCRETE, N_classes =%d' % (name,n_classes))
-
-                # Initialize with NaN for all data points
-                M_mode = np.full((nsounding, nm), np.nan)
-                M_entropy = np.full((nsounding, nm), np.nan)
-                M_P = np.full((nsounding, n_classes, nm), np.nan)
-                if computeKL_discrete:
-                    M_KL = np.full((nsounding, nm), np.nan)
-
-                # Create datasets in h5 file
-                for stat in ['Mode', 'Entropy']:
-                    if stat not in f_post:
-                        dset = '/%s/%s' % (name,stat)
-                        if dset not in f_post:
-                            if (showInfo>0):
-                                print('Creating %s in %s' % (dset,f_post_h5 ))
-                            f_post.create_dataset(dset, (nsounding,nm))
-                for stat in ['P']:
-                    if stat not in f_post:
-                        dset = '/%s/%s' % (name,stat)
-                        if dset not in f_post:
-                            if (showInfo>0):
-                                print('Creating %s' % dset)
-                            f_post.create_dataset(dset, (nsounding,n_classes,nm))
-
-                # Load all prior data into memory
-                M_all = dataset[:]
-
-                # Subsample prior once for KL (prior is fixed across soundings)
-                if computeKL_discrete:
-                    idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
-                    M_prior_kl = M_all[idx_kl, :]
-
-                # Sequential processing - simple, fast, memory-efficient
-                for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='%s-discrete' % name, leave=False):
-                    ir = np.int64(i_use[iid,:])
-                    m_post = M_all[ir,:]
-
-                    # Compute class probabilities
-                    n_count = np.zeros((n_classes,nm))
-                    for ic in range(n_classes):
-                        n_count[ic,:] = np.sum(class_id[ic]==m_post, axis=0)/nr
-                    M_P[iid,:,:] = n_count
-
-                    # Compute mode
-                    M_mode[iid,:] = class_id[np.argmax(n_count, axis=0)]
-
-                    # Compute entropy
-                    M_entropy[iid,:] = sp.stats.entropy(n_count, base=n_classes)
-                    if computeKL_discrete:
-                        M_KL[iid, :] = kl_divergence(m_post, M_prior_kl, is_discrete=True, log_base=log_base_kl)
-
-                f_post['/%s/%s' % (name,'Mode')][:] = M_mode
-                f_post['/%s/%s' % (name,'Entropy')][:] = M_entropy
-                f_post['/%s/%s' % (name,'P')][:] = M_P
-                if computeKL_discrete:
-                    dset = '/%s/KL' % name
-                    if dset not in f_post:
-                        f_post.create_dataset(dset, (nsounding, nm))
-                    f_post[dset][:] = M_KL
-
-
-            else: 
-                if (showInfo>1):
-                    print('%s: NOT RECOGNIZED' % name.upper())
-                
-            
-                
+            if _ps_is_continuous(dataset):
+                _ps_process_continuous(
+                    name, dataset, i_use, ip_range, nr, nsounding,
+                    cont_names, batch_size, f_post, showInfo, disableTqdm,
+                    computeKL_continuous, rng,
+                )
+            elif _ps_is_discrete(dataset):
+                _ps_process_discrete(
+                    name, dataset, i_use, ip_range, nr, nsounding,
+                    disc_names, batch_size, f_post, showInfo, disableTqdm,
+                    computeKL_discrete, rng,
+                )
+            elif showInfo > 1:
+                print(f'{name}: NOT RECOGNIZED')
 
     return None
 
