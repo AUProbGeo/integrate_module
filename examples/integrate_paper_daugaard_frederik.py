@@ -54,7 +54,7 @@ useGenericPrior=True
 doEffectSize = False
 doTbase = False
 doPlotAll=False
-N_use = 100_000
+N_use = 1_000_000
 N_use_org= N_use
 
 

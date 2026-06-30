@@ -28,7 +28,7 @@ import numpy as np
 import copy
 
 # %%
-N = 500_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
+N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
     # %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
@@ -394,8 +394,91 @@ for f_post_h5 in f_post_h5_list:
     P, meta = ig.query(f_post_h5, query)
     query_title = ig.title_from_json(query, f_prior_h5)
     #  Plot the predicted probability map, and the the outcome at the borehole locations (which should be close to 1 since the query is based on the borehole data)
-    ig.query_plot(P, meta, query_dict=query, title = query_title, f_post_h5=f_post_h5)
-    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, title = query_title, f_post_h5=f_post_h5)
-    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, title = query_title, f_post_h5=f_post_h5)
+    ig.query_plot(P, meta, query_dict=query, title = query_title, f_post_h5=f_post_h5, hardcopy=hardcopy)
+    ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, title = query_title, f_post_h5=f_post_h5, hardcopy=hardcopy)
+    ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, title = query_title, f_post_h5=f_post_h5, hardcopy=hardcopy)
+
+# %% Query from text
+
+ig.prior_describe(f_prior_h5)
+
+f_post_h5 = 'post_daugaard_merged_prior_N1000000_gf4_log0_id1.h5'
+f_post_h5 = 'post_daugaard_merged_prior_N500000_gf4_log0_id1.h5'
+
+usellm = 'ollama'  # 'claude' or 'ollama'
+usellm = 'claude'  # 'claude' or 'ollama'
+
+if usellm == 'claude':
+    MODEL = 'anthropic/claude-sonnet-4-6'
+    # Only set API_KEY if it is not already defined as a variable
+    if 'API_KEY' not in dir():
+        API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+elif usellm == 'ollama':
+    #MODEL = 'ollama_chat/phi4:latest'
+    #MODEL = 'ollama_chat/gemma4:latest'
+    MODEL = 'ollama_chat/qwen3.6:latest'
+    # Other options: ollama_chat/qwen3.6:latest, ollama_chat/gemma4:latest
+    API_KEY = None
+else:
+    raise ValueError(f"Unsupported LLM: {usellm}")
+
+ig.query_test_llm(model=MODEL, api_key=API_KEY)
+
+
+text1 = ("Probability that sand and gravel together have a cumulative thickness above 20 m "
+         "within 0 to 30 m depth, AND the first non-sand/gravel layer at the top is less than 3 m thick.")
+text1 = "What is the probability that the total cumulative thickness " \
+        "of Meltwater sand or Gravel is larger than 10m, located above 30m depth"
+text1 = "What is the probability that there exist a continous layer ot least 10m thickness of " \
+        "raw material (sand/gravel) starting at a depth not exceeding 5 m below ground?"
+
+
+query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+print(json.dumps(query1, indent=2))
+print(interp1)
+
+P1, meta1 = ig.query(f_post_h5, query1)
+print(f"N_data={meta1['N_data']}, mean P={P1.mean():.3f}")
+ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
+              plotPoints = True, 
+              text_panel=True, hardcopy='query1_%s' % (MODEL)
+)
+
 
 # %%
+text1 = "What is the probability that the Source File Index is class 2?"
+query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+P1, meta1 = ig.query(f_post_h5, query1)
+ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
+              text_panel=True, hardcopy='query2_%s' % (MODEL)
+)
+
+# %%
+text1 = "What is the 10th percentile of the cumulative thickness of sand and gravel in the upper 50m"
+query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+P1, meta1 = ig.query(f_post_h5, query1)
+ig.query_percentile_plot(
+    P1, meta1,
+    query_text=text1,
+    interpretation=interp1,
+    text_panel=True,
+    hardcopy="query_pct"
+)
+
+
+# %%
+# Find points within buffer distance
+X1 = 543500+100
+Y1 = 6175000
+X2 = X1
+Y2 = 6617500
+Xl = np.array([X1-100,X1, X2, X2+1500])
+Yl = np.array([Y1, Y1, Y2, Y2-150])
+buffer = 15.0
+indices, distances, segment_ids = ig.find_points_along_line_segments(
+    X, Y, Xl, Yl, tolerance=buffer
+)
+id_line = indices
+
+ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=50, xaxis='y', hardcopy=hardcopy, alpha = 1,logstd_min = 0.5, logstd_max = 0.6)
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=50, xaxis='y', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)

@@ -248,7 +248,7 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
 def plot_xy(values, X=None, Y=None,
             f_data_h5=None, f_post_h5=None,
             im=None, f_prior_h5=None,
-            cmap=None, clim=None, uselog=False,
+            cmap=None, clim=None, norm=None, uselog=False,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
             ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', fontsize=None, **kwargs):
@@ -386,15 +386,16 @@ def plot_xy(values, X=None, Y=None,
     # --- Scatter ---
     vmin = clim[0] if clim is not None else None
     vmax = clim[1] if clim is not None else None
-    if uselog:
+    if norm is not None:
+        sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, norm=norm, **kwargs)
+    elif uselog:
         # LogNorm requires strictly positive bounds — derive from data if needed
         pos = values[np.isfinite(values) & (values > 0)]
         if vmin is None or vmin <= 0:
             vmin = float(pos.min()) if pos.size > 0 else 1e-10
         if vmax is None:
             vmax = float(pos.max()) if pos.size > 0 else 1.0
-        norm = LogNorm(vmin=vmin, vmax=vmax)
-        sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, norm=norm, **kwargs)
+        sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, norm=LogNorm(vmin=vmin, vmax=vmax), **kwargs)
     else:
         sc = ax.scatter(X, Y, c=values, cmap=cmap, s=s, vmin=vmin, vmax=vmax, **kwargs)
 
@@ -421,14 +422,14 @@ def plot_xy(values, X=None, Y=None,
             cbar.ax.invert_yaxis()
         if fontsize is not None:
             cbar.set_label(colorbar_label or '', fontsize=fontsize)
-            cbar.ax.tick_params(labelsize=fontsize)
+            cbar.ax.tick_params(labelsize=fontsize - 2)
 
     # --- Decoration ---
     if fontsize is not None:
         ax.set_title(title, fontsize=fontsize + 2) if title else None
         ax.set_xlabel('X', fontsize=fontsize)
         ax.set_ylabel('Y', fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
+        ax.tick_params(labelsize=fontsize - 2)
     else:
         if title:
             ax.set_title(title)
@@ -535,7 +536,7 @@ def plot_posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], property='med
         f_png = '%s_im%d_ic%s_%s' % (os.path.splitext(f_post_h5)[0], im, icat_str, property)
         if usePrior:
             f_png = f_png + '_prior'
-        plt.savefig(f_png + '.png')
+        plt.savefig(f_png + '.png', bbox_inches='tight')
         # plt.show()
 
     return fig
@@ -937,7 +938,7 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
                 f_png = '%s_%d_%d_%d_%s_ic%d_iz%02d_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, iz)
             else:
                 f_png = '%s_%d_%d_%d_%s%02d_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, iz)
-        fig.savefig(f_png)
+        fig.savefig(f_png, bbox_inches='tight')
     return
 
 
@@ -1003,15 +1004,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     run integrate_posterior_stats() first to compute it.
     """
 
-    s=kwargs.setdefault('s', 1)
+    s = kwargs.pop('s', 1)
     plot_data_locations = kwargs.pop('plot_data_locations', False)
     CHI2_min = kwargs.pop('CHI2_min', 0)
     CHI2_max = kwargs.pop('CHI2_max', 5)
     N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
     N_UNIQUE_max = kwargs.pop('N_UNIQUE_max', None)
     fontsize = kwargs.pop('fontsize', None)
-    fs_kw = {'fontsize': fontsize} if fontsize is not None else {}
-    title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
 
     with h5py.File(f_post_h5,'r') as f_post:
         f_prior_h5 = f_post['/'].attrs['f5_prior']
@@ -1057,186 +1056,75 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     if i2<i1:
         i2=i1+1
     
+    base = os.path.splitext(f_post_h5)[0]
+    shared = dict(X=X[i1:i2], Y=Y[i1:i2], s=s, fontsize=fontsize,
+                  plotPoints=plot_data_locations, **kwargs)
+
     if (pl=='all') or (pl=='T'):
-        fig = plt.figure(1, figsize=(wx,wy))
-        fig.clf()  # Clear the figure to avoid warnings
-        if plot_data_locations:
-            plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
-        plt.scatter(X[i1:i2],Y[i1:i2],c=np.log10(T[i1:i2]),cmap='jet',**kwargs)
-        plt.grid()
-        plt.xlabel('X', **fs_kw)
-        plt.ylabel('Y', **fs_kw)
-        plt.clim(np.log10(clim))
-        cb = plt.colorbar(label='log10(T)')
-        if fontsize is not None:
-            cb.set_label('log10(T)', **fs_kw)
-            cb.ax.tick_params(labelsize=fontsize)
-        plt.title('Temperature', **title_fs_kw)
-        plt.axis('equal')
-        if hardcopy:
-            # get filename without extension
-            f_png = '%s_%d_%d_T.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
-            plt.savefig(f_png)
+        f_png = '%s_%d_%d_T.png' % (base, i1, i2) if hardcopy else False
+        plot_xy(np.log10(T[i1:i2]), cmap='jet', clim=list(np.log10(clim)),
+                colorbar_label='log10(T)', title='Temperature',
+                hardcopy=f_png, **shared)
         plt.show()
 
     if (pl=='all') or (pl=='EV'):
-        # get the 99% percentile of EV values
-        EV_max = np.percentile(EV,99)
         EV_max = 0
-        EV_min = np.percentile(EV,1)
-        #EV_min = -30
-        cmap_ev, clim = get_colormap_and_limits(cmap_type='evidence', custom_clim=[EV_min, EV_max])
-        #if 'vmin' not in kwargs:
-        #    kwargs['vmin'] = EV_min
-        #if 'vmax' not in kwargs:
-        #    kwargs['vmax'] = EV_max
-        #print('EV_min=%f, EV_max=%f' % (EV_min, EV_max))
-        fig = plt.figure(2, figsize=(wx,wy))
-        fig.clf()  # Clear the figure to avoid warnings
-        if plot_data_locations:
-            plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
-        plt.scatter(X[i1:i2],Y[i1:i2],c=EV[i1:i2],cmap=cmap_ev, vmin=clim[0], vmax=clim[1], **kwargs)
-        plt.grid()
-        plt.xlabel('X', **fs_kw)
-        plt.ylabel('Y', **fs_kw)
-        cb = plt.colorbar()
-        if fontsize is not None:
-            cb.ax.tick_params(labelsize=fontsize)
-        plt.title('log(EV)', **title_fs_kw)
-        plt.axis('equal')
-        if hardcopy:
-            # get filename without extension
-            f_png = '%s_%d_%d_EV.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
-            plt.savefig(f_png)
+        EV_min = np.percentile(EV, 1)
+        cmap_ev, clim_ev = get_colormap_and_limits(cmap_type='evidence', custom_clim=[EV_min, EV_max])
+        f_png = '%s_%d_%d_EV.png' % (base, i1, i2) if hardcopy else False
+        plot_xy(EV[i1:i2], cmap=cmap_ev, clim=list(clim_ev),
+                colorbar_label='log(EV)', title='log(EV)',
+                hardcopy=f_png, **shared)
         plt.show()
-    if (pl=='all') or (pl=='ND'):
-        #
-        with h5py.File(f_data_h5,'r') as f_data:
-            ndata,ns = f_data['/%s' % 'D1']['d_obs'].shape
-            # find number of nan values on d_obs
-            non_nan = np.sum(~np.isnan(f_data['/%s' % 'D1']['d_obs']), axis=1)
-        #print(non_nan)
 
-        fig = plt.figure(3, figsize=(wx, wy))
-        fig.clf()  # Clear the figure to avoid warnings
-        if plot_data_locations:
-            plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
-        plt.scatter(X[i1:i2],Y[i1:i2],c=non_nan[i1:i2],cmap='jet', **kwargs)
-        plt.grid()
-        plt.xlabel('X', **fs_kw)
-        plt.ylabel('Y', **fs_kw)
-        cb = plt.colorbar(label='Number of Data')
-        if fontsize is not None:
-            cb.set_label('Number of Data', **fs_kw)
-            cb.ax.tick_params(labelsize=fontsize)
-        plt.title('N data', **title_fs_kw)
-        plt.axis('equal')
-        if hardcopy:
-            # get filename without extension
-            f_png = '%s_%d_%d_ND.png' % (os.path.splitext(f_post_h5)[0],i1,i2)
-            plt.savefig(f_png)
+    if (pl=='all') or (pl=='ND'):
+        with h5py.File(f_data_h5, 'r') as f_data:
+            non_nan = np.sum(~np.isnan(f_data['/D1']['d_obs']), axis=1)
+        f_png = '%s_%d_%d_ND.png' % (base, i1, i2) if hardcopy else False
+        plot_xy(non_nan[i1:i2], cmap='jet',
+                colorbar_label='Number of Data', title='N data',
+                hardcopy=f_png, **shared)
         plt.show()
-            
+
     if (pl=='all') or (pl=='CHI2'):
         if CHI2 is not None:
-            # Plot reduced chi-squared (goodness of fit metric)
-            # Sum across data types if multiple
-            if len(CHI2.shape) == 2:
-                # If multiple data types, sum across them for visualization
-                CHI2_plot = np.nansum(CHI2, axis=1)
-            else:
-                CHI2_plot = CHI2
-
-            # Use fixed color limits for CHI2 from kwargs (default: 0-5)
-            # User can override with CHI2_min and CHI2_max in kwargs
-
-            # Create custom colormap: green -> white -> red with white at CHI2=1
             from matplotlib.colors import LinearSegmentedColormap, Normalize
-
-            # Define color segments with CHI2=1 (perfect fit) as white
-            # 0 -> 1: green to white, 1 -> max: white to red
+            CHI2_plot = np.nansum(CHI2, axis=1) if len(CHI2.shape) == 2 else CHI2
             if CHI2_max > 1.0:
-                # Position of CHI2=1 in the colormap range [CHI2_min, CHI2_max]
-                white_position = (1.0 - CHI2_min) / (CHI2_max - CHI2_min)
-                colors = ['green', 'white', 'red']
-                segment_positions = [0.0, white_position, 1.0]
+                white_pos = (1.0 - CHI2_min) / (CHI2_max - CHI2_min)
+                chi2_colors = ['green', 'white', 'red']
+                chi2_positions = [0.0, white_pos, 1.0]
             else:
-                # If max <= 1, use green to white only
-                colors = ['green', 'white']
-                segment_positions = [0.0, 1.0]
-
-            custom_cmap = LinearSegmentedColormap.from_list('chi2_cmap', list(zip(segment_positions, colors)), N=256)
-
-            # Use standard normalization with fixed limits
-            norm = Normalize(vmin=CHI2_min, vmax=CHI2_max)
-
-            fig = plt.figure(4, figsize=(wx, wy))
-            fig.clf()  # Clear the figure to avoid warnings
-            if plot_data_locations:
-                plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
-            scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=CHI2_plot[i1:i2],
-                                cmap=custom_cmap, norm=norm, **kwargs)
-            plt.grid()
-            plt.xlabel('X', **fs_kw)
-            plt.ylabel('Y', **fs_kw)
-            cb = plt.colorbar(scatter, label='CHI2 (Reduced χ²)')
-            if fontsize is not None:
-                cb.set_label('CHI2 (Reduced χ²)', **fs_kw)
-                cb.ax.tick_params(labelsize=fontsize)
-            plt.title('Reduced Chi-Squared (Goodness of Fit)', **title_fs_kw)
-            plt.axis('equal')
-            if hardcopy:
-                # get filename without extension
-                f_png = '%s_%d_%d_CHI2.png' % (os.path.splitext(f_post_h5)[0], i1, i2)
-                #plt.savefig(f_png, dpi=dpi, bbox_inches='tight')
-                plt.savefig(f_png)
-                print('Saved: %s' % f_png)
+                chi2_colors = ['green', 'white']
+                chi2_positions = [0.0, 1.0]
+            custom_cmap = LinearSegmentedColormap.from_list(
+                'chi2_cmap', list(zip(chi2_positions, chi2_colors)), N=256)
+            chi2_norm = Normalize(vmin=CHI2_min, vmax=CHI2_max)
+            f_png = '%s_%d_%d_CHI2.png' % (base, i1, i2) if hardcopy else False
+            plot_xy(CHI2_plot[i1:i2], cmap=custom_cmap, norm=chi2_norm,
+                    colorbar_label='CHI2 (Reduced χ²)', title='Reduced Chi-Squared (Goodness of Fit)',
+                    hardcopy=f_png, **shared)
             plt.show()
         else:
             print('CHI2 data not found in %s' % f_post_h5)
 
     if (pl=='all') or (pl=='N_UNIQUE'):
         if N_UNIQUE is not None:
-            # Plot number of unique realizations per location (log scale)
-            # Determine color scale limits in linear space first
             if N_UNIQUE_min is None:
-                N_UNIQUE_min = np.nanmin(N_UNIQUE[i1:i2])
-                if N_UNIQUE_min <= 0:
-                    N_UNIQUE_min = 1  # Default to 1 for log scale
+                N_UNIQUE_min = max(np.nanmin(N_UNIQUE[i1:i2]), 1)
             if N_UNIQUE_max is None:
                 N_UNIQUE_max = np.nanmax(N_UNIQUE[i1:i2])
-
-            # Clip N_UNIQUE to min value to avoid log(0)
-            N_UNIQUE_clipped = np.maximum(N_UNIQUE, N_UNIQUE_min)
-
-            # Apply log10 transformation directly (no +1 needed since we clipped)
-            N_UNIQUE_log = np.log10(N_UNIQUE_clipped)
+            N_UNIQUE_log = np.log10(np.maximum(N_UNIQUE, N_UNIQUE_min))
             N_UNIQUE_min_log = np.log10(N_UNIQUE_min)
             N_UNIQUE_max_log = np.log10(N_UNIQUE_max)
-
-            # Use evidence colormap (magma) for better visualization of low/high values
-            cmap_n_unique, _ = get_colormap_and_limits(cmap_type='evidence', custom_clim=[N_UNIQUE_min_log, N_UNIQUE_max_log])
-
-            fig = plt.figure(5, figsize=(wx, wy))
-            fig.clf()  # Clear the figure to avoid warnings
-            if plot_data_locations:
-                plt.plot(X[i1:i2], Y[i1:i2], color='black', zorder=-1, marker='.', linestyle='None', markersize=1.2*s)
-            scatter = plt.scatter(X[i1:i2], Y[i1:i2], c=N_UNIQUE_log[i1:i2],
-                                cmap=cmap_n_unique, vmin=N_UNIQUE_min_log, vmax=N_UNIQUE_max_log, **kwargs)
-            plt.grid()
-            plt.xlabel('X', **fs_kw)
-            plt.ylabel('Y', **fs_kw)
-            cb = plt.colorbar(scatter, label='log10(N_UNIQUE)')
-            if fontsize is not None:
-                cb.set_label('log10(N_UNIQUE)', **fs_kw)
-                cb.ax.tick_params(labelsize=fontsize)
-            plt.title('N_UNIQUE (Number of Unique Realizations, log scale)', **title_fs_kw)
-            plt.axis('equal')
-            if hardcopy:
-                # get filename without extension
-                f_png = '%s_%d_%d_N_UNIQUE.png' % (os.path.splitext(f_post_h5)[0], i1, i2)
-                plt.savefig(f_png)
-                print('Saved: %s' % f_png)
+            cmap_n_unique, _ = get_colormap_and_limits(cmap_type='evidence',
+                                                        custom_clim=[N_UNIQUE_min_log, N_UNIQUE_max_log])
+            f_png = '%s_%d_%d_N_UNIQUE.png' % (base, i1, i2) if hardcopy else False
+            plot_xy(N_UNIQUE_log[i1:i2], cmap=cmap_n_unique,
+                    clim=[N_UNIQUE_min_log, N_UNIQUE_max_log],
+                    colorbar_label='log10(N_UNIQUE)',
+                    title='N_UNIQUE (Number of Unique Realizations, log scale)',
+                    hardcopy=f_png, **shared)
             plt.show()
         else:
             print('N_UNIQUE data not found in %s. Run integrate_posterior_stats() first.' % f_post_h5)
@@ -1361,7 +1249,7 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
         if hardcopy:
             # get filename without extension        
             f_png = '%s_%d_%d_ELEVATION.png' % (os.path.splitext(f_data_h5)[0],i1,i2)
-            plt.savefig(f_png)
+            plt.savefig(f_png, bbox_inches='tight')
 
         if pl == 'all':
             plt.show()
@@ -2164,7 +2052,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         else:
             panel_str = ''
         f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
-        plt.savefig(f_png)
+        plt.savefig(f_png, bbox_inches='tight')
     plt.show()
 
     return
@@ -2838,7 +2726,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         else:
             panel_str = ''
         f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
-        plt.savefig(f_png)
+        plt.savefig(f_png, bbox_inches='tight')
     plt.show()
 
     return
@@ -3149,7 +3037,7 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # strip the filename from f_data_h5
-        plt.savefig('%s_%s_%s.png' % (os.path.splitext(f_data_h5)[0],Dkey,plType))
+        plt.savefig('%s_%s_%s.png' % (os.path.splitext(f_data_h5)[0],Dkey,plType), bbox_inches='tight')
 
 
 
@@ -3307,7 +3195,7 @@ def plot_data_prior(f_prior_data_h5,
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # strip the filename from f_data_h5
-        plt.savefig('%s_%s_id%d_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str))
+        plt.savefig('%s_%s_id%d_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str), bbox_inches='tight')
     plt.show()
     
     return True
@@ -3560,9 +3448,9 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                 # strip the filename from f_data_h5
                 # get filename without extension of f_post_h5
                 if i_plot==-1:
-                    plt.savefig('%s_%s.png' % (os.path.splitext(f_post_h5)[0],Dkey))
+                    plt.savefig('%s_%s.png' % (os.path.splitext(f_post_h5)[0],Dkey), bbox_inches='tight')
                 else:
-                    plt.savefig('%s_%s_id%05d.png' % (os.path.splitext(f_post_h5)[0],Dkey,i_plot))
+                    plt.savefig('%s_%s_id%05d.png' % (os.path.splitext(f_post_h5)[0],Dkey,i_plot), bbox_inches='tight')
             plt.show()
 
 
@@ -4118,7 +4006,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # strip the filename from f_data_h5
-        plt.savefig('%s_%s.png' % (os.path.splitext(f_prior_h5)[0],Mkey[1::]))
+        plt.savefig('%s_%s.png' % (os.path.splitext(f_prior_h5)[0],Mkey[1::]), bbox_inches='tight')
 
 
 def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo=0, im=None, **kwargs):
@@ -4619,7 +4507,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # Save with data point index in filename
-        plt.savefig('%s_%s_i%d.png' % (os.path.splitext(f_post_h5)[0], Mkey[1::], i_plot))
+        plt.savefig('%s_%s_i%d.png' % (os.path.splitext(f_post_h5)[0], Mkey[1::], i_plot), bbox_inches='tight')
 
 
 # function that reads cmap and clim if they are set
@@ -4751,7 +4639,7 @@ def plot_cumulative_probability_profile(P_hypothesis, i1=0, i2=0, label=None, co
     plt.tight_layout()
     # Save the figure if hardcopy is True
     if hardcopy:
-        plt.savefig(name, dpi=300)
+        plt.savefig(name, dpi=300, bbox_inches='tight')
         print("Saved figure as %s.png" % (name))
     plt.show()
 

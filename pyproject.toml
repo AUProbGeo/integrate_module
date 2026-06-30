@@ -32,6 +32,7 @@ dependencies = [
     "litellm",
     "streamlit",
     "libaarhusxyz",
+    "jax",
 ]
 
 [project.optional-dependencies]

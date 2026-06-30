@@ -3431,37 +3431,41 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
     return file_out
 
 
-def timing_plot(f_timing=''):
+def timing_plot(f_timing='', fontsize=16):
     """
     Generate comprehensive timing analysis plots from benchmark results.
-    
+
     This function creates multiple plots analyzing the performance characteristics
     of the INTEGRATE workflow across different dataset sizes and processor counts.
-    
+
     Parameters
     ----------
     f_timing : str
         Path to NPZ file containing timing benchmark results from timing_compute().
-        
+    fontsize : int, optional
+        Base font size for all plot text (labels, titles, ticks, legends).
+        Default is 16.
+
     Returns
     -------
     None
         Saves multiple PNG files with timing analysis plots.
-        
+
     Notes
     -----
     Generated plots include:
     - Total execution time vs processors and dataset size
-    - Forward modeling performance and speedup analysis  
+    - Forward modeling performance and speedup analysis
     - Rejection sampling performance and scaling
     - Posterior statistics computation performance
     - Cumulative time breakdowns for different processor counts
     - Comparisons with traditional least squares and MCMC methods
-    
+
     The function handles missing data gracefully and includes reference lines
     for linear scaling to assess parallel efficiency.
     """
     import numpy as np
+    import matplotlib as mpl
     import matplotlib.pyplot as plt
 
     def safe_show():
@@ -3475,6 +3479,15 @@ def timing_plot(f_timing=''):
         return
     else:
         print('Plotting timing results from %s' % f_timing)
+
+    mpl.rcParams.update({
+        'font.size': fontsize,
+        'axes.labelsize': fontsize,
+        'axes.titlesize': fontsize + 2,
+        'xtick.labelsize': fontsize - 2,
+        'ytick.labelsize': fontsize - 2,
+        'legend.fontsize': fontsize - 2,
+    })
 
     # file_out is f_timing, without file extension
     file_out = f_timing.split('.')[0]

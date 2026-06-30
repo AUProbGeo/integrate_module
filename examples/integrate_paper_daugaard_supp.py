@@ -17,7 +17,7 @@ from scipy.ndimage import maximum_filter1d
 
 plt.ion()
 hardcopy = True
-
+fontsize = 16
 # %% [markdown]
 # # Get some data
 

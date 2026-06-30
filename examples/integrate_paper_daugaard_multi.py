@@ -12,6 +12,8 @@ try:
     # Execute the magic commands using IPython's run_line_magic function
     get_ipython().run_line_magic('load_ext', 'autoreload')
     get_ipython().run_line_magic('autoreload', '2')
+    get_ipython().run_line_magic('aimport', '-scipy')
+    get_ipython().run_line_magic('aimport', '-jax')
 except:
     # If get_ipython() raises an error, we are not in a Jupyter environment
     # # # # # # # # #%load_ext autoreload
@@ -27,6 +29,7 @@ import h5py
 
 from integrate.integrate_io import copy_prior
 hardcopy=True
+backend = 'jax'
 
 # %% [markdown]
 # ## Download the data DAUGAARD data including non-trivial prior data realizations
@@ -35,7 +38,7 @@ hardcopy=True
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
-inflateNoise = 2   # 1,2, 4
+inflateNoise = 4   # 1,2, 4
 useLogData = False
 N_use = 1_000_000
 N_use_org= N_use
@@ -51,7 +54,7 @@ doSamplePrior = False # Load prior model and data? (True) or load precomputed pr
 useTestMode = False
 if useTestMode:
     N_use = 30_000
-    useGenericPrior=False
+    #useGenericPrior=False
     doEffectSize = False
     doTbase = False
 
@@ -135,7 +138,7 @@ if useLogData:
 
 
 # %%
-if inflateNoise != 1:
+if inflateNoise != 0:
     gf=inflateNoise
     print("="*60)
     print("Increasing noise level (std) by a factor of %d" % gf)
@@ -264,7 +267,7 @@ if useLogData == True:
 if useMergedPrior:
     f_prior_data_merged_h5 = ig.merge_prior(f_prior_data_h5_list, 
                                             f_prior_merged_h5='daugaard_merged_N%d.h5' % (2*N_use), 
-                                            showInfo=2,
+                                            showInfo=2,                                            
                                             shuffle=True)
     ig.hdf5_info(f_prior_data_merged_h5)
     f_prior_data_h5_list.append(f_prior_data_merged_h5)
@@ -300,16 +303,17 @@ for i_prior in range(len(f_prior_data_h5_list)):
     fileparts = os.path.splitext(f_prior_data_h5)
     f_post_h5 = 'post_%s_Nuse%d_inflateNoise%d_main.h5' % (fileparts[0], N_use,inflateNoise)
 
-    f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
-                                    f_data_h5, 
-                                    f_post_h5, 
-                                    N_use = 2*N_use, 
-                                    showInfo=1, 
+    f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+                                    f_data_h5,
+                                    f_post_h5,
+                                    N_use = 2*N_use,
+                                    showInfo=1,
                                     nr=nr,
-                                    parallel=True, 
+                                    parallel=True,
                                     autoT=autoT,
                                     T_base=1,
-                                    updatePostStat=False)
+                                    updatePostStat=False,
+                                    backend=backend)
    
 
     f_post_h5_list.append(f_post_h5)    
@@ -361,32 +365,27 @@ P_valley_check = P[:,:,0]
 #P_valley = EV1/(EV1+EV2)
 # use cmap red white blue
 cmap_valley = plt.get_cmap('RdBu_r')
-plt.figure(figsize=(8, 6))
-plt.scatter(X, Y, c=P_valley, s=1, cmap=cmap_valley, vmin=0, vmax=1);plt.colorbar(label='P(Valley)');plt.axis('equal')
-plt.grid()
-plt.savefig('DAUGAARD_Pvalley_EV_N%d_No%d_aT%d_l%d.png' % (N_use,inflateNoise,autoT,useLogData), dpi=300)
-if useShapeFiles:
-    plt.plot(line1[:,0],line1[:,1],'y-',linewidth=6, alpha=0.4)
-    plt.plot(line1[:,0],line1[:,1],'k--',linewidth=2)
-    plt.plot(line2[:,0],line2[:,1],'y-',linewidth=6, alpha=0.4)
-    plt.plot(line2[:,0],line2[:,1],'k--',linewidth=2)
-    #plt.plot(line1_erosion[:,0],line1_erosion[:,1],'c-',linewidth=6)
-    #plt.plot(line2_erosion[:,0],line2_erosion[:,1],'r-',linewidth=6)
-    plt.savefig('DAUGAARD_Pvalley_EV_N%d_No%d_aT%d_l%d_shape.png' % (N_use,inflateNoise,autoT,useLogData), dpi=300)
 
-plt.figure(figsize=(8, 6))
-#plt.scatter(X, Y, c=P_valley_check[:,0], s=1, cmap=cmap_valley, vmin=.45, vmax=.55);plt.colorbar(label='P(Valley)');plt.axis('equal')
-plt.scatter(X, Y, c=P_valley_check[:,0], s=1, cmap=cmap_valley, vmin=0, vmax=1);plt.colorbar(label='P(Valley)');plt.axis('equal')
-plt.grid()
-plt.savefig('DAUGAARD_Pvalley_MIXTURE_N%d_No%d_aT%d_l%d.png' % (N_use,inflateNoise,autoT,useLogData), dpi=300)
+fontsize = 16
+
+fig, ax, sc = ig.plot_xy(P_valley, X=X, Y=Y, s=1, cmap=cmap_valley, clim=[0, 1], colorbar_label='P(Valley)', fontsize=fontsize)
+fig.savefig('DAUGAARD_Pvalley_EV_N%d_No%d_aT%d_l%d.png' % (N_use, inflateNoise, autoT, useLogData), dpi=300, bbox_inches='tight')
 if useShapeFiles:
-    plt.plot(line1[:,0],line1[:,1],'y-',linewidth=6, alpha=0.4)
-    plt.plot(line1[:,0],line1[:,1],'k--',linewidth=2)
-    plt.plot(line2[:,0],line2[:,1],'y-',linewidth=6, alpha=0.4)
-    plt.plot(line2[:,0],line2[:,1],'k--',linewidth=2)
-    #plt.plot(line1_erosion[:,0],line1_erosion[:,1],'c-',linewidth=6)
-    #plt.plot(line2_erosion[:,0],line2_erosion[:,1],'r-',linewidth=6)
-plt.savefig('DAUGAARD_Pvalley_MIXTURE_N%d_No%d_aT%d_l%d_shape.png' % (N_use,inflateNoise,autoT,useLogData), dpi=300)
+    ax.plot(line1[:,0], line1[:,1], 'y-', linewidth=6, alpha=0.4)
+    ax.plot(line1[:,0], line1[:,1], 'k--', linewidth=2)
+    ax.plot(line2[:,0], line2[:,1], 'y-', linewidth=6, alpha=0.4)
+    ax.plot(line2[:,0], line2[:,1], 'k--', linewidth=2)
+    fig.savefig('DAUGAARD_Pvalley_EV_N%d_No%d_aT%d_l%d_shape.png' % (N_use, inflateNoise, autoT, useLogData), dpi=300, bbox_inches='tight')
+
+
+fig, ax, sc = ig.plot_xy(P_valley_check[:,0], X=X, Y=Y, s=1, cmap=cmap_valley, clim=[0, 1], colorbar_label='P(Valley)', fontsize=fontsize)
+fig.savefig('DAUGAARD_Pvalley_MIXTURE_N%d_No%d_aT%d_l%d.png' % (N_use,inflateNoise,autoT,useLogData), dpi=300, bbox_inches='tight')
+if useShapeFiles:
+    ax.plot(line1[:,0],line1[:,1],'y-',linewidth=6, alpha=0.4)
+    ax.plot(line1[:,0],line1[:,1],'k--',linewidth=2)
+    ax.plot(line2[:,0],line2[:,1],'y-',linewidth=6, alpha=0.4)
+    ax.plot(line2[:,0],line2[:,1],'k--',linewidth=2)
+    fig.savefig('DAUGAARD_Pvalley_MIXTURE_N%d_No%d_aT%d_l%d_shape.png' % (N_use,inflateNoise,autoT,useLogData), dpi=300, bbox_inches='tight')
 
 
 
@@ -423,9 +422,9 @@ for i_post in range(len(f_post_h5_list)):
         ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
 
 
-        ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Mean', uselog=1, s=10,hardcopy=hardcopy)
+        ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Mean', uselog=1, s=10,hardcopy=hardcopy, fontsize=16)
         plt.show()
-        ig.plot_feature_2d(f_post_h5,im=2,iz=15, key='Mode', uselog=0, s=10,hardcopy=hardcopy)
+        ig.plot_feature_2d(f_post_h5,im=2,iz=15, key='Mode', uselog=0, s=10,hardcopy=hardcopy, fontsize=16)
         plt.show()
 
         # Plot prior and post model parameter stats
@@ -460,13 +459,14 @@ if doEffectSize:
             fileparts = os.path.splitext(f_prior_data_h5)
             f_post_h5 = 'post_%s_Nuse%d_inflateNoise%d.h5' % (fileparts[0], N_use,inflateNoise)
 
-            f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
-                                            f_data_h5, 
-                                            f_post_h5, 
-                                            N_use = N_use, 
-                                            showInfo=1, 
-                                            parallel=True, 
-                                            updatePostStat=True)
+            f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+                                            f_data_h5,
+                                            f_post_h5,
+                                            N_use = N_use,
+                                            showInfo=1,
+                                            parallel=True,
+                                            updatePostStat=True,
+                                            backend=backend)
             
             f_post_h5_N_list.append(f_post_h5)
         
@@ -497,15 +497,16 @@ if doTbase:
             fileparts = os.path.splitext(f_prior_data_h5)
             f_post_h5 = 'post_%s_Nuse%d_T%d_inflateNoise%d.h5' % (fileparts[0], N_use,T_base,inflateNoise)
 
-            f_post_h5 = ig.integrate_rejection(f_prior_data_h5, 
-                                            f_data_h5, 
-                                            f_post_h5, 
+            f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+                                            f_data_h5,
+                                            f_post_h5,
                                             T_base = T_base,
                                             N_use = 2*N_use,
                                             autoT=False,
-                                            showInfo=1, 
-                                            parallel=True, 
-                                            updatePostStat=True)
+                                            showInfo=1,
+                                            parallel=True,
+                                            updatePostStat=True,
+                                            backend=backend)
             
             f_post_h5_T_list.append(f_post_h5)
 
@@ -579,8 +580,10 @@ if doPlotAll:
             ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=nr, plot_data_locations=True, fontsize = fontsize)
 
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' , fontsize = fontsize)
+            ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' , fontsize = fontsize)
             plt.show()
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
+            ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
             plt.show()
             ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
             plt.show()
@@ -590,6 +593,7 @@ if doPlotAll:
                 ig.plot_feature_2d(f_post_h5,im=2,iz=5, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' , fontsize = fontsize )
                 plt.show()
                 ig.plot_feature_2d(f_post_h5,im=2,iz=15, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' , fontsize = fontsize)
+                ig.plot_feature_2d(f_post_h5,im=2,iz=45, key='Mode', uselog=0, hardcopy=hardcopy, title='Mode' , fontsize = fontsize)                
                 plt.show()
 
             except:
@@ -627,14 +631,17 @@ if doReadList:
 
     f_txt_list=[]
     # if exist
-    # f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt')
-    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt')
-    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt')
+    #f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt')
+    #f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt')
+    #f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt')
    
 #    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt' 
 #    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt'
 #    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt'
 
+    f_txt_list.append('N1.txt')
+    #f_txt_list.append('N2.txt')
+    #f_txt_list.append('N4.txt')
 
     f_post_h5_all_list = []
     for f_txt in f_txt_list:
@@ -785,7 +792,7 @@ for ele in np.arange(80,-51,-1):
         
     plt.suptitle('Class probabilities at %3.1f m elevation' % ele)
     plt.axis('equal')
-    plt.savefig('PROB_CLASS_%04d.png' % i, dpi=300)
+    plt.savefig('PROB_CLASS_%04d_%8d.png' % (i,N_use), dpi=300)
 
 # %% 
 # ffmpeg -framerate 4 -pattern_type glob -i "PROB_CLASS_*.png" -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p output.mp4

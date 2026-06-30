@@ -254,6 +254,8 @@ Results are saved as .npz files and automatically plotted with performance analy
                            help='Plot all NPZ timing files in the current directory')
     plot_parser.add_argument('--no-summary', action='store_true',
                            help='Disable timing summary output (enabled by default)')
+    plot_parser.add_argument('--fontsize', type=int, default=16,
+                           help='Base font size for plot text (default: 16)')
     
     # Time command
     time_parser = subparsers.add_parser('time', help='Run performance benchmark of INTEGRATE workflow')
@@ -308,7 +310,7 @@ Results are saved as .npz files and automatically plotted with performance analy
                     if not args.no_summary:
                         print_timing_summary(f)
 
-                    timing_plot(f)
+                    timing_plot(f, fontsize=args.fontsize)
                     plt.close('all')  # Close all figures after plotting
                     print(f"Successfully plotted: {f}")
                 except Exception as e:
@@ -325,7 +327,7 @@ Results are saved as .npz files and automatically plotted with performance analy
                 if not args.no_summary:
                     print_timing_summary(args.file)
 
-                timing_plot(args.file)
+                timing_plot(args.file, fontsize=args.fontsize)
                 plt.close('all')  # Close all figures after plotting
                 print(f"Successfully plotted: {args.file}")
             except Exception as e:
@@ -395,7 +397,7 @@ Results are saved as .npz files and automatically plotted with performance analy
             if not args.no_summary:
                 print_timing_summary(f_timing)
 
-            timing_plot(f_timing)
+            timing_plot(f_timing, fontsize=getattr(args, 'fontsize', 16))
             plt.close('all')  # Close all figures after plotting
             print(f"Timing plots saved successfully.")
         except Exception as e:
