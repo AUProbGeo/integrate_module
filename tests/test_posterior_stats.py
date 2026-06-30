@@ -17,7 +17,7 @@ import h5py
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from integrate.integrate import (
+from integrate.integrate_posterior import (
     _CONTINUOUS_STATS as CONTINUOUS_STATS,
     _DISCRETE_STATS as DISCRETE_STATS,
     _ps_compute_n_unique as _compute_n_unique,
@@ -207,7 +207,7 @@ def _reference_stats(i_use, M1, M2, class_id, computeKL=False):
 
 
 def test_end_to_end():
-    from integrate.integrate import integrate_posterior_stats
+    from integrate.integrate_posterior import integrate_posterior_stats
     with tempfile.TemporaryDirectory() as tmpdir:
         f_prior, f_post, i_use, M1, M2 = _make_synthetic(tmpdir)
         class_id = np.arange(1, 5, dtype=float)
