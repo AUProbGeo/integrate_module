@@ -2,6 +2,9 @@
 
 # Build and publish script for the "integrate" package
 # Usage: ./pypi_build_script
+#
+# Uses `uv` for building and publishing so it never touches the
+# system Python (avoids PEP 668 "externally-managed-environment").
 
 set -e  # Exit on error
 
@@ -16,40 +19,54 @@ echo "      Windows users will automatically get 'ga-aem-forward-win'"
 echo "Cleaning up old build artifacts..."
 rm -rf dist/ build/ *.egg-info/
 
-# Make sure you have the required tools
-echo "Updating build tools..."
-pip install --upgrade pip
-pip install --upgrade build setuptools wheel twine
-
-# Build distribution packages using build module (PEP 517)
+# Build sdist + wheel in an isolated build environment (PEP 517)
 echo "Building distribution packages..."
-python -m build
+uv build
 
 echo "=== Build complete ==="
 echo "Distribution files created:"
 ls -l dist/
 
+# Prompt for an API token, preferring an existing env var.
+# Usage: get_token <env-var-name> <human-readable-label>
+# Sets the global TOKEN variable on success.
+get_token() {
+    local env_var="$1" label="$2"
+    TOKEN="${!env_var}"
+    if [[ -n "$TOKEN" ]]; then
+        echo "Using $label token from \$$env_var"
+        return 0
+    fi
+    read -rsp "Enter $label API token (input hidden): " TOKEN
+    echo
+    if [[ -z "$TOKEN" ]]; then
+        echo "No token provided; skipping upload." >&2
+        return 1
+    fi
+}
+
 # Upload to TestPyPI first
 echo -e "\n=== TestPyPI Upload ==="
 read -p "Upload to TestPyPI for verification? [y/N] " test_upload
 if [[ $test_upload =~ ^[Yy]$ ]]; then
-    python -m twine upload --repository testpypi dist/*
-    echo -e "\nTestPyPI upload complete!"
-    echo "You can install and test with:"
-    echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $MODULE_NAME==$VERSION"
-    echo "This uses TestPyPI for $MODULE_NAME but regular PyPI for dependencies."
+    if get_token UV_PUBLISH_TOKEN_TEST "TestPyPI"; then
+        uv publish --publish-url https://test.pypi.org/legacy/ --token "$TOKEN" dist/*
+        echo -e "\nTestPyPI upload complete!"
+        echo "You can install and test with:"
+        echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $MODULE_NAME==$VERSION"
+        echo "This uses TestPyPI for $MODULE_NAME but regular PyPI for dependencies."
+    fi
 fi
 
 # Upload to PyPI when ready
 echo -e "\n=== PyPI Upload ==="
 read -p "Upload to PyPI for production release? [y/N] " prod_upload
-if [[ $prod_upload =~ ^[Yy]$ ]]; then
-    python -m twine upload dist/*
+if [[ $prod_upload =~ ^[Yy]$ ]] && get_token UV_PUBLISH_TOKEN "PyPI"; then
+    uv publish --token "$TOKEN" dist/*
     echo -e "\nPyPI upload complete!"
     echo "Your package is now available via:"
     echo "pip install $MODULE_NAME"
 else
     echo -e "\nSkipped PyPI upload. When ready for the real release, run:"
-    echo "python -m twine upload dist/*"
+    echo "uv publish dist/*"
 fi
-
