@@ -3240,7 +3240,7 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     return f_data_h5
 
 
-def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None):
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None):
     """
     Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
 
@@ -3292,6 +3292,38 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         same length as ``data_obs``.  Use ``None`` for an individual entry to
         fall back to ``0.05 * |d_obs|`` for that column.  If the whole
         parameter is omitted, all columns default to ``0.05 * |d_obs|``.
+    altitude : str, optional
+        Flightlines column name (case-insensitive) holding the platform's
+        flight altitude/height, e.g. ``'Alt'``.  When given, written as its
+        own Gaussian data block with ``id=2`` (the second dataset, after the
+        ``/D1`` dbdt data).  Any ``data_obs`` columns are then written
+        starting at ``id=3`` instead of ``id=2``.
+    altitude_std : str, float, or None, optional
+        Uncertainty for ``altitude``.
+        - A **string** is treated as another flightlines column name
+          (case-insensitive) holding the absolute std directly.
+        - A **number** with ``abs(altitude_std) < 1`` is treated as a
+          *relative* std: ``std = altitude_std * altitude``.
+        - A **number** with ``abs(altitude_std) >= 1`` is treated as an
+          *absolute* std in meters, constant for all soundings.
+        - If ``None`` (default), falls back to ``0.05 * |altitude|``.
+    tx_altitude : str, optional
+        Flightlines column name (case-insensitive) holding the transmitter
+        altitude/height. When given, written as its own Gaussian data block,
+        immediately after ``altitude`` (if also given). Optional — omitted
+        entirely if not given.
+    tx_altitude_std : str, float, or None, optional
+        Uncertainty for ``tx_altitude``. Same rules as ``altitude_std``
+        (string column name / relative number / absolute number / default
+        5% relative if ``None``). Only used if ``tx_altitude`` is given.
+    rx_altitude : str, optional
+        Flightlines column name (case-insensitive) holding the receiver
+        altitude/height. When given, written as its own Gaussian data block,
+        after ``altitude`` and ``tx_altitude`` (if also given). Optional —
+        omitted entirely if not given.
+    rx_altitude_std : str, float, or None, optional
+        Uncertainty for ``rx_altitude``. Same rules as ``altitude_std``.
+        Only used if ``rx_altitude`` is given.
 
     Returns
     -------
@@ -3380,9 +3412,22 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     ld = {k: pd.concat([xyz.layer_data[k] for xyz in xyz_list], ignore_index=True)
           for k in xyz_list[0].layer_data}
 
-    # Handle XYZ files that use 'x'/'y' instead of 'utmx'/'utmy'
+    # Handle XYZ files that use alternate column names for geometry
+    # (e.g. tTEM: utmx/utmy/line_no/elevation, SkyTEM: e/n/line/dem)
     if 'utmx' not in fl.columns and 'x' in fl.columns:
         fl = fl.rename(columns={'x': 'utmx', 'y': 'utmy'})
+    if 'utmx' not in fl.columns and 'e' in fl.columns:
+        fl = fl.rename(columns={'e': 'utmx', 'n': 'utmy'})
+    if 'line_no' not in fl.columns and 'line' in fl.columns:
+        fl = fl.rename(columns={'line': 'line_no'})
+    if 'elevation' not in fl.columns and 'dem' in fl.columns:
+        fl = fl.rename(columns={'dem': 'elevation'})
+
+    # Handle single-channel XYZ files (e.g. SkyTEM) that store the sounding
+    # data under a plain component name instead of the tTEM 'ch1gt' naming
+    if 'dbdt_ch1gt' not in ld and 'z_dbdt' in ld:
+        ld['dbdt_ch1gt'] = ld['z_dbdt']
+        ld['dbdt_std_ch1gt'] = ld['relunc_z_dbdt']
 
     # Determine dummy/missing value: explicit arg > XYZ header > fallback 9999
     if nan_value is None:
@@ -3393,7 +3438,12 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     # --- pair ch1 / ch2 rows (mirrors MATLAB logic) ---
     # Every ch1 row becomes a sounding.  HM data is filled where the
     # immediately following row is ch2; otherwise those columns stay NaN.
-    channel_arr = fl['channel_no'].values
+    # Single-channel systems (e.g. SkyTEM) have no 'channel_no' column at
+    # all: every row is its own (channel-1) sounding.
+    if 'channel_no' in fl.columns:
+        channel_arr = fl['channel_no'].values
+    else:
+        channel_arr = np.ones(len(fl))
     ch1_pos = np.where(channel_arr == 1)[0]
 
     # geometry from channel-1 rows (all of them)
@@ -3475,7 +3525,38 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         if n_channels >= 2:
             hf.create_dataset('/D1/i_hm', data=np.arange(i_hm_start, i_hm_end))
 
-    # --- write additional data columns as D2, D3, ... ---
+    # --- write altitude / rx_altitude / tx_altitude (if given) as their own Gaussian data blocks ---
+    def _resolve_std(obs, std_arg):
+        if isinstance(std_arg, str):
+            return fl[std_arg.lower()].values[ch1_pos][keep].reshape(-1, 1).astype(float)
+        elif isinstance(std_arg, (int, float)):
+            if abs(std_arg) < 1:
+                return std_arg * np.abs(obs)  # relative
+            else:
+                return np.full_like(obs, float(std_arg))  # absolute, meters
+        else:
+            return 0.05 * np.abs(obs)  # default: 5% relative
+
+    next_id = 2
+    for col, col_std, name in (
+        (altitude, altitude_std, 'Altitude'),
+        (tx_altitude, tx_altitude_std, 'Tx_altitude'),
+        (rx_altitude, rx_altitude_std, 'Rx_altitude'),
+    ):
+        if col is not None:
+            obs = fl[col.lower()].values[ch1_pos][keep].reshape(-1, 1).astype(float)
+            std = _resolve_std(obs, col_std)
+            save_data_gaussian(
+                obs, D_std=std,
+                f_data_h5=f_data_h5,
+                id=next_id,
+                name=name,
+                delete_if_exist=False,
+                showInfo=showInfo,
+            )
+            next_id += 1
+
+    # --- write additional data columns as D2, D3, ... (or shifted if altitude present) ---
     if data_obs is not None:
         _data_std = data_std if data_std is not None else [None] * len(data_obs)
         for i, col_obs in enumerate(data_obs):
@@ -3488,7 +3569,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
             save_data_gaussian(
                 obs, D_std=std,
                 f_data_h5=f_data_h5,
-                id=i + 2,
+                id=next_id + i,
                 name=col_obs,
                 delete_if_exist=False,
                 showInfo=showInfo,

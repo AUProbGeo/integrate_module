@@ -40,6 +40,11 @@ dev = [
     "pytest",
     "black",
 ]
+ml = [
+    "tensorflow",
+    "scikit-learn",
+    "keras_tuner",
+]
 docs = [
     "sphinx",
     "nbsphinx",
