@@ -2844,20 +2844,23 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
 
     return fig
 
-def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwargs):
+def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=True, **kwargs):
     """
     Plot observational data from an HDF5 file.
-    
+
     This function creates visualizations of electromagnetic data including time-series plots,
     2D image displays, and other data representations. Supports multiple data types and
     plotting styles for comprehensive data analysis.
-    
+
     :param f_data_h5: Path to the HDF5 file containing observational data
     :type f_data_h5: str
     :param i_plot: Indices of data points to plot. If empty, plots all available data
     :type i_plot: list or array-like, optional
     :param Dkey: Data keys/identifiers to plot. If empty, uses all available datasets
     :type Dkey: str or list, optional
+    :param id: Dataset id to plot (e.g. id=1 plots only 'D1'). If None (default) and
+        Dkey is also unset, every dataset found in the file (D1, D2, ...) is plotted.
+    :type id: int, optional
     :param plType: Plotting method - 'imshow' for 2D image display, 'plot' for line plots
     :type plType: str, optional
     :param uselog: Apply logarithmic scaling to data visualization (default is True)
@@ -2889,155 +2892,162 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwa
         return
 
 
+    # set plot in kwarg to True if not already set
+    if 'hardcopy' not in kwargs:
+        kwargs['hardcopy'] = True
+
     with h5py.File(f_data_h5,'r') as f_data:
 
-        if len(Dkey)==0:
-            nd = 0
+        if id is not None:
+            Dkeys = ['D%d' % id]
+        elif len(Dkey)==0:
             Dkeys = []
             for key in f_data.keys():
                 if key[0]=='D':
                     if showInfo>0:
                         print("plot_data: Found data set %s" % key)
                     Dkeys.append(key)
-                nd += 1
-            Dkey=Dkeys[0]
             if showInfo>0:
-                print("plot_data: Using data set %s" % Dkey)
-
-        noise_model = f_data['/%s' % Dkey].attrs['noise_model']
-
-        # Get name attribute if it exists
-        name_attr = f_data['/%s' % Dkey].attrs.get('name', None)
-
-        # Force plot type for discrete/multinomial data
-        if noise_model == 'multinomial' or Dkey.upper() in ['D2', 'D3', 'D4', 'D5']:
-            plType = 'plot'
-
-        if noise_model == 'gaussian':
-            noise_model = 'Gaussian'
-            d_obs = f_data['/%s' % Dkey]['d_obs'][:]
-            d_std = f_data['/%s' % Dkey]['d_std'][:]
-
-
-            ndata,ns = f_data['/%s' % Dkey]['d_obs'].shape
-            # set i_plot as an array from 0 to ndata
-            if len(i_plot)==0:
-                i_plot = np.arange(ndata)
-                #i_plot = 1000+np.arange(5000)
-
-            # remove all values in i_plot that are larger than the number of data
-            i_plot = i_plot[i_plot<ndata]
-            # remove all values in i_plot that are smaller than 0
-            i_plot = i_plot[i_plot>=0]
-
-            # find number of nan values on d_obs
-            non_nan = np.sum(~np.isnan(d_obs), axis=1)
-
-            # Calculate the extent
-            # extent = [left, right, bottom, top]; imshow row 0 maps to top,
-            # so bottom=N_gates and top=0 gives gate 0 at the top of the plot
-            # with the y-axis label reading 0→N_gates from top to bottom.
-            xlim = [i_plot.min(), i_plot.max()]
-            extent = [xlim[0], xlim[1], d_obs.shape[1], 1]
-
-            # plot figure with data
-
-            fig, ax = plt.subplots(4,1,figsize=(10,12), gridspec_kw={'height_ratios': [3, 3, 3, 1]})
-
-            # Set suptitle with optional name attribute
-
-            if plType=='plot':
-                if uselog:
-                    im1 = ax[0].semilogy(d_obs[i_plot,:], linewidth=.5)
-                    im2 = ax[1].semilogy(d_std[i_plot,:], linewidth=.5)
-                    im3 = ax[2].semilogy((d_obs[i_plot,:]/d_std[i_plot,:]), linewidth=.5)
-                else:
-                    im1 = ax[0].plot(d_obs[i_plot,:], linewidth=.5)
-                    im2 = ax[1].plot(d_std[i_plot,:], linewidth=.5)
-                    im3 = ax[2].plot(100.0 * d_std[i_plot,:]/d_obs[i_plot,:], linewidth=.5)
-                ax[0].set_xlim(xlim)
-                ax[1].set_xlim(xlim)
-                ax[2].set_xlim(xlim)
-                ax[2].set_ylim([0, 20])
-                ax[0].set_ylabel('d_obs')
-                ax[1].set_ylabel('d_std')
-                ax[2].set_ylabel('Relative noise [%] (d_std/d_obs × 100)')
-
-            elif plType=='imshow':
-                def _masked(arr):
-                    """Mask NaN, inf, and non-positive values; leave positives intact."""
-                    return np.ma.masked_where(~np.isfinite(arr) | (arr <= 0), arr)
-
-                def _cmap_white_bad(name):
-                    cmap = matplotlib.colormaps[name].copy()
-                    cmap.set_bad('white')
-                    return cmap
-
-                if uselog:
-                    im1 = ax[0].imshow(_masked(d_obs[i_plot,:]).T, aspect='auto',
-                                       cmap=_cmap_white_bad('jet_r'),
-                                       norm=matplotlib.colors.LogNorm(), extent=extent)
-                    im2 = ax[1].imshow(_masked(d_std[i_plot,:]).T, aspect='auto',
-                                       cmap=_cmap_white_bad('hot_r'),
-                                       norm=matplotlib.colors.LogNorm(), extent=extent)
-                else:
-                    im1 = ax[0].imshow(np.ma.masked_invalid(d_obs[i_plot,:]).T,
-                                       aspect='auto', cmap=_cmap_white_bad('jet_r'), extent=extent)
-                    im2 = ax[1].imshow(np.ma.masked_invalid(d_std[i_plot,:]).T,
-                                       aspect='auto', cmap=_cmap_white_bad('hot_r'), extent=extent)
-
-                # Relative noise in % — mask invalid entries
-                rel_noise = np.ma.masked_invalid(100.0 * d_std[i_plot,:] / d_obs[i_plot,:])
-                im3 = ax[2].imshow(rel_noise.T, aspect='auto', vmin=0, vmax=20,
-                                   cmap=_cmap_white_bad('turbo'), extent=extent)
-
-                fig.colorbar(im1, ax=ax[0])
-                fig.colorbar(im2, ax=ax[1])
-                fig.colorbar(im3, ax=ax[2])
-
-                ax[0].set_ylabel('gate number')
-                ax[1].set_ylabel('gate number')
-                ax[2].set_ylabel('gate number')
-
-                ax[0].set_title('d_obs: observed data')
-                ax[1].set_title('d_std: standard deviation')
-                ax[2].set_title('Relative noise, % (d_std / d_obs × 100)')
-
-
-            im4 = ax[3].plot(i_plot,non_nan[i_plot], 'k.', markersize=.5)
-            ax[3].set_ylabel('Number of data')
-            ax[3].set_xlim(xlim)
-
-            if plType=='imshow':
-                # Create an invisible colorbar for the last subplot
-                cbar4 = fig.colorbar(im3, ax=ax[3])
-                cbar4.solids.set(alpha=0)
-                cbar4.outline.set_visible(False)
-                cbar4.ax.set_yticks([])  # Hide the colorbar ticks
-                cbar4.ax.set_yticklabels([])  # Hide the colorbar ticks labels
-
-            ax[-1].set_xlabel('Index')
-
-            ax[0].grid()
-            ax[1].grid()
-            ax[2].grid()
-            ax[3].grid()
-
-            if name_attr is not None:
-                fig.suptitle("Dataset %s: %s" % (Dkey, name_attr))
-            else:
-                fig.suptitle("Dataset %s" % Dkey)
-
-            plt.tight_layout()
+                print("plot_data: Using data set(s) %s" % Dkeys)
+        elif isinstance(Dkey, str):
+            Dkeys = [Dkey]
         else:
-            print("plot_data: Unknown noise model: %s" % noise_model)
+            Dkeys = list(Dkey)
 
-    # set plot in kwarg to True if not allready set
-    if 'hardcopy' not in kwargs:
-        kwargs['hardcopy'] = True
-    if kwargs['hardcopy']:
-        # strip the filename from f_data_h5
-        plt.savefig('%s_%s_%s.png' % (os.path.splitext(f_data_h5)[0],Dkey,plType), bbox_inches='tight')
+        for Dkey in Dkeys:
+            noise_model = f_data['/%s' % Dkey].attrs['noise_model']
+
+            # Get name attribute if it exists
+            name_attr = f_data['/%s' % Dkey].attrs.get('name', None)
+
+            # Force plot type for discrete/multinomial data
+            cur_plType = plType
+            if noise_model == 'multinomial' or Dkey.upper() in ['D2', 'D3', 'D4', 'D5']:
+                cur_plType = 'plot'
+
+            if noise_model == 'gaussian':
+                noise_model = 'Gaussian'
+                d_obs = f_data['/%s' % Dkey]['d_obs'][:]
+                d_std = f_data['/%s' % Dkey]['d_std'][:]
+
+
+                ndata,ns = f_data['/%s' % Dkey]['d_obs'].shape
+                # set i_plot_cur as an array from 0 to ndata
+                if len(i_plot)==0:
+                    i_plot_cur = np.arange(ndata)
+                else:
+                    i_plot_cur = np.asarray(i_plot)
+
+                # remove all values in i_plot_cur that are larger than the number of data
+                i_plot_cur = i_plot_cur[i_plot_cur<ndata]
+                # remove all values in i_plot_cur that are smaller than 0
+                i_plot_cur = i_plot_cur[i_plot_cur>=0]
+
+                # find number of nan values on d_obs
+                non_nan = np.sum(~np.isnan(d_obs), axis=1)
+
+                # Calculate the extent
+                # extent = [left, right, bottom, top]; imshow row 0 maps to top,
+                # so bottom=N_gates and top=0 gives gate 0 at the top of the plot
+                # with the y-axis label reading 0→N_gates from top to bottom.
+                xlim = [i_plot_cur.min(), i_plot_cur.max()]
+                extent = [xlim[0], xlim[1], d_obs.shape[1], 1]
+
+                # plot figure with data
+
+                fig, ax = plt.subplots(4,1,figsize=(10,12), gridspec_kw={'height_ratios': [3, 3, 3, 1]})
+
+                # Set suptitle with optional name attribute
+
+                if cur_plType=='plot':
+                    if uselog:
+                        im1 = ax[0].semilogy(d_obs[i_plot_cur,:], linewidth=.5)
+                        im2 = ax[1].semilogy(d_std[i_plot_cur,:], linewidth=.5)
+                        im3 = ax[2].semilogy((d_obs[i_plot_cur,:]/d_std[i_plot_cur,:]), linewidth=.5)
+                    else:
+                        im1 = ax[0].plot(d_obs[i_plot_cur,:], linewidth=.5)
+                        im2 = ax[1].plot(d_std[i_plot_cur,:], linewidth=.5)
+                        im3 = ax[2].plot(100.0 * d_std[i_plot_cur,:]/d_obs[i_plot_cur,:], linewidth=.5)
+                    ax[0].set_xlim(xlim)
+                    ax[1].set_xlim(xlim)
+                    ax[2].set_xlim(xlim)
+                    ax[2].set_ylim([0, 20])
+                    ax[0].set_ylabel('d_obs')
+                    ax[1].set_ylabel('d_std')
+                    ax[2].set_ylabel('Relative noise [%] (d_std/d_obs × 100)')
+
+                elif cur_plType=='imshow':
+                    def _masked(arr):
+                        """Mask NaN, inf, and non-positive values; leave positives intact."""
+                        return np.ma.masked_where(~np.isfinite(arr) | (arr <= 0), arr)
+
+                    def _cmap_white_bad(name):
+                        cmap = matplotlib.colormaps[name].copy()
+                        cmap.set_bad('white')
+                        return cmap
+
+                    if uselog:
+                        im1 = ax[0].imshow(_masked(d_obs[i_plot_cur,:]).T, aspect='auto',
+                                           cmap=_cmap_white_bad('jet_r'),
+                                           norm=matplotlib.colors.LogNorm(), extent=extent)
+                        im2 = ax[1].imshow(_masked(d_std[i_plot_cur,:]).T, aspect='auto',
+                                           cmap=_cmap_white_bad('hot_r'),
+                                           norm=matplotlib.colors.LogNorm(), extent=extent)
+                    else:
+                        im1 = ax[0].imshow(np.ma.masked_invalid(d_obs[i_plot_cur,:]).T,
+                                           aspect='auto', cmap=_cmap_white_bad('jet_r'), extent=extent)
+                        im2 = ax[1].imshow(np.ma.masked_invalid(d_std[i_plot_cur,:]).T,
+                                           aspect='auto', cmap=_cmap_white_bad('hot_r'), extent=extent)
+
+                    # Relative noise in % — mask invalid entries
+                    rel_noise = np.ma.masked_invalid(100.0 * d_std[i_plot_cur,:] / d_obs[i_plot_cur,:])
+                    im3 = ax[2].imshow(rel_noise.T, aspect='auto', vmin=0, vmax=20,
+                                       cmap=_cmap_white_bad('turbo'), extent=extent)
+
+                    fig.colorbar(im1, ax=ax[0])
+                    fig.colorbar(im2, ax=ax[1])
+                    fig.colorbar(im3, ax=ax[2])
+
+                    ax[0].set_ylabel('gate number')
+                    ax[1].set_ylabel('gate number')
+                    ax[2].set_ylabel('gate number')
+
+                    ax[0].set_title('d_obs: observed data')
+                    ax[1].set_title('d_std: standard deviation')
+                    ax[2].set_title('Relative noise, % (d_std / d_obs × 100)')
+
+
+                im4 = ax[3].plot(i_plot_cur,non_nan[i_plot_cur], 'k.', markersize=.5)
+                ax[3].set_ylabel('Number of data')
+                ax[3].set_xlim(xlim)
+
+                if cur_plType=='imshow':
+                    # Create an invisible colorbar for the last subplot
+                    cbar4 = fig.colorbar(im3, ax=ax[3])
+                    cbar4.solids.set(alpha=0)
+                    cbar4.outline.set_visible(False)
+                    cbar4.ax.set_yticks([])  # Hide the colorbar ticks
+                    cbar4.ax.set_yticklabels([])  # Hide the colorbar ticks labels
+
+                ax[-1].set_xlabel('Index')
+
+                ax[0].grid()
+                ax[1].grid()
+                ax[2].grid()
+                ax[3].grid()
+
+                if name_attr is not None:
+                    fig.suptitle("Dataset %s: %s" % (Dkey, name_attr))
+                else:
+                    fig.suptitle("Dataset %s" % Dkey)
+
+                plt.tight_layout()
+
+                if kwargs['hardcopy']:
+                    # strip the filename from f_data_h5
+                    plt.savefig('%s_%s_%s.png' % (os.path.splitext(f_data_h5)[0],Dkey,cur_plType), bbox_inches='tight')
+            else:
+                print("plot_data: Unknown noise model: %s" % noise_model)
 
 
 

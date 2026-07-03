@@ -141,7 +141,7 @@ D_obs = ig.load_data(f_data_h5)
 
 # %% 
 
-N=2_000_00000
+N=2_000_000
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, 
                                     f_prior_h5='PRIOR_N%d.h5' % N, 
                                     dz = 1, 
