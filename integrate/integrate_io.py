@@ -2967,6 +2967,10 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
         print("filelist to download:")
         print(filelist)
 
+    # Direct-download endpoint for the shared data. Use ERDA's 'share_redirect'
+    # form (serves raw file bytes, returns proper 404s), NOT the 'sharelink'
+    # browse link, which returns an HTML directory page with status 200 for any
+    # path and would be saved as a corrupt file.
     urlErda = 'https://anon.erda.au.dk/share_redirect/dxOLKDtoul'
     urlErdaCase = '%s/%s' % (urlErda,case)
     from tqdm import tqdm
@@ -2976,7 +2980,22 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
     if showInfo>-1:
         print('--> Got data for case: %s' % case)
 
-    return [f.replace('\\', '/').split('/')[-1] for f in filelist]
+    # Return the local filename for each requested file, but only if it was
+    # actually obtained (downloaded or already present locally). download_file
+    # saves to download_dir='.' using the basename, so we check for that here.
+    # Files that could not be obtained (e.g. missing on the remote server)
+    # return an empty string, so callers can test `if len(name) == 0`.
+    result = []
+    for f in filelist:
+        basename = f.replace('\\', '/').split('/')[-1]
+        if os.path.exists(basename):
+            result.append(basename)
+        else:
+            if showInfo>-1:
+                print('File %s was not obtained (missing locally and on remote); returning empty string.' % basename)
+            result.append('')
+
+    return result
 
 
 
