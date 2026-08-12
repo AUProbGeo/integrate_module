@@ -243,7 +243,10 @@ def integrate_rejection_range_jax(
     T_P_acc_level : float             — passed to logl_T_est (target P_acc)
     progress_callback : callable      — optional (current, total) callback
     Nbatch        : int               — data points per JAX batch (default 64)
-    **kwargs      : use_N_best, showInfo, console_progress, useRandomData, …
+    **kwargs      : use_N_best, showInfo, console_progress, useRandomData,
+                    normalize_likelihood (bool, default False — include the
+                    full Gaussian normalization constant; inert for
+                    P_acc/T/EV weighting, CHI2 is de-normalized back out), …
 
     Returns
     -------
@@ -269,6 +272,11 @@ def integrate_rejection_range_jax(
     console_progress = kwargs.get('console_progress', True)
     disableTqdm = not console_progress if showInfo >= 0 else True
     useRandomData = kwargs.get('useRandomData', True)
+    # If True, Gaussian likelihoods include the full normalization constant.
+    # Inert for P_acc/T/EV weighting (constant shift); CHI2 is de-normalized
+    # back out below so it stays a pure misfit statistic. See
+    # integrate_rejection_range (NumPy backend) for the full rationale.
+    normalize_likelihood = kwargs.get('normalize_likelihood', False)
 
     Ndp = DATA['d_obs'][0].shape[0]
     if len(ip_range) == 0:
@@ -354,6 +362,9 @@ def integrate_rejection_range_jax(
         # Fallbacks (full-Cd, multinomial): computed in NumPy, then converted.
         L_per_type_list = []                               # list of (bsz, N) JAX arrays
         n_data_per_type = np.zeros((bsz, Ndt), dtype=np.float32)
+        # Gaussian normalization constant used per (data point, data type),
+        # 0 unless normalize_likelihood — tracked so CHI2 can be de-normalized.
+        log_norm_const_b = np.zeros((bsz, Ndt))
 
         for i in range(Ndt):
             # active[b]=1 means data point ip_batch[b] has valid data for type i
@@ -374,8 +385,9 @@ def integrate_rejection_range_jax(
                             Cd = (DATA['Cd'][0][ip]
                                   if len(DATA['Cd'][0].shape) == 3
                                   else DATA['Cd'][0][:])
-                            L_np[b] = likelihood_gaussian_full(
-                                D[i], DATA['d_obs'][i][ip], Cd, N_app=use_N_best
+                            L_np[b], log_norm_const_b[b, i] = likelihood_gaussian_full(
+                                D[i], DATA['d_obs'][i][ip], Cd, N_app=use_N_best,
+                                normalize=normalize_likelihood, return_norm_const=True,
                             )
                     L_per_type_list.append(jnp.asarray(L_np))
 
@@ -388,6 +400,12 @@ def integrate_rejection_range_jax(
                         jnp.asarray(d_obs_batch),
                         jnp.asarray(d_std_batch),
                     )  # (bsz, N)
+                    if normalize_likelihood:
+                        lnc_batch = -0.5 * np.nansum(
+                            np.log(2*np.pi*d_std_batch**2), axis=1
+                        ) * active
+                        log_norm_const_b[:, i] = lnc_batch
+                        L_jax = L_jax + jnp.asarray(lnc_batch)[:, None]
                     L_per_type_list.append(L_jax * jnp.asarray(active[:, None]))
 
                 else:
@@ -414,6 +432,11 @@ def integrate_rejection_range_jax(
         L_per_type_stacked = jnp.stack(L_per_type_list, axis=0)  # (Ndt, bsz, N)
         L_combined = jnp.sum(L_per_type_stacked, axis=0)          # (bsz, N)
 
+        # De-normalized per-type likelihoods, used only for CHI2 (a pure misfit
+        # statistic). L_per_type_stacked (and hence L_combined, used for
+        # P_acc/T/EV) stays normalized when normalize_likelihood is set.
+        L_per_type_raw_stacked = L_per_type_stacked - jnp.asarray(log_norm_const_b.T)[:, :, None]
+
         if _on_gpu:
             # GPU path: all post-processing on-device, one point at a time.
             # Avoids the ~256 MB PCIe transfer per batch that the CPU path pays
@@ -427,7 +450,7 @@ def integrate_rejection_range_jax(
                 i_use_b, T_b, EV_b, CHI2_b, N_UNIQUE_b = postprocess_single(
                     keys[b],
                     L_combined[b],
-                    L_per_type_stacked[:, b, :],
+                    L_per_type_raw_stacked[:, b, :],
                     n_data_jax[b],
                     idx_jax,
                     N_above_jax,
@@ -446,7 +469,7 @@ def integrate_rejection_range_jax(
             # then post-process with NumPy.  Avoids jnp.sort(N=1M) which is
             # ~54× slower than np.sort on CPU and dominates wall-clock time.
             L_combined_np    = np.asarray(L_combined)              # (bsz, N)
-            L_per_type_np    = np.asarray(L_per_type_stacked)      # (Ndt, bsz, N)
+            L_per_type_raw_np = np.asarray(L_per_type_raw_stacked)  # (Ndt, bsz, N), de-normalized
 
             for b, j in enumerate(batch_js):
                 L = L_combined_np[b]                               # (N,)
@@ -468,7 +491,7 @@ def integrate_rejection_range_jax(
                 CHI2_current = np.full(Ndt, np.nan)
                 for i in range(Ndt):
                     if n_data_per_type[b, i] > 0:
-                        L_acc = L_per_type_np[i, b, i_use]
+                        L_acc = L_per_type_raw_np[i, b, i_use]
                         CHI2_current[i] = (
                             np.nanmean(-2.0 * L_acc) / n_data_per_type[b, i]
                         )

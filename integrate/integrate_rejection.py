@@ -115,8 +115,11 @@ def integrate_rejection(f_prior_h5='prior.h5',
         JAX must be installed separately: ``pip install jax``.
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
-        and Nbatch (batch size for backend='jax').
-    
+        Nbatch (batch size for backend='jax'), and normalize_likelihood (bool,
+        default False; if True, Gaussian likelihoods include the full
+        normalization constant, giving a properly comparable EV/entropy across
+        data points and hypotheses, without changing P_acc/T/CHI2).
+
     Returns
     -------
     str
@@ -150,6 +153,11 @@ def integrate_rejection(f_prior_h5='prior.h5',
     Ncpu = kwargs.get('N_cpu', Ncpu) # Allow using N_cpu instead of Ncpu
     Nchunks = kwargs.get('N_chunks', Nchunks) # Allow using N_chunks instead of Nchunks
     posterior_output_path = kwargs.get('post_dir', os.getcwd())
+    # The parallel (multiprocessing) path below does not forward **kwargs, so
+    # this needs to be extracted here and threaded explicitly into
+    # integrate_posterior_main. The backend='jax' and non-parallel branches
+    # already forward **kwargs and pick this up on their own.
+    normalize_likelihood = kwargs.get('normalize_likelihood', False)
     
     # Setup progress callback functionality
     if console_progress is None:
@@ -366,6 +374,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
             use_N_best=use_N_best,
             T_N_above=_T_N_above,
             T_P_acc_level=_T_P_acc_level,
+            normalize_likelihood=normalize_likelihood,
             progress_callback=update_progress if progress_callback else None,
         )
 
@@ -507,7 +516,10 @@ def integrate_rejection_range(D,
         Optional callback function for progress updates. Called with (current, total).
         Default is None (no callbacks).
     **kwargs : dict
-        Additional arguments including useRandomData, showInfo, use_N_best.
+        Additional arguments including useRandomData, showInfo, use_N_best, and
+        normalize_likelihood (bool, default False; use the full normalized
+        Gaussian log-pdf. Inert for P_acc/T; CHI2 is de-normalized back out;
+        EV becomes a properly comparable evidence across data points/hypotheses).
     
     Returns
     -------
@@ -548,7 +560,15 @@ def integrate_rejection_range(D,
     
     useRandomData = kwargs.get('useRandomData', True)
     #useRandomData = kwargs.get('useRandomData', False)
-    
+
+    # If True, Gaussian likelihoods include the full normalization constant
+    # (-0.5*(n*log(2*pi) + log|Cov|)). This is inert for P_acc/T (a constant
+    # shift cancels in L - max(L)), but makes EV a properly comparable
+    # evidence across data points/hypotheses with differing noise or valid
+    # channel counts. CHI2 is de-normalized back out below so it stays a
+    # pure misfit statistic.
+    normalize_likelihood = kwargs.get('normalize_likelihood', False)
+
 
     # Get number of data points
     Ndp = DATA['d_obs'][0].shape[0]
@@ -653,6 +673,7 @@ def integrate_rejection_range(D,
         # Loop over the number of data types Ndt
         total_n_data_non_nan = 0  # Initialize total count for all data types
         n_data_per_type = np.zeros(Ndt)  # Track data count per data type
+        log_norm_const_per_type = np.zeros(Ndt)  # Gaussian normalization constant used per data type (0 unless normalize_likelihood)
 
         for i in range(Ndt):
             use_data_point = i_use_data[i][ip]
@@ -696,14 +717,18 @@ def integrate_rejection_range(D,
                         else:
                             Cd = DATA['Cd'][0][:]
 
-                        L_single = likelihood_gaussian_full(D[i_prior], d_obs, Cd, N_app = use_N_best)
-                        
+                        L_single, log_norm_const_per_type[i] = likelihood_gaussian_full(
+                            D[i_prior], d_obs, Cd, N_app = use_N_best,
+                            normalize=normalize_likelihood, return_norm_const=True)
+
                     elif DATA['d_std'][0] is not None:
                         d_std = DATA['d_std'][i][ip]
                         #print(d_obs)
                         #print(d_std)
                         #print(D[i_prior][0])
-                        L_single = likelihood_gaussian_diagonal(D[i_prior], d_obs, d_std, use_N_best)
+                        L_single, log_norm_const_per_type[i] = likelihood_gaussian_diagonal(
+                            D[i_prior], d_obs, d_std, use_N_best,
+                            normalize=normalize_likelihood, return_norm_const=True)
                         #print(L_single[0:3])
                     else:
                         print('No d_std or Cd in %s' % DS)
@@ -791,7 +816,9 @@ def integrate_rejection_range(D,
         for i in range(Ndt):
             if n_data_per_type[i] > 0:
                 # Get log-likelihood for accepted samples for this data type
-                L_accepted = L_single[i, i_use]  # Log-likelihood for accepted samples, data type i
+                # De-normalize (subtract back out the Gaussian normalization constant,
+                # if any) so CHI2 remains a pure misfit statistic (~2 for a good fit).
+                L_accepted = L_single[i, i_use] - log_norm_const_per_type[i]
 
                 # Convert log-likelihood to chi-squared: chi2 = -2 * logL
                 chi2_samples = -2.0 * L_accepted
@@ -855,7 +882,7 @@ def integrate_rejection_range(D,
 
 
 
-def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, progress_callback=None):
+def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=False, progress_callback=None):
     """
     Coordinate parallel processing of posterior sampling across multiple chunks.
     
@@ -941,7 +968,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     try:
         with ctx.Pool(Ncpu) as p:
             # New implementation with shared memory
-            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level) for i in range(len(ip_chunks))]
+            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood) for i in range(len(ip_chunks))]
             if progress_callback is None:
                 results = p.map(integrate_posterior_chunk, chunk_args)
             else:
@@ -1016,8 +1043,9 @@ def integrate_posterior_chunk(args):
     ----------
     args : tuple
         Packed arguments: (i_chunk, ip_chunks, DATA, idx, N_use, id_use,
-        shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level). See
-        ``integrate_rejection_range`` for descriptions of individual fields.
+        shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level,
+        normalize_likelihood). See ``integrate_rejection_range`` for descriptions
+        of individual fields.
 
     Returns
     -------
@@ -1046,7 +1074,7 @@ def integrate_posterior_chunk(args):
     #import integrate as ig
     
     # New implementation with shared memory
-    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level = args
+    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood = args
     # Old implementation where D was copied to each process
     #i_chunk, ip_chunks, D, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best = args
     #D=reconstruct_shared_arrays(shared_memory_refs)
@@ -1076,6 +1104,7 @@ def integrate_posterior_chunk(args):
             use_N_best=use_N_best,
             T_N_above=T_N_above,
             T_P_acc_level=T_P_acc_level,
+            normalize_likelihood=normalize_likelihood,
         )
 
         return i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range
@@ -1120,7 +1149,8 @@ def select_subset_for_inversion(dd, N_app):
     return idx
 
 
-def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0):
+def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0, normalize=False,
+                                  log_norm_const=None, return_norm_const=False):
     """
     Compute the Gaussian likelihood for a diagonal covariance matrix.
 
@@ -1138,12 +1168,23 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0):
     N_app : int, optional
         Number of data points to use for approximation. If 0, uses all data.
         Default is 0.
+    normalize : bool, optional
+        If True, include the Gaussian normalization constant
+        -0.5*sum(log(2*pi*d_std**2)) in the returned log-likelihood, giving
+        the full (normalized) Gaussian log-pdf instead of just the quadratic
+        form. Default is False (preserves prior behavior).
+    log_norm_const : float, optional
+        Precomputed normalization constant to use instead of recomputing it
+        from d_std. Only used when normalize=True. Default is None.
+    return_norm_const : bool, optional
+        If True, return (L, log_norm_const) instead of just L. Default is False.
 
     Returns
     -------
     ndarray, shape (n_samples,)
         Log-likelihood values for each sample, computed as:
         L[i] = -0.5 * sum((D[i] - d_obs)**2 / d_std**2)
+        plus the normalization constant when normalize=True.
 
     Notes
     -----
@@ -1157,19 +1198,27 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0):
     inverse variance do not improve performance with modern NumPy.
     """
 
+    if normalize:
+        if log_norm_const is None:
+            log_norm_const = -0.5 * np.nansum(np.log(2*np.pi*d_std**2))
+    else:
+        log_norm_const = 0.0
+
     # Compute the likelihood (fully vectorized)
     dd = D - d_obs
 
     if N_app > 0:
        L = np.ones(D.shape[0])*-1e+15
        idx = select_subset_for_inversion(dd, N_app)
-       L_small = likelihood_gaussian_diagonal(D[idx], d_obs, d_std,0)
+       L_small = likelihood_gaussian_diagonal(D[idx], d_obs, d_std, 0, normalize, log_norm_const)
        L[idx]=L_small
 
     else:
         # Vectorized computation - already optimal
-        L = -0.5 * np.nansum((dd / d_std)**2, axis=1)
+        L = -0.5 * np.nansum((dd / d_std)**2, axis=1) + log_norm_const
 
+    if return_norm_const:
+        return L, log_norm_const
     return L
 
 
@@ -1219,13 +1268,31 @@ def likelihood_gaussian_diagonal_old(D, d_obs, d_std, N_app=0):
 
     return L
 
-def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized=True):
+_log_det_cache = {}
+
+
+def _cached_slogdet(Cd_sub):
+    """
+    Return log|Cd_sub|, memoized by content so repeated calls with the same
+    (typically re-sliced but byte-identical) covariance matrix skip the
+    O(n^3) slogdet recomputation.
+    """
+    key = (Cd_sub.shape, Cd_sub.dtype.str, Cd_sub.tobytes())
+    if key not in _log_det_cache:
+        if len(_log_det_cache) > 64:
+            _log_det_cache.clear()
+        _log_det_cache[key] = np.linalg.slogdet(Cd_sub)[1]
+    return _log_det_cache[key]
+
+
+def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized=True,
+                              normalize=False, log_det_Cd=None, return_norm_const=False):
     """
     Calculate the Gaussian likelihood with full covariance matrix.
-    
+
     This function computes likelihood values for model predictions given observed data
     and a full covariance matrix, handling NaN values appropriately.
-    
+
     Parameters
     ----------
     D : ndarray, shape (n_samples, n_features)
@@ -1243,24 +1310,38 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
     useVectorized : bool, optional
         If True, uses vectorized computation for better performance.
         Default is False.
-    
+    normalize : bool, optional
+        If True, include the Gaussian normalization constant
+        -0.5*(n*log(2*pi) + log|Cd|) in the returned log-likelihood, giving
+        the full (normalized) Gaussian log-pdf instead of just the quadratic
+        form. The log-determinant is memoized (see _cached_slogdet) so it is
+        only recomputed when the covariance (or the valid-channel subset)
+        actually changes. Default is False (preserves prior behavior).
+    log_det_Cd : float, optional
+        Precomputed log|Cd| (of the same valid-channel subset used internally)
+        to use instead of recomputing/looking it up. Only used when
+        normalize=True. Default is None.
+    return_norm_const : bool, optional
+        If True, return (L, log_norm_const) instead of just L. Default is False.
+
     Returns
     -------
     ndarray, shape (n_samples,)
         Log-likelihood values for each sample, computed as:
         L[i] = -0.5 * (D[i] - d_obs)^T * Cd^(-1) * (D[i] - d_obs)
-    
+        plus the normalization constant when normalize=True.
+
     Notes
     -----
     The function handles full covariance matrices accounting for correlated errors.
     When checkNaN=True, only non-NaN data points are used in the likelihood calculation.
-    
+
     The vectorized implementation uses einsum for efficient matrix operations.
     When N_app > 0, only the N_app samples with smallest residuals are evaluated.
-    
+
     TODO: Check that this works when D has NaN values and determine why they occur.
     """
-    
+
     if checkNaN:
         # find index of non-nan values in d_obs or non-nan values in np.sum(Cd, axis=0)
         #ind = np.where(~np.isnan(d_obs))[0]
@@ -1268,35 +1349,48 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
         # Exclude also all data for which one Nan Is available.. This is probably not ideal
         ind = np.where(~np.isnan(d_obs) & ~np.isnan(np.sum(Cd, axis=0)) & ~np.isnan(np.sum(D, axis=0)) )[0]
         dd = D[:,ind] - d_obs[ind]
-        iCd = np.linalg.inv(Cd[np.ix_(ind, ind)])
-    else:    
+        Cd_sub = Cd[np.ix_(ind, ind)]
+        iCd = np.linalg.inv(Cd_sub)
+    else:
         dd = D - d_obs
+        Cd_sub = Cd
         iCd = np.linalg.inv(Cd)
-            
+
+    if normalize:
+        if log_det_Cd is None:
+            log_det_Cd = _cached_slogdet(Cd_sub)
+        log_norm_const = -0.5 * (Cd_sub.shape[0] * np.log(2*np.pi) + log_det_Cd)
+    else:
+        log_norm_const = 0.0
+
     if N_app > 0:
         L = np.ones(D.shape[0])*-1e+15
-        idx = select_subset_for_inversion(dd, N_app) 
+        idx = select_subset_for_inversion(dd, N_app)
         if useVectorized:
             #print('Using vectorized likelihood calculation -approximation')
-            L_small = -.5 * np.einsum('ij,ij->i', dd[idx] @ iCd, dd[idx])
+            L_small = -.5 * np.einsum('ij,ij->i', dd[idx] @ iCd, dd[idx]) + log_norm_const
         else:
             L_small = np.zeros(idx.shape[0])
             for i in range(idx.shape[0]):
-                L_small[i] = -.5 * np.nansum(dd[idx[i]].T @ iCd @ dd[idx[i]])
+                L_small[i] = -.5 * np.nansum(dd[idx[i]].T @ iCd @ dd[idx[i]]) + log_norm_const
         L[idx] = L_small
-    
+
+        if return_norm_const:
+            return L, log_norm_const
         return L
-    
+
     if useVectorized:
-        # vectorized    
+        # vectorized
         #print('Using vectorized likelihood calculation')
-        L = -.5 * np.einsum('ij,ij->i', dd @ iCd, dd)        
-    else:   
+        L = -.5 * np.einsum('ij,ij->i', dd @ iCd, dd) + log_norm_const
+    else:
         # non-vectorized
         L = np.zeros(D.shape[0])
         for i in range(D.shape[0]):
-            L[i] = -.5 * np.nansum(dd[i].T @ iCd @ dd[i])
-        
+            L[i] = -.5 * np.nansum(dd[i].T @ iCd @ dd[i]) + log_norm_const
+
+    if return_norm_const:
+        return L, log_norm_const
     return L
 
 
