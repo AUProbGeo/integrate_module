@@ -17,8 +17,7 @@ except Exception:
     pass
 
 # %%
-import json
-
+import os
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
@@ -105,11 +104,16 @@ import integrate as ig
 f_post_h5= 'post_DAUGAARD_AVG_WF_id1_2_3_4_5_6_7_8_9_10_11_12_13.h5'
 f_post_h5 = 'post_daugaard_valley_new_N1000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse2000000_inflateNoise2.h5'
 f_post_h5 = 'post_daugaard_merged_N2000000_Nuse1000000_T2_inflateNoise4.h5'
+# if f_post_h5 does not exist, try to get it from the examples directory
+if not os.path.isfile(f_post_h5):
+    files = ig.get_case_data(case='DAUGAARD', loadType='post')
+    f_post_h5 = files[-1]
+
 with h5py.File(f_post_h5, 'r') as f:
     f_prior_h5 = str(f.attrs.get('f5_prior', ''))
     f_data_h5 = str(f.attrs.get('f5_data', ''))
 
-ig.describe_prior(f_prior_h5)
+ig.prior_describe(f_prior_h5)
 
 # Select data location to plot
 ip = 1000

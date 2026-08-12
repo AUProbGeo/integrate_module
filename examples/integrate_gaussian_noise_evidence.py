@@ -87,6 +87,7 @@ plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 
 # %%
 N = 2000000  # sample size
+N = 500_000  # sample size
 NLAY_min = 3
 NLAY_max = 3
 
@@ -114,7 +115,7 @@ ig.plot_prior_stats(f_prior_h5)
 
 # %%
 rng = np.random.default_rng()
-d_std_rel = 0.03      # "true" relative noise level
+d_std_rel = 0.03    # "true" relative noise level
 d_std_base = 1e-12    # noise floor
 D_std_true = d_std_rel * D_ref + d_std_base
 
@@ -287,5 +288,19 @@ plt.title('Probability of each noise-scale hypothesis (normalize_likelihood=True
 plt.legend(loc='upper right')
 if hardcopy:
     plt.savefig('integrate_gaussian_noise_evidence_hypothesis_probability.png')
+
+
+# %% [markdown]
+# ## Posterior HarmonicMean resistivity profiles for all inverted data
+#
+# For each of the 8 inversions (4 assumed noise levels x 2
+# `normalize_likelihood` settings), the posterior `HarmonicMean` resistivity
+# profile is plotted with `ig.plot_profile`.
+
+# %%
+for i_scale in range(len(noise_scale)):
+    for normalize_likelihood in normalize_settings:
+        f_post_h5_i = f_post_h5_dict[(i_scale, normalize_likelihood)]
+        ig.plot_profile(f_post_h5_i, im=1, key='HarmonicMean', hardcopy=hardcopy)
 
 # %%
