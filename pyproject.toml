@@ -45,6 +45,10 @@ ml = [
     "scikit-learn",
     "keras_tuner",
 ]
+examples = [
+    "geopandas",
+    "shapely",
+]
 docs = [
     "sphinx",
     "nbsphinx",
