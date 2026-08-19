@@ -159,7 +159,7 @@ rmu.plot_polygons_over_points(X, Y, polygons, title='Daugaard', hardcopy=hardcop
 # inversion) -- the LSQ result is an independently computed reference file.
 
 # %%
-N_generic = 10_000   # demo-scale; increase for a production-quality run
+N_generic = 1_000_000   # demo-scale; increase for a production-quality run
 f_prior_generic_h5 = ig.prior_model_layered(
     N=N_generic, lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000,
     f_prior_h5='PRIOR_GENERIC_N%d.h5' % N_generic, showInfo=1)
