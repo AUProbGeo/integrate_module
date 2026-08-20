@@ -86,6 +86,23 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet')
 BHOLES = ig.read_borehole('daugaard_12boreholes.json', showInfo=1)
 ig.plot_boreholes(BHOLES)
 
+# %% Optionally scale noise
+inflateNoise = 2
+if inflateNoise != 0:
+    gf=inflateNoise
+    print("="*60)
+    print("Increasing noise level (std) by a factor of %d" % gf)
+    print("="*60)
+    D = ig.load_data(f_data_h5)
+    D_obs = D['d_obs'][0]
+    D_std = D['d_std'][0]*gf
+    f_data_old_h5 = f_data_h5
+    f_data_h5 = 'DAUGAARD_AVG_gf%g.h5' % (gf) 
+    ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
+    ig.save_data_gaussian(D_obs, D_std=D_std, f_data_h5=f_data_h5, file_gex=file_gex)
+
+ig.plot_data(f_data_h5, useLog = 0, hardcopy= hardcopy)
+plt.show()
 # %% [markdown]
 # ### 1b. Target-area polygons (the old approach's raw-material areas)
 #
@@ -159,7 +176,7 @@ rmu.plot_polygons_over_points(X, Y, polygons, title='Daugaard', hardcopy=hardcop
 # inversion) -- the LSQ result is an independently computed reference file.
 
 # %%
-N_generic = 1_000_000   # demo-scale; increase for a production-quality run
+N_generic = 2_000_000   # demo-scale; increase for a production-quality run
 f_prior_generic_h5 = ig.prior_model_layered(
     N=N_generic, lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000,
     f_prior_h5='PRIOR_GENERIC_N%d.h5' % N_generic, showInfo=1)
@@ -174,7 +191,8 @@ if not os.path.exists(f_prior_generic_data_h5):
 # %%
 f_post_generic_h5 = ig.integrate_rejection(
     f_prior_generic_data_h5, f_data_h5, f_post_h5='POST_GENERIC.h5',
-    N_use=N_generic, id_use=[1], autoT=1, T_base=1, showInfo=0, updatePostStat=True)
+    N_use=N_generic, id_use=[1], autoT=1, T_base=1, showInfo=0, updatePostStat=True,
+    backend='jax')
 
 ig.plot_T_EV(f_post_generic_h5, pl='CHI2', hardcopy=hardcopy)
 
@@ -318,7 +336,7 @@ raw_classes, coarse_classes = rmu.resolve_material_classes(f_prior_h5, im=2)
 # jointly inverted data type, exactly as in `integrate_workflow.py`.
 
 # %%
-N_use = 200_000   # demo-scale subset of the 2,000,000-member prior; increase for production
+N_use = N_generic   # demo-scale subset of the 2,000,000-member prior; increase for production
 
 f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N_use, doMakePriorCopy=True)
 
