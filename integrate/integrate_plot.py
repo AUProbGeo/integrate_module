@@ -134,6 +134,8 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
         - 'default': Red-white-blue-black colormap for general use
         - 'resistivity': Log-scale colormap optimized for resistivity data
         - 'entropy': Grayscale colormap for uncertainty visualization
+        - 'discrete_data_entropy': Black-red-white colormap where 0 (informative)
+          is black and 1 (uninformative) is white
         - 'discrete': Categorical colormap for discrete classifications
         - 'temperature': Hot colormap for temperature/evidence fields
         - 'elevation': Terrain-like colormap for topographic data
@@ -199,6 +201,13 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
         # White-black-red colormap for uncertainty/entropy visualization
         colors = ['white', 'black', 'red']
         cmap = LinearSegmentedColormap.from_list('entropy', colors, N=256)
+        clim = [0, 1]
+
+    elif cmap_type == 'discrete_data_entropy':
+        # Black-red-white colormap: 0 (informative, low entropy) -> black,
+        # 1 (uninformative, high entropy) -> white
+        colors = ['black', 'red', 'white']
+        cmap = LinearSegmentedColormap.from_list('discrete_data_entropy', colors, N=256)
         clim = [0, 1]
 
     elif cmap_type == 'discrete':
@@ -2843,6 +2852,55 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
     ax.set_ylabel('Y (km)')
 
     return fig
+
+
+def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs):
+    """
+    Plot the pointwise entropy of one or more multinomial discrete data
+    entries in a DATA HDF5 file, as a 2D map via :func:`plot_xy`.
+
+    See :func:`discrete_data_entropy` for how the entropy value at each
+    location is computed. Useful for visualizing, on a map, where one or
+    more discrete-type observations (e.g. borehole-derived data written by
+    :func:`save_borehole_data`) constrain the inversion versus where they
+    don't — low entropy marks confident/informative locations, high entropy
+    marks uninformative ones.
+
+    Parameters
+    ----------
+    f_data_h5 : str
+        Path to the DATA HDF5 file.
+    id_list : int or list of int
+        One or more dataset ids referencing multinomial /D{id} groups
+        (e.g. from ``save_borehole_data()``'s ``id_out`` / ``id_borehole_list``).
+    depth_reduce : {'min', 'mean'}, optional
+        See :func:`discrete_data_entropy`. Default ``'min'``.
+    **kwargs
+        Forwarded to :func:`plot_xy` (e.g. cmap, clim, hardcopy, title, ax, ...).
+
+    Returns
+    -------
+    fig, ax, sc
+        As returned by :func:`plot_xy`.
+
+    Examples
+    --------
+    >>> fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, id_borehole_list)
+    """
+    import integrate as ig
+
+    H = ig.discrete_data_entropy(f_data_h5, id_list, depth_reduce=depth_reduce,
+                                  showInfo=kwargs.pop('showInfo', 1))
+
+    ids_str = ','.join(str(i) for i in (id_list if isinstance(id_list, list) else [id_list]))
+    kwargs.setdefault('title', 'Minimum discrete data entropy (D%s)' % ids_str)
+    kwargs.setdefault('colorbar_label', 'Entropy')
+    _cmap, _clim = get_colormap_and_limits('discrete_data_entropy')
+    kwargs.setdefault('cmap', _cmap)
+    kwargs.setdefault('clim', _clim)
+
+    return plot_xy(H, f_data_h5=f_data_h5, **kwargs)
+
 
 def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwargs):
     """
