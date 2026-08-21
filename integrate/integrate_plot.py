@@ -2853,9 +2853,6 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
 
     return fig
 
-<<<<<<< HEAD
-def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=True, **kwargs):
-=======
 
 def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs):
     """
@@ -2905,8 +2902,7 @@ def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs)
     return plot_xy(H, f_data_h5=f_data_h5, **kwargs)
 
 
-def plot_data(f_data_h5, i_plot=[], Dkey=[], plType='imshow', uselog=True, **kwargs):
->>>>>>> main
+def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=True, **kwargs):
     """
     Plot observational data from an HDF5 file.
 

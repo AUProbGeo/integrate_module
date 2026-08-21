@@ -224,15 +224,17 @@ else:
         f_prior_h5, f_data_h5,BHOLES,        
         im_prior=im_prior, 
         #range_data=range_data, # If set this will override any value set in BHOLES
-        range_xyz=1000, #range_xyz, # If set this will override any value set in BHOLES
+        range_xyz=200, #range_xyz, # If set this will override any value set in BHOLES
         #doPlot=True,
         #showInfo=1        
         )
 
 # %% Show the maximum entropy at each data location in id_data_borehole_list
 ig.plot_discrete_data_entropy(f_data_h5, 
-                              id_data_borehole_list[0:10],
+                              id_data_borehole_list,
+                              depth_reduce='min', 
                               plotPoints  =True,
+                              plotPoints_color='lightgreen',
                               hardcopy=hardcopy)
 
 
