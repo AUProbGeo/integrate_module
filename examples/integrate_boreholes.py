@@ -343,21 +343,21 @@ else:
 #    observed class IDs and `class_prob` values.
 # 3. Spatially extrapolates the point observation across the survey grid
 #    using a distance-based temperature weighting:
-#    - Within `r_data` metres: observation strength = 1 (full weight).
-#    - Beyond `r_dis` metres: weight approaches zero (observation ignored).
-#    - Between `r_data` and `r_dis`: smooth Gaussian fade-out.
+#    - Within `range_data` metres: observation strength = 1 (full weight).
+#    - Beyond `range_xyz` metres: weight approaches zero (observation ignored).
+#    - Between `range_data` and `range_xyz`: smooth Gaussian fade-out.
 # 4. Saves the gridded observation as a new dataset in the data HDF5 file
 #    and returns its ID so it can be referenced in `ig.integrate_rejection()`.
 #
 # Key parameters of `ig.save_borehole_data()`:
 #
-# | Parameter  | Default | Description                                              |
-# |------------|---------|----------------------------------------------------------|
-# | `im_prior` | 2       | Index of discrete model in prior (e.g. `/M2`)            |
-# | `r_data`   | 2       | Inner radius (m): full observation strength              |
-# | `r_dis`    | 300     | Outer radius (m): weight drops to ~0 beyond this         |
-# | `doPlot`   | False   | Plot spatial weight maps for inspection                  |
-# | `parallel` | False   | Enable multiprocessing for large prior ensembles         |
+# | Parameter    | Default | Description                                              |
+# |--------------|---------|----------------------------------------------------------|
+# | `im_prior`   | 2       | Index of discrete model in prior (e.g. `/M2`)            |
+# | `range_data` | 2       | Inner radius (m): full observation strength              |
+# | `range_xyz`  | 300     | Outer radius (m): weight drops to ~0 beyond this         |
+# | `doPlot`     | False   | Plot spatial weight maps for inspection                  |
+# | `parallel`   | False   | Enable multiprocessing for large prior ensembles         |
 
 # %%
 # Load the DAUGAARD case files (prior + electromagnetic data)
@@ -435,17 +435,17 @@ plt.show()
 # via `id_use` to select which data types to include in the inversion.
 
 # %%
-im_prior = 2    # Lithology model index (corresponds to /M2 in the prior HDF5)
-r_data   = 4    # Inner radius (m): full observation strength out to this distance
-r_dis    = 300  # Outer radius (m): weight fades to ~0 at this distance
+im_prior   = 2    # Lithology model index (corresponds to /M2 in the prior HDF5)
+range_data = 4    # Inner radius (m): full observation strength out to this distance
+range_xyz  = 300  # Outer radius (m): weight fades to ~0 at this distance
 
 id_borehole_list = []
 for BH in BHOLES:
     id_prior, id_out = ig.save_borehole_data(
         f_prior_h5, f_data_h5, BH,
         im_prior=im_prior,
-        r_data=r_data,
-        r_dis=r_dis,
+        range_data=range_data,
+        range_xyz=range_xyz,
         doPlot=True,   # Creates spatial weight maps – useful for quality control
         showInfo=1)
     id_borehole_list.append(id_out)

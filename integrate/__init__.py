@@ -36,6 +36,7 @@ from integrate.integrate import posterior_cumulative_thickness
 from integrate.integrate import use_parallel
 from integrate.integrate import kl_divergence
 from integrate.integrate import entropy
+from integrate.integrate import discrete_data_entropy
 from integrate.integrate import class_id_to_idx
 from integrate.integrate import is_notebook
 from integrate.integrate import get_hypothesis_probability
@@ -94,6 +95,7 @@ from integrate.integrate_plot import plot_profile_discrete
 from integrate.integrate_plot import plot_cumulative_probability_profile
 from integrate.integrate_plot import plot_T_EV
 from integrate.integrate_plot import plot_data_xy
+from integrate.integrate_plot import plot_discrete_data_entropy
 from integrate.integrate_plot import plot_data
 from integrate.integrate_plot import plot_data_prior_post
 from integrate.integrate_plot import plot_data_prior
