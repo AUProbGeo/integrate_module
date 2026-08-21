@@ -30,7 +30,7 @@ import copy
 # %%
 N = 1_000_000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
-    # %% [markdown]
+# %% [markdown]
 # ## GETTING THE DATA AND GEX FILE for gthe chosen area
 
 # %%
@@ -79,7 +79,7 @@ for file_xlsx in f_xlsx_files:
 f_prior_h5 = ig.merge_prior(f_prior_h5_list, f_prior_merged_h5='daugaard_merged_prior_N%d.h5' % N)
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 
-# %% 
+# %%
 ig.prior_describe(f_prior_h5)
 
 # %% [markdown]
@@ -200,19 +200,42 @@ f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
 #      distance-based weighting  →  d_obs, i_use
 #   3. Save the observed borehole data to f_data_h5  →  id_out
 
-im_prior = 2       # lithology model index (M2)
-r_data   = 4       # tTEMN data based radius (db/dT) — If this is very high it will have no effect
-r_dis    = 300     # fade-out radius (m) — weight approaches zero at this distance
+im_prior   = 2       # lithology model index (M2)
+range_data = 4       # tTEMN data based radius (db/dT) — If this is very high it will have no effect
+range_xyz  = 300     # fade-out radius (m) — weight approaches zero at this distance
 
-# Compute and save prior + observed data for all boreholes in one step per borehole
-id_borehole_list = []
-for BH in BHOLES:
-    id_prior, id_out = ig.save_borehole_data(
-        f_prior_h5, f_data_h5, BH,
-        im_prior=im_prior, r_data=r_data, r_dis=r_dis,
-        doPlot=True,
-        showInfo=1)
-    id_borehole_list.append(id_out)
+useLoop = False  # Whether to loop over boreholes or do all in one step 
+                # (the latter is faster but less flexible)
+if useLoop:
+    # Compute and save prior + observed data for all boreholes in one step per borehole
+    id_data_borehole_list = []
+    for BH in BHOLES:
+        id_prior, id_data_out = ig.save_borehole_data(
+            f_prior_h5, f_data_h5, BH,
+            im_prior=im_prior, 
+            range_data=range_data, 
+            range_xyz=range_xyz,
+            doPlot=True,
+            showInfo=1)
+        id_data_borehole_list.append(id_data_out)
+
+else:
+    id_prior_list, id_data_borehole_list = ig.save_borehole_data(
+        f_prior_h5, f_data_h5,BHOLES,        
+        im_prior=im_prior, 
+        #range_data=range_data, # If set this will override any value set in BHOLES
+        range_xyz=1000, #range_xyz, # If set this will override any value set in BHOLES
+        #doPlot=True,
+        #showInfo=1        
+        )
+
+# %% Show the maximum entropy at each data location in id_data_borehole_list
+ig.plot_discrete_data_entropy(f_data_h5, 
+                              id_data_borehole_list[0:10],
+                              plotPoints  =True,
+                              hardcopy=hardcopy)
+
+
 
 # %% [markdown]
 # ### Select a profile
@@ -398,7 +421,7 @@ for f_post_h5 in f_post_h5_list:
     ig.query_plot(P, meta, ip=i_bh[0], query_dict=query, title = query_title, f_post_h5=f_post_h5, hardcopy=hardcopy)
     ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, title = query_title, f_post_h5=f_post_h5, hardcopy=hardcopy)
 
-# %% Query from text
+# %%
 
 ig.prior_describe(f_prior_h5)
 

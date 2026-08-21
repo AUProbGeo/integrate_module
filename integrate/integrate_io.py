@@ -5198,14 +5198,16 @@ def write_borehole(W, filename, **kwargs):
           Used only by :func:`plot_boreholes` to place the well on a shared
           elevation axis.  Has no effect on inversion.
         * ``range_data`` (float, optional) – data-space similarity radius used by
-          :func:`save_borehole_data` when ``r_data`` is not passed explicitly.
+          :func:`save_borehole_data` when ``range_data`` is not passed explicitly.
+          Only used if present and non-negative, otherwise the default applies.
           Default: 1,000,000 (no cutoff).
-        * ``range_dis`` (float, optional) – geographic XY fade-out distance [m]
-          used by :func:`save_borehole_data` when ``r_dis`` is not passed explicitly.
-          Default: 300 m.
+        * ``range_xyz`` (float, optional) – geographic XY fade-out distance [m]
+          used by :func:`save_borehole_data` when ``range_xyz`` is not passed
+          explicitly. Only used if present and non-negative, otherwise the
+          default applies. Default: 300 m.
         * ``nan_freq`` (float, optional) – NaN-frequency threshold for automatic
           data-gate selection in :func:`save_borehole_data`. Default: 0.8.
-        * ``r_data_i_use`` (list of int, optional) – explicit gate/channel indices
+        * ``range_data_i_use`` (list of int, optional) – explicit gate/channel indices
           for data-distance computation; overrides ``nan_freq`` when provided.
 
         numpy arrays and scalars are automatically converted to plain

@@ -254,9 +254,9 @@ f_prior_h5 = f_prior_sub[0]
 #   3. Save the observed borehole data to f_data_h5  →  id_out
 import tqdm
 
-im_prior = 2       # lithology model index (M2)
-r_data   = 4       # tTEMN data based radius (db/dT) — If this is very high it will have no effect
-r_dis    = 300     # fade-out radius (m) — weight approaches zero at this distance
+im_prior   = 2       # lithology model index (M2)
+range_data = 4       # tTEMN data based radius (db/dT) — If this is very high it will have no effect
+range_xyz  = 300     # fade-out radius (m) — weight approaches zero at this distance
 
 # Compute and save prior + observed data for all boreholes in one step per borehole
 #for i in range(len(f_data_sub)):
@@ -270,10 +270,10 @@ for i in [0]:
     #for BH in [BHOLES[25]]:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
-            im_prior=im_prior, 
-            #r_data=r_data, r_dis=r_dis,
-            #r_data = 1, r_dis = 1000,
-            nan_freq = .8, r_data = 1, r_dis = 1000,
+            im_prior=im_prior,
+            #range_data=range_data, range_xyz=range_xyz,
+            #range_data = 1, range_xyz = 1000,
+            nan_freq = .8, range_data = 1, range_xyz = 1000,
             doPlot=True,
             showInfo=11)
         id_borehole_list.append(id_out)

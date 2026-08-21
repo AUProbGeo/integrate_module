@@ -572,8 +572,8 @@ def rescale_P_obs_temperature(P_obs, T=1.0):
 
     return P_obs_scaled
 
-def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
-                     nan_freq=0.8, r_data_i_use=None):
+def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, range_data=10, range_xyz=100, doPlot=False,
+                     nan_freq=0.8, range_data_i_use=None):
     """
     Convert point-based discrete probability observations to gridded data with distance-based weighting.
 
@@ -594,10 +594,10 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
         Y coordinate (e.g., UTM Northing) of the observation point.
     f_data_h5 : str
         Path to HDF5 data file containing survey geometry (X, Y coordinates).
-    r_data : float, optional
+    range_data : float, optional
         Inner radius in meters within which observations have full strength.
         Default is 10 meters.
-    r_dis : float, optional
+    range_xyz : float, optional
         Outer radius in meters for distance-based weighting. Beyond this distance,
         observations are fully attenuated (temperature → ∞). Default is 100 meters.
     doPlot : bool, optional
@@ -607,8 +607,8 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
         NaN-frequency threshold for automatic data-gate selection inside
         :func:`get_weight_from_position`. Gates where the fraction of
         non-NaN values is below this threshold are excluded. Default 0.8.
-        Ignored when ``r_data_i_use`` is provided.
-    r_data_i_use : array-like of int or None, optional
+        Ignored when ``range_data_i_use`` is provided.
+    range_data_i_use : array-like of int or None, optional
         Explicit gate/channel indices to use for data-distance computation
         inside :func:`get_weight_from_position`. Overrides ``nan_freq`` when
         provided. Default None.
@@ -649,7 +649,7 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
     >>> P_obs = compute_P_obs_discrete(depth_top, depth_bottom, lithology, z, class_id)
     >>> X_well, Y_well = 543000.0, 6175800.0
     >>> d_obs, i_use, T_all = Pobs_to_datagrid(P_obs, X_well, Y_well, 'survey_data.h5',
-    ...                                  r_data=10, r_dis=100)
+    ...                                  range_data=10, range_xyz=100)
     >>> # Write to data file
     >>> ig.save_data_multinomial(d_obs, i_use=i_use, id=2, f_data_h5='survey_data.h5')
 
@@ -673,8 +673,8 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
 
     # Compute distance-based weights for all grid points
     w_combined, w_dis, w_data, i_use_from_func = ig.get_weight_from_position(
-        f_data_h5, X, Y, r_data=r_data, r_dis=r_dis, doPlot=doPlot,
-        nan_freq=nan_freq, r_data_i_use=r_data_i_use
+        f_data_h5, X, Y, range_data=range_data, range_xyz=range_xyz, doPlot=doPlot,
+        nan_freq=nan_freq, range_data_i_use=range_data_i_use
     )
 
     # Convert distance weight to temperature
@@ -703,9 +703,9 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, r_data=10, r_dis=100, doPlot=False,
 
 
 
-def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400, r_data=2,
+def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, range_xyz=400, range_data=2,
                              useLog=True, doPlot=False, plFile=None, showInfo=0,
-                             nan_freq=0.8, r_data_i_use=None):
+                             nan_freq=0.8, range_data_i_use=None):
     """Calculate weights based on distance and data similarity to a reference point.
 
     This function computes three sets of weights:
@@ -723,9 +723,9 @@ def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400,
         Y coordinate of reference point (well). Default 0.
     i_ref : int, optional
         Index of reference point. Default -1 (auto-calculated as closest to x_well, y_well).
-    r_dis : float, optional
+    range_xyz : float, optional
         Geographic XY distance range [m] for spatial weighting. Default 400.
-    r_data : float, optional
+    range_data : float, optional
         Data-space similarity range parameter for data weighting. Default 2.
     useLog : bool, optional
         Apply log10 transform to data before computing similarity. Default True.
@@ -739,8 +739,8 @@ def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400,
         NaN-frequency threshold for automatic gate selection. Gates where the
         fraction of non-NaN values across all soundings is below this threshold
         are excluded from the data-distance computation. Default 0.8.
-        Ignored when ``r_data_i_use`` is provided.
-    r_data_i_use : array-like of int or None, optional
+        Ignored when ``range_data_i_use`` is provided.
+    range_data_i_use : array-like of int or None, optional
         Explicit gate/channel indices to use for the data-distance computation.
         When provided, overrides the ``nan_freq`` automatic selection.
         A NaN check at the reference sounding is still applied.
@@ -760,8 +760,8 @@ def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400,
     Notes
     -----
     Weights are calculated using Gaussian functions:
-    - Distance weights: exp(-dis² / r_dis²)
-    - Data weights:     exp(-sum_dd² / r_data²)
+    - Distance weights: exp(-dis² / range_xyz²)
+    - Data weights:     exp(-sum_dd² / range_data²)
     where dis is geographic distance and sum_dd is cumulative data difference.
     """
     import integrate as ig
@@ -777,8 +777,8 @@ def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400,
         i_ref = np.argmin((X-x_well)**2 + (Y-y_well)**2)
 
     # Select gates to use for data-distance computation
-    if r_data_i_use is not None:
-        gates = np.asarray(r_data_i_use, dtype=int)
+    if range_data_i_use is not None:
+        gates = np.asarray(range_data_i_use, dtype=int)
     else:
         n_not_nan = np.sum(~np.isnan(d_obs), axis=0)
         n_not_nan_freq = n_not_nan / d_obs.shape[0]
@@ -795,12 +795,12 @@ def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400,
         d_test =d_obs[:,i_use]
     dd = np.abs(d_test - d_ref)
     sum_dd = np.sum(dd, axis=1)
-    w_data = np.exp(-1*sum_dd**2/r_data**2)
-    
+    w_data = np.exp(-1*sum_dd**2/range_data**2)
+
 
     # Compute the distance from each data point to the actual borehole location
     dis = np.sqrt((X-x_well)**2 + (Y-y_well)**2)
-    w_dis = np.exp(-1*dis**2/r_dis**2)
+    w_dis = np.exp(-1*dis**2/range_xyz**2)
 
     w_combined = w_data * w_dis
 
@@ -838,7 +838,7 @@ def get_weight_from_position(f_data_h5, x_well=0, y_well=0, i_ref=-1, r_dis=400,
         plt.xlabel('X')
         plt.ylabel('Y')
         if plFile is None:
-            plFile = 'weights_%d_%d_%d_rdis%d_rdata%d.png' % (x_well,y_well,i_ref,r_dis,r_data)
+            plFile = 'weights_%d_%d_%d_rdis%d_rdata%d.png' % (x_well,y_well,i_ref,range_xyz,range_data)
         plt.savefig(plFile, dpi=300)
 
     return w_combined, w_dis, w_data, i_ref
@@ -1023,46 +1023,54 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
         Path to the prior HDF5 file.
     f_data_h5 : str
         Path to the observed-data HDF5 file.
-    BH : dict
+    BH : dict or list of dict
         Borehole dictionary with keys depth_top, depth_bottom, class_obs,
         class_prob, X, Y, name, method. Two optional keys control the
-        distance-weighting radii when r_data / r_dis are not passed as
-        explicit kwargs:
+        distance-weighting radii when range_data / range_xyz are not passed
+        as explicit kwargs:
 
         * ``range_data`` (float, optional) — data-space similarity radius.
           Survey points whose EM data response is similar to the borehole
           location receive higher weight; points that are more dissimilar are
-          down-weighted. Default: 1,000,000 (effectively no cutoff).
-        * ``range_dis`` (float, optional) — geographic XY distance [m] beyond
+          down-weighted. Only used if present and non-negative; otherwise the
+          default applies. Default: 1,000,000 (effectively no cutoff).
+        * ``range_xyz`` (float, optional) — geographic XY distance [m] beyond
           which the borehole exerts no influence on nearby survey points.
-          Default: 300 m.
+          Only used if present and non-negative; otherwise the default
+          applies. Default: 300 m.
         * ``nan_freq`` (float, optional) — NaN-frequency threshold for automatic
           data-gate selection. Default: 0.8.
-        * ``r_data_i_use`` (list of int, optional) — explicit gate indices for
+        * ``range_data_i_use`` (list of int, optional) — explicit gate indices for
           data-distance computation; overrides ``nan_freq`` when provided.
+
+        If ``BH`` is a list of dicts, each borehole is processed in turn
+        (one call per element, in order) using the same ``**kwargs`` for
+        every borehole; a per-borehole ``range_data``/``range_xyz``/etc. key
+        set inside an individual dict still takes effect for that borehole
+        exactly as in the single-dict case. See ``Returns`` below.
     **kwargs
         im_prior : int, optional
             Index of the discrete model parameter in f_prior_h5 (e.g. 2 for /M2).
             Default is 2.
         parallel : bool, optional
             Enable parallel mode computation. Default is False.
-        r_data : float, optional
+        range_data : float, optional
             Data-space similarity radius. Overrides ``BH['range_data']`` when
-            provided. Resolution order: explicit kwarg > BH['range_data'] >
-            1,000,000 (no cutoff).
-        r_dis : float, optional
-            Geographic XY fade-out distance [m]. Overrides ``BH['range_dis']``
-            when provided. Resolution order: explicit kwarg > BH['range_dis'] >
-            300 m.
+            provided. Resolution order: explicit kwarg > BH['range_data']
+            (if present and non-negative) > 1,000,000 (no cutoff).
+        range_xyz : float, optional
+            Geographic XY fade-out distance [m]. Overrides ``BH['range_xyz']``
+            when provided. Resolution order: explicit kwarg > BH['range_xyz']
+            (if present and non-negative) > 300 m.
         nan_freq : float, optional
             NaN-frequency threshold for automatic data-gate selection. Gates
             where the fraction of non-NaN soundings is below this threshold are
             excluded from data-distance computation. Resolution order: explicit
-            kwarg > BH['nan_freq'] > 0.8. Ignored when ``r_data_i_use`` is set.
-        r_data_i_use : list of int or None, optional
+            kwarg > BH['nan_freq'] > 0.8. Ignored when ``range_data_i_use`` is set.
+        range_data_i_use : list of int or None, optional
             Explicit gate/channel indices to use for data-distance computation.
             Overrides ``nan_freq`` when provided. Resolution order: explicit
-            kwarg > BH['r_data_i_use'] > None.
+            kwarg > BH['range_data_i_use'] > None.
         doPlot : bool, optional
             Plot distance-weight maps. Default is False.
         showInfo : int, optional
@@ -1072,32 +1080,56 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
     Returns
     -------
     id_prior : int
-        Dataset index of the new /D entry added to f_prior_h5.
+        If ``BH`` is a single dict: dataset index of the new /D entry added
+        to f_prior_h5.
     id_out : int
-        Dataset index of the new /D entry added to f_data_h5.
+        If ``BH`` is a single dict: dataset index of the new /D entry added
+        to f_data_h5.
+    id_prior_list : list of int
+        If ``BH`` is a list of dicts: dataset indices of the new /D entries
+        added to f_prior_h5, one per borehole, same order as ``BH``.
+    id_borehole_list : list of int
+        If ``BH`` is a list of dicts: dataset indices of the new /D entries
+        added to f_data_h5, one per borehole, same order as ``BH``.
 
     Examples
     --------
     >>> # Single borehole
     >>> id_prior, id_data = ig.save_borehole_data(f_prior_h5, f_data_h5, BH)
 
-    >>> # All boreholes — collect data IDs for joint inversion
-    >>> id_borehole_list = []
-    >>> for BH in BHOLES:
-    ...     _, id_out = ig.save_borehole_data(f_prior_h5, f_data_h5, BH,
-    ...                                       r_data=2, r_dis=300, parallel=True)
-    ...     id_borehole_list.append(id_out)
+    >>> # All boreholes in one call — collect data IDs for joint inversion
+    >>> id_prior_list, id_borehole_list = ig.save_borehole_data(
+    ...     f_prior_h5, f_data_h5, BHOLES,
+    ...     range_data=2, range_xyz=300, parallel=True)
     >>> f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5,
     ...                                    id_use=[1] + id_borehole_list)
     """
+    if isinstance(BH, list):
+        id_prior_list = []
+        id_borehole_list = []
+        for bh in BH:
+            id_prior, id_out = save_borehole_data(f_prior_h5, f_data_h5, bh, **kwargs)
+            id_prior_list.append(id_prior)
+            id_borehole_list.append(id_out)
+        return id_prior_list, id_borehole_list
+
     import integrate as ig
+
+    def _resolve_radius(name, default):
+        val = kwargs.get(name, None)
+        if val is not None:
+            return val
+        val = BH.get(name, None)
+        if val is not None and val >= 0:
+            return val
+        return default
 
     im_prior = kwargs.get('im_prior', 2)
     parallel = kwargs.get('parallel', False)
-    r_data       = kwargs.get('r_data',       BH.get('range_data',   1_000_000))
-    r_dis        = kwargs.get('r_dis',        BH.get('range_dis',    300))
+    range_data   = _resolve_radius('range_data', 1_000_000)
+    range_xyz    = _resolve_radius('range_xyz',  300)
     nan_freq     = kwargs.get('nan_freq',     BH.get('nan_freq',     0.8))
-    r_data_i_use = kwargs.get('r_data_i_use', BH.get('r_data_i_use', None))
+    range_data_i_use = kwargs.get('range_data_i_use', BH.get('range_data_i_use', None))
     doPlot   = kwargs.get('doPlot', False)
     showInfo = kwargs.get('showInfo', 1)
 
@@ -1109,8 +1141,8 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
     # Step 2: extrapolate point observations to the survey grid
     d_obs, i_use, T_use = Pobs_to_datagrid(
         P_obs, BH['X'], BH['Y'], f_data_h5,
-        r_data=r_data, r_dis=r_dis, doPlot=doPlot,
-        nan_freq=nan_freq, r_data_i_use=r_data_i_use)
+        range_data=range_data, range_xyz=range_xyz, doPlot=doPlot,
+        nan_freq=nan_freq, range_data_i_use=range_data_i_use)
 
     # Step 3: save gridded observations to f_data_h5
     id_out, _ = ig.save_data_multinomial(

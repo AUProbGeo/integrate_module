@@ -2963,11 +2963,94 @@ def entropy(P, base = None):
     >>> entropy(P)
     array([1.0, 0.469])
     """
-    P = np.atleast_2d(P)    
+    P = np.atleast_2d(P)
     if base is None:
         base = P.shape[1]
     H = -np.sum(P*np.log(P)/np.log(base), axis=1)
     return H
+
+
+def discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', showInfo=1):
+    """
+    Compute the pointwise (per survey location) entropy of one or more
+    multinomial discrete /D{id} data entries in a DATA HDF5 file.
+
+    Each location's discrete observation is a probability-over-classes
+    profile spanning ``nm`` depth layers (shape ``(ns, nclass, nm)`` per id,
+    as written by :func:`save_data_multinomial`, e.g. via
+    :func:`save_borehole_data`). Entropy is computed per (location,
+    depth-layer) using ``scipy.stats.entropy`` (which correctly handles
+    exact-zero probabilities, unlike :func:`entropy`), the depth axis is
+    then collapsed per ``depth_reduce``, and — if more than one id is given —
+    the pointwise minimum across ids is returned (i.e. the best-informed id
+    at each location; adding more ids can only lower or keep equal the
+    entropy at a given location, never raise it).
+
+    Parameters
+    ----------
+    f_data_h5 : str
+        Path to the DATA HDF5 file.
+    id_list : int or list of int
+        One or more dataset ids referencing multinomial /D{id} groups
+        (e.g. from ``save_borehole_data()``'s ``id_out`` / ``id_borehole_list``).
+    depth_reduce : {'min', 'mean'}, optional
+        How to collapse the per-location depth-layer axis, per id, before
+        combining across ids. ``'min'`` (default) takes the lowest (most
+        informative) entropy value across depth layers, i.e. each id's best
+        depth-layer represents it at that location; ``'mean'`` averages
+        entropy across depth layers instead.
+    showInfo : int, optional
+        Verbosity level passed through to :func:`load_data`. Default 1.
+
+    Returns
+    -------
+    H : ndarray, shape (ns,)
+        Pointwise entropy in [0, 1] (base = nclass). NaN at locations not
+        covered by any of the given ids (``i_use == 0`` for all of them).
+
+    Examples
+    --------
+    >>> H = ig.discrete_data_entropy(f_data_h5, id_borehole_list)
+    >>> H = ig.discrete_data_entropy(f_data_h5, id_borehole_list, depth_reduce='mean')
+    """
+    import scipy as sp
+    import warnings
+    import integrate as ig
+
+    if not isinstance(id_list, list):
+        id_list = [id_list]
+    if depth_reduce not in ('mean', 'min'):
+        raise ValueError("depth_reduce must be 'mean' or 'min'")
+
+    DATA = ig.load_data(f_data_h5, id_arr=id_list, showInfo=showInfo)
+
+    H_per_id = []
+    for i, id in enumerate(id_list):
+        if DATA['noise_model'][i] != 'multinomial':
+            raise ValueError(
+                "D%d is not a multinomial dataset (noise_model=%r)" %
+                (id, DATA['noise_model'][i]))
+        P = DATA['d_obs'][i]                     # (ns, nclass, nm)
+        i_use = np.asarray(DATA['i_use'][i]).ravel().astype(bool)
+        ns, nclass, nm = P.shape
+
+        H = np.full((ns, nm), np.nan)
+        if np.any(i_use):
+            H[i_use, :] = sp.stats.entropy(
+                P[i_use].transpose(1, 0, 2).reshape(nclass, -1),
+                base=nclass
+            ).reshape(-1, nm)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', category=RuntimeWarning)
+            H_id = np.nanmean(H, axis=1) if depth_reduce == 'mean' else np.nanmin(H, axis=1)
+        H_per_id.append(H_id)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', category=RuntimeWarning)
+        H_map = np.nanmin(np.vstack(H_per_id), axis=0)
+    return H_map
+
 
 def class_id_to_idx(D, class_id=None):
     """

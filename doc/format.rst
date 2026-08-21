@@ -28,9 +28,18 @@ The observed data can be of many types, such as TEM data and well-log data
 
 By default, observed data in ``/D1`` is compared with prior data in ``/D1``, ``/D2`` with ``/D2``, etc.
 To compare observed data with a different prior dataset, set the ``/D1/id_prior`` field.
-For example, setting ``/D1/id_prior=2`` will compare observed ``/D1`` with prior ``/D2``. 
+For example, setting ``/D1/id_prior=2`` will compare observed ``/D1`` with prior ``/D2``.
 
-  
+.. note::
+   When ``save_data_multinomial()`` is called without an explicit ``id=``, it
+   auto-assigns the next free ``/D{id}`` slot by scanning ids 1 through 99. A
+   DATA.h5 file can therefore currently hold at most 99 auto-numbered
+   ``/D{id}`` datasets — once ``/D1``-``/D99`` all exist, further calls
+   without an explicit ``id=`` will silently overwrite ``/D99`` instead of
+   creating a new dataset. If you need more than 99 data types in one file,
+   pass an explicit ``id=`` (e.g. ``id=100``), which has no such limit.
+
+
   ``Np``: Number of data locations (typically one set data per unique X-Y location)
   
   ``Ndi``: Number of data points ``Nd`` per data type ``i`` per location.

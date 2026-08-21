@@ -87,16 +87,18 @@ Boreholes are represented as Python dictionaries containing lithology observatio
 
 ``range_data``
     **Optional.** Data-space similarity radius used when calling
-    :func:`save_borehole_data` without an explicit ``r_data`` argument.
+    :func:`save_borehole_data` without an explicit ``range_data`` argument.
     Survey points whose EM data response is similar to the borehole location
     receive higher weight; more dissimilar points are down-weighted.
+    Only used if present and non-negative; a negative value is treated as unset.
     Default: 1,000,000 (effectively no data-similarity cutoff).
 
-``range_dis``
+``range_xyz``
     **Optional.** Geographic XY fade-out distance [m] used when calling
-    :func:`save_borehole_data` without an explicit ``r_dis`` argument.
+    :func:`save_borehole_data` without an explicit ``range_xyz`` argument.
     Survey points further than this distance from the borehole location
     are effectively unaffected by the borehole observation.
+    Only used if present and non-negative; a negative value is treated as unset.
     Default: 300 m.
 
 ``nan_freq``
@@ -104,9 +106,9 @@ Boreholes are represented as Python dictionaries containing lithology observatio
     when computing data-space similarity inside :func:`get_weight_from_position`.
     Gates where fewer than this fraction of soundings have non-NaN values are
     excluded from the data-distance computation.
-    Default: 0.8. Ignored when ``r_data_i_use`` is also set.
+    Default: 0.8. Ignored when ``range_data_i_use`` is also set.
 
-``r_data_i_use``
+``range_data_i_use``
     **Optional.** Explicit list of gate/channel indices (integers) to use for the
     data-distance computation, e.g. ``[0, 1, 2, 3]``. When provided, overrides the
     ``nan_freq`` automatic gate selection entirely. A NaN check at the reference
@@ -179,9 +181,9 @@ Borehole with explicit distance-weighting radii (``borehole_65.795_local.json``)
       "method": "mode_probability",
       "elevation": 42.5,
       "range_data": 4,
-      "range_dis": 150,
+      "range_xyz": 150,
       "nan_freq": 0.7,
-      "r_data_i_use": [0, 1, 2, 3]
+      "range_data_i_use": [0, 1, 2, 3]
     }
 
 ``ig.read_borehole()`` automatically detects the format: it returns a single dict
@@ -328,15 +330,15 @@ processing in a single call per borehole:
     BHOLES = [BH1, BH2]
 
     # 2. Process all boreholes — one call per borehole
-    im_prior = 2     # index of lithology model parameter (M2)
-    r_data   = 2     # full-strength radius (m)
-    r_dis    = 300   # fade-out radius (m)
+    im_prior   = 2     # index of lithology model parameter (M2)
+    range_data = 2     # full-strength radius (m)
+    range_xyz  = 300   # fade-out radius (m)
 
     id_borehole_list = []
     for BH in BHOLES:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
-            im_prior=im_prior, r_data=r_data, r_dis=r_dis,
+            im_prior=im_prior, range_data=range_data, range_xyz=range_xyz,
             parallel=False, showInfo=1)
         id_borehole_list.append(id_out)
 
@@ -360,24 +362,27 @@ processing in a single call per borehole:
 ``save_borehole_data`` Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``r_data`` and ``r_dis`` are resolved in this priority order:
+``range_data`` and ``range_xyz`` are resolved in this priority order:
 
 1. Explicit keyword argument passed to ``save_borehole_data()`` *(highest priority)*
-2. ``BH['range_data']`` / ``BH['range_dis']`` from the borehole dict
-3. Built-in defaults: ``r_data = 1,000,000``, ``r_dis = 300`` *(lowest priority)*
+2. ``BH['range_data']`` / ``BH['range_xyz']`` from the borehole dict, if present and non-negative
+3. Built-in defaults: ``range_data = 1,000,000``, ``range_xyz = 300`` *(lowest priority)*
+
+A negative value in the borehole dict (e.g. ``BH['range_data'] = -1``) is treated
+the same as the key being absent, and the default is used instead.
 
 .. code-block:: python
 
     id_prior, id_out = ig.save_borehole_data(
         f_prior_h5,          # Path to prior HDF5 file
         f_data_h5,           # Path to observed-data HDF5 file
-        BH,                  # Borehole dictionary (may include range_data / range_dis)
+        BH,                  # Borehole dictionary (may include range_data / range_xyz)
         im_prior=2,          # Model parameter index (e.g. 2 → /M2)
         parallel=False,      # Parallel mode extraction
-        r_data=2,            # Data-space similarity radius (overrides BH['range_data'])
-        r_dis=300,           # Geographic XY fade-out distance [m] (overrides BH['range_dis'])
+        range_data=2,        # Data-space similarity radius (overrides BH['range_data'])
+        range_xyz=300,       # Geographic XY fade-out distance [m] (overrides BH['range_xyz'])
         nan_freq=0.8,        # NaN-freq threshold for gate selection (overrides BH['nan_freq'])
-        r_data_i_use=None,   # Explicit gate indices (overrides nan_freq and BH['r_data_i_use'])
+        range_data_i_use=None,   # Explicit gate indices (overrides nan_freq and BH['range_data_i_use'])
         doPlot=False,        # Plot distance-weight maps
         showInfo=1           # Verbosity (0=silent, 1=summary line)
     )
@@ -423,8 +428,8 @@ Borehole observations influence survey points based on distance:
         f_data_h5,
         x_well=BH['X'],
         y_well=BH['Y'],
-        r_dis=300,
-        r_data=2,
+        range_xyz=300,
+        range_data=2,
         doPlot=True
     )
 
@@ -453,9 +458,9 @@ Distance converts to temperature for probability scaling:
 
 **Behavior by Distance:**
 
-* d < r_data: T ≈ 1, full observation strength
-* r_data < d < r_dis: T increases gradually
-* d > r_dis: T >> 1, observation effectively ignored
+* d < range_data: T ≈ 1, full observation strength
+* range_data < d < range_xyz: T increases gradually
+* d > range_xyz: T >> 1, observation effectively ignored
 
 **Distance Weighting Function:**
 
@@ -463,7 +468,7 @@ The weight decreases with distance using a Gaussian-like function:
 
 .. math::
 
-    w_{dis}(d) = \exp\left(-\frac{1}{2}\left(\frac{d - r_{data}}{r_{dis} - r_{data}}\right)^2\right)
+    w_{dis}(d) = \exp\left(-\frac{1}{2}\left(\frac{d - range_{data}}{range_{xyz} - range_{data}}\right)^2\right)
 
 This weight is converted to temperature for probability scaling:
 
@@ -482,7 +487,7 @@ Visualize weight distribution:
         f_data_h5,
         x_well=BH['X'],
         y_well=BH['Y'],
-        r_dis=300,
+        range_xyz=300,
         doPlot=True
     )
 
@@ -504,7 +509,7 @@ Use ``save_borehole_data()`` in a loop — one call per borehole:
     for BH in BHOLES:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
-            im_prior=2, r_data=2, r_dis=300,
+            im_prior=2, range_data=2, range_xyz=300,
             showInfo=1)
         id_borehole_list.append(id_out)
 
@@ -519,7 +524,7 @@ Use ``save_borehole_data()`` in a loop — one call per borehole:
 Overlapping Influence Zones
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When multiple boreholes have overlapping influence zones (r_dis), the inversion automatically handles this through the multinomial noise model. Each borehole observation is treated as an independent constraint, and the posterior distribution reflects the combined information from all boreholes and geophysical data.
+When multiple boreholes have overlapping influence zones (range_xyz), the inversion automatically handles this through the multinomial noise model. Each borehole observation is treated as an independent constraint, and the posterior distribution reflects the combined information from all boreholes and geophysical data.
 
 Performance Considerations
 --------------------------
@@ -549,7 +554,7 @@ Optimization Tips
 
 **Adjust Distance Parameters:**
 
-Smaller ``r_dis`` reduces the area influenced by each borehole:
+Smaller ``range_xyz`` reduces the area influenced by each borehole:
 
 * Faster processing (fewer survey points affected)
 * Less memory required
@@ -572,15 +577,15 @@ Key code section:
 
 .. code-block:: python
 
-    im_prior = 2     # lithology model index (M2)
-    r_data   = 2     # full-strength radius (m)
-    r_dis    = 300   # fade-out radius (m)
+    im_prior   = 2     # lithology model index (M2)
+    range_data = 2     # full-strength radius (m)
+    range_xyz  = 300   # fade-out radius (m)
 
     id_borehole_list = []
     for BH in BHOLES:
         id_prior, id_out = ig.save_borehole_data(
             f_prior_h5, f_data_h5, BH,
-            im_prior=im_prior, r_data=r_data, r_dis=r_dis,
+            im_prior=im_prior, range_data=range_data, range_xyz=range_xyz,
             parallel=parallel, showInfo=1)
         id_borehole_list.append(id_out)
 
