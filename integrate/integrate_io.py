@@ -5205,10 +5205,10 @@ def write_borehole(W, filename, **kwargs):
           used by :func:`save_borehole_data` when ``range_xyz`` is not passed
           explicitly. Only used if present and non-negative, otherwise the
           default applies. Default: 300 m.
-        * ``nan_freq`` (float, optional) – NaN-frequency threshold for automatic
+        * ``range_data_nan_freq`` (float, optional) – NaN-frequency threshold for automatic
           data-gate selection in :func:`save_borehole_data`. Default: 0.8.
         * ``range_data_i_use`` (list of int, optional) – explicit gate/channel indices
-          for data-distance computation; overrides ``nan_freq`` when provided.
+          for data-distance computation; overrides ``range_data_nan_freq`` when provided.
 
         numpy arrays and scalars are automatically converted to plain
         Python lists/numbers so the file is human-readable JSON.

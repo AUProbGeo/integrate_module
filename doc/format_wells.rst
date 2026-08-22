@@ -101,7 +101,7 @@ Boreholes are represented as Python dictionaries containing lithology observatio
     Only used if present and non-negative; a negative value is treated as unset.
     Default: 300 m.
 
-``nan_freq``
+``range_data_nan_freq``
     **Optional.** NaN-frequency threshold (0–1) for automatic data-gate selection
     when computing data-space similarity inside :func:`get_weight_from_position`.
     Gates where fewer than this fraction of soundings have non-NaN values are
@@ -111,8 +111,8 @@ Boreholes are represented as Python dictionaries containing lithology observatio
 ``range_data_i_use``
     **Optional.** Explicit list of gate/channel indices (integers) to use for the
     data-distance computation, e.g. ``[0, 1, 2, 3]``. When provided, overrides the
-    ``nan_freq`` automatic gate selection entirely. A NaN check at the reference
-    sounding is still applied. Default: not set (use ``nan_freq``).
+    ``range_data_nan_freq`` automatic gate selection entirely. A NaN check at the reference
+    sounding is still applied. Default: not set (use ``range_data_nan_freq``).
 
 JSON File Format
 ~~~~~~~~~~~~~~~~
@@ -182,7 +182,7 @@ Borehole with explicit distance-weighting radii (``borehole_65.795_local.json``)
       "elevation": 42.5,
       "range_data": 4,
       "range_xyz": 150,
-      "nan_freq": 0.7,
+      "range_data_nan_freq": 0.7,
       "range_data_i_use": [0, 1, 2, 3]
     }
 
@@ -381,8 +381,8 @@ the same as the key being absent, and the default is used instead.
         parallel=False,      # Parallel mode extraction
         range_data=2,        # Data-space similarity radius (overrides BH['range_data'])
         range_xyz=300,       # Geographic XY fade-out distance [m] (overrides BH['range_xyz'])
-        nan_freq=0.8,        # NaN-freq threshold for gate selection (overrides BH['nan_freq'])
-        range_data_i_use=None,   # Explicit gate indices (overrides nan_freq and BH['range_data_i_use'])
+        range_data_nan_freq=0.8, # NaN-freq threshold for gate selection (overrides BH['range_data_nan_freq'])
+        range_data_i_use=None,   # Explicit gate indices (overrides range_data_nan_freq and BH['range_data_i_use'])
         doPlot=False,        # Plot distance-weight maps
         showInfo=1           # Verbosity (0=silent, 1=summary line)
     )
