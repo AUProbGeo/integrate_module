@@ -273,7 +273,7 @@ for i in [0]:
             im_prior=im_prior,
             #range_data=range_data, range_xyz=range_xyz,
             #range_data = 1, range_xyz = 1000,
-            nan_freq = .8, range_data = 1, range_xyz = 1000,
+            range_data_nan_freq = .8, range_data = 1, range_xyz = 1000,
             doPlot=True,
             showInfo=11)
         id_borehole_list.append(id_out)
