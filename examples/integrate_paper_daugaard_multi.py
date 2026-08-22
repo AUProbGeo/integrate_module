@@ -610,7 +610,11 @@ if doPlotAll:
 
             if 'post_PRIOR' in f_post_h5:
                 ig.plot_feature_2d(f_post_h5,im=3,iz=0, key='HarmonicMean', uselog=0, hardcopy=hardcopy, title = 'Posterior Mean number of layers', 
-                                   cmap='hot_r', 
+                                   cmap='jet_r', 
+                                   clim=[1,8], 
+                                   fontsize = fontsize )
+                ig.plot_feature_2d(f_post_h5,im=3,iz=0, key='Median', uselog=0, hardcopy=hardcopy, title = 'Posterior Median number of layers', 
+                                   cmap='jet_r', 
                                    clim=[1,8], 
                                    fontsize = fontsize )
 

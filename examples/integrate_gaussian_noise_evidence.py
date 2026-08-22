@@ -122,7 +122,7 @@ D_std_true = d_std_rel * D_ref + d_std_base
 D_noise = rng.normal(0, D_std_true, D_ref.shape)
 D_obs = D_ref + D_noise
 
-noise_scale = [0.5, 1, 2, 4]
+noise_scale = [0.4, 0.6, 0.8, 1, 1.5, 2, 4, 8, 16]
 
 
 def scale_str(s):

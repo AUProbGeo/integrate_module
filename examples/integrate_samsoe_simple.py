@@ -141,7 +141,7 @@ D_obs = ig.load_data(f_data_h5)
 
 # %% 
 
-N=2_000_000
+N=4_000_000
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, 
                                     f_prior_h5='PRIOR_N%d.h5' % N, 
                                     dz = 1, 
@@ -203,6 +203,7 @@ f_post_h5 = ig.integrate_rejection(f_prior_h5,
                                 f_post_h5,
                                 N_use = N_use,
                                 autoT=autoT,
+                                T_base = 9,
                                 showInfo=1,
                                 parallel=True,
                                 updatePostStat=True,
@@ -216,7 +217,8 @@ ig.plot_data_prior_post(f_post_h5, i_plot=100)
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 hardcopy = True
 
-ig.plot_profile(f_post_h5, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
+ig.plot_profile(f_post_h5, im1=1, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
+ig.plot_profile(f_post_h5, im1=2, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
 
 ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1,plot_data_locations=True)
 
@@ -227,7 +229,7 @@ ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='LogMean', uselog=1, hardcopy=hardc
 ig.plot_feature_2d(f_post_h5, im=1, elevation=10, key='HarmonicMean')
 
 ig.plot_feature_2d(f_post_h5,im=2,iz=0, key='HarmonicMean', uselog=0, hardcopy=hardcopy, 
-                   title = 'Posterior Tx',  cmap='jet_r', clim=[0,50]) 
+                   title = 'Posterior Tx',  cmap='jet_r', clim=[0,50], ) 
 
 
 # %% Plot profile using coordinates
@@ -250,7 +252,7 @@ plt.xlabel('X [m]')
 plt.ylabel('Y [m]')
 plt.grid()
 
-ig.plot_profile(f_post_h5, ii=id_line ,  gap_threshold=150, xaxis='x', clim=clim, cmap=cmap, hardcopy=hardcopy)
+ig.plot_profile(f_post_h5, ii=id_line ,  im=1, gap_threshold=150, xaxis='x', clim=clim, cmap=cmap, hardcopy=hardcopy)
 
 
 
