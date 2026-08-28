@@ -1,0 +1,50 @@
+import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, OllamaModels, PostStats, PriorModelsResponse, QueryResult } from './types';
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, init);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      detail = (await res.json()).detail ?? detail;
+    } catch { /* non-JSON error */ }
+    throw new Error(detail);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  listFiles: () => req<{ workspace: string; files: H5FileInfo[] }>('/api/files'),
+  fileTree: (name: string) => req<H5Node & { truncated?: boolean }>(`/api/files/${encodeURIComponent(name)}/tree`),
+  fileSummary: (name: string) => req<H5Summary>(`/api/files/${encodeURIComponent(name)}/summary`),
+
+  listJobs: () => req<{ jobs: Job[] }>('/api/jobs'),
+  getJob: (id: string) => req<Job>(`/api/jobs/${id}`),
+  startRejection: (params: Record<string, unknown>) =>
+    req<Job>('/api/jobs/rejection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }),
+  stopJob: (id: string) => req<Job>(`/api/jobs/${id}/stop`, { method: 'POST' }),
+
+  llmConfig: () => req<LLMConfig>('/api/query/config'),
+  ollamaModels: () => req<OllamaModels>('/api/query/ollama-models'),
+  queryModels: (name: string) =>
+    req<PriorModelsResponse>(`/api/query/models?f=${encodeURIComponent(name)}`),
+  runQuery: (params: {
+    f: string;
+    text: string;
+    provider?: 'claude' | 'ollama';
+    api_key?: string;
+    model?: string;
+  }) =>
+    req<QueryResult>('/api/query/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }),
+
+  postStats: (name: string) => req<PostStats>(`/api/results/${encodeURIComponent(name)}/stats`),
+  profileUrl: (name: string, im: number) =>
+    `/api/results/${encodeURIComponent(name)}/profile.png?im=${im}`,
+};

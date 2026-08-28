@@ -1261,9 +1261,19 @@ Query: "What is the typical (median) thickness of Sand and Grus above the water 
 
 
 def _litellm_extra(model):
-    """Return extra_body kwargs for litellm.completion to disable thinking on Ollama models."""
+    """Return extra kwargs for litellm.completion on Ollama models.
+
+    Disables thinking, and routes to a remote Ollama server when
+    OLLAMA_API_BASE or OLLAMA_HOST is set. litellm only reads
+    OLLAMA_API_BASE itself; OLLAMA_HOST is the standard Ollama client
+    variable, honored here so both are respected.
+    """
     if model.startswith('ollama'):
-        return {'extra_body': {'think': False}}
+        extra = {'extra_body': {'think': False}}
+        host = os.environ.get('OLLAMA_API_BASE') or os.environ.get('OLLAMA_HOST')
+        if host:
+            extra['api_base'] = host.rstrip('/')
+        return extra
     return {}
 
 
