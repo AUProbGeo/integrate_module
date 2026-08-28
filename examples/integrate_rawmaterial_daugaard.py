@@ -84,8 +84,8 @@ hardcopy = True
 
 # %%
 # --- run-size settings -------------------------------------------------
-N = 2_000_000   # production-scale
-N = 42_000      # demo-scale; increase for a production-quality run
+N = 1_000_000   # production-scale
+#N = 42_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -132,7 +132,7 @@ ig.plot_geometry(f_data_h5, pl='LINE')
 ig.plot_data(f_data_h5, hardcopy=hardcopy)
 ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet')
 
-# %% Optionally scale the data noise (fixed name -> built once, reused after)
+# %%
 if inflateNoise != 0:
     print("=" * 60)
     print("Using tTEM data with noise (std) inflated by a factor of %d" % inflateNoise)
@@ -519,7 +519,7 @@ ig.query_plot(P_raw, meta_raw,
               hardcopy='daugaard_P_raw' if hardcopy else False)
 
 
-# %% The same probability map as B7, with the target polygons and the
+# %%
 # west-to-east profile line overlaid for context.
 fig, ax = plt.subplots(figsize=(9, 8))
 sc = ax.scatter(X, Y, c=P_raw, s=6, cmap='hot_r', vmin=0, vmax=1)
@@ -767,7 +767,7 @@ vol_region = np.nansum(pct_raw_region[region_mask, :] * cell_area[region_mask, N
 print("Raw-material volume in region  min/med/max = %s m^3"
       % np.round(vol_region).astype(int))
 
-# %% Turn the auto-grown region into a polygon, in the SAME
+# %%
 # {name: shapely.Polygon} format as `polygons` (Mette's deterministic areas),
 # so it can be plotted and fed to the volume helpers exactly the same way.
 region_polygon = cells_to_polygon(voro_cells, region_mask)
@@ -801,7 +801,7 @@ if hardcopy:
 plt.show()
 
 
-# %% Map of the actual Voronoi cells (clipped to the concave survey outline).
+# %%
 # Good cells are coloured by P_raw; edge-affected cells are hatched grey; the
 # auto-grown region's cells are outlined in cyan.
 from matplotlib.collections import PatchCollection

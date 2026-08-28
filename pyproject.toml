@@ -85,3 +85,8 @@ packages = ["integrate", "ui", "ui.backend", "ui.backend.routers"]
 [tool.setuptools.package-data]
 # Ship the built frontend (run ui/dev.sh build before packaging).
 ui = ["frontend/dist/**/*"]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+]
