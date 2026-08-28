@@ -84,7 +84,7 @@ hardcopy = True
 
 # %%
 # --- run-size settings -------------------------------------------------
-N = 1_000_000   # production-scale
+N = 4_000_000   # production-scale
 #N = 42_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
@@ -483,34 +483,41 @@ for elevation in [40, 30, 20, 10]:
 # %% [markdown]
 # ### B7. The `ig.query` tool
 #
-# We nee dto find WHERE we potentially have raw material worth producing!
+# We need to find WHERE we potentially have raw material worth producing!
 
 # %%
 # %%
-#os.environ['ANTHROPIC_API_KEY']='sk-ant-XXXXX'
-query_raw, interp_raw, prompt_raw = ig.query_from_text(
-    'What is the probbability that the cumulative thickness af raw materials (any sand and gravel) is greater than 10 m within the top 30 m, and where the oberburden (the top layer of non-raw material) is no more than 3 meters thick?', 
-    f_prior_h5=f_prior_h5, 
-    api_key=os.environ.get('ANTHROPIC_API_KEY'))
+useLLM = False
+if 'ANTHROPIC_API_KEY' in os.environ:
+    useLLM = True
+if useLLM:
+    #os.environ['ANTHROPIC_API_KEY']='sk-ant-XXXXX'
+    query_raw, interp_raw, prompt_raw = ig.query_from_text(
+        'What is the probbability that the cumulative thickness af raw materials (any sand and gravel) is greater than 10 m within the top 30 m, and where the oberburden (the top layer of non-raw material) is no more than 3 meters thick?', 
+        f_prior_h5=f_prior_h5, 
+        api_key=os.environ.get('ANTHROPIC_API_KEY'))
+else:
+    query_raw = {'constraints': [{'im': 2,
+       'classes': [2, 5, 6],
+       'thickness_mode': 'cumulative',
+       'thickness_comparison': '>',
+       'thickness_threshold': 10.0,
+       'depth_min': 0.0,
+       'depth_max': 30.0,
+       'negate': False},
+      {'im': 2,
+       'classes': [1, 3, 4, 7, 8],
+       'thickness_mode': 'first_occurrence',
+       'thickness_comparison': '<=',
+       'thickness_threshold': 3.0,
+       'depth_min': 0.0,
+       'depth_max': 30.0,
+       'negate': False}]}
+
+
 
 # %%
-query_raw = {'constraints': [{'im': 2,
-   'classes': [2, 5, 6],
-   'thickness_mode': 'cumulative',
-   'thickness_comparison': '>',
-   'thickness_threshold': 10.0,
-   'depth_min': 0.0,
-   'depth_max': 30.0,
-   'negate': False},
-  {'im': 2,
-   'classes': [1, 3, 4, 7, 8],
-   'thickness_mode': 'first_occurrence',
-   'thickness_comparison': '<=',
-   'thickness_threshold': 3.0,
-   'depth_min': 0.0,
-   'depth_max': 30.0,
-   'negate': False}]}
-
+# perform the query
 P_raw, meta_raw = ig.query(f_post_h5, query_raw)
 
 ig.query_plot(P_raw, meta_raw,
