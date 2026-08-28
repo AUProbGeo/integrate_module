@@ -1308,7 +1308,7 @@ def get_process_handle_count():
     import os
     return psutil.Process(os.getpid()).num_handles()
 
-def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, force_replace=False, **kwargs):
+def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, force_replace=False, f_prior_data_h5='', **kwargs):
     """
     Generate prior data for the GA-AEM method.
 
@@ -1325,6 +1325,11 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         Number of soundings to consider. Default is 0 (use all).
     doMakePriorCopy : bool, optional
         Flag indicating whether to make a copy of the prior file. Default is True.
+    f_prior_data_h5 : str, optional
+        Output path for the prior-data copy (only used when
+        ``doMakePriorCopy=True``). If empty (default), a name is generated
+        automatically as ``'<prior-stem>_<gex/stm-basename>[_N<N>]_Nh<Nhank>_Nf<Nfreq>.h5'``.
+        The path actually used is always the return value.
     im : int, optional
         Index of the model. Default is 1.
     id : int, optional
@@ -1420,21 +1425,27 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
 
     if doMakePriorCopy:
 
-        # If file_gex is not None, then use it to get the file_base_name
-        if (file_gex is not None) and os.path.isfile(file_gex): 
-            file_basename = os.path.splitext(os.path.basename(file_gex))[0]
-        elif (stmfiles is not None) and (len(stmfiles)>0):
-            file_basename = os.path.splitext(os.path.basename(stmfiles[0]))[0]
+        # Use the caller-provided output name if given; otherwise auto-generate
+        # one from the prior file and the gex/stm basename.
+        if f_prior_data_h5:
+            if (showInfo > 0):
+                print('Using caller-provided f_prior_data_h5=%s' % f_prior_data_h5)
         else:
-            file_basename = 'GAAEM'
-        
-        print('Using file_basename=%s' % file_basename)
+            # If file_gex is not None, then use it to get the file_base_name
+            if (file_gex is not None) and os.path.isfile(file_gex):
+                file_basename = os.path.splitext(os.path.basename(file_gex))[0]
+            elif (stmfiles is not None) and (len(stmfiles)>0):
+                file_basename = os.path.splitext(os.path.basename(stmfiles[0]))[0]
+            else:
+                file_basename = 'GAAEM'
 
-        if N < N_in:
-            f_prior_data_h5 = '%s_%s_N%d_Nh%d_Nf%d.h5' % (os.path.splitext(f_prior_h5)[0], os.path.splitext(file_basename)[0], N, Nhank, Nfreq)
-        else:
-            f_prior_data_h5 = '%s_%s_Nh%d_Nf%d.h5' % (os.path.splitext(f_prior_h5)[0], os.path.splitext(file_basename)[0], Nhank, Nfreq)
-        
+            print('Using file_basename=%s' % file_basename)
+
+            if N < N_in:
+                f_prior_data_h5 = '%s_%s_N%d_Nh%d_Nf%d.h5' % (os.path.splitext(f_prior_h5)[0], os.path.splitext(file_basename)[0], N, Nhank, Nfreq)
+            else:
+                f_prior_data_h5 = '%s_%s_Nh%d_Nf%d.h5' % (os.path.splitext(f_prior_h5)[0], os.path.splitext(file_basename)[0], Nhank, Nfreq)
+
 
         if (showInfo>0):
             print("Creating a copy of %s" % (f_prior_h5))
