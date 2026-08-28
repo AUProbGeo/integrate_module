@@ -27,15 +27,18 @@
 # (`daugaard_standard.xlsx` + `daugaard_valley.xlsx`, built with `geoprior1d`,
 # merged 50/50), forward-model the prior tTEM data, load and add the borehole
 # data, run the joint (tTEM + borehole) rejection inversion, demonstrate the
-# `ig.query` tool, automatically grow a data-driven raw-material area from the
-# posterior probability map (B8), and turn it into low / median / high
-# volume estimates alongside Mette's target polygons (B9). Volumes are built
-# from per-sounding thickness percentiles times the Voronoi-cell area around
-# each sounding.
+# `ig.query` tool, grow a data-driven raw-material region from the posterior
+# probability map (B8), and turn it into a low / median / high volume
+# estimate (B9), built from per-sounding thickness percentiles times the
+# Voronoi-cell area around each sounding. Part B is purely about the
+# probabilistic result and ends with a bar chart of the grown region's
+# raw-material volume.
 #
 # **Part C -- Comparison to Mette's original estimate.**
-# Put the probabilistic per-polygon volumes next to the single-number
-# estimates from the old sequential/deterministic assessment.
+# Everything involving Mette's hand-drawn target polygons lives here: their
+# own low/median/high volumes, and the region-vs-polygon comparison next to
+# the single-number estimates from the old sequential/deterministic
+# assessment.
 #
 # One important caveat, from GEUS's own notes on the old assessment (see
 # `ReferenceProjects/EmailFromMette.md`): the deterministic raw-material
@@ -85,7 +88,7 @@ hardcopy = True
 # %%
 # --- run-size settings -------------------------------------------------
 N = 4_000_000   # production-scale
-#N = 42_000      # demo-scale; increase for a production-quality run
+N = 12_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -399,11 +402,6 @@ f_prior_h5 = f_prior_merged_h5
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 ig.prior_describe(f_prior_h5)
 
-# Resolve which lithology classes count as "raw material" (sand+gravel) and
-# "coarser material" (gravel) by name -- see
-# integrate_rawmaterial_utils.resolve_material_classes.
-raw_classes, coarse_classes = rmu.resolve_material_classes(f_prior_h5, im=2)
-
 # %% [markdown]
 # ### B3. Prior tTEM data
 #
@@ -514,7 +512,8 @@ else:
        'depth_max': 30.0,
        'negate': False}]}
 
-
+raw_classes = query_raw['constraints'][0]['classes']    # sand + gravel: coarse raw material
+fine_classes = query_raw['constraints'][1]['classes']    # everything else: fine, non-raw material (overburden)
 
 # %%
 # perform the query
@@ -530,16 +529,12 @@ ig.query_plot(P_raw, meta_raw,
 # west-to-east profile line overlaid for context.
 fig, ax = plt.subplots(figsize=(9, 8))
 sc = ax.scatter(X, Y, c=P_raw, s=6, cmap='hot_r', vmin=0, vmax=1)
-for nm, geom in polygons.items():
-    xs, ys = geom.exterior.xy
-    ax.plot(xs, ys, 'k-', lw=1.5)
-    ax.annotate(nm, (geom.centroid.x, geom.centroid.y), ha='center', fontsize=8)
 ax.plot(Xl_wide, Yl_wide, 'r--', lw=1.2, label='W-E profile')
 ax.plot(X[id_line], Y[id_line], 'r.', ms=3)
 ax.set_aspect('equal')
 ax.set_xlabel('UTM X (m)')
 ax.set_ylabel('UTM Y (m)')
-ax.set_title('P(raw material) with target areas + profile')
+ax.set_title('P(raw material) with profile')
 fig.colorbar(sc, ax=ax, label='P_raw')
 ax.legend(fontsize=8)
 if hardcopy:
@@ -557,11 +552,12 @@ plt.show()
 # The region simply keeps spreading into adjacent high-probability ground and
 # stops on its own when the surrounding soundings are no longer likely enough.
 #
-# `P_MIN` is the one knob: "include every connected sounding where the
-# probability of raw material is at least this". P_MIN = 0.5 -> the region is
-# the contiguous patch (around the most likely spot) where raw material is
-# more likely than not. Lower it to grow the region, raise it to shrink it.
-# `MAX_AREA_M2` is an optional hard cap (None = no cap).
+# `P_MIN` is the main knob (the polygon "width"/area): "include every
+# connected sounding where the probability of raw material is at least
+# this". P_MIN = 0.5 -> the region is the contiguous patch (around the seed)
+# where raw material is more likely than not. Lower it to grow the region,
+# raise it to shrink it. `MAX_AREA_M2` is an optional hard cap (None = no
+# cap).
 #
 # Neighbours come from a Voronoi tessellation of the sounding locations (two
 # soundings are neighbours iff their Voronoi cells share an edge); each cell
@@ -572,405 +568,205 @@ plt.show()
 # Before growing, **edge-affected soundings are dropped** (`flag_edge_cells`):
 # a sounding on the sparse rim of the survey has a huge, badly constrained
 # Voronoi cell that would otherwise let the region balloon into empty ground.
-# A sounding is dropped if its cell is unbounded (a convex-hull vertex), or if
-# it is within `EDGE_BUFFER` of the survey outline AND its cell is oversized
-# (`> CELL_AREA_K x` the interior-median cell) or very elongated (`> ELONG_MAX`).
-# Large cells that are *not* on the rim (interior data gaps) are kept.
+#
+# **Organization.** This block first defines the reusable region-analysis
+# functions (below), then B9 runs the clean end-to-end pipeline (query ->
+# pick point(s) -> grow -> percentile -> volume).
+#
+# Two entry points:
+#   * `find_coherent_area(X, Y, P, p_min, ...)` -- the full pipeline in one
+#     call: builds the Voronoi adjacency + per-sounding cells, applies the
+#     edge filter, grows a connected region from a seed, and returns the
+#     region indices, its boundary polygon, AND the Voronoi scaffold (graph /
+#     cells / areas / outline / keep-mask) for reuse. These now live in the
+#     `integrate` package (integrate.integrate_query), called as `ig.<name>`.
+#   * `grow_connected_region(P, neighbors, cell_area, p_min, ...)` -- the
+#     pure graph-grow step on a pre-built scaffold (no Voronoi/shapely).
+#     `find_coherent_area` uses it internally.
 
 # %%
-import heapq
-from scipy.spatial import Voronoi, ConvexHull
-from shapely import concave_hull, voronoi_polygons, distance
-from shapely import points as sh_points
-from shapely import MultiPoint, STRtree
-from shapely.geometry import Polygon, Point
-from shapely.ops import unary_union
-
-# --- region-growing knobs ---
-P_MIN       = 0.2      # keep growing while the next sounding has P_raw >= this
-MAX_AREA_M2 = None     # optional hard cap on the region area [m^2]; None = no cap
-useManual   = False    # True -> seed at (X_start, Y_start) instead of argmax(P_raw)
-X_start, Y_start = 543000.0, 6175750.0
-
-# --- edge-affected-cell filter (soundings on the sparse rim of the survey) ---
-HULL_RATIO  = 0.10    # concave-hull tightness for the survey outline (0 = tight, 1 = convex)
-EDGE_BUFFER = None    # m; a sounding this close to the outline is "near the edge".
-                      # None -> auto = 2 * sqrt(interior-median cell area)
-CELL_AREA_K = 6.0     # a cell is "oversized" if larger than K x the interior-median cell area
-ELONG_MAX   = 4.0     # drop near-edge cells more elongated than this
-                      # (perimeter^2 / (4 pi area); 1 = disc); None to skip this test
-
-CELL_SIZE   = 5.0     # m; raster resolution for the polygon-clipped cell areas used in B9
+# The region-search functions (voronoi_graph, voronoi_cells_ordered,
+# cells_to_polygon, flag_edge_cells, grow_connected_region, find_coherent_area)
+# are part of the `integrate` package -- call them as ig.<name>(...).
+# See the B8 markdown above for what each does.
 
 
-def voronoi_graph(X, Y):
-    """(vor, neighbors): scipy Voronoi object + neighbour-index lists (cells sharing an edge).
+POS_CENTER = []
+POS_CENTER.append((543039.3,6175596.0))   # west end of the profile
+POS_CENTER.append((544500.0,6175800.0))   # west end of the profile
 
-    Fails on exactly-duplicated coordinates -- deduplicate X, Y first if that happens.
-    """
-    vor = Voronoi(np.column_stack([X, Y]))
-    nb = [set() for _ in range(len(X))]
-    for a, b in vor.ridge_points:
-        nb[a].add(int(b))
-        nb[b].add(int(a))
-    return vor, [sorted(s) for s in nb]
+AREA_LIST = []
 
+for icenter in range(len(POS_CENTER)):
 
-def voronoi_cells_ordered(X, Y, boundary):
-    """Per-sounding Voronoi cell polygons, in input order, clipped to `boundary`."""
-    XY = np.column_stack([X, Y])
-    raw = list(voronoi_polygons(MultiPoint(XY), extend_to=boundary).geoms)
-    tree = STRtree([Point(xy) for xy in XY])
-    cells = [None] * len(XY)
-    for cell in raw:
-        inside = tree.query(cell, predicate="contains")
-        idx = int(inside[0]) if len(inside) else int(tree.nearest(cell.centroid))
-        cells[idx] = cell.intersection(boundary)
-    return cells
+    # --- central nodel
+    X_center = POS_CENTER[icenter][0]
+    Y_center = POS_CENTER[icenter][1]
 
+    # --- region-growing knobs (the polygon "width"/area is set by these two) ---
+    P_MIN       = 0.2      # keep growing while the next sounding has P_raw >= this
+    MAX_AREA_M2 = None     # optional hard cap on the region area [m^2]; None = no cap
 
-def cells_to_polygon(cells, mask):
-    """Union of the masked Voronoi cells -> a single shapely Polygon (largest part)."""
-    poly = unary_union([c for i, c in enumerate(cells)
-                        if c is not None and mask[i]]).buffer(0)
-    if poly.geom_type == "MultiPolygon":
-        poly = max(poly.geoms, key=lambda g: g.area)
-    return poly
+    # --- edge-affected-cell filter (soundings on the sparse rim of the survey) ---
+    HULL_RATIO  = 0.10    # concave-hull tightness for the survey outline (0 = tight, 1 = convex)
+    EDGE_BUFFER = None    # m; a sounding this close to the outline is "near the edge".
+                        # None -> auto = 2 * sqrt(interior-median cell area)
+    CELL_AREA_K = 6.0     # a cell is "oversized" if larger than K x the interior-median cell area
+    ELONG_MAX   = 4.0     # drop near-edge cells more elongated than this
+                        # (perimeter^2 / (4 pi area); 1 = disc); None to skip this test
+
+    CELL_SIZE   = 5.0     # m; raster resolution for the polygon-clipped cell areas used in B9
 
 
-def flag_edge_cells(X, Y, vor, cells, boundary, edge_buffer=None, k=6.0, elong_max=None):
-    """Boolean `good` mask -- False for edge-affected soundings on the sparse survey rim.
+    # Grow the region at the single highest-P_raw sounding. `AREA` (idx / mask /
+    # polygon / vor / neighbors / cells / cell_area / boundary / good / ...) is
+    # used directly everywhere below, including in B9.
+    AREA = ig.find_coherent_area(X, Y, P_raw, P_MIN, max_area_m2=MAX_AREA_M2,
+                                X_center = X_center, Y_center = Y_center,
+                                hull_ratio=HULL_RATIO, edge_buffer=EDGE_BUFFER,
+                                cell_area_k=CELL_AREA_K, elong_max=ELONG_MAX)
 
-    A sounding is dropped if its Voronoi cell is unbounded (a convex-hull
-    vertex), or if it lies within `edge_buffer` of the survey outline AND its
-    cell is either much larger than the interior-median cell (> k x) or very
-    elongated (perimeter^2 / (4 pi area) > elong_max). Large cells that are
-    NOT near the rim (interior data gaps) are kept.
+    edge_affected = ~AREA['good']
+    P_raw_eff = np.where(AREA['good'], P_raw, -np.inf)   # edge-affected soundings are unreachable
+    print("Edge filter dropped %d / %d soundings; default region seed %d at (%.0f, %.0f), P_raw=%.2f"
+        % (int(edge_affected.sum()), len(X), AREA['seed'],
+            X[AREA['seed']], Y[AREA['seed']], P_raw[AREA['seed']]))
 
-    Returns (good, edge_affected, info).
-    """
-    n = len(X)
-    area = np.array([c.area if (c is not None and not c.is_empty) else 0.0 for c in cells])
-    peri = np.array([c.length if (c is not None and not c.is_empty) else 0.0 for c in cells])
+    plt.figure(figsize=(8, 8))
+    plt.plot(X, Y,'.', markersize=.1, color='lightgray', label='all soundings')
+    plt.scatter(X, Y, c=P_raw, s=2, cmap='hot_r', vmin=0, vmax=1, label='kept soundings')
+    #plt.plot(X[AREA['idx']], Y[AREA['idx']], 'k.', markersize=1, label='region')
+    plt.plot(*AREA['polygon'].exterior.xy, 'k-', lw=2, label='polygon')
+    plt.plot(AREA['X_center'], AREA['Y_center'], 'ko', ms=22, label='CENTER')
+    plt.legend()
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('P_raw with edge-affected soundings dropped')
+    plt.axis('equal')
+    plt.show()
 
-    # unbounded Voronoi cell -> the sounding is a convex-hull vertex -> definitely edge
-    is_open = np.array([
-        (len(vor.regions[vor.point_region[i]]) == 0) or (-1 in vor.regions[vor.point_region[i]])
-        for i in range(n)])
+    AREA_LIST.append(AREA)  
 
-    if edge_buffer is None:
-        base = area[(~is_open) & (area > 0)]
-        edge_buffer = 2.0 * np.sqrt(np.median(base)) if base.size else 0.0
-
-    near_boundary = distance(sh_points(np.asarray(X), np.asarray(Y)), boundary.exterior) < edge_buffer
-
-    interior = (~is_open) & (~near_boundary) & (area > 0)
-    a_med = float(np.median(area[interior])) if interior.any() else float(np.median(area[area > 0]))
-    oversized = area > k * a_med
-
-    if elong_max is not None:
-        with np.errstate(divide='ignore', invalid='ignore'):
-            elong = peri ** 2 / (4.0 * np.pi * np.where(area > 0, area, np.nan))
-        stretched = np.nan_to_num(elong, nan=0.0) > elong_max
-    else:
-        stretched = np.zeros(n, dtype=bool)
-
-    edge_affected = is_open | (near_boundary & (oversized | stretched))
-    info = dict(edge_buffer=float(edge_buffer), a_med=a_med,
-                n_open=int(is_open.sum()), n_near=int(near_boundary.sum()),
-                n_dropped=int(edge_affected.sum()))
-    return ~edge_affected, edge_affected, info
-
-
-def auto_grow_region(P, neighbors, cell_area, p_min=0.5, max_area_m2=None, seed=None):
-    """Automatically grow a region outward from the highest-probability sounding.
-
-    Starting at the seed, repeatedly add the adjacent sounding with the highest
-    probability P, keeping only those with ``P >= p_min``. The region stops
-    growing on its own when no adjacent sounding is likely enough, or when its
-    area reaches ``max_area_m2`` (if given).
-
-    Returns (mask, area, order): boolean mask over soundings, the accumulated
-    Voronoi-cell area, and the order soundings were added.
-    """
-    P = np.where(np.isfinite(P), P, -np.inf)
-    if seed is None:
-        seed = int(np.argmax(P))
-    in_region = np.zeros(len(P), dtype=bool)
-    in_region[seed] = True
-    area = float(cell_area[seed])
-    order = [seed]
-    seen = np.zeros(len(P), dtype=bool)
-    seen[seed] = True
-    frontier = []                       # max-heap on P via negative key
-    for j in neighbors[seed]:
-        heapq.heappush(frontier, (-P[j], j))
-        seen[j] = True
-    while frontier:
-        if max_area_m2 is not None and area >= max_area_m2:
-            break
-        negp, j = heapq.heappop(frontier)
-        if -negp < p_min:               # best remaining neighbour is below cutoff -> done
-            break
-        if in_region[j]:
-            continue
-        in_region[j] = True
-        area += float(cell_area[j])
-        order.append(j)
-        for k in neighbors[j]:
-            if not seen[k]:
-                heapq.heappush(frontier, (-P[k], k))
-                seen[k] = True
-    return in_region, area, order
-
-
-# --- Voronoi graph, concave survey outline, per-sounding cells + areas ---
-vor, neighbors = voronoi_graph(X, Y)
-
-XY = np.column_stack([X, Y])
-survey_poly = concave_hull(MultiPoint(XY), ratio=HULL_RATIO)
-if survey_poly.geom_type == "MultiPolygon":
-    survey_poly = max(survey_poly.geoms, key=lambda g: g.area)
-if survey_poly.is_empty or survey_poly.geom_type != "Polygon":
-    survey_poly = Polygon(XY[ConvexHull(XY).vertices])            # fallback to convex hull
-
-voro_cells = voronoi_cells_ordered(X, Y, survey_poly)
-cell_area = np.array([c.area if (c is not None and not c.is_empty) else 0.0
-                      for c in voro_cells])
-
-# --- drop edge-affected soundings, then grow only on the good ones ---
-good, edge_affected, edge_info = flag_edge_cells(
-    X, Y, vor, voro_cells, survey_poly,
-    edge_buffer=EDGE_BUFFER, k=CELL_AREA_K, elong_max=ELONG_MAX)
-print("Edge filter: dropped %d / %d soundings (%d hull-open, edge_buffer=%.0f m, "
-      "interior median cell = %.0f m^2)"
-      % (edge_info['n_dropped'], len(X), edge_info['n_open'],
-         edge_info['edge_buffer'], edge_info['a_med']))
-
-P_raw_eff = np.where(good, P_raw, -np.inf)   # edge-affected soundings are unreachable
-
-if useManual:
-    i_start = int(np.argmin((X - X_start) ** 2 + (Y - Y_start) ** 2))
-else:
-    i_start = int(np.nanargmax(P_raw_eff))
-print("Seed sounding %d at (%.0f, %.0f), P_raw=%.2f"
-      % (i_start, X[i_start], Y[i_start], P_raw[i_start]))
-
-region_mask, region_area, region_order = auto_grow_region(
-    P_raw_eff, neighbors, cell_area, p_min=P_MIN, max_area_m2=MAX_AREA_M2, seed=i_start)
-region_mask &= good                          # belt and suspenders
-region_area = float(cell_area[region_mask].sum())
-print("Grown region (P_raw >= %.2f): %d soundings, %.0f m^2"
-      % (P_MIN, region_mask.sum(), region_area))
+# %% [markdown]
+# ### B9. Volume: query -> percentile -> volume
+#
+# One `ig.query` percentile query per quantity -- raw material (`raw_classes`:
+# sand+gravel) and overburden (`fine_classes`: every other, non-raw class) --
+# run once over ALL soundings, exactly like the percentile-query examples in
+# `integrate_query.py`. Volume at each percentile = sum(percentile_thickness *
+# cell_area) over the grown region's soundings (`AREA['mask']`, from B8).
 
 # %%
-# Raw-material volume inside the grown region (P5/P50/P95).
-pct_raw_region, _ = ig.query(f_post_h5, {
-    "metric": {"im": 2, "classes": raw_classes,
-               "thickness_mode": "cumulative", "depth_min": 0.0},
-    "percentiles": [5, 50, 95],
-})
-vol_region = np.nansum(pct_raw_region[region_mask, :] * cell_area[region_mask, None], axis=0)
-print("Raw-material volume in region  min/med/max = %s m^3"
-      % np.round(vol_region).astype(int))
-
-# %%
-# {name: shapely.Polygon} format as `polygons` (Mette's deterministic areas),
-# so it can be plotted and fed to the volume helpers exactly the same way.
-region_polygon = cells_to_polygon(voro_cells, region_mask)
-polygons_prob = {'Probabilistic region': region_polygon}
-print("Probabilistic region polygon: area = %.0f m^2  (%d soundings)"
-      % (region_polygon.area, region_mask.sum()))
-
-# %%
-fig, ax = plt.subplots(figsize=(9, 8))
-sc = ax.scatter(X[good], Y[good], c=P_raw[good], s=6, cmap='hot_r', vmin=0, vmax=1)
-ax.scatter(X[edge_affected], Y[edge_affected], s=8, marker='x', color='0.6',
-           linewidths=0.5, label='edge-affected (dropped, %d)' % edge_affected.sum())
-ax.scatter(X[region_mask], Y[region_mask], s=.1, facecolors='none',
-           edgecolors='cyan', linewidths=0.7,
-           label='grown region (%.0f,000 m$^2$)' % (region_area / 1000))
-ax.plot(*survey_poly.exterior.xy, color='0.5', lw=0.8, ls=':', label='survey outline')
-for nm, geom in polygons.items():
-    xs, ys = geom.exterior.xy
-    ax.plot(xs, ys, 'k-', lw=1.5)
-for nm, geom in polygons_prob.items():
-    xs, ys = geom.exterior.xy
-    ax.plot(xs, ys, color='cyan', lw=2, label=nm)
-ax.set_aspect('equal')
-ax.set_xlabel('UTM X (m)')
-ax.set_ylabel('UTM Y (m)')
-ax.set_title('Auto-grown raw-material region (from P_raw)')
-fig.colorbar(sc, ax=ax, label='P_raw')
-ax.legend(fontsize=8)
-if hardcopy:
-    fig.savefig('daugaard_rawmat_region.png', dpi=200, bbox_inches='tight')
-plt.show()
+# ---- volume = sum(percentile thickness * cell area), over AREA['mask'] ----
+def region_volumes(pct, AREA):
+    """Volume at each percentile in `pct` ((N_sounding, len(PCT)), e.g.
+    `pct_raw_material`), summed over the soundings in `AREA['mask']`."""
+    m = AREA['mask']
+    return np.nansum(pct[m, :] * AREA['cell_area'][m, None], axis=0)
 
 
 # %%
-# Good cells are coloured by P_raw; edge-affected cells are hatched grey; the
-# auto-grown region's cells are outlined in cyan.
-from matplotlib.collections import PatchCollection
-from matplotlib.patches import Polygon as MplPolygon
+# ---- A. one percentile query per quantity ---------------------------------
+PCT = [5, 50, 95]      # -> low / median / high
+
+query_overburden   = {"im": 2, "classes": fine_classes, "thickness_mode": "cumulative", "depth_min": 0.0}
+query_raw_material = {"im": 2, "classes": raw_classes,  "thickness_mode": "cumulative", "depth_min": 0.0}
+
+pct_overburden, _   = ig.query(f_post_h5, {"metric": query_overburden, "percentiles": PCT})
+pct_raw_material, _ = ig.query(f_post_h5, {"metric": query_raw_material, "percentiles": PCT})
+# each: (N_sounding, len(PCT)) posterior thickness percentiles [m], one row per sounding
+
+# ---- volume of the region grown in B8 (AREA) -------------------------------
+V_overburden = region_volumes(pct_overburden, AREA)
+V_raw_material = region_volumes(pct_raw_material, AREA)
+print("Grown region overburden   PCT%s = %s m^3" % (PCT, np.round(V_overburden).astype(int)))
+print("Grown region raw material PCT%s = %s m^3" % (PCT, np.round(V_raw_material).astype(int)))
 
 
-def _cell_patches(cells, idx):
-    """matplotlib polygon patches for cells[i] with i in idx (skips empty/multipart bits)."""
-    patches, keep = [], []
-    for i in idx:
-        c = cells[i]
-        if c is None or c.is_empty:
-            continue
-        parts = c.geoms if c.geom_type == "MultiPolygon" else [c]
-        for p in parts:
-            if p.geom_type == "Polygon" and not p.is_empty:
-                patches.append(MplPolygon(np.asarray(p.exterior.coords)))
-                keep.append(i)
-    return patches, np.asarray(keep)
-
-
-patches_good, keep_good = _cell_patches(voro_cells, np.where(good)[0])
-patches_edge, _ = _cell_patches(voro_cells, np.where(edge_affected)[0])
-patches_reg, _ = _cell_patches(voro_cells, np.where(region_mask)[0])
-
-fig, ax = plt.subplots(figsize=(10, 9))
-pc_good = PatchCollection(patches_good, cmap='hot_r', edgecolor='0.75', linewidths=0.15)
-pc_good.set_array(P_raw[keep_good])
-pc_good.set_clim(0, 1)
-ax.add_collection(pc_good, autolim=True)
-
-pc_edge = PatchCollection(patches_edge, facecolor='0.85', edgecolor='0.6',
-                          linewidths=0.15, hatch='//')
-ax.add_collection(pc_edge, autolim=True)
-
-pc_reg = PatchCollection(patches_reg, facecolor='none', edgecolor='cyan', linewidths=0.6)
-ax.add_collection(pc_reg, autolim=True)
-
-rx, ry = region_polygon.exterior.xy
-ax.plot(rx, ry, color='cyan', lw=2.5, label='probabilistic region')
-for geom in polygons.values():
-    ax.plot(*geom.exterior.xy, 'k-', lw=1.5)
-
-ax.set_aspect('equal')
-ax.autoscale_view()
+# %%
+# Voronoi cells coloured by P_raw; edge-affected cells hatched grey; the
+# grown region's cells outlined.
+fig, ax, mappable = ig.plot_voronoi_cells(AREA, P=P_raw, vmin=0, vmax=1)
+ax.plot(*AREA['polygon'].exterior.xy, color='k', lw=2.5, label='grown region')
 ax.set_xlabel('UTM X (m)')
 ax.set_ylabel('UTM Y (m)')
 ax.set_title('Voronoi cells coloured by P_raw  (grey hatch = edge-affected, dropped)')
-fig.colorbar(pc_good, ax=ax, label='P_raw')
+fig.colorbar(mappable, ax=ax, label='P_raw')
 ax.legend(fontsize=8)
 if hardcopy:
     fig.savefig('daugaard_voronoi_cells.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 
-
-
-# %% [markdown]
-# ### B9. Low / median / high volumes: auto-grown region vs. Mette's polygons
-#
-# For each area and quantity the volume estimate is
-#
-#     V(p) = sum_i  thickness_i(p) * voronoi_cell_area_i
-#          = (area-weighted mean thickness at percentile p) x area
-#
-# at p = 5 / 50 / 95 (low / median / high). Quantities:
-#   * overburden   -- depth to the first raw-material layer (first_occurrence)
-#   * raw material -- cumulative thickness of `raw_classes`
-#   * coarser      -- cumulative thickness of `coarse_classes`
-#
-# Areas: the auto-grown `P_raw` region from B8, and each of Mette's target
-# polygons (Section 1b). The per-polygon result, `prob_results`, feeds the
-# comparison to Mette's original numbers in Part C.
-
 # %%
-PCT = [5, 50, 95]                                    # -> min / median / max
-
-
-def _thickness_pct(classes, mode):
-    """(N_sounding, 3): posterior P5/P50/P95 of a per-sounding thickness metric."""
-    pct, _ = ig.query(f_post_h5, {
-        "metric": {"im": 2, "classes": classes, "thickness_mode": mode, "depth_min": 0.0},
-        "percentiles": PCT})
-    return pct
-
-
-pct_overburden = _thickness_pct(raw_classes, "first_occurrence")
-pct_raw        = pct_raw_region                                     # already queried in B8
-pct_coarse     = _thickness_pct(coarse_classes, "cumulative") if coarse_classes else None
-
-
-def area_volumes(area_per_sounding):
-    """{quantity: [V_p5, V_p50, V_p95]} + area, for a per-sounding area array (0 outside)."""
-    a = np.asarray(area_per_sounding, dtype=float)
-    m = a > 0
-
-    def _v(pct_thick):
-        if pct_thick is None:
-            return np.full(len(PCT), np.nan)
-        return np.nansum(pct_thick[m, :] * a[m, None], axis=0)      # [p5, p50, p95] m^3
-
-    return {'overburden':  _v(pct_overburden),
-            'raw_material': _v(pct_raw),
-            'coarser':      _v(pct_coarse),
-            'area_m2':      float(a[m].sum()),
-            'n_points':     int(m.sum())}
-
-
-def _print_vols(label, r):
-    print("%-22s area=%9.0f m^2 (n=%d)" % (label, r['area_m2'], r['n_points']))
-    for q in ('overburden', 'raw_material', 'coarser'):
-        print("    %-12s p5/50/95 = %s m^3" % (q, np.round(r[q]).astype(int)))
-
-
-# auto-grown probabilistic region (Voronoi-cell areas from B8)
-region_results = area_volumes(np.where(region_mask, cell_area, 0.0))
-_print_vols("Auto-grown region", region_results)
-
-# Mette's polygons -> prob_results (used by Part C)
-prob_results = {}
-for name, polygon in polygons.items():
-    prob_results[name] = area_volumes(
-        rmu.compute_point_footprint_area(X, Y, polygon, cell_size=CELL_SIZE))
-    _print_vols("Polygon %s" % name, prob_results[name])
-
-# %%
-# Raw-material volume: auto-grown region vs. each polygon (bar = P50, whiskers = P5-P95).
-_names = ['Auto-grown\nregion'] + list(prob_results)
-_V = np.vstack([region_results['raw_material']]
-               + [prob_results[n]['raw_material'] for n in prob_results])
-x = np.arange(len(_names))
-fig, ax = plt.subplots(figsize=(7, 5))
-ax.bar(x, _V[:, 1], yerr=[_V[:, 1] - _V[:, 0], _V[:, 2] - _V[:, 1]],
-       capsize=5, color=['C0'] + ['0.7'] * len(prob_results))
-ax.set_xticks(x)
-ax.set_xticklabels(_names)
+# Raw-material volume, grown region only (bar = P50, whiskers = P5-P95).
+# Purely probabilistic -- no comparison to Mette's polygons (see Part C).
+fig, ax = plt.subplots(figsize=(4, 5))
+ax.bar(0, V_raw_material[1], yerr=[[V_raw_material[1] - V_raw_material[0]],
+                                   [V_raw_material[2] - V_raw_material[1]]], capsize=5, color='C0')
+ax.set_xticks([0])
+ax.set_xticklabels(['Grown region'])
 ax.set_ylabel('Raw-material volume (m$^3$)')
-ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
+ax.set_title('Raw-material volume, grown region  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig('daugaard_rawmat_volume_B9.png', dpi=200, bbox_inches='tight')
+    fig.savefig('daugaard_rawmat_volume_B.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 
 # %% [markdown]
 # # Part C -- Comparison to Mette's original (deterministic) estimate
 #
-# The headline result: the probabilistic per-polygon volumes (`prob_results`,
-# built in B9) next to the single-number estimates from the old
-# sequential/deterministic assessment. Reference numbers are transcribed from
-# `ReferenceProjects/Sdr Felding og Daugard til Integrate.pptx` (cross-checked
-# against the shapefile polygon areas).
+# Everything that involves Mette's hand-drawn target polygons lives here --
+# Part B is about the probabilistic result only. Per-polygon low / median /
+# high volumes reuse the same `region_volumes(pct, AREA)` helper and the
+# `pct_*` arrays queried in B9, on an AREA-like dict built from the
+# per-sounding area inside each of Mette's polygons (rasterized at
+# `CELL_SIZE` resolution via `rmu.compute_point_footprint_area`). Reference
+# numbers are transcribed from
+# `ReferenceProjects/Sdr Felding og Daugard til Integrate.pptx`
+# (cross-checked against the shapefile polygon areas).
 
 # %%
+# C1. Low / median / high volumes for each of Mette's target polygons.
+prob_results = {}
+for name, polygon in polygons.items():
+    footprint_area = rmu.compute_point_footprint_area(X, Y, polygon, cell_size=CELL_SIZE)
+    poly_area = {'mask': footprint_area > 0, 'cell_area': footprint_area}
+    prob_results[name] = {'overburden':   region_volumes(pct_overburden, poly_area),
+                          'raw_material': region_volumes(pct_raw_material, poly_area)}
+    print("%-15s overburden   PCT%s = %s m^3" % (name, PCT, np.round(prob_results[name]['overburden']).astype(int)))
+    print("%-15s raw material PCT%s = %s m^3" % (name, PCT, np.round(prob_results[name]['raw_material']).astype(int)))
+
+# %%
+# C2. Raw-material volume, grown region vs. Mette's polygons (bar = P50,
+# whiskers = P5-P95), then the side-by-side tables from `rmu.compare_to_reference`.
+names = ['Grown region'] + list(prob_results)
+V = np.vstack([V_raw_material] + [prob_results[n]['raw_material'] for n in prob_results])
+x = np.arange(len(names))
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.bar(x, V[:, 1], yerr=[V[:, 1] - V[:, 0], V[:, 2] - V[:, 1]],
+       capsize=5, color=['C0'] + ['0.7'] * len(prob_results))
+ax.set_xticks(x)
+ax.set_xticklabels(names)
+ax.set_ylabel('Raw-material volume (m$^3$)')
+ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
+ax.grid(True, axis='y', ls='--', alpha=0.4)
+if hardcopy:
+    fig.savefig('daugaard_rawmat_volume_C.png', dpi=200, bbox_inches='tight')
+plt.show()
+
 DAUGAARD_REFERENCE = {
+    # 'coarser' (gravel-only) is kept for documentation but not compared below --
+    # this workflow only distinguishes raw material (sand+gravel) vs. overburden
+    # (everything else), not a further gravel-only split.
     'Delområde 1': {'overburden': 865_000,   'raw_material': 4_500_000, 'coarser': 1_700_000},
     'Delområde 2': {'overburden': 566_000,   'raw_material': 1_700_000, 'coarser': 1_000_000},
     'Delområde 3': {'overburden': 452_000,   'raw_material': 3_300_000, 'coarser': 2_200_000},
 }
 
-rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, hardcopy=hardcopy,
-                         f_name='daugaard_rawmaterial_comparison')
+rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, quantities=('overburden', 'raw_material'),
+                         hardcopy=hardcopy, f_name='daugaard_rawmaterial_comparison')
 
 # %% [markdown]
 # ### Discussion
@@ -987,7 +783,7 @@ rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, hardcopy=hardcopy,
 # where the tTEM inversion suggested raw material could extend deeper. The
 # probabilistic model is not capped this way, so part of any gap reflects
 # that methodological difference rather than a disagreement about the shallow
-# geology. Whether deep/older units matched by `resolve_material_classes`
-# (e.g. Miocene sand) should count as producible raw material at all is a
+# geology. Whether deep/older units in `raw_classes` (e.g. Miocene sand)
+# should count as producible raw material at all is a
 # geological judgement call that should be reviewed before treating this as a
 # strict apples-to-apples comparison (see Part B's printed class list).

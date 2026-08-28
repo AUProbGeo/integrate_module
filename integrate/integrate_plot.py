@@ -114,6 +114,8 @@ import h5py
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Polygon as MplPolygon
 from integrate.integrate import integrate_posterior_stats
 from integrate.integrate_io import get_geometry, get_number_of_data
 from integrate.integrate import posterior_cumulative_thickness
@@ -4995,4 +4997,89 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             print(f'plot_boreholes: saved {out}')
 
     return fig
+
+
+def plot_voronoi_cells(AREA, P=None, ax=None, cmap='hot_r', vmin=None, vmax=None,
+                       show_edge_affected=True, show_boundary=True, hardcopy=False):
+    """Plot the Voronoi cells of a region returned by :func:`find_coherent_area`.
+
+    Every cell in ``AREA['cells']`` is drawn as a polygon. Cells that failed
+    the edge filter (``AREA['good'] == False``) are hatched grey. If ``P``
+    (one value per sounding, same length as ``AREA['cells']``) is given, the
+    kept cells are filled and colour-mapped by ``P``; otherwise they are
+    drawn unfilled, just the cell boundaries (the Voronoi tessellation).
+
+    Parameters
+    ----------
+    AREA : dict
+        Output of :func:`find_coherent_area` (or any dict with the same
+        ``cells`` / ``good`` / ``boundary`` keys).
+    P : ndarray (N,), optional
+        Per-sounding value to colour the kept cells by (e.g. ``P_raw``).
+    ax : matplotlib Axes, optional
+        Draw into this axes instead of a new figure.
+    cmap, vmin, vmax : colour-mapping of `P` (ignored if `P` is None).
+    show_edge_affected : bool
+        Draw the dropped (edge-affected) cells, hatched grey.
+    show_boundary : bool
+        Draw the concave survey outline (``AREA['boundary']``).
+    hardcopy : bool or str
+        Save the figure as PNG (``True`` -> ``'voronoi_cells.png'``, or a
+        given file name).
+
+    Returns
+    -------
+    fig, ax, mappable
+        The figure/axes, and the coloured `PatchCollection` to pass to
+        ``fig.colorbar(mappable, ...)`` (``None`` if `P` was not given).
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 8))
+    else:
+        fig = ax.figure
+
+    def _patches(idx):
+        patches, keep = [], []
+        for i in idx:
+            c = AREA['cells'][i]
+            if c is None or c.is_empty:
+                continue
+            parts = c.geoms if c.geom_type == "MultiPolygon" else [c]
+            for part in parts:
+                if part.geom_type == "Polygon" and not part.is_empty:
+                    patches.append(MplPolygon(np.asarray(part.exterior.coords)))
+                    keep.append(i)
+        return patches, np.asarray(keep, dtype=int)
+
+    good = AREA['good']
+    patches_good, keep_good = _patches(np.where(good)[0])
+    mappable = None
+    if P is not None:
+        P = np.asarray(P)
+        pc_good = PatchCollection(patches_good, edgecolor='0.75', linewidths=0.15)
+        pc_good.set_cmap(cmap)
+        pc_good.set_array(P[keep_good])
+        pc_good.set_clim(vmin, vmax)
+        mappable = pc_good
+    else:
+        pc_good = PatchCollection(patches_good, facecolor='none', edgecolor='0.3', linewidths=0.5)
+    ax.add_collection(pc_good, autolim=True)
+
+    if show_edge_affected:
+        patches_edge, _ = _patches(np.where(~good)[0])
+        pc_edge = PatchCollection(patches_edge, facecolor='0.85', edgecolor='0.6',
+                                  linewidths=0.15, hatch='//')
+        ax.add_collection(pc_edge, autolim=True)
+
+    if show_boundary:
+        ax.plot(*AREA['boundary'].exterior.xy, color='0.5', lw=0.8, ls=':')
+
+    ax.set_aspect('equal')
+    ax.autoscale_view()
+
+    if hardcopy:
+        fname = hardcopy if isinstance(hardcopy, str) else 'voronoi_cells.png'
+        fig.savefig(fname, dpi=200, bbox_inches='tight')
+
+    return fig, ax, mappable
 

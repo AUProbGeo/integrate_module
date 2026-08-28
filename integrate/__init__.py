@@ -108,6 +108,7 @@ from integrate.integrate_plot import get_colormap_and_limits
 from integrate.integrate_plot import plot_xy
 from integrate.integrate_plot import find_points_along_line_segments
 from integrate.integrate_plot import plot_boreholes
+from integrate.integrate_plot import plot_voronoi_cells
 
 # Import from borehole module
 from integrate.integrate_borehole import compute_P_obs_discrete
@@ -135,6 +136,14 @@ from integrate.integrate_query import prior_describe
 from integrate.integrate_query import query_from_text
 from integrate.integrate_query import title_from_json
 from integrate.integrate_query import query_test_llm
+
+# Import coherent-area (region-search) functions
+from integrate.integrate_query import voronoi_graph
+from integrate.integrate_query import voronoi_cells_ordered
+from integrate.integrate_query import cells_to_polygon
+from integrate.integrate_query import flag_edge_cells
+from integrate.integrate_query import grow_connected_region
+from integrate.integrate_query import find_coherent_area
 
 # Import gex module functions
 from integrate.gex import read_gex as read_gex2
