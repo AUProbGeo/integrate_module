@@ -639,19 +639,9 @@ for icenter in range(len(POS_CENTER)):
 # sand+gravel) and overburden (`fine_classes`: every other, non-raw class) --
 # run once over ALL soundings, exactly like the percentile-query examples in
 # `integrate_query.py`. Volume at each percentile = sum(percentile_thickness *
-# cell_area) over the grown region's soundings (`AREA['mask']`, from B8).
+# cell_area) over the grown region's soundings (`AREA['mask']`, from B8), via
+# `ig.region_volumes(pct, area)`.
 
-# %%
-# ---- volume = sum(percentile thickness * cell area), over AREA['mask'] ----
-def region_volumes(pct, AREA):
-    """Volume at each percentile in `pct` ((N_sounding, len(PCT)), e.g.
-    `pct_raw_material`), summed over the soundings in `AREA['mask']`."""
-    m = AREA['mask']
-    return np.nansum(pct[m, :] * AREA['cell_area'][m, None], axis=0)
-
-
-
- 
 # %%
 # ---- A. one percentile query per quantity (run ONCE, shared by every AREA) -
 PCT = [5, 50, 95]      # -> low / median / high
@@ -670,8 +660,8 @@ V_raw_material_list  = []
 
 for iarea, AREA in enumerate(AREA_LIST):
 
-    V_overburden   = region_volumes(pct_overburden, AREA)
-    V_raw_material = region_volumes(pct_raw_material, AREA)
+    V_overburden   = ig.region_volumes(pct_overburden, AREA)
+    V_raw_material = ig.region_volumes(pct_raw_material, AREA)
     V_overburden_list.append(V_overburden)
     V_raw_material_list.append(V_raw_material)
     print("%-8s overburden   PCT%s = %s m^3" % (AREA_NAMES[iarea], PCT, np.round(V_overburden).astype(int)))
@@ -712,7 +702,7 @@ plt.show()
 #
 # Everything that involves Mette's hand-drawn target polygons lives here --
 # Part B is about the probabilistic result only. Per-polygon low / median /
-# high volumes reuse the same `region_volumes(pct, AREA)` helper and the
+# high volumes reuse the same `ig.region_volumes(pct, area)` helper and the
 # `pct_*` arrays queried in B9, on an AREA-like dict built from the
 # per-sounding area inside each of Mette's polygons (rasterized at
 # `CELL_SIZE` resolution via `rmu.compute_point_footprint_area`). Reference
@@ -731,8 +721,8 @@ prob_results = {}
 for name, polygon in polygons.items():
     footprint_area = rmu.compute_point_footprint_area(X, Y, polygon, cell_size=CELL_SIZE)
     poly_area = {'mask': footprint_area > 0, 'cell_area': footprint_area}
-    prob_results[name] = {'overburden':   region_volumes(pct_overburden, poly_area),
-                          'raw_material': region_volumes(pct_raw_material, poly_area)}
+    prob_results[name] = {'overburden':   ig.region_volumes(pct_overburden, poly_area),
+                          'raw_material': ig.region_volumes(pct_raw_material, poly_area)}
     print("%-15s overburden   PCT%s = %s m^3" % (name, PCT, np.round(prob_results[name]['overburden']).astype(int)))
     print("%-15s raw material PCT%s = %s m^3" % (name, PCT, np.round(prob_results[name]['raw_material']).astype(int)))
 

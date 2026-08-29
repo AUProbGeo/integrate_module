@@ -144,6 +144,7 @@ from integrate.integrate_query import cells_to_polygon
 from integrate.integrate_query import flag_edge_cells
 from integrate.integrate_query import grow_connected_region
 from integrate.integrate_query import find_coherent_area
+from integrate.integrate_query import region_volumes
 
 # Import gex module functions
 from integrate.gex import read_gex as read_gex2

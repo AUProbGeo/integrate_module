@@ -1930,3 +1930,27 @@ def find_coherent_area(X, Y, P, p_min, X_center=None, Y_center=None, max_area_m2
             'area': float(cell_area[idx].sum()), 'order': order, 'mask': mask,
             'vor': vor, 'neighbors': neighbors, 'cells': cells,
             'cell_area': cell_area, 'boundary': boundary, 'good': good}
+
+
+def region_volumes(pct, area):
+    """Volume at each percentile, summed over an area's soundings.
+
+    Parameters
+    ----------
+    pct : ndarray (N_sounding, N_pct)
+        Per-sounding posterior thickness percentiles [m] (e.g. the array
+        returned by ``ig.query(f_post_h5, {"metric": ..., "percentiles": ...})``).
+    area : dict
+        Must provide ``mask`` ((N,) bool -- which soundings to sum over) and
+        ``cell_area`` ((N,) float [m^2] -- the representative area of each
+        sounding). A dict returned by :func:`find_coherent_area` works directly;
+        so does any ``{'mask': ..., 'cell_area': ...}`` (e.g. one built from the
+        soundings inside a hand-drawn polygon).
+
+    Returns
+    -------
+    ndarray (N_pct,)
+        ``sum(pct[mask] * cell_area[mask])`` -- one volume [m^3] per percentile.
+    """
+    m = area['mask']
+    return np.nansum(pct[m, :] * area['cell_area'][m, None], axis=0)
