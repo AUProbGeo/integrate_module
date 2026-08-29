@@ -81,7 +81,7 @@ def load_target_polygons(shp_path, name_field=None, area_id_map=None):
 
 
 def plot_polygons_over_points(X, Y, polygons, title='', hardcopy=False,
-                               profile_xy=None, profile_idx=None):
+                               profile_xy=None, profile_idx=None, suffix=''):
     """
     Sanity-check plot: survey sounding locations plus target-area outlines,
     on the same axes. Used right after loading the data and the shapefile to
@@ -110,6 +110,9 @@ def plot_polygons_over_points(X, Y, polygons, title='', hardcopy=False,
         Indices into `X`/`Y` of the sounding locations found along the
         profile (e.g. the `indices` returned by
         `ig.find_points_along_line_segments`), highlighted as dots.
+    suffix : str
+        Appended to the hardcopy file name (e.g. an ``N<N>_`` / run tag) so
+        the figure is specific to the current run settings.
     """
     fig, ax = plt.subplots(figsize=(9, 8))
     # Plotted with a tiny markersize (there can be tens of thousands of
@@ -141,7 +144,7 @@ def plot_polygons_over_points(X, Y, polygons, title='', hardcopy=False,
     ax.legend(handles=handles, fontsize=8)
     ax.grid(True, linestyle='--', alpha=0.4)
     if hardcopy:
-        fig.savefig('%s_polygon_alignment.png' % (title.replace(' ', '_') or 'check'), dpi=200)
+        fig.savefig('%s_polygon_alignment%s.png' % (title.replace(' ', '_') or 'check', suffix), dpi=200)
     plt.show()
 
 

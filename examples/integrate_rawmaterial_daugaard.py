@@ -89,6 +89,7 @@ hardcopy = True
 # %%
 # --- run-size settings -------------------------------------------------
 N = 1_000_000   # production-scale
+N = 100_000      # demo-scale; increase for a production-quality run
 #N = 12_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
@@ -214,7 +215,8 @@ print("Found %d soundings within %.0f m of the widened west-to-east center profi
 # rather than assuming.) The selected profile line and its soundings are
 # overlaid on the same plot.
 rmu.plot_polygons_over_points(X, Y, polygons, title='Daugaard', hardcopy=hardcopy,
-                              profile_xy=(Xl_wide, Yl_wide), profile_idx=id_line)
+                              profile_xy=(Xl_wide, Yl_wide), profile_idx=id_line,
+                              suffix=SUFFIX)
 
 
 # %% [markdown]
@@ -528,7 +530,7 @@ P_raw, meta_raw = ig.query(f_post_h5, query_raw)
 ig.query_plot(P_raw, meta_raw,
               query_text="P(raw material)",
               text_panel=True,
-              hardcopy=PREFIX + 'daugaard_P_raw' if hardcopy else False)
+              hardcopy=PREFIX + 'daugaard_P_raw' + SUFFIX if hardcopy else False)
 
 
 
@@ -683,7 +685,7 @@ for iarea, AREA in enumerate(AREA_LIST):
     fig.colorbar(mappable, ax=ax, label='P_raw')
     ax.legend(fontsize=8)
     if hardcopy:
-        fig.savefig('%sdaugaard_voronoi_cells_area%d.png' % (PREFIX, iarea), dpi=200, bbox_inches='tight')
+        fig.savefig('%sdaugaard_voronoi_cells_area%d%s.png' % (PREFIX, iarea, SUFFIX), dpi=200, bbox_inches='tight')
     plt.show()
 
 # ---- C. raw-material volume, one bar per grown area ----------------------------
@@ -698,7 +700,7 @@ ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume per grown area  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig(PREFIX + 'daugaard_rawmat_volume_B.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_rawmat_volume_B' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 
@@ -746,7 +748,7 @@ ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig(PREFIX + 'daugaard_rawmat_volume_C.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_rawmat_volume_C' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -780,7 +782,7 @@ ax.set_title("Voronoi cells (P_raw) -- Mette's polygons vs. the grown areas")
 fig.colorbar(mappable, ax=ax, label='P_raw')
 ax.legend(fontsize=8, loc='best')
 if hardcopy:
-    fig.savefig(PREFIX + 'daugaard_voronoi_areas_vs_mette.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_voronoi_areas_vs_mette' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 DAUGAARD_REFERENCE = {
@@ -793,7 +795,7 @@ DAUGAARD_REFERENCE = {
 }
 
 rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, quantities=('overburden', 'raw_material'),
-                         hardcopy=hardcopy, f_name=PREFIX + 'daugaard_rawmaterial_comparison')
+                         hardcopy=hardcopy, f_name=PREFIX + 'daugaard_rawmaterial_comparison' + SUFFIX)
 
 # %% [markdown]
 # ### Discussion
