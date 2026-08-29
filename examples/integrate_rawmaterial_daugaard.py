@@ -87,8 +87,8 @@ hardcopy = True
 
 # %%
 # --- run-size settings -------------------------------------------------
-N = 4_000_000   # production-scale
-N = 12_000      # demo-scale; increase for a production-quality run
+N = 1_000_000   # production-scale
+#N = 12_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -512,11 +512,12 @@ else:
        'depth_max': 30.0,
        'negate': False}]}
 
+
+# %%
+# perform the que
 raw_classes = query_raw['constraints'][0]['classes']    # sand + gravel: coarse raw material
 fine_classes = query_raw['constraints'][1]['classes']    # everything else: fine, non-raw material (overburden)
 
-# %%
-# perform the query
 P_raw, meta_raw = ig.query(f_post_h5, query_raw)
 
 ig.query_plot(P_raw, meta_raw,
@@ -524,22 +525,6 @@ ig.query_plot(P_raw, meta_raw,
               text_panel=True,
               hardcopy='daugaard_P_raw' if hardcopy else False)
 
-
-# %%
-# west-to-east profile line overlaid for context.
-fig, ax = plt.subplots(figsize=(9, 8))
-sc = ax.scatter(X, Y, c=P_raw, s=6, cmap='hot_r', vmin=0, vmax=1)
-ax.plot(Xl_wide, Yl_wide, 'r--', lw=1.2, label='W-E profile')
-ax.plot(X[id_line], Y[id_line], 'r.', ms=3)
-ax.set_aspect('equal')
-ax.set_xlabel('UTM X (m)')
-ax.set_ylabel('UTM Y (m)')
-ax.set_title('P(raw material) with profile')
-fig.colorbar(sc, ax=ax, label='P_raw')
-ax.legend(fontsize=8)
-if hardcopy:
-    fig.savefig('daugaard_P_raw_context.png', dpi=200, bbox_inches='tight')
-plt.show()
 
 
 # %% [markdown]
@@ -665,8 +650,10 @@ def region_volumes(pct, AREA):
     return np.nansum(pct[m, :] * AREA['cell_area'][m, None], axis=0)
 
 
+
+ 
 # %%
-# ---- A. one percentile query per quantity ---------------------------------
+# ---- A. one percentile query per quantity (run ONCE, shared by every AREA) -
 PCT = [5, 50, 95]      # -> low / median / high
 
 query_overburden   = {"im": 2, "classes": fine_classes, "thickness_mode": "cumulative", "depth_min": 0.0}
@@ -676,38 +663,44 @@ pct_overburden, _   = ig.query(f_post_h5, {"metric": query_overburden, "percenti
 pct_raw_material, _ = ig.query(f_post_h5, {"metric": query_raw_material, "percentiles": PCT})
 # each: (N_sounding, len(PCT)) posterior thickness percentiles [m], one row per sounding
 
-# ---- volume of the region grown in B8 (AREA) -------------------------------
-V_overburden = region_volumes(pct_overburden, AREA)
-V_raw_material = region_volumes(pct_raw_material, AREA)
-print("Grown region overburden   PCT%s = %s m^3" % (PCT, np.round(V_overburden).astype(int)))
-print("Grown region raw material PCT%s = %s m^3" % (PCT, np.round(V_raw_material).astype(int)))
+# ---- B. volume per grown area (one entry per AREA in AREA_LIST) -----------
+AREA_NAMES         = ['Area %d' % i for i in range(len(AREA_LIST))]
+V_overburden_list   = []
+V_raw_material_list  = []
 
+for iarea, AREA in enumerate(AREA_LIST):
 
-# %%
-# Voronoi cells coloured by P_raw; edge-affected cells hatched grey; the
-# grown region's cells outlined.
-fig, ax, mappable = ig.plot_voronoi_cells(AREA, P=P_raw, vmin=0, vmax=1)
-ax.plot(*AREA['polygon'].exterior.xy, color='k', lw=2.5, label='grown region')
-ax.set_xlabel('UTM X (m)')
-ax.set_ylabel('UTM Y (m)')
-ax.set_title('Voronoi cells coloured by P_raw  (grey hatch = edge-affected, dropped)')
-fig.colorbar(mappable, ax=ax, label='P_raw')
-ax.legend(fontsize=8)
-if hardcopy:
-    fig.savefig('daugaard_voronoi_cells.png', dpi=200, bbox_inches='tight')
-plt.show()
+    V_overburden   = region_volumes(pct_overburden, AREA)
+    V_raw_material = region_volumes(pct_raw_material, AREA)
+    V_overburden_list.append(V_overburden)
+    V_raw_material_list.append(V_raw_material)
+    print("%-8s overburden   PCT%s = %s m^3" % (AREA_NAMES[iarea], PCT, np.round(V_overburden).astype(int)))
+    print("%-8s raw material PCT%s = %s m^3" % (AREA_NAMES[iarea], PCT, np.round(V_raw_material).astype(int)))
 
+    # Voronoi cells coloured by P_raw; edge-affected cells hatched grey; this
+    # area's grown region outlined.
+    fig, ax, mappable = ig.plot_voronoi_cells(AREA, P=P_raw, vmin=0, vmax=1)
+    ax.plot(*AREA['polygon'].exterior.xy, color='k', lw=2.5, label='grown region')
+    ax.plot(AREA['X_center'], AREA['Y_center'], 'ko', ms=25, label='center location')
+    ax.set_xlabel('UTM X (m)')
+    ax.set_ylabel('UTM Y (m)')
+    ax.set_title('%s -- Voronoi cells coloured by P_raw  (grey hatch = edge-affected, dropped)' % AREA_NAMES[iarea])
+    fig.colorbar(mappable, ax=ax, label='P_raw')
+    ax.legend(fontsize=8)
+    if hardcopy:
+        fig.savefig('daugaard_voronoi_cells_area%d.png' % iarea, dpi=200, bbox_inches='tight')
+    plt.show()
 
-# %%
-# Raw-material volume, grown region only (bar = P50, whiskers = P5-P95).
-# Purely probabilistic -- no comparison to Mette's polygons (see Part C).
-fig, ax = plt.subplots(figsize=(4, 5))
-ax.bar(0, V_raw_material[1], yerr=[[V_raw_material[1] - V_raw_material[0]],
-                                   [V_raw_material[2] - V_raw_material[1]]], capsize=5, color='C0')
-ax.set_xticks([0])
-ax.set_xticklabels(['Grown region'])
+# ---- C. raw-material volume, one bar per grown area ----------------------------
+# Purely probabilistic -- comparison to Mette's polygons is in Part C.
+Vg = np.vstack(V_raw_material_list)
+xg = np.arange(len(AREA_LIST))
+fig, ax = plt.subplots(figsize=(3 + 1.5 * len(AREA_LIST), 5))
+ax.bar(xg, Vg[:, 1], yerr=[Vg[:, 1] - Vg[:, 0], Vg[:, 2] - Vg[:, 1]], capsize=5, color='C0')
+ax.set_xticks(xg)
+ax.set_xticklabels(AREA_NAMES)
 ax.set_ylabel('Raw-material volume (m$^3$)')
-ax.set_title('Raw-material volume, grown region  (bar = P50, whiskers = P5-P95)')
+ax.set_title('Raw-material volume per grown area  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
     fig.savefig('daugaard_rawmat_volume_B.png', dpi=200, bbox_inches='tight')
@@ -726,6 +719,11 @@ plt.show()
 # numbers are transcribed from
 # `ReferenceProjects/Sdr Felding og Daugard til Integrate.pptx`
 # (cross-checked against the shapefile polygon areas).
+#
+# The grown region is no longer a single area: every area in `AREA_LIST`
+# (grown from its own centre in B8) is carried through the comparison, so
+# C2's bar chart shows one bar per grown area alongside one per Mette
+# polygon, and C3 overlays both sets on the Voronoi tessellation.
 
 # %%
 # C1. Low / median / high volumes for each of Mette's target polygons.
@@ -739,21 +737,55 @@ for name, polygon in polygons.items():
     print("%-15s raw material PCT%s = %s m^3" % (name, PCT, np.round(prob_results[name]['raw_material']).astype(int)))
 
 # %%
-# C2. Raw-material volume, grown region vs. Mette's polygons (bar = P50,
+# C2. Raw-material volume, every grown area vs. Mette's polygons (bar = P50,
 # whiskers = P5-P95), then the side-by-side tables from `rmu.compare_to_reference`.
-names = ['Grown region'] + list(prob_results)
-V = np.vstack([V_raw_material] + [prob_results[n]['raw_material'] for n in prob_results])
+names = AREA_NAMES + list(prob_results)
+V = np.vstack(V_raw_material_list + [prob_results[n]['raw_material'] for n in prob_results])
 x = np.arange(len(names))
-fig, ax = plt.subplots(figsize=(7, 5))
+fig, ax = plt.subplots(figsize=(5 + 1.2 * len(names), 5))
 ax.bar(x, V[:, 1], yerr=[V[:, 1] - V[:, 0], V[:, 2] - V[:, 1]],
-       capsize=5, color=['C0'] + ['0.7'] * len(prob_results))
+       capsize=5, color=['C0'] * len(AREA_NAMES) + ['0.7'] * len(prob_results))
 ax.set_xticks(x)
-ax.set_xticklabels(names)
+ax.set_xticklabels(names, rotation=30, ha='right')
 ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
     fig.savefig('daugaard_rawmat_volume_C.png', dpi=200, bbox_inches='tight')
+plt.show()
+
+# %%
+# C3. Voronoi overview: cells coloured by P_raw, with Mette's target polygons
+# (shades of blue, thin solid lines) and the grown areas (black->light-grey,
+# thicker solid lines) drawn on top. The Voronoi scaffold (cells / edge filter
+# / survey outline) is identical for every AREA, so AREA_LIST[0] is the backdrop.
+fig, ax, mappable = ig.plot_voronoi_cells(AREA_LIST[0], P=P_raw, vmin=0, vmax=1)
+
+def _grey_shades(n, lo=0.0, hi=0.75):
+    """n greyscale levels from black (`lo`) to light grey (`hi`)."""
+    return [str(lo + (hi - lo) * (i / max(n - 1, 1))) for i in range(n)]
+
+area_greys = _grey_shades(len(AREA_LIST))
+for i, AREA in enumerate(AREA_LIST):
+    shade = area_greys[i]
+    ax.plot(*AREA['polygon'].exterior.xy, color=shade, lw=3.0, zorder=3,
+            label=AREA_NAMES[i])
+    ax.plot(AREA['X_center'], AREA['Y_center'], marker='o', color=shade,
+            ms=12, mec='k', zorder=5)
+
+mette_blues = [plt.cm.Blues(0.45 + 0.5 * (i / max(len(polygons) - 1, 1)))
+               for i in range(len(polygons))]
+for i, (name, polygon) in enumerate(polygons.items()):
+    ax.plot(*polygon.exterior.xy, color=mette_blues[i], lw=1.0, zorder=4,
+            label="Mette: %s" % name)
+
+ax.set_xlabel('UTM X (m)')
+ax.set_ylabel('UTM Y (m)')
+ax.set_title("Voronoi cells (P_raw) -- Mette's polygons vs. the grown areas")
+fig.colorbar(mappable, ax=ax, label='P_raw')
+ax.legend(fontsize=8, loc='best')
+if hardcopy:
+    fig.savefig('daugaard_voronoi_areas_vs_mette.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 DAUGAARD_REFERENCE = {
@@ -787,3 +819,5 @@ rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, quantities=('overburd
 # should count as producible raw material at all is a
 # geological judgement call that should be reviewed before treating this as a
 # strict apples-to-apples comparison (see Part B's printed class list).
+
+# %%

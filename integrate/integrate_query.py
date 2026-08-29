@@ -1277,7 +1277,7 @@ def _litellm_extra(model):
     return {}
 
 
-def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_key=None, max_tokens=4096, verbose=False):
+def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_key=None, max_tokens=4096, verbose=False, system_prompt=None):
     """
     Translate a natural-language query into a query dict using an LLM.
 
@@ -1302,6 +1302,10 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
         (e.g. ANTHROPIC_API_KEY) is used.
     verbose : bool, optional
         If True, print the system prompt and LLM response for inspection.
+    system_prompt : str, optional
+        Custom system prompt overriding the default built from the prior file.
+        Use to hand-tune the translation instructions (model list and schema
+        context). The effective prompt is still returned for inspection.
 
     Returns
     -------
@@ -1346,7 +1350,7 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
             "Install it with: pip install litellm"
         )
 
-    system_prompt = _build_llm_system_prompt(f_prior_h5)
+    system_prompt = system_prompt if system_prompt is not None else _build_llm_system_prompt(f_prior_h5)
 
     if verbose:
         print("=== SYSTEM PROMPT ===")
@@ -1631,3 +1635,298 @@ def query_test_llm(model='anthropic/claude-sonnet-4-6', api_key=None, verbose=1)
             print(f"  Raw response: {result['response']}")
 
     return result
+
+
+# ----------------------------------------------------------------------
+# Coherent-area search: grow a connected high-probability region
+# ----------------------------------------------------------------------
+import heapq
+from scipy.spatial import Voronoi, ConvexHull
+from shapely import concave_hull, voronoi_polygons, distance
+from shapely import points as sh_points
+from shapely import MultiPoint, STRtree
+from shapely.geometry import Polygon, Point
+from shapely.ops import unary_union
+
+
+def voronoi_graph(X, Y):
+    """(vor, neighbors): scipy Voronoi object + neighbour-index lists (cells sharing an edge).
+
+    Fails on exactly-duplicated coordinates -- deduplicate X, Y first if that happens.
+    """
+    vor = Voronoi(np.column_stack([X, Y]))
+    nb = [set() for _ in range(len(X))]
+    for a, b in vor.ridge_points:
+        nb[a].add(int(b))
+        nb[b].add(int(a))
+    return vor, [sorted(s) for s in nb]
+
+
+def voronoi_cells_ordered(X, Y, boundary):
+    """Per-sounding Voronoi cell polygons, in input order, clipped to `boundary`.
+
+    Always returns exactly ``len(X)`` entries with ``cells[i]`` belonging to
+    sounding ``i`` (each cell is matched to the sounding point it contains, or
+    the nearest sounding as a fallback), so ``cells`` / ``cell_area`` stay
+    aligned with ``X`` / ``Y`` / ``P``.
+    """
+    XY = np.column_stack([X, Y])
+    raw = list(voronoi_polygons(MultiPoint(XY), extend_to=boundary).geoms)
+    tree = STRtree([Point(xy) for xy in XY])
+    cells = [None] * len(XY)
+    for cell in raw:
+        inside = tree.query(cell, predicate="contains")
+        idx = int(inside[0]) if len(inside) else int(tree.nearest(cell.centroid))
+        cells[idx] = cell.intersection(boundary)
+    return cells
+
+
+def cells_to_polygon(cells, mask):
+    """Union of the masked Voronoi cells -> a single shapely Polygon (largest part)."""
+    poly = unary_union([c for i, c in enumerate(cells)
+                        if c is not None and mask[i]]).buffer(0)
+    if poly.geom_type == "MultiPolygon":
+        poly = max(poly.geoms, key=lambda g: g.area)
+    return poly
+
+
+def flag_edge_cells(X, Y, vor, cells, boundary, edge_buffer=None, k=6.0, elong_max=None):
+    """Boolean `good` mask -- False for edge-affected soundings on the sparse survey rim.
+
+    A sounding is dropped if its Voronoi cell is unbounded (a convex-hull
+    vertex), or if it lies within `edge_buffer` of the survey outline AND its
+    cell is either much larger than the interior-median cell (> k x) or very
+    elongated (perimeter^2 / (4 pi area) > elong_max). Large cells that are
+    NOT near the rim (interior data gaps) are kept.
+
+    Returns (good, edge_affected, info).
+    """
+    n = len(X)
+    area = np.array([c.area if (c is not None and not c.is_empty) else 0.0 for c in cells])
+    peri = np.array([c.length if (c is not None and not c.is_empty) else 0.0 for c in cells])
+
+    # unbounded Voronoi cell -> the sounding is a convex-hull vertex -> definitely edge
+    is_open = np.array([
+        (len(vor.regions[vor.point_region[i]]) == 0) or (-1 in vor.regions[vor.point_region[i]])
+        for i in range(n)])
+
+    if edge_buffer is None:
+        base = area[(~is_open) & (area > 0)]
+        edge_buffer = 2.0 * np.sqrt(np.median(base)) if base.size else 0.0
+
+    near_boundary = distance(sh_points(np.asarray(X), np.asarray(Y)), boundary.exterior) < edge_buffer
+
+    interior = (~is_open) & (~near_boundary) & (area > 0)
+    a_med = float(np.median(area[interior])) if interior.any() else float(np.median(area[area > 0]))
+    oversized = area > k * a_med
+
+    if elong_max is not None:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            elong = peri ** 2 / (4.0 * np.pi * np.where(area > 0, area, np.nan))
+        stretched = np.nan_to_num(elong, nan=0.0) > elong_max
+    else:
+        stretched = np.zeros(n, dtype=bool)
+
+    edge_affected = is_open | (near_boundary & (oversized | stretched))
+    info = dict(edge_buffer=float(edge_buffer), a_med=a_med,
+                n_open=int(is_open.sum()), n_near=int(near_boundary.sum()),
+                n_dropped=int(edge_affected.sum()))
+    return ~edge_affected, edge_affected, info
+
+
+def grow_connected_region(P, neighbors, cell_area, p_min, max_area_m2=None, seed=None):
+    """Grow one connected high-probability region outward from a seed sounding.
+
+    Starting at ``seed``, repeatedly add the adjacent sounding with the highest
+    ``P``, keeping only those with ``P >= p_min``.  Growth stops on its own when
+    no untried adjacent sounding is likely enough, or when the accumulated area
+    reaches ``max_area_m2`` (if given).
+
+    This is the pure graph step -- it needs a pre-built adjacency graph and
+    per-sounding areas but no Voronoi/shapely.  Use :func:`find_coherent_area`
+    for the full geometry pipeline (Voronoi + edge filter + boundary polygon).
+
+    Parameters
+    ----------
+    P : ndarray (N,)
+        Per-sounding score/probability; ``NaN``/``-inf`` soundings are never
+        added (use this to make edge-dropped soundings unreachable).
+    neighbors : list of iterable of int
+        Adjacency graph; ``neighbors[i]`` = indices of soundings adjacent to i.
+    cell_area : ndarray (N,)
+        Per-sounding representative area [m^2]; summed into ``area``.
+    p_min : float
+        Inclusion cutoff -- the region grows while the best neighbour has
+        ``P >= p_min``.
+    max_area_m2 : float, optional
+        Hard cap on the accumulated area [m^2]; None = no cap.
+    seed : int, optional
+        Starting sounding index; None -> argmax of ``P``.
+
+    Returns
+    -------
+    indices : ndarray (M,) int
+        Indices of the soundings in the grown region (includes the seed).
+    area : float
+        Accumulated area [m^2], sum of ``cell_area`` over ``indices``.
+    order : list of int
+        ``indices`` in the order they were added (growth path; order[0] = seed).
+    """
+    P = np.where(np.isfinite(P), P, -np.inf)
+    if seed is None:
+        seed = int(np.argmax(P))
+    in_region = np.zeros(len(P), dtype=bool)
+    in_region[seed] = True
+    area = float(cell_area[seed])
+    order = [seed]
+    seen = np.zeros(len(P), dtype=bool)
+    seen[seed] = True
+    frontier = []                       # max-heap on P via negative key
+    for j in neighbors[seed]:
+        heapq.heappush(frontier, (-P[j], j))
+        seen[j] = True
+    while frontier:
+        if max_area_m2 is not None and area >= max_area_m2:
+            break
+        negp, j = heapq.heappop(frontier)
+        if -negp < p_min:               # best remaining neighbour is below cutoff -> done
+            break
+        if in_region[j]:
+            continue
+        in_region[j] = True
+        area += float(cell_area[j])
+        order.append(j)
+        for k in neighbors[j]:
+            if not seen[k]:
+                heapq.heappush(frontier, (-P[k], k))
+                seen[k] = True
+    return np.asarray(order, dtype=int), area, order
+
+
+def find_coherent_area(X, Y, P, p_min, X_center=None, Y_center=None, max_area_m2=None,
+                       seed_index=None, xy=None,
+                       hull_ratio=0.10, edge_buffer=None, cell_area_k=6.0, elong_max=4.0):
+    """Grow one coherent high-probability area and return its indices + polygon.
+
+    Full geometry pipeline in one call.  From the sounding coordinates a
+    Voronoi tessellation defines the adjacency graph and the per-sounding cell
+    areas; the cells are clipped to a concave hull of the survey so their areas
+    are meaningful.  Edge-affected soundings (huge, badly constrained cells on
+    the sparse survey rim) are dropped -- they can neither seed a region nor be
+    reached by growth.  A connected region is then grown with
+    :func:`grow_connected_region` and its boundary returned as a polygon.
+
+    Parameters
+    ----------
+    X, Y : ndarray (N,) or (N, 1)
+        Sounding coordinates [m]; column vectors (raw HDF5) are flattened.
+    P : ndarray (N,) or (N, 1)
+        Per-sounding probability/score, aligned with ``X``/``Y``.  Soundings
+        failing the edge filter are made unreachable internally.
+    p_min : float
+        Inclusion probability cutoff (the region "width"/area knob).
+    X_center, Y_center : float, optional
+        Seed the region near this (x, y) -- the nearest *kept* sounding is used
+        as the center.  If both are None (and no ``seed_index``/``xy``), the
+        sounding with the maximum ``P`` is used.  The resolved center is
+        returned in the output as ``X_center`` / ``Y_center``.
+    max_area_m2 : float, optional
+        Hard cap on the region area [m^2]; None = no cap.
+    seed_index : int, optional
+        Seed at this exact sounding index (bypasses ``X_center``/``Y_center``).
+    xy : (float, float), optional
+        Deprecated alias for ``(X_center, Y_center)``.  At most one seed
+        selector (``X_center``/``Y_center``/``xy``, ``seed_index``) may be set.
+    hull_ratio : float, optional
+        Concave-hull tightness for the survey outline (0 = tight, 1 = convex).
+    edge_buffer, cell_area_k, elong_max : optional
+        Edge-filter parameters; see :func:`flag_edge_cells`.
+
+    Returns
+    -------
+    region : dict
+        ``idx`` (int (M,) region sounding indices), ``polygon`` (shapely
+        Polygon outline), ``seed`` (int), ``area`` (float [m^2]), ``order``
+        (list[int] growth path), ``X_center`` / ``Y_center`` (float -- the
+        sounding coordinates actually used as the region center/seed: the
+        requested ``X_center``/``Y_center`` snapped to its nearest sounding, or
+        the argmax-``P`` sounding if no center was given), plus the reusable
+        Voronoi scaffold:
+        ``vor`` (scipy Voronoi), ``neighbors`` (list[list[int]] adjacency), ``cells``
+        (per-sounding clipped cell polygons), ``cell_area`` ((N,) float),
+        ``boundary`` (concave survey outline Polygon), ``good`` ((N,) bool
+        edge-filter keep mask) and ``mask`` ((N,) bool) -- ``mask[i] = i in idx``.
+        For several regions of interest share this scaffold across calls, or
+        pass ``vor``/``neighbors``/``cells``/``cell_area``/``boundary``/``good``
+        into :func:`grow_connected_region` to grow extra regions without
+        recomputing the geometry.
+
+    Examples
+    --------
+    >>> region = find_coherent_area(X, Y, P_raw, p_min=0.5)
+    >>> region['idx'], region['polygon'].area, region['area']
+    >>> # extra region on the same scaffold, no recompute:
+    >>> idx2, area2, _ = grow_connected_region(
+    ...     np.where(region['good'], P_raw, -np.inf),
+    ...     region['neighbors'], region['cell_area'], p_min=0.5,
+    ...     seed=region['seed'])
+    """
+    # Accept 1-D (N,) or column (N,1) arrays (raw HDF5 UTMX/UTMY are (N,1));
+    # canonicalize to 1-D. A genuine N mismatch is still an error.
+    X = np.asarray(X, dtype=float).ravel()
+    Y = np.asarray(Y, dtype=float).ravel()
+    P = np.asarray(P, dtype=float).ravel()
+    if not (X.size == Y.size == P.size):
+        raise ValueError("X, Y and P must have the same length N (got %d / %d / %d)"
+                         % (X.size, Y.size, P.size))
+    # Resolve the optional center/seed selectors into a single target point.
+    if (X_center is None) != (Y_center is None):
+        raise ValueError("X_center and Y_center must be given together (or both None).")
+    if xy is not None:
+        if X_center is not None:
+            raise ValueError("Give either X_center/Y_center or xy, not both.")
+        X_center, Y_center = xy
+    n_seed_selectors = int((X_center is not None) or (Y_center is not None)) + int(seed_index is not None)
+    if n_seed_selectors > 1:
+        raise ValueError("Give only one seed selector: X_center/Y_center (or xy), or seed_index.")
+
+    # Voronoi adjacency graph + concave survey outline + per-sounding cells.
+    vor, neighbors = voronoi_graph(X, Y)
+    XY = np.column_stack([X, Y])
+    boundary = concave_hull(MultiPoint(XY), ratio=hull_ratio)
+    if boundary.geom_type == "MultiPolygon":
+        boundary = max(boundary.geoms, key=lambda g: g.area)
+    if boundary.is_empty or boundary.geom_type != "Polygon":
+        boundary = Polygon(XY[ConvexHull(XY).vertices])         # convex-hull fallback
+    cells = voronoi_cells_ordered(X, Y, boundary)
+    cell_area = np.array([c.area if (c is not None and not c.is_empty) else 0.0
+                          for c in cells])
+
+    # Drop edge-affected soundings: they can neither seed nor join a region.
+    good, _, _ = flag_edge_cells(X, Y, vor, cells, boundary,
+                                 edge_buffer=edge_buffer, k=cell_area_k, elong_max=elong_max)
+    P_eff = np.where(good, P, -np.inf)
+
+    # Resolve the seed: explicit index, nearest kept sounding to the requested
+    # center, or (default) the highest-probability kept sounding.
+    if seed_index is not None:
+        seed = int(seed_index)
+        if not good[seed]:
+            raise ValueError("seed_index %d is an edge-affected (dropped) sounding" % seed)
+    elif X_center is not None:
+        cand = np.where(good)[0]
+        seed = int(cand[np.argmin((X[cand] - X_center) ** 2 + (Y[cand] - Y_center) ** 2)])
+    else:
+        seed = int(np.nanargmax(P_eff))
+
+    idx, _, order = grow_connected_region(P_eff, neighbors, cell_area,
+                                          p_min=p_min, max_area_m2=max_area_m2, seed=seed)
+    mask = np.zeros(len(P), dtype=bool)
+    mask[idx] = True
+    polygon = cells_to_polygon(cells, mask)
+
+    return {'idx': idx, 'polygon': polygon, 'seed': seed,
+            'X_center': float(X[seed]), 'Y_center': float(Y[seed]),
+            'area': float(cell_area[idx].sum()), 'order': order, 'mask': mask,
+            'vor': vor, 'neighbors': neighbors, 'cells': cells,
+            'cell_area': cell_area, 'boundary': boundary, 'good': good}
