@@ -109,6 +109,27 @@ Natural-language queries over posterior realizations (the `ig_query` pane):
    map figure, plus expandable **Query JSON** and **System Prompt** sections.
    Percentile questions (“p5/p50/p95 of …”) are handled too.
 
+### Query Volume — `/query-volume`
+
+Visual probabilistic volume computations over a posterior file (the B8–B9
+workflow of `examples/integrate_rawmaterial_daugaard.py` as a UI):
+
+1. **LLM / Posterior File** — same as the Query tool.
+2. **A. Probability map** — plain-English probability query (e.g. *“probability
+   that cumulative sand-and-gravel thickness exceeds 10 m within the top 30 m”*).
+   The result is an interactive map of every sounding coloured by probability
+   (grey = edge-affected, dropped; dotted line = survey outline).
+3. **B. Interactive region growing** — click a sounding to set the **center**
+   (snapped to the nearest kept sounding), adjust `P_MIN` (inclusion cutoff) and
+   optionally `MAX_AREA_M2` and the advanced geometry knobs (`hull_ratio`,
+   `edge_buffer`, `cell_area_k`, `elong_max`), and grow the coherent area in
+   place (`ig.find_coherent_area` machinery). **Add area** appends it to the
+   list and starts the next; every area is listed and individually removable.
+4. **C. Volume computation** — a second plain-English **percentile**
+   question (e.g. *“P5, P50 and P95 of the cumulative thickness of sand and
+   gravel between 0 and 50 m depth”*) gives per-area volumes in m³
+   (`ig.region_volumes`) as a text table plus a P50-bar / P5–P95-whisker chart.
+
 ### LLM configuration (Query tool)
 
 Server-side environment variables take effect without any user input:

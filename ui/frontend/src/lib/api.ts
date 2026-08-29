@@ -1,4 +1,4 @@
-import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, OllamaModels, PostStats, PriorModelsResponse, QueryResult, QueryTranslation } from './types';
+import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, OllamaModels, PostStats, PriorModelsResponse, QueryResult, QueryTranslation, VolumeGrowResponse, VolumeProbResponse, VolumeVolumesResponse } from './types';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -61,4 +61,38 @@ export const api = {
   postStats: (name: string) => req<PostStats>(`/api/results/${encodeURIComponent(name)}/stats`),
   profileUrl: (name: string, im: number) =>
     `/api/results/${encodeURIComponent(name)}/profile.png?im=${im}`,
+  volumeProb: (params: {
+    f: string;
+    query_dict: Record<string, unknown>;
+    geo?: { hull_ratio: number; edge_buffer: number | null; cell_area_k: number; elong_max: number | null };
+  }) =>
+    req<VolumeProbResponse>('/api/volume/prob', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }),
+  volumeGrow: (params: {
+    f: string;
+    p: number[];
+    p_min: number;
+    x_center?: number | null;
+    y_center?: number | null;
+    max_area_m2?: number | null;
+    geo?: { hull_ratio: number; edge_buffer: number | null; cell_area_k: number; elong_max: number | null };
+  }) =>
+    req<VolumeGrowResponse>('/api/volume/grow', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }),
+  volumeVolumes: (params: {
+    f: string;
+    query_dict: Record<string, unknown>;
+    areas: Array<{ name: string; indices: number[] }>;
+    text?: string;
+    interpretation?: string;
+    geo?: { hull_ratio: number; edge_buffer: number | null; cell_area_k: number; elong_max: number | null };
+  }) =>
+    req<VolumeVolumesResponse>('/api/volume/volumes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }),
 };

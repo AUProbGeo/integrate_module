@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ui.backend.jobmanager import manager
-from ui.backend.routers import files, jobs, query, results
+from ui.backend.routers import files, jobs, query, results, volume
 
 DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(query.router)
     app.include_router(results.router)
+    app.include_router(volume.router)
 
     @app.on_event("startup")
     async def _attach_loop():

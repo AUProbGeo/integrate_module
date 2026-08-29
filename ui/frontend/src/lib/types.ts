@@ -121,3 +121,45 @@ export interface PostStats {
   utmx?: (number | null)[];
   utmy?: (number | null)[];
 }
+
+export interface GeoParams {
+  hull_ratio: number;
+  edge_buffer: number | null;
+  cell_area_k: number;
+  elong_max: number | null;
+}
+
+export interface VolumeProbResponse {
+  x: number[];
+  y: number[];
+  p: number[];
+  good: boolean[];
+  cell_area: number[];
+  boundary: [number, number][];
+  n: number;
+  n_dropped: number;
+  mean_probability: number;
+}
+
+export interface VolumeGrowResponse {
+  seed: number;
+  center: [number, number];
+  indices: number[];
+  n_soundings: number;
+  area_m2: number;
+  polygon: [number, number][];
+  p_seed: number | null;
+}
+
+export interface VolumeAreaVolumes {
+  name: string;
+  n_soundings: number;
+  volumes: number[];                       // [P5, P50, P95]
+}
+
+export interface VolumeVolumesResponse {
+  percentiles: number[];
+  areas: VolumeAreaVolumes[];
+  figure: string;                          // base64 PNG
+  n_locations: number;
+}

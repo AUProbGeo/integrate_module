@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { Layers, Database, Waves, BarChart3, Activity, FlaskConical, Search } from 'lucide-react';
+import { Layers, Database, Waves, BarChart3, Activity, FlaskConical, Search, Boxes } from 'lucide-react';
 import { api } from './lib/api';
 import { JobsProvider, useJobs } from './lib/jobs';
 import type { H5FileInfo } from './lib/types';
 import { FilesView } from './views/FilesView';
 import { QueryView } from './views/QueryView';
+import { VolumeView } from './views/VolumeView';
 import { RejectionView } from './views/RejectionView';
 
 function SoonView({ name, detail }: { name: string; detail: string }) {
@@ -50,6 +51,7 @@ function Shell() {
     { to: '/', label: 'Rejection', icon: <Waves size={16} />, end: true },
     { to: '/files', label: 'Files', icon: <Database size={16} />, end: false },
     { to: '/query', label: 'Query', icon: <Search size={16} />, end: false },
+    { to: '/query-volume', label: 'Query Volume', icon: <Boxes size={16} />, end: false },
   ];
   const soon = [
     { to: '/prior', label: 'Prior models', icon: <Layers size={16} /> },
@@ -116,6 +118,7 @@ function Shell() {
           <Route path="/" element={<RejectionView files={files} />} />
           <Route path="/files" element={<FilesView files={files} workspace={workspace} onRefresh={reloadFiles} />} />
           <Route path="/query" element={<QueryView files={files} />} />
+          <Route path="/query-volume" element={<VolumeView files={files} />} />
           <Route path="/prior" element={<SoonView name="Prior model generation" detail="prior_model_layered(), prior_model_workbench() and prior_model_workbench_direct() — arriving on this framework next." />} />
           <Route path="/forward" element={<SoonView name="Forward modelling" detail="forward_gaaem() — arriving next." />} />
           <Route path="/plot" element={<SoonView name="Plotting" detail="Selected integrate_plot functions — arriving next." />} />
