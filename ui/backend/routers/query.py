@@ -178,6 +178,7 @@ class QueryRunParams(BaseModel):
     provider: Literal["claude", "ollama"] | None = None  # None → server config
     api_key: str | None = None
     model: str | None = None
+    system_prompt: str | None = None   # custom system prompt (hand-edited in UI)
 
 
 def _resolve_llm(params: QueryRunParams) -> dict:
@@ -213,20 +214,32 @@ class _StageError(Exception):
         self.cause = cause
 
 
-def _execute_query(post: Path, prior: Path, text: str, model: str, api_key: str | None) -> dict:
-    """Translate, evaluate, and render one query. Runs in a worker thread."""
+def _translate_query(prior: Path, text: str, model: str, api_key: str | None,
+                     system_prompt: str | None = None) -> dict:
+    """Stage 1: translate *text* into a query dict via the LLM. Runs in a worker thread."""
+    import integrate as ig
+
+    cwd = os.getcwd()
+    os.chdir(get_workspace())  # f5_prior attrs resolve relative to cwd
+    try:
+        try:
+            query_dict, interpretation, system_prompt = ig.query_from_text(
+                text, str(prior), model=model, api_key=api_key, system_prompt=system_prompt
+            )
+        except Exception as e:
+            raise _StageError("LLM query translation", e)
+    finally:
+        os.chdir(cwd)
+    return {"query_dict": query_dict, "interpretation": interpretation, "system_prompt": system_prompt}
+
+
+def _evaluate_query(post: Path, text: str, query_dict: dict, interpretation: str | None) -> dict:
+    """Stage 2: evaluate *query_dict* over the posterior file and render. Worker thread."""
     import integrate as ig
 
     cwd = os.getcwd()
     os.chdir(get_workspace())  # f5_prior / f5_data attrs resolve relative to cwd
     try:
-        try:
-            query_dict, interpretation, system_prompt = ig.query_from_text(
-                text, str(prior), model=model, api_key=api_key
-            )
-        except Exception as e:
-            raise _StageError("LLM query translation", e)
-
         kind = "percentile" if "metric" in query_dict else "probability"
         try:
             result, meta = ig.query(str(post), query_dict)
@@ -260,9 +273,6 @@ def _execute_query(post: Path, prior: Path, text: str, model: str, api_key: str 
 
     out = {
         "kind": kind,
-        "interpretation": interpretation,
-        "query_dict": query_dict,
-        "system_prompt": system_prompt,
         "n_locations": int(meta.get("N_data", 0)),
         "figures": figures,
     }
@@ -273,19 +283,74 @@ def _execute_query(post: Path, prior: Path, text: str, model: str, api_key: str 
     return out
 
 
-@router.post("/run")
-async def run_query(params: QueryRunParams):
-    """Translate *text* with the LLM and evaluate it over the posterior file."""
+class QueryEvaluateParams(BaseModel):
+    f: str                                    # posterior file (workspace-relative)
+    text: str                                 # natural-language query (for the plot caption)
+    query_dict: dict                          # LLM-produced / hand-edited query spec
+    interpretation: str | None = None         # LLM interpretation (optional caption)
+
+
+@router.get("/system-prompt")
+def get_system_prompt(f: str):
+    """Default LLM system prompt for the prior file linked from posterior *f*."""
+    from integrate.integrate_query import _build_llm_system_prompt
+
+    prior, _ = _posterior_prior_posterior(_resolve_post(f))
+    try:
+        prompt = _build_llm_system_prompt(str(prior))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build system prompt: {e}")
+    return {"system_prompt": prompt}
+
+
+def _friendly_llm_error(msg: str) -> str:
+    """Append actionable hints to common LLM provider errors."""
+    lowered = msg.lower()
+    if "authentication" in lowered or "invalid x-api-key" in lowered:
+        return (
+            msg
+            + "\n\nThe Anthropic API key was rejected. Check that ANTHROPIC_API_KEY on the "
+            "server (or the key entered in the UI) is valid and not expired. Restart the "
+            "backend after changing the environment variable."
+        )
+    if "rate limit" in lowered:
+        return msg + "\n\nRate limited by the provider — wait a moment and run the query again."
+    return msg
+
+
+
+@router.post("/translate")
+async def translate_query(params: QueryRunParams):
+    """Stage 1: translate *text* into a query dict with the LLM. JSON is returned
+    unexecuted so the UI can show and optionally hand-edit it before evaluation."""
     if not params.text.strip():
         raise HTTPException(status_code=400, detail="Please enter a query.")
-    post = _resolve_post(params.f)
-    prior, _ = _posterior_prior_posterior(post)
+    _resolve_post(params.f)
+    prior, _ = _posterior_prior_posterior(_resolve_post(params.f))
     llm = _resolve_llm(params)
     try:
         return await asyncio.to_thread(
-            _execute_query, post, prior, params.text, llm["model"], llm["api_key"]
+            _translate_query, prior, params.text, llm["model"], llm["api_key"],
+            params.system_prompt,
         )
     except _StageError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=_friendly_llm_error(str(e)))
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/evaluate")
+async def evaluate_query(params: QueryEvaluateParams):
+    """Stage 2: evaluate a (possibly hand-edited) query dict over the posterior file."""
+    if not params.query_dict:
+        raise HTTPException(status_code=400, detail="Query JSON is empty.")
+    post = _resolve_post(params.f)
+    prior, _ = _posterior_prior_posterior(post)  # validates posterior + prior link
+    try:
+        return await asyncio.to_thread(
+            _evaluate_query, post, params.text, params.query_dict, params.interpretation
+        )
+    except _StageError as e:
+        raise HTTPException(status_code=502, detail=_friendly_llm_error(str(e)))
     except ImportError as e:
         raise HTTPException(status_code=500, detail=str(e))

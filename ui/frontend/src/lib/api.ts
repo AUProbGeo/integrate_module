@@ -1,4 +1,4 @@
-import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, OllamaModels, PostStats, PriorModelsResponse, QueryResult } from './types';
+import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, OllamaModels, PostStats, PriorModelsResponse, QueryResult, QueryTranslation } from './types';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -31,14 +31,28 @@ export const api = {
   ollamaModels: () => req<OllamaModels>('/api/query/ollama-models'),
   queryModels: (name: string) =>
     req<PriorModelsResponse>(`/api/query/models?f=${encodeURIComponent(name)}`),
-  runQuery: (params: {
+  systemPrompt: (name: string) =>
+    req<{ system_prompt: string }>(`/api/query/system-prompt?f=${encodeURIComponent(name)}`),
+  translateQuery: (params: {
     f: string;
     text: string;
     provider?: 'claude' | 'ollama';
     api_key?: string;
     model?: string;
+    system_prompt?: string;
   }) =>
-    req<QueryResult>('/api/query/run', {
+    req<QueryTranslation>('/api/query/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }),
+  evaluateQuery: (params: {
+    f: string;
+    text: string;
+    query_dict: Record<string, unknown>;
+    interpretation?: string;
+  }) =>
+    req<QueryResult>('/api/query/evaluate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),

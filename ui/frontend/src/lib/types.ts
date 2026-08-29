@@ -96,11 +96,14 @@ export interface PriorModelsResponse {
   describe: string;
 }
 
+export interface QueryTranslation {
+  query_dict: Record<string, unknown>;
+  interpretation: string;
+  system_prompt: string;
+}
+
 export interface QueryResult {
   kind: 'probability' | 'percentile';
-  interpretation: string;
-  query_dict: Record<string, unknown>;
-  system_prompt: string;
   n_locations: number;
   mean_probability?: number;
   percentiles?: number[];

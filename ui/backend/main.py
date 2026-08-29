@@ -25,15 +25,23 @@ DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
 class SPAStaticFiles(StaticFiles):
-    """Static files with index.html fallback for client-side routes."""
+    """Static files with index.html fallback and no-cache on HTML entry points.
+
+    The hashed asset files are immutable; index.html must always revalidate so
+    users never run a stale frontend against a changed API.
+    """
 
     async def get_response(self, path: str, scope):
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except StarletteHTTPException as e:
             if e.status_code == 404 and not path.startswith("api/"):
-                return await super().get_response("index.html", scope)
-            raise
+                response = await super().get_response("index.html", scope)
+            else:
+                raise
+        if response.headers.get("content-type", "").startswith("text/html"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def create_app() -> FastAPI:

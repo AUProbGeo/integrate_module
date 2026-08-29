@@ -1,9 +1,9 @@
 /** Query view: natural-language posterior queries translated by an LLM. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { api } from '../lib/api';
-import type { H5FileInfo, LLMConfig, OllamaModels, PriorModelsResponse, QueryResult } from '../lib/types';
+import type { H5FileInfo, LLMConfig, OllamaModels, PriorModelsResponse, QueryResult, QueryTranslation } from '../lib/types';
 import { Button, Card, Field, Select, TextInput } from '../components/ui';
 
 const OLLAMA_DEFAULT_MODEL = 'ollama_chat/qwen3:latest';
@@ -132,9 +132,6 @@ function ModelTable({ data }: { data: PriorModelsResponse }) {
 function QueryResultPanel({ result }: { result: QueryResult }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-sm text-info">
-        <span className="font-semibold">Interpretation:</span> {result.interpretation}
-      </div>
       <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
         Done.{' '}
         {result.kind === 'probability' ? (
@@ -155,18 +152,6 @@ function QueryResultPanel({ result }: { result: QueryResult }) {
           className="w-full max-w-3xl rounded-lg border border-edge"
         />
       ))}
-      <details className="rounded-lg border border-edge bg-panel-2 px-3 py-2">
-        <summary className="cursor-pointer text-xs font-semibold text-muted">Query JSON</summary>
-        <pre className="mt-2 max-h-72 overflow-auto text-xs text-fg">
-          {JSON.stringify(result.query_dict, null, 2)}
-        </pre>
-      </details>
-      <details className="rounded-lg border border-edge bg-panel-2 px-3 py-2">
-        <summary className="cursor-pointer text-xs font-semibold text-muted">System Prompt</summary>
-        <pre className="mt-2 max-h-72 overflow-auto text-xs whitespace-pre-wrap text-fg">
-          {result.system_prompt}
-        </pre>
-      </details>
     </div>
   );
 }
@@ -187,6 +172,13 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<QueryResult | null>(null);
+  const [translation, setTranslation] = useState<QueryTranslation | null>(null);
+  const [jsonText, setJsonText] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [jsonEdited, setJsonEdited] = useState(false);
+  const [sysPrompt, setSysPrompt] = useState('');
+  const jsonTextRef = useRef('');
 
   useEffect(() => {
     api
@@ -201,7 +193,6 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
 
   // Probe the local Ollama server the first time Ollama is selected.
   useEffect(() => {
-    if (provider !== 'ollama' || ollamaList !== null) return;
     let cancelled = false;
     api
       .ollamaModels()
@@ -241,10 +232,42 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
       .queryModels(selected)
       .then((r) => !cancelled && setModelInfo(r))
       .catch((e) => !cancelled && setModelsError((e as Error).message));
+    api
+      .systemPrompt(selected)
+      .then((r) => !cancelled && setSysPrompt(r.system_prompt))
+      .catch(() => !cancelled && setSysPrompt(''));
     return () => {
       cancelled = true;
     };
   }, [selected]);
+
+  const translate = async (params:
+    | { f: string; text: string; provider: 'claude'; api_key?: string; system_prompt?: string }
+    | { f: string; text: string; provider: 'ollama'; model: string; system_prompt?: string }) => {
+    const tr = await api.translateQuery(params);
+    setTranslation(tr);
+    const json = JSON.stringify(tr.query_dict, null, 2);
+    setJsonText(json);
+    jsonTextRef.current = json;   // always see the latest value from any async handler
+    setJsonEdited(false);
+  };
+
+  const evaluate = async () => {
+    let dict: Record<string, unknown>;
+    try {
+      dict = JSON.parse(jsonTextRef.current || jsonText) as Record<string, unknown>;
+    } catch (e) {
+      setJsonError((e as Error).message);
+      return null;
+    }
+    setJsonError(null);
+    return await api.evaluateQuery({
+      f: selected,
+      text,
+      query_dict: dict,
+      interpretation: translation?.interpretation,
+    });
+  };
 
   const runQuery = async () => {
     setBusy(true);
@@ -253,9 +276,15 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
     try {
       const params =
         provider === 'claude'
-          ? { f: selected, text, provider: 'claude' as const, ...(apiKey.trim() ? { api_key: apiKey } : {}) }
-          : { f: selected, text, provider: 'ollama' as const, model: ollamaModel };
-      setResult(await api.runQuery(params));
+          ? { f: selected, text, provider: 'claude' as const, ...(apiKey.trim() ? { api_key: apiKey } : {}), ...(sysPrompt.trim() ? { system_prompt: sysPrompt } : {}) }
+          : { f: selected, text, provider: 'ollama' as const, model: ollamaModel, ...(sysPrompt.trim() ? { system_prompt: sysPrompt } : {}) };
+      if (jsonEdited) {
+        // JSON panel is open with hand edits: re-use them, skip re-translation.
+        setResult(await evaluate());
+      } else {
+        await translate(params);
+        setResult(await evaluate());
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -272,7 +301,6 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
           geological query, translated by an LLM.
         </p>
       </div>
-
       <Card title="LLM">
         <LLMSection
           llm={llm}
@@ -357,6 +385,18 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
           {modelInfo && (
             <Card title="Query">
               <div className="space-y-4">
+                <details className="rounded-lg border border-edge bg-panel-2 px-3 py-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-muted">
+                    System prompt (advanced — rarely changed)
+                  </summary>
+                  <textarea
+                    value={sysPrompt}
+                    onChange={(e) => setSysPrompt(e.target.value)}
+                    rows={10}
+                    spellCheck={false}
+                    className="mt-2 w-full rounded-lg border border-edge bg-panel-2 px-3 py-2 font-mono text-xs text-fg outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
+                  />
+                </details>
                 <Field label="Enter query in plain English:">
                   <textarea
                     value={text}
@@ -368,12 +408,50 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
                 </Field>
                 <Button onClick={runQuery} disabled={busy || !text.trim() || !selected}>
                   <Search size={14} />
-                  {busy ? 'Running — translating with LLM, then evaluating…' : 'Query'}
+                  {busy ? 'Running…' : 'Run query'}
                 </Button>
                 {error && (
                   <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs whitespace-pre-wrap text-danger">
                     {error}
                   </div>
+                )}
+                {translation && (
+                  <>
+                    <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-sm text-info">
+                      <span className="font-semibold">Interpretation:</span> {translation.interpretation}
+                    </div>
+                    <details
+                      className="rounded-lg border border-edge bg-panel-2 px-3 py-2"
+                      open={jsonOpen}
+                      onToggle={(e) => setJsonOpen((e.target as HTMLDetailsElement).open)}
+                    >
+                      <summary className="cursor-pointer text-xs font-semibold text-muted">
+                        Query JSON (optional advanced view — edit and run again to apply)
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        <textarea
+                          value={jsonText}
+                          onChange={(e) => {
+                            setJsonText(e.target.value);
+                            jsonTextRef.current = e.target.value;
+                            setJsonEdited(true);
+                          }}
+                          rows={12}
+                          spellCheck={false}
+                          className="w-full rounded-lg border border-edge bg-panel-2 px-3 py-2 font-mono text-xs text-fg outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
+                        />
+                        {jsonError && (
+                          <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+                            Invalid JSON: {jsonError}
+                          </div>
+                        )}
+                        <Button onClick={runQuery} disabled={busy || !!jsonError}>
+                          <Search size={14} />
+                          {busy ? 'Running…' : 'Run query'}
+                        </Button>
+                      </div>
+                    </details>
+                  </>
                 )}
                 {result && <QueryResultPanel result={result} />}
               </div>
