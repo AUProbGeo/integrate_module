@@ -81,9 +81,10 @@ hardcopy = True
 # later section can just load `f_post_h5` (etc.) without re-running the
 # earlier ones -- e.g. run Part C directly once `f_post_h5` exists.
 #
-# The names do NOT encode `N` / `inflateNoise`. If you change either, delete
-# the affected `DAUGAARD_*.h5` files (or bump `SUFFIX`) so they are
-# regenerated.
+# Every generated file name is prefixed with `N<N>_` (and the working data
+# file also encodes `inflateNoise`), so a different `N` writes to a separate
+# set of files / figures. If you change `inflateNoise`, delete the affected
+# `N*_DAUGAARD_*.h5` files (or bump `SUFFIX`) so they are regenerated.
 
 # %%
 # --- run-size settings -------------------------------------------------
@@ -95,26 +96,30 @@ N = 1_000_000   # production-scale
 
 inflateNoise = 2        # multiply the tTEM data std by this (0 = use as-is)
 
-SUFFIX = ''             # optional tag appended to every generated file name
+SUFFIX = '_N%d_iN%d' % (N, inflateNoise)             # optional tag appended to every generated file name
+
+# Prefix prepended to every generated file name (h5 + figures) so that a
+# given choice of N writes to its own set of files, e.g. 'N12000_iN2_'.
+PREFIX = '' 
 
 # --- fixed output file names -----------------------------------------
 # working data file (noise-inflated copy; == downloaded file if inflateNoise == 0)
-f_data_work_h5 = 'DAUGAARD_AVG_gf%g%s.h5' % (inflateNoise, SUFFIX)
+f_data_work_h5 = '%sDAUGAARD_AVG_gf%g%s.h5' % (PREFIX, inflateNoise, SUFFIX)
 
 # Part A -- resistivity-only, generic prior
-f_prior_generic_h5      = 'DAUGAARD_PRIOR_GENERIC%s.h5'       % SUFFIX
-f_prior_generic_data_h5 = 'DAUGAARD_PRIOR_GENERIC_DATA%s.h5'  % SUFFIX
-f_post_generic_h5       = 'DAUGAARD_POSTERIOR_GENERIC%s.h5'   % SUFFIX
+f_prior_generic_h5      = '%sDAUGAARD_PRIOR_GENERIC%s.h5'       % (PREFIX, SUFFIX)
+f_prior_generic_data_h5 = '%sDAUGAARD_PRIOR_GENERIC_DATA%s.h5'  % (PREFIX, SUFFIX)
+f_post_generic_h5       = '%sDAUGAARD_POSTERIOR_GENERIC%s.h5'   % (PREFIX, SUFFIX)
 
 # Part B -- informed prior + boreholes
 f_prior_scenario_h5_map = {
-    'daugaard_standard': 'DAUGAARD_PRIOR_STANDARD%s.h5' % SUFFIX,
-    'daugaard_valley':   'DAUGAARD_PRIOR_VALLEY%s.h5'   % SUFFIX,
+    'daugaard_standard': '%sDAUGAARD_PRIOR_STANDARD%s.h5' % (PREFIX, SUFFIX),
+    'daugaard_valley':   '%sDAUGAARD_PRIOR_VALLEY%s.h5'   % (PREFIX, SUFFIX),
 }
-f_prior_merged_h5  = 'DAUGAARD_PRIOR_MERGED%s.h5'          % SUFFIX
-f_prior_data_h5    = 'DAUGAARD_PRIOR_MERGED_DATA%s.h5'     % SUFFIX
-f_prior_data_bh_h5 = 'DAUGAARD_PRIOR_MERGED_DATA_BH%s.h5'  % SUFFIX
-f_post_h5          = 'DAUGAARD_POSTERIOR%s.h5'             % SUFFIX
+f_prior_merged_h5  = '%sDAUGAARD_PRIOR_MERGED%s.h5'          % (PREFIX, SUFFIX)
+f_prior_data_h5    = '%sDAUGAARD_PRIOR_MERGED_DATA%s.h5'     % (PREFIX, SUFFIX)
+f_prior_data_bh_h5 = '%sDAUGAARD_PRIOR_MERGED_DATA_BH%s.h5'  % (PREFIX, SUFFIX)
+f_post_h5          = '%sDAUGAARD_POSTERIOR%s.h5'             % (PREFIX, SUFFIX)
 
 # %% [markdown]
 # ## 1. Load the data
@@ -523,7 +528,7 @@ P_raw, meta_raw = ig.query(f_post_h5, query_raw)
 ig.query_plot(P_raw, meta_raw,
               query_text="P(raw material)",
               text_panel=True,
-              hardcopy='daugaard_P_raw' if hardcopy else False)
+              hardcopy=PREFIX + 'daugaard_P_raw' if hardcopy else False)
 
 
 
@@ -678,7 +683,7 @@ for iarea, AREA in enumerate(AREA_LIST):
     fig.colorbar(mappable, ax=ax, label='P_raw')
     ax.legend(fontsize=8)
     if hardcopy:
-        fig.savefig('daugaard_voronoi_cells_area%d.png' % iarea, dpi=200, bbox_inches='tight')
+        fig.savefig('%sdaugaard_voronoi_cells_area%d.png' % (PREFIX, iarea), dpi=200, bbox_inches='tight')
     plt.show()
 
 # ---- C. raw-material volume, one bar per grown area ----------------------------
@@ -693,7 +698,7 @@ ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume per grown area  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig('daugaard_rawmat_volume_B.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_rawmat_volume_B.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 
@@ -741,7 +746,7 @@ ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig('daugaard_rawmat_volume_C.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_rawmat_volume_C.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -775,7 +780,7 @@ ax.set_title("Voronoi cells (P_raw) -- Mette's polygons vs. the grown areas")
 fig.colorbar(mappable, ax=ax, label='P_raw')
 ax.legend(fontsize=8, loc='best')
 if hardcopy:
-    fig.savefig('daugaard_voronoi_areas_vs_mette.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_voronoi_areas_vs_mette.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 DAUGAARD_REFERENCE = {
@@ -788,7 +793,7 @@ DAUGAARD_REFERENCE = {
 }
 
 rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, quantities=('overburden', 'raw_material'),
-                         hardcopy=hardcopy, f_name='daugaard_rawmaterial_comparison')
+                         hardcopy=hardcopy, f_name=PREFIX + 'daugaard_rawmaterial_comparison')
 
 # %% [markdown]
 # ### Discussion
