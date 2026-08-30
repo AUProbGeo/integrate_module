@@ -450,14 +450,14 @@ ig.plot_discrete_data_entropy(f_data_h5, id_list=list(range(2, len(BHOLES))))
 
 # %%
 # Entropy map over ALL multinomial (borehole) datasets — no id_list needed
-fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, cmap = 'gray')
+fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, cmap = 'gray', plotPoints=True)
 
 # Overlay the borehole collar locations from the BHOLES list
 bx = [bh['X'] for bh in BHOLES]
 by = [bh['Y'] for bh in BHOLES]
 ax.plot(bx, by, 'rx', ms=9, mew=1.5, label='boreholes')
 for bh in BHOLES:
-    ax.annotate(bh['name'], (bh['X'], bh['Y']),
+    ax.annotate(bh['name'], (bh['X'], bh['Y']),                
                 xytext=(4, 4), textcoords='offset points', fontsize=7)
 ax.legend(loc='best')
 

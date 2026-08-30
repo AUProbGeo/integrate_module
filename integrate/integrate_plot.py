@@ -989,7 +989,9 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     **kwargs : dict
         Additional keyword arguments:
         - s : int, marker size (default is 1)
-        - plot_data_locations : bool, plot black background dots at all data locations (default is False)
+        - plotPoints : bool, plot grey background dots at all data locations
+          (default is False). ``plot_data_locations`` is accepted as a
+          deprecated alias.
         - CHI2_min : float, minimum CHI2 color scale value (default is 0)
         - CHI2_max : float, maximum CHI2 color scale value (default is 5)
         - N_UNIQUE_min : float, minimum N_UNIQUE color scale value (default is auto)
@@ -1016,7 +1018,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     """
 
     s = kwargs.pop('s', 1)
-    plot_data_locations = kwargs.pop('plot_data_locations', False)
+    plotPoints = kwargs.pop('plotPoints', False)
+    if 'plot_data_locations' in kwargs:
+        import warnings
+        warnings.warn(
+            "plot_T_EV: 'plot_data_locations' is deprecated, use 'plotPoints'",
+            DeprecationWarning, stacklevel=2)
+        plotPoints = kwargs.pop('plot_data_locations')
     CHI2_min = kwargs.pop('CHI2_min', 0)
     CHI2_max = kwargs.pop('CHI2_max', 5)
     N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
@@ -1069,7 +1077,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     
     base = os.path.splitext(f_post_h5)[0]
     shared = dict(X=X[i1:i2], Y=Y[i1:i2], s=s, fontsize=fontsize,
-                  plotPoints=plot_data_locations, **kwargs)
+                  plotPoints=plotPoints, **kwargs)
 
     if (pl=='all') or (pl=='T'):
         f_png = '%s_%d_%d_T.png' % (base, i1, i2) if hardcopy else False

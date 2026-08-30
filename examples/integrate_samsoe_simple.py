@@ -220,7 +220,7 @@ hardcopy = True
 ig.plot_profile(f_post_h5, im1=1, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
 ig.plot_profile(f_post_h5, im1=2, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
 
-ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1,plot_data_locations=True)
+ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1,plotPoints=True)
 
 ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean) iz = 15')
 ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean), iz = 45')
