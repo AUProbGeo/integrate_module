@@ -3,101 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { api } from '../lib/api';
-import type { H5FileInfo, LLMConfig, OllamaModels, PriorModelsResponse, QueryResult, QueryTranslation } from '../lib/types';
+import type { H5FileInfo, PriorModelsResponse, QueryResult, QueryTranslation } from '../lib/types';
 import { Button, Card, Field, Select, TextInput } from '../components/ui';
-
-const OLLAMA_DEFAULT_MODEL = 'ollama_chat/qwen3:latest';
-
-function LLMSection({
-  llm,
-  provider,
-  setProvider,
-  apiKey,
-  setApiKey,
-  ollamaModel,
-  setOllamaModel,
-  ollamaList,
-}: {
-  llm: LLMConfig | null;
-  provider: 'claude' | 'ollama';
-  setProvider: (p: 'claude' | 'ollama') => void;
-  apiKey: string;
-  setApiKey: (k: string) => void;
-  ollamaModel: string;
-  setOllamaModel: (m: string) => void;
-  ollamaList: OllamaModels | null;
-}) {
-  const serverHasClaude = !!(llm?.configured && llm.provider === 'claude');
-  const serverHasOllama = !!(llm?.configured && llm.provider === 'ollama');
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-4">
-        <span className="text-[13px] font-medium text-muted">LLM provider:</span>
-        {(['claude', 'ollama'] as const).map((p) => (
-          <label key={p} className="flex cursor-pointer items-center gap-1.5 text-sm">
-            <input
-              type="radio"
-              name="llm-provider"
-              checked={provider === p}
-              onChange={() => setProvider(p)}
-              className="accent-accent"
-            />
-            {p === 'claude' ? 'Claude' : 'Ollama'}
-          </label>
-        ))}
-      </div>
-      {provider === 'claude' ? (
-        serverHasClaude ? (
-          <div className="text-xs text-muted">
-            Using Claude (<code>{llm?.model}</code>) with the API key configured on the server.
-          </div>
-        ) : (
-          <Field label="Anthropic API key:">
-            <TextInput
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-..."
-              autoComplete="off"
-            />
-          </Field>
-        )
-      ) : ollamaList?.running && ollamaList.models.length ? (
-        <Field label="Ollama model (local server):">
-          <Select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)}>
-            {!ollamaList.models.some((m) => `ollama_chat/${m}` === ollamaModel) && (
-              <option value={ollamaModel}>{ollamaModel}</option>
-            )}
-            {ollamaList.models.map((m) => (
-              <option key={m} value={`ollama_chat/${m}`}>
-                {m}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      ) : (
-        <Field
-          label="Ollama model:"
-          hint={ollamaList ? 'No local Ollama server detected — entering a free-form model id.' : 'Checking for a local Ollama server…'}
-        >
-          <TextInput
-            value={ollamaModel}
-            onChange={(e) => setOllamaModel(e.target.value)}
-            placeholder="ollama_chat/llama3:latest"
-          />
-        </Field>
-      )}
-      {provider === 'ollama' && serverHasOllama && (
-        <div className="text-xs text-muted">Using the API key configured on the server.</div>
-      )}
-      {provider === 'claude' && !serverHasClaude && !apiKey.trim() && (
-        <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-info">
-          Enter an API key or select Ollama to continue.
-        </div>
-      )}
-    </div>
-  );
-}
+import { LLMSection } from '../components/LLMSection';
+import { useLlm } from '../lib/useLlm';
 
 function ModelTable({ data }: { data: PriorModelsResponse }) {
   if (!data.models.length) {
@@ -157,11 +66,7 @@ function QueryResultPanel({ result }: { result: QueryResult }) {
 }
 
 export function QueryView({ files }: { files: H5FileInfo[] }) {
-  const [llm, setLlm] = useState<LLMConfig | null>(null);
-  const [provider, setProvider] = useState<'claude' | 'ollama'>('claude');
-  const [apiKey, setApiKey] = useState('');
-  const [ollamaModel, setOllamaModel] = useState(OLLAMA_DEFAULT_MODEL);
-  const [ollamaList, setOllamaList] = useState<OllamaModels | null>(null);
+  const llm = useLlm();
 
   const [filterText, setFilterText] = useState('');
   const [selected, setSelected] = useState('');
@@ -179,45 +84,6 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
   const [jsonEdited, setJsonEdited] = useState(false);
   const [sysPrompt, setSysPrompt] = useState('');
   const jsonTextRef = useRef('');
-
-  useEffect(() => {
-    api
-      .llmConfig()
-      .then((cfg) => {
-        setLlm(cfg);
-        if (cfg.configured && cfg.provider) setProvider(cfg.provider);
-        if (cfg.configured && cfg.provider === 'ollama' && cfg.model) setOllamaModel(cfg.model);
-      })
-      .catch(() => setLlm({ configured: false, provider: null, model: null }));
-  }, []);
-
-  // Probe the local Ollama server the first time Ollama is selected.
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .ollamaModels()
-      .then((r) => {
-        if (cancelled) return;
-        setOllamaList(r);
-        if (r.running && r.models.length) {
-          setOllamaModel((cur) =>
-            r.models.some((m) => `ollama_chat/${m}` === cur) ? cur : `ollama_chat/${r.models[0]}`,
-          );
-        }
-      })
-      .catch(() => !cancelled && setOllamaList({ running: false, models: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [provider, ollamaList]);
-
-  const llmReady = useMemo(() => {
-    if (!llm) return false;
-    if (provider === 'claude') {
-      return (llm.configured && llm.provider === 'claude') || !!apiKey.trim();
-    }
-    return !!ollamaModel.trim();
-  }, [llm, provider, apiKey, ollamaModel]);
 
   const posteriors = useMemo(() => files.filter((f) => f.class === 'POSTERIOR'), [files]);
   const filtered = useMemo(
@@ -241,9 +107,14 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
     };
   }, [selected]);
 
-  const translate = async (params:
-    | { f: string; text: string; provider: 'claude'; api_key?: string; system_prompt?: string }
-    | { f: string; text: string; provider: 'ollama'; model: string; system_prompt?: string }) => {
+  const translate = async (params: {
+    f: string;
+    text: string;
+    provider?: string;
+    api_key?: string;
+    model?: string;
+    system_prompt?: string;
+  }) => {
     const tr = await api.translateQuery(params);
     setTranslation(tr);
     const json = JSON.stringify(tr.query_dict, null, 2);
@@ -274,10 +145,12 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
     setError(null);
     setResult(null);
     try {
-      const params =
-        provider === 'claude'
-          ? { f: selected, text, provider: 'claude' as const, ...(apiKey.trim() ? { api_key: apiKey } : {}), ...(sysPrompt.trim() ? { system_prompt: sysPrompt } : {}) }
-          : { f: selected, text, provider: 'ollama' as const, model: ollamaModel, ...(sysPrompt.trim() ? { system_prompt: sysPrompt } : {}) };
+      const params = {
+        f: selected,
+        text,
+        ...llm.llmParams(),
+        ...(sysPrompt.trim() ? { system_prompt: sysPrompt } : {}),
+      };
       if (jsonEdited) {
         // JSON panel is open with hand edits: re-use them, skip re-translation.
         setResult(await evaluate());
@@ -302,19 +175,10 @@ export function QueryView({ files }: { files: H5FileInfo[] }) {
         </p>
       </div>
       <Card title="LLM">
-        <LLMSection
-          llm={llm}
-          provider={provider}
-          setProvider={setProvider}
-          apiKey={apiKey}
-          setApiKey={setApiKey}
-          ollamaModel={ollamaModel}
-          setOllamaModel={setOllamaModel}
-          ollamaList={ollamaList}
-        />
+        <LLMSection llm={llm} />
       </Card>
 
-      {llmReady && (
+      {llm.ready && (
         <>
           <Card title="Posterior File">
             {!posteriors.length ? (

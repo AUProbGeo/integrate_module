@@ -71,13 +71,14 @@ export interface Job {
 
 export interface LLMConfig {
   configured: boolean;
-  provider: 'claude' | 'ollama' | null;
+  provider: string | null;
   model: string | null;
 }
 
-export interface OllamaModels {
-  running: boolean;
+export interface ProviderModels {
   models: string[];
+  live: boolean;
+  error: string | null;
 }
 
 export interface PriorModelInfo {

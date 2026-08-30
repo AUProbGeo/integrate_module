@@ -1,4 +1,4 @@
-import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, OllamaModels, PostStats, PriorModelsResponse, QueryResult, QueryTranslation, VolumeGrowResponse, VolumeProbResponse, VolumeVolumesResponse } from './types';
+import type { H5FileInfo, H5Node, H5Summary, Job, LLMConfig, PostStats, PriorModelsResponse, ProviderModels, QueryResult, QueryTranslation, VolumeGrowResponse, VolumeProbResponse, VolumeVolumesResponse } from './types';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -28,7 +28,12 @@ export const api = {
   stopJob: (id: string) => req<Job>(`/api/jobs/${id}/stop`, { method: 'POST' }),
 
   llmConfig: () => req<LLMConfig>('/api/query/config'),
-  ollamaModels: () => req<OllamaModels>('/api/query/ollama-models'),
+  providerModels: (provider: string, apiKey?: string) =>
+    req<ProviderModels>('/api/query/provider-models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, api_key: apiKey ?? null }),
+    }),
   queryModels: (name: string) =>
     req<PriorModelsResponse>(`/api/query/models?f=${encodeURIComponent(name)}`),
   systemPrompt: (name: string) =>
@@ -36,7 +41,7 @@ export const api = {
   translateQuery: (params: {
     f: string;
     text: string;
-    provider?: 'claude' | 'ollama';
+    provider?: string;
     api_key?: string;
     model?: string;
     system_prompt?: string;

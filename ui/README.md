@@ -89,12 +89,13 @@ with shapes, dtypes and attributes.
 
 Natural-language queries over posterior realizations (the `ig_query` pane):
 
-1. **LLM** — pick the provider (Claude or Ollama). If a key is configured on
-   the server (see below) it is used by default, but you can always switch to
-   the other provider. Without a server key Claude asks for an Anthropic API
-   key (kept in browser memory, sent per request). For Ollama, a dropdown
-   lists the models on the reachable Ollama server (local or remote); if none
-   answers, enter a litellm model id manually (e.g. `ollama_chat/qwen3:latest`).
+1. **LLM** — if a model is configured on the server (see below) the panel just
+   shows which one and no input is needed. Otherwise pick a **provider**
+   (OpenAI, Anthropic, Gemini, Groq, Mistral, DeepSeek, xAI, OpenRouter,
+   Ollama, or *Other…* for any other LiteLLM provider), paste its **API key**
+   (kept in browser memory, sent per request), and choose a **model** from the
+   dropdown — populated by a live call to that provider's model list. If the
+   list can't be fetched, type the model id manually.
 2. **Posterior file** — filter + select among the workspace's `POSTERIOR`
    files (those containing an `i_use` dataset). The linked prior file
    (`f5_prior` attribute) is shown.
@@ -132,22 +133,29 @@ workflow of `examples/integrate_rawmaterial_daugaard.py` as a UI):
 
 ### LLM configuration (Query tool)
 
-Server-side environment variables take effect without any user input:
+Server-side environment variables take effect without any user input. When any
+of them configure a model, the browser LLM picker is hidden and that model is
+used for every request.
 
 | Variable | Effect |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude becomes the default provider (`anthropic/claude-sonnet-4-6`). |
-| `OLLAMA_API_KEY` | Ollama becomes the default provider (for authenticated remote servers). |
-| `OLLAMA_HOST` | Ollama server to use for the model dropdown **and** the LLM calls, e.g. `http://nsmain:11434`. |
-| `INTEGRATE_CLAUDE_MODEL` / `INTEGRATE_OLLAMA_MODEL` | Override the default model ids. |
+| `INTEGRATE_LLM_MODEL` | **General knob.** A full LiteLLM model string, e.g. `openai/gpt-4o`, `openrouter/anthropic/claude-3.5-sonnet`, `gemini/gemini-1.5-pro`, `ollama_chat/qwen3:latest`. The provider's own key var (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, …) must also be set. |
+| `ANTHROPIC_API_KEY` | *(Back-compat)* Claude becomes the server default (`anthropic/claude-sonnet-4-6`). |
+| `OLLAMA_API_KEY` | *(Back-compat)* Ollama becomes the server default (authenticated remote servers). |
+| `OLLAMA_HOST` / `OLLAMA_API_BASE` | Ollama server for the model dropdown **and** the LLM calls, e.g. `http://nsmain:11434`. |
+| `INTEGRATE_CLAUDE_MODEL` / `INTEGRATE_OLLAMA_MODEL` | Override the back-compat default model ids. |
 | `INTEGRATE_WORKSPACE` | Fixed workspace directory (see above). |
 
 Notes:
 
+- With none of the above set, the user picks provider + key + model in the
+  browser; the model list is fetched live from the provider's API. Any
+  LiteLLM-supported provider works (via the *Other…* option if not in the
+  shortlist).
 - litellm itself only honors `OLLAMA_API_BASE`; INTEGRATE additionally maps
   the standard `OLLAMA_HOST` onto it, so either variable works (`api_base`
   kwarg → `OLLAMA_API_BASE` → `OLLAMA_HOST` → `http://localhost:11434`).
-- Keys sent from the browser are never stored server-side.
+- Keys sent from the browser are never stored or logged server-side.
 
 ---
 
@@ -175,8 +183,8 @@ Notes:
   rendered with matplotlib's Agg backend to PNG; figure capture diffing under
   a global lock (matplotlib is not thread-safe).
 - `routers/query.py` — LLM config discovery, prior-model tables
-  (`ig.get_prior_model_info`, `ig.prior_describe`), Ollama model probing,
-  and the combined translate → evaluate → render pipeline
+  (`ig.get_prior_model_info`, `ig.prior_describe`), live per-provider model
+  listing, and the combined translate → evaluate → render pipeline
   (`ig.query_from_text` → `ig.query` → `ig.query_plot` /
   `ig.query_percentile_plot`).
 - `routers/jobs.py` + `jobmanager.py` + `worker.py` — every inversion runs in

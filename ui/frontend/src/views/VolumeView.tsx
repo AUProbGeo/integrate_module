@@ -1,12 +1,12 @@
 /** Query Volume view: probability map → interactive region growing → volumes. */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { api } from '../lib/api';
-import type { GeoParams, H5FileInfo, LLMConfig, OllamaModels, PriorModelsResponse, QueryTranslation, VolumeGrowResponse, VolumeProbResponse, VolumeVolumesResponse } from '../lib/types';
+import type { GeoParams, H5FileInfo, PriorModelsResponse, QueryTranslation, VolumeGrowResponse, VolumeProbResponse, VolumeVolumesResponse } from '../lib/types';
 import { Button, Card, Field, Select, TextInput } from '../components/ui';
-
-const OLLAMA_DEFAULT_MODEL = 'ollama_chat/qwen3:latest';
+import { LLMSection } from '../components/LLMSection';
+import { useLlm } from '../lib/useLlm';
 
 const DEFAULT_GEO: GeoParams = { hull_ratio: 0.10, edge_buffer: null, cell_area_k: 6.0, elong_max: 4.0 };
 
@@ -18,78 +18,6 @@ interface AreaState {
   indices: number[];
   area_m2: number;
   polygon: [number, number][];
-}
-
-function LLMSection({
-  llm,
-  provider,
-  setProvider,
-  apiKey,
-  setApiKey,
-  ollamaModel,
-  setOllamaModel,
-  ollamaList,
-}: {
-  llm: LLMConfig | null;
-  provider: 'claude' | 'ollama';
-  setProvider: (p: 'claude' | 'ollama') => void;
-  apiKey: string;
-  setApiKey: (k: string) => void;
-  ollamaModel: string;
-  setOllamaModel: (m: string) => void;
-  ollamaList: OllamaModels | null;
-}) {
-  const serverHasClaude = !!(llm?.configured && llm.provider === 'claude');
-  const serverHasOllama = !!(llm?.configured && llm.provider === 'ollama');
-  return (
-    <div className="space-y-3">
-      <div className="flex gap-4">
-        <label className="flex items-center gap-1.5 text-sm">
-          <input type="radio" checked={provider === 'claude'} onChange={() => setProvider('claude')} />
-          Claude
-        </label>
-        <label className="flex items-center gap-1.5 text-sm">
-          <input type="radio" checked={provider === 'ollama'} onChange={() => setProvider('ollama')} />
-          Ollama
-        </label>
-      </div>
-      {provider === 'claude' ? (
-        serverHasClaude ? (
-          <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-info">
-            Using server-configured Claude ({llm?.model}). Enter a key below to override.
-          </div>
-        ) : null
-      ) : null}
-      {provider === 'claude' && (
-        <Field label="Anthropic API key (only if the server has none):">
-          <TextInput type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" />
-        </Field>
-      )}
-      {provider === 'ollama' && (
-        <Field label="Ollama model:">
-          {ollamaList?.running && ollamaList.models.length ? (
-            <Select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)}>
-              {ollamaList.models.map((m) => (
-                <option key={m} value={`ollama_chat/${m}`}>{`ollama_chat/${m}`}</option>
-              ))}
-            </Select>
-          ) : (
-            <TextInput value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} placeholder="ollama_chat/qwen3:latest" />
-          )}
-        </Field>
-      )}
-      {provider === 'ollama' && ollamaList && !ollamaList.running && (
-        <div className="rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
-          No reachable Ollama server — enter a model id manually (litellm form).
-        </div>
-      )}
-      {provider === 'ollama' && serverHasOllama && (
-        <div className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-info">
-          Using server-configured Ollama ({llm?.model}).
-        </div>
-      )}
-    </div>
-  );
 }
 
 function ModelTable({ data }: { data: PriorModelsResponse }) {
@@ -122,26 +50,52 @@ function ModelTable({ data }: { data: PriorModelsResponse }) {
   );
 }
 
-/** "hot_r"-ish black → red → orange → white ramp; named colour mapping, used on every sounding dot. */
+/** matplotlib "hot" colormap, sampled at t in [0, 1] (piecewise-linear R/G/B
+ *  segments straight from matplotlib's `_hot_data`). */
+function hotRGB(t: number): [number, number, number] {
+  const seg = (v: number, a: number, b: number) => (v <= a ? 0 : v >= b ? 1 : (v - a) / (b - a));
+  const r = 0.0416 + (1 - 0.0416) * seg(t, 0, 0.365079);
+  const g = seg(t, 0.365079, 0.746032);
+  const b = seg(t, 0.746032, 1);
+  return [r, g, b];
+}
+
+/** matplotlib `cmap='hot_r'`: reversed hot — P=0 → white, P=1 → near-black. */
 function hotR(t: number): string {
-  const stops: Array<[number, [number, number, number]]> = [
-    [0, [0, 0, 0]],
-    [0.33, [178, 0, 0]],
-    [0.66, [255, 170, 0]],
-    [1, [255, 255, 255]],
-  ];
-  const c = (() => {
-    for (let k = 1; k < stops.length; k++) {
-      if (t <= stops[k][0]) {
-        const [t0, c0] = stops[k - 1];
-        const [t1, c1] = stops[k];
-        const u = (t - t0) / Math.max(1e-9, t1 - t0);
-        return [0, 1, 2].map((j) => Math.round(c0[j] + u * (c1[j] - c0[j])));
-      }
-    }
-    return stops[stops.length - 1][1];
-  })();
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
+  const u = Math.max(0, Math.min(1, t));
+  const [r, g, b] = hotRGB(1 - u);
+  return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+}
+
+/** CSS gradient string mirroring the hot_r colorbar (left = 0, right = 1). */
+const HOT_R_GRADIENT = Array.from({ length: 9 }, (_, i) => hotR(i / 8)).join(', ');
+
+/** Region outline: a wide white stroke with a narrow black stroke on top, so it
+ *  stays readable over any hot_r shade (white → black). `dashed` marks the live
+ *  preview; solid marks committed areas. */
+function HaloPolygon({ points, dashed }: { points: string; dashed?: boolean }) {
+  return (
+    <>
+      <polygon points={points} fill="none" stroke="#ffffff" strokeWidth={4} strokeLinejoin="round" />
+      <polygon
+        points={points}
+        fill="none"
+        stroke="#000000"
+        strokeWidth={1.75}
+        strokeLinejoin="round"
+        strokeDasharray={dashed ? '6 4' : undefined}
+      />
+    </>
+  );
+}
+
+function HaloCircle({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+  return (
+    <>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeWidth={4} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#000000" strokeWidth={1.75} />
+    </>
+  );
 }
 
 function ProbabilityMap({ map, areas, preview, pendingCenter, onPointClick }: {
@@ -183,42 +137,44 @@ function ProbabilityMap({ map, areas, preview, pendingCenter, onPointClick }: {
 
   return (
     <div className="overflow-x-auto">
-      <svg width={W} height={H} className="rounded-lg border border-edge bg-panel-2 cursor-crosshair text-fg"
+      <svg width={W} height={H} className="rounded-lg border border-edge bg-white cursor-crosshair text-neutral-500"
            onClick={handleClick}>
-        <polygon points={ring(map.boundary)} fill="none" stroke="currentColor" strokeOpacity={0.4} strokeDasharray="4 3" />
+        <polygon points={ring(map.boundary)} fill="none" stroke="currentColor" strokeOpacity={0.6} strokeDasharray="4 3" />
         {x.map((vx, i) => (
           <circle key={i} cx={px(vx)} cy={py(y[i])} r={2.2}
-                  fill={good[i] ? hotR(Math.max(0, Math.min(1, p[i]))) : '#555'}
-                  opacity={good[i] ? 1 : 0.5} />
+                  fill={good[i] ? hotR(p[i]) : '#9ca3af'}
+                  opacity={good[i] ? 1 : 0.55} />
         ))}
         {areas.map((a) => (
-          <polygon key={a.name} points={ring(a.polygon)} fill="none" stroke="#7dd3fc" strokeWidth={2.5} />
+          <HaloPolygon key={a.name} points={ring(a.polygon)} />
         ))}
-        {preview && (
-          <polygon points={ring(preview.polygon)} fill="none" stroke="#f0abfc" strokeWidth={2.5} strokeDasharray="6 4" />
-        )}
+        {preview && <HaloPolygon points={ring(preview.polygon)} dashed />}
         {pendingCenter && (
-          <circle cx={px(pendingCenter[0])} cy={py(pendingCenter[1])} r={9} fill="none" stroke="#f0abfc" strokeWidth={2.5} />
+          <HaloCircle cx={px(pendingCenter[0])} cy={py(pendingCenter[1])} r={9} />
         )}
         {areas.map((a) => (
-          <circle key={'c' + a.name} cx={px(a.center[0])} cy={py(a.center[1])} r={6} fill="none" stroke="#7dd3fc" strokeWidth={2} />
+          <HaloCircle key={'c' + a.name} cx={px(a.center[0])} cy={py(a.center[1])} r={6} />
         ))}
       </svg>
-      <div className="mt-1 text-xs text-muted">
-        {map.n} soundings — dot colour = probability (black → red → orange → white),
-        grey = edge-affected (dropped), dotted = survey outline, blue = added areas, pink = preview/center.
-        Click a sounding to set the region center.
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+        <span className="flex items-center gap-1.5">
+          P = 0
+          <span
+            className="inline-block h-3 w-40 rounded border border-edge"
+            style={{ background: `linear-gradient(to right, ${HOT_R_GRADIENT})` }}
+          />
+          1 <span className="text-muted/70">(hot_r)</span>
+        </span>
+        <span>{map.n} soundings — grey = edge-affected (dropped), dashed grey = survey outline,
+          black/white outline = region (dashed = live preview, solid = added areas).
+          Click a sounding to set the region center.</span>
       </div>
     </div>
   );
 }
 
 export function VolumeView({ files }: { files: H5FileInfo[] }) {
-  const [llm, setLlm] = useState<LLMConfig | null>(null);
-  const [provider, setProvider] = useState<'claude' | 'ollama'>('claude');
-  const [apiKey, setApiKey] = useState('');
-  const [ollamaModel, setOllamaModel] = useState(OLLAMA_DEFAULT_MODEL);
-  const [ollamaList, setOllamaList] = useState<OllamaModels | null>(null);
+  const llm = useLlm();
 
   const [filterText, setFilterText] = useState('');
   const [selected, setSelected] = useState('');
@@ -259,46 +215,6 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
   const [probJsonError, setProbJsonError] = useState<string | null>(null);
   const [thickJsonError, setThickJsonError] = useState<string | null>(null);
   const [thickWarning, setThickWarning] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .llmConfig()
-      .then((cfg) => {
-        setLlm(cfg);
-        if (cfg.configured && cfg.provider) setProvider(cfg.provider);
-        if (cfg.configured && cfg.provider === 'ollama' && cfg.model) setOllamaModel(cfg.model);
-      })
-      .catch(() => setLlm({ configured: false, provider: null, model: null }));
-  }, []);
-
-  // Probe the local Ollama server the first time Ollama is selected.
-  useEffect(() => {
-    if (provider !== 'ollama') return;
-    let cancelled = false;
-    api
-      .ollamaModels()
-      .then((r) => {
-        if (cancelled) return;
-        setOllamaList(r);
-        if (r.running && r.models.length) {
-          setOllamaModel((cur) =>
-            r.models.some((m) => `ollama_chat/${m}` === cur) ? cur : `ollama_chat/${r.models[0]}`,
-          );
-        }
-      })
-      .catch(() => !cancelled && setOllamaList({ running: false, models: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [provider]);
-
-  const llmReady = useMemo(() => {
-    if (!llm) return false;
-    if (provider === 'claude') {
-      return (llm.configured && llm.provider === 'claude') || !!apiKey.trim();
-    }
-    return !!ollamaModel.trim();
-  }, [llm, provider, apiKey, ollamaModel]);
 
   const posteriors = useMemo(() => files.filter((f) => f.class === 'POSTERIOR'), [files]);
   const filtered = useMemo(
@@ -343,11 +259,6 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
     setThickWarning(null);
   };
 
-  const llmParams = () =>
-    provider === 'claude'
-      ? { provider: 'claude' as const, ...(apiKey.trim() ? { api_key: apiKey } : {}) }
-      : { provider: 'ollama' as const, model: ollamaModel };
-
   const setJsonText = (
     v: string,
     setJson: (s: string) => void,
@@ -379,7 +290,7 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
       }
       setProbJsonError(null);
       if (!probJsonEdited) {
-        const tr = await api.translateQuery({ f: selected, text: probText, ...llmParams() });
+        const tr = await api.translateQuery({ f: selected, text: probText, ...llm.llmParams() });
         probTranslation.current = tr;
         setProbInterp(tr.interpretation);
         const json = JSON.stringify(tr.query_dict, null, 2);
@@ -401,7 +312,7 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
   };
 
   // ---- B: grow one preview area ----
-  const runGrow = async () => {
+  const runGrow = useCallback(async () => {
     if (!map || !pendingCenter) return;
     setBusyGrow(true);
     setError(null);
@@ -426,7 +337,15 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
     } finally {
       setBusyGrow(false);
     }
-  };
+  }, [map, pendingCenter, pMin, maxArea, geo, selected]);
+
+  // Auto-grow: re-run whenever the center or the P_MIN / MAX_AREA_M2 knobs
+  // change (grow is cheap). Debounced so typing a value doesn't spam requests.
+  useEffect(() => {
+    if (!map || !pendingCenter) return;
+    const t = setTimeout(() => { void runGrow(); }, 300);
+    return () => clearTimeout(t);
+  }, [runGrow, map, pendingCenter]);
 
   const addArea = () => {
     if (!preview) return;
@@ -457,7 +376,7 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
     setError(null);
     setThickWarning(null);
     try {
-      const tr = await api.translateQuery({ f: selected, text: thickText, ...llmParams() });
+      const tr = await api.translateQuery({ f: selected, text: thickText, ...llm.llmParams() });
       thickTranslation.current = tr;
       setThickInterp(tr.interpretation);
       const json = JSON.stringify(tr.query_dict, null, 2);
@@ -518,19 +437,10 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
         </p>
       </div>
       <Card title="LLM">
-        <LLMSection
-          llm={llm}
-          provider={provider}
-          setProvider={setProvider}
-          apiKey={apiKey}
-          setApiKey={setApiKey}
-          ollamaModel={ollamaModel}
-          setOllamaModel={setOllamaModel}
-          ollamaList={ollamaList}
-        />
+        <LLMSection llm={llm} />
       </Card>
 
-      {llmReady && (
+      {llm.ready && (
         <>
           <Card title="Posterior File">
             {!posteriors.length ? (
@@ -665,7 +575,7 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Field label="P_MIN (inclusion cutoff):">
-                    <TextInput type="number" step={0.05} min={0} max={1} value={pMin}
+                    <TextInput type="number" step={0.01} min={0} max={1} value={pMin}
                                onChange={(e) => setPMin(parseFloat(e.target.value) || 0)} />
                   </Field>
                   <Field label="MAX_AREA_M2 (empty = no cap):">
@@ -704,15 +614,15 @@ export function VolumeView({ files }: { files: H5FileInfo[] }) {
                   onPointClick={setPendingCenter}
                 />
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button onClick={runGrow} disabled={busyGrow || !pendingCenter}>
-                    {busyGrow ? 'Growing…' : 'Grow area / Update preview'}
+                  <Button variant="ghost" onClick={() => void runGrow()} disabled={busyGrow || !pendingCenter}>
+                    {busyGrow ? 'Growing…' : 'Update preview'}
                   </Button>
-                  <Button variant="ghost" onClick={addArea} disabled={!preview}>
+                  <Button onClick={addArea} disabled={!preview}>
                     Add area
                   </Button>
                   <span className="text-xs text-muted">
                     {pendingCenter
-                      ? `Center: (${pendingCenter[0].toFixed(0)}, ${pendingCenter[1].toFixed(0)})`
+                      ? `Center: (${pendingCenter[0].toFixed(0)}, ${pendingCenter[1].toFixed(0)}) — grows automatically as you change P_MIN / MAX_AREA_M2 or click a new point`
                       : 'Click a sounding on the map to set the region center.'}
                   </span>
                 </div>

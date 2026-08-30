@@ -89,7 +89,7 @@ hardcopy = True
 # %%
 # --- run-size settings -------------------------------------------------
 N = 1_000_000   # production-scale
-N = 100_000      # demo-scale; increase for a production-quality run
+N = 4_000_000      # demo-scale; increase for a production-quality run
 #N = 12_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
