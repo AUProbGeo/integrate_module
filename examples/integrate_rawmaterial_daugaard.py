@@ -89,7 +89,7 @@ hardcopy = True
 # %%
 # --- run-size settings -------------------------------------------------
 N = 1_000_000   # production-scale
-N = 4_000_000      # demo-scale; increase for a production-quality run
+N = 100_000      # demo-scale; increase for a production-quality run
 #N = 12_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
@@ -444,6 +444,24 @@ if not os.path.exists(f_post_h5) and not os.path.exists(f_prior_data_bh_h5):
 else:
     print("Skipping borehole prior-data build (posterior or %s already exists)."
           % f_prior_data_bh_h5)
+
+# %%
+ig.plot_discrete_data_entropy(f_data_h5, id_list=list(range(2, len(BHOLES))))
+
+# %%
+# Entropy map over ALL multinomial (borehole) datasets — no id_list needed
+fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, cmap = 'gray')
+
+# Overlay the borehole collar locations from the BHOLES list
+bx = [bh['X'] for bh in BHOLES]
+by = [bh['Y'] for bh in BHOLES]
+ax.plot(bx, by, 'rx', ms=9, mew=1.5, label='boreholes')
+for bh in BHOLES:
+    ax.annotate(bh['name'], (bh['X'], bh['Y']),
+                xytext=(4, 4), textcoords='offset points', fontsize=7)
+ax.legend(loc='best')
+
+fig.savefig('DAUGAARD_entropy_with_boreholes.png', dpi=150, bbox_inches='tight')
 
 # %% [markdown]
 # ### B5. Joint (tTEM + borehole) rejection inversion

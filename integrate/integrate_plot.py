@@ -2856,7 +2856,7 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
     return fig
 
 
-def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs):
+def plot_discrete_data_entropy(f_data_h5, id_list=None, depth_reduce='min', **kwargs):
     """
     Plot the pointwise entropy of one or more multinomial discrete data
     entries in a DATA HDF5 file, as a 2D map via :func:`plot_xy`.
@@ -2872,9 +2872,11 @@ def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs)
     ----------
     f_data_h5 : str
         Path to the DATA HDF5 file.
-    id_list : int or list of int
+    id_list : int or list of int, optional
         One or more dataset ids referencing multinomial /D{id} groups
         (e.g. from ``save_borehole_data()``'s ``id_out`` / ``id_borehole_list``).
+        If ``None`` (default), every /D{id} group in the file with
+        ``noise_model == 'multinomial'`` is used.
     depth_reduce : {'min', 'mean'}, optional
         See :func:`discrete_data_entropy`. Default ``'min'``.
     **kwargs
@@ -2889,7 +2891,21 @@ def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs)
     --------
     >>> fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, id_borehole_list)
     """
+    import re
+    import h5py
     import integrate as ig
+
+    if id_list is None:
+        with h5py.File(f_data_h5, 'r') as f_data:
+            id_list = sorted(
+                int(re.search(r'D(\d+)', key).group(1))
+                for key in f_data.keys()
+                if re.match(r'D\d+$', key)
+                and f_data[f'/{key}'].attrs.get('noise_model', 'none') == 'multinomial'
+            )
+        if len(id_list) == 0:
+            raise ValueError(
+                "No multinomial /D{id} datasets found in %s" % f_data_h5)
 
     H = ig.discrete_data_entropy(f_data_h5, id_list, depth_reduce=depth_reduce,
                                   showInfo=kwargs.pop('showInfo', 1))
