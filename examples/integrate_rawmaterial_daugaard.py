@@ -54,7 +54,7 @@
 
 # %%
 try:
-    get_ipython()
+    get_*ipython()
     get_ipython().run_line_magic('load_ext', 'autoreload')
     get_ipython().run_line_magic('autoreload', '2')
 except Exception:
@@ -88,8 +88,8 @@ hardcopy = True
 
 # %%
 # --- run-size settings -------------------------------------------------
-N = 1_000_000   # production-scale
-N = 100_000      # demo-scale; increase for a production-quality run
+N = 1_000_001   # production-scale
+#N = 100_000      # demo-scale; increase for a production-quality run
 #N = 12_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
@@ -193,6 +193,7 @@ for name, (cx, cy) in centroids_sorted:
 
 Xl = np.array([cx for _, (cx, cy) in centroids_sorted])
 Yl = np.array([cy for _, (cx, cy) in centroids_sorted])
+Yl[0]=Yl[0]-200
 
 buffer = 10.0
 
@@ -210,6 +211,8 @@ indices, distances, segment_ids = ig.find_points_along_line_segments(X, Y, Xl_wi
 id_line = indices
 print("Found %d soundings within %.0f m of the widened west-to-east center profile" % (len(id_line), buffer))
 
+pl_data = [id_line[10], id_line[100]]
+
 # Sanity check: are the tTEM soundings and the target polygons in the same
 # coordinate frame? (Both are UTM32N, but this is worth confirming visually
 # rather than assuming.) The selected profile line and its soundings are
@@ -218,6 +221,21 @@ rmu.plot_polygons_over_points(X, Y, polygons, title='Daugaard', hardcopy=hardcop
                               profile_xy=(Xl_wide, Yl_wide), profile_idx=id_line,
                               suffix=SUFFIX)
 
+
+# %% PLot data locations as well as the selected profile
+fig, ax, sc = ig.plot_xy(ELEVATION, X=X, Y=Y, cmap='jet', colorbar_label='Line',
+                         title='Data locations and selected profile', s=3)
+ax.plot(X[id_line], Y[id_line], 'k.', ms=6, label='profile soundings (id_line)')
+j=0
+for i in pl_data:
+    j=j+1
+    ax.plot(X[i], Y[i], 'wo', ms=16, label='example data location (id=%d)' % i)
+    ax.plot(X[i], Y[i], 'ko', ms=12, label='example data location (id=%d)' % i)
+    ax.text(X[i] + 25, Y[i] + 25, 'd%d' % j, color='k', fontsize=18)
+ax.legend(loc='best')
+if hardcopy:
+    fig.savefig(PREFIX + 'daugaard_data_locations_profile' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
+plt.show()
 
 # %% [markdown]
 # # Part A -- Resistivity only: probabilistic (generic prior) vs. deterministic
@@ -342,7 +360,7 @@ for label, f_lsq_h5 in f_lsq_h5_list.items():
                     xaxis='x', gap_threshold=100, hardcopy=hardcopy,
                     txt='WB_%s' % label)
 ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'std'],
-                xaxis='x', gap_threshold=150, hardcopy=hardcopy,
+                xaxis='x', gap_threshold=100, hardcopy=hardcopy,
                 txt='probabilistic_generic')
 
 # %% [markdown]
@@ -439,18 +457,20 @@ if not os.path.exists(f_post_h5) and not os.path.exists(f_prior_data_bh_h5):
     ig.copy_hdf5_file(f_prior_data_h5, f_prior_data_bh_h5)
     id_prior_list, id_borehole_list = ig.save_borehole_data(
         f_prior_data_bh_h5, f_data_h5, BHOLES,
-        im_prior=im_prior, range_xyz=300,
+        im_prior=im_prior, range_xyz=100,
         doPlot=False, showInfo=0)
 else:
     print("Skipping borehole prior-data build (posterior or %s already exists)."
           % f_prior_data_bh_h5)
 
-# %%
-ig.plot_discrete_data_entropy(f_data_h5, id_list=list(range(2, len(BHOLES))))
 
 # %%
+# ig.plot_discrete_data_entropy(f_data_h5, id_list=[2,3],plotPoints=True, )
 # Entropy map over ALL multinomial (borehole) datasets — no id_list needed
-fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, cmap = 'gray', plotPoints=True)
+fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, cmap = 'hot', 
+                                            plotPoints=True, plotPoints_size=1, plotPoints_color='k', 
+                                            plotPoints_alpha=0.1, 
+                                            hardcopy=False)
 
 # Overlay the borehole collar locations from the BHOLES list
 bx = [bh['X'] for bh in BHOLES]
@@ -461,7 +481,7 @@ for bh in BHOLES:
                 xytext=(4, 4), textcoords='offset points', fontsize=7)
 ax.legend(loc='best')
 
-fig.savefig('DAUGAARD_entropy_with_boreholes.png', dpi=150, bbox_inches='tight')
+fig.savefig('DAUGAARD_entropy_with_boreholes_N%d.png' % (N), dpi=150, bbox_inches='tight')
 
 # %% [markdown]
 # ### B5. Joint (tTEM + borehole) rejection inversion
@@ -489,8 +509,20 @@ ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
 # %%
 ig.plot_profile(f_post_h5, im=1, ii=id_line, key='HarmonicMean', gap_threshold=100,
                 xaxis='x', hardcopy=hardcopy)
-ig.plot_profile(f_post_h5, im=2, ii=id_line, panels=['mode'], gap_threshold=100,
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100,
                 xaxis='x', hardcopy=hardcopy)
+
+# %%  plot posterior models ad data lications (similar the prior realisationz)
+# Yes: `ig.plot_post_stats(f_post_h5, i_plot=<sounding index>, ...)` is the
+# posterior counterpart of `ig.plot_prior_stats` used in B2/Part A -- same
+# histogram + depth-profile + realizations layout, but conditioned on ONE
+# selected sounding (`i_plot`) instead of showing the whole (unconditioned)
+# prior. Looping over `pl_data` (same example locations as the data plot
+# above), for both model parameters shown in B6 (im=1 resistivity, im=2
+# lithology).
+for i_plot in pl_data:
+    ig.plot_post_stats(f_post_h5, i_plot=i_plot, im=1, hardcopy=hardcopy)
+    ig.plot_post_stats(f_post_h5, i_plot=i_plot, im=2, hardcopy=hardcopy)
 
 # %%
 for elevation in [40, 30, 20, 10]:
@@ -502,6 +534,21 @@ for elevation in [40, 30, 20, 10]:
     ig.plot_feature_2d(f_post_h5, im=2, key='Mode', elevation=elevation,
                        s=2, hardcopy=hardcopy)
     plt.show()
+
+# %% Plot prior data and posterior data fo a few select lociations
+# Prior (wheat/gray), posterior (black) and observed (red) tTEM data at a
+# couple of specific (X, Y) locations, using `ig.plot_data_prior_post`, which
+# takes a sounding *index* (`i_plot`) -- so each location is first snapped to
+# its nearest sounding via `argmin` on the same (X, Y) loaded in section 1a
+# (the same pattern used for the WorkBench reprojection in Part A and the
+# region-growing seed in B8).
+
+
+
+for i_plot in pl_data:
+    #print("Location (%.1f, %.1f) -> nearest sounding #%d at (%.1f, %.1f)"
+    #      % (X_loc, Y_loc, i_plot, X[i_plot], Y[i_plot]))
+    ig.plot_data_prior_post(f_post_h5, i_plot=i_plot, hardcopy=hardcopy)
 
 # %% [markdown]
 # ### B7. The `ig.query` tool

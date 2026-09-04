@@ -262,7 +262,8 @@ def plot_xy(values, X=None, Y=None,
             cmap=None, clim=None, norm=None, uselog=False,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
-            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', fontsize=None, **kwargs):
+            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.',
+            plotPoints_size=None, plotPoints_alpha=0.6, fontsize=None, **kwargs):
     """
     Core 2D scatter map: plot any array of values at survey (X, Y) locations.
 
@@ -334,8 +335,15 @@ def plot_xy(values, X=None, Y=None,
     plotPoints_color : str or colour, optional
         Colour for the background dots when ``plotPoints=True`` (default ``'0.7'``
         — light grey). Using a neutral grey avoids confusion with class colours.
+    plotPoints_marker : str, optional
+        Marker style for the background dots when ``plotPoints=True`` (default ``'.'``).
+    plotPoints_size : float, optional
+        Marker size for the background dots when ``plotPoints=True``
+        (default: ``max(0.3, s * 0.4)``).
+    plotPoints_alpha : float, optional
+        Marker alpha for the background dots when ``plotPoints=True`` (default ``0.6``).
     **kwargs
-        Forwarded to ``ax.scatter()``.
+        Forwarded to ``ax.scatter()`` for the main (coloured) scatter.
 
     Returns
     -------
@@ -392,7 +400,8 @@ def plot_xy(values, X=None, Y=None,
 
     # --- Background points ---
     if plotPoints:
-        ax.scatter(X, Y, color=plotPoints_color, s=max(0.3, s * 0.4), marker=plotPoints_marker, alpha=0.6, zorder=1)
+        _plotPoints_size = plotPoints_size if plotPoints_size is not None else max(0.3, s * 0.4)
+        ax.scatter(X, Y, color=plotPoints_color, s=_plotPoints_size, marker=plotPoints_marker, alpha=plotPoints_alpha, zorder=1)
 
     # --- Scatter ---
     vmin = clim[0] if clim is not None else None
