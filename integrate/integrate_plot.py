@@ -3888,23 +3888,23 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         ax_left = fig.add_subplot(gs[0])
 
         if show_stats:
-            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M.flatten()
                 M_hist = M_hist[M_hist > 0]
                 if len(M_hist) > 0:
-                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                    m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
-                    m1 = ax_left.hist([], 101, orientation='horizontal')
-                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
-                ticks = ax_left.get_yticks()
-                ax_left.set_yticks(ticks)
-                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                    m1 = ax_left.hist([], 101)
+                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_xticks()
+                ax_left.set_xticks(ticks)
+                ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
             else:
                 M_hist = M.flatten()
-                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-                ax_left.set_ylabel(name, **fs_kw)
-            ax_left.set_xlabel('Counts', **fs_kw)
+                m1 = ax_left.hist(M_hist, 101)
+                ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_ylabel('Counts', **fs_kw)
         else:
             # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M.flatten()
@@ -4364,35 +4364,35 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         ax_left = fig.add_subplot(gs[0])
 
         if show_stats:
-            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M_all.flatten()
                 M_hist = M_hist[M_hist > 0]
                 if len(M_hist) > 0:
-                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                    m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
-                    m1 = ax_left.hist([], 101, orientation='horizontal')
-                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
-                ticks = ax_left.get_yticks()
-                ax_left.set_yticks(ticks)
-                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                    m1 = ax_left.hist([], 101)
+                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_xticks()
+                ax_left.set_xticks(ticks)
+                ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
                 if stat_mean is not None:
                     mean_pos = stat_mean[stat_mean > 0]
                     if len(mean_pos) > 0:
-                        ax_left.axhline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
+                        ax_left.axvline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
                     median_pos = stat_median[stat_median > 0]
                     if len(median_pos) > 0:
-                        ax_left.axhline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
+                        ax_left.axvline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
             else:
                 M_hist = M_all.flatten()
-                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-                ax_left.set_ylabel(name, **fs_kw)
+                m1 = ax_left.hist(M_hist, 101)
+                ax_left.set_xlabel(name, **fs_kw)
                 if stat_mean is not None:
-                    ax_left.axhline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
+                    ax_left.axvline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
-                    ax_left.axhline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
-            ax_left.set_xlabel('Counts', **fs_kw)
+                    ax_left.axvline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
+            ax_left.set_ylabel('Counts', **fs_kw)
             if stat_mean is not None or stat_median is not None:
                 ax_left.legend(loc='best', fontsize=legend_fs)
         else:

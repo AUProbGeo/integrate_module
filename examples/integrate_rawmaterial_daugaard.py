@@ -223,15 +223,16 @@ rmu.plot_polygons_over_points(X, Y, polygons, title='Daugaard', hardcopy=hardcop
 
 
 # %% PLot data locations as well as the selected profile
-fig, ax, sc = ig.plot_xy(ELEVATION, X=X, Y=Y, cmap='jet', colorbar_label='Line',
+fig, ax, sc = ig.plot_xy(ELEVATION, X=X, Y=Y, cmap='jet', colorbar_label='Elevation [m]',
                          title='Data locations and selected profile', s=3)
-ax.plot(X[id_line], Y[id_line], 'k.', ms=6, label='profile soundings (id_line)')
+ax.plot(X[id_line], Y[id_line], 'k.', label='profile soundings (id_line)')
 j=0
+
 for i in pl_data:
     j=j+1
-    ax.plot(X[i], Y[i], 'wo', ms=16, label='example data location (id=%d)' % i)
-    ax.plot(X[i], Y[i], 'ko', ms=12, label='example data location (id=%d)' % i)
-    ax.text(X[i] + 25, Y[i] + 25, 'd%d' % j, color='k', fontsize=18)
+    ax.plot(X[i], Y[i], 'wo', ms=16)
+    ax.plot(X[i], Y[i], 'k*', ms=6+j*5, label='example data location %d (id=%d)' % (j,i))
+    ax.text(X[i] + 25, Y[i] + 25, 'd%d (%d)' % (j, i), color='k', fontsize=18)
 ax.legend(loc='best')
 if hardcopy:
     fig.savefig(PREFIX + 'daugaard_data_locations_profile' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
@@ -274,7 +275,7 @@ ig.plot_T_EV(f_post_generic_h5, pl='CHI2', hardcopy=hardcopy)
 
 # %%
 ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'std'],
-                xaxis='x', gap_threshold=150, hardcopy=hardcopy,
+                xaxis='x', gap_threshold=100, hardcopy=hardcopy,
                 txt='probabilistic_generic')
 
 # %% [markdown]
@@ -512,14 +513,7 @@ ig.plot_profile(f_post_h5, im=1, ii=id_line, key='HarmonicMean', gap_threshold=1
 ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100,
                 xaxis='x', hardcopy=hardcopy)
 
-# %%  plot posterior models ad data lications (similar the prior realisationz)
-# Yes: `ig.plot_post_stats(f_post_h5, i_plot=<sounding index>, ...)` is the
-# posterior counterpart of `ig.plot_prior_stats` used in B2/Part A -- same
-# histogram + depth-profile + realizations layout, but conditioned on ONE
-# selected sounding (`i_plot`) instead of showing the whole (unconditioned)
-# prior. Looping over `pl_data` (same example locations as the data plot
-# above), for both model parameters shown in B6 (im=1 resistivity, im=2
-# lithology).
+# %%  plot posterior models at selected data locations (similar the prior realisationz)
 for i_plot in pl_data:
     ig.plot_post_stats(f_post_h5, i_plot=i_plot, im=1, hardcopy=hardcopy)
     ig.plot_post_stats(f_post_h5, i_plot=i_plot, im=2, hardcopy=hardcopy)
