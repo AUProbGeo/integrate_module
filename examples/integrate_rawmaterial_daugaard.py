@@ -543,6 +543,7 @@ for i_plot in pl_data:
     #print("Location (%.1f, %.1f) -> nearest sounding #%d at (%.1f, %.1f)"
     #      % (X_loc, Y_loc, i_plot, X[i_plot], Y[i_plot]))
     ig.plot_data_prior_post(f_post_h5, i_plot=i_plot, hardcopy=hardcopy)
+ig.plot_data_prior(f_post_h5, f_data_h5, hardcopy=hardcopy)
 
 # %% [markdown]
 # ### B7. The `ig.query` tool

@@ -3146,13 +3146,14 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
 
 
 def plot_data_prior(f_prior_data_h5,
-                    f_data_h5, 
+                    f_data_h5,
                     nr=1000,
                     id=1,
                     id_data = None,
-                    d_str='d_obs', 
+                    d_str='d_obs',
                     alpha=0.5,
-                    ylim=None, 
+                    ylim=None,
+                    plot_type=['prior', 'data'],
                     **kwargs):
     """
     Compare observed data with prior model predictions.
@@ -3179,6 +3180,11 @@ def plot_data_prior(f_prior_data_h5,
         Transparency level for prior realization lines, range 0-1 (default is 0.5).
     ylim : tuple or list, optional
         Y-axis limits as (ymin, ymax). If None, uses automatic scaling (default is None).
+    plot_type : str or list of str, optional
+        Which data to show: 'prior' (prior realizations only), 'data' (observed
+        data only), or both. Accepts a single string or a list, e.g.
+        plot_type='prior' or plot_type=['prior', 'data'] (default is
+        ['prior', 'data'], i.e. show both).
     **kwargs : dict
         Additional keyword arguments:
         - hardcopy : bool, save plot as PNG file (default True)
@@ -3204,6 +3210,15 @@ def plot_data_prior(f_prior_data_h5,
     
     cols=['wheat','black','red']
 
+    # Normalize plot_type to a list and decide what to show
+    if isinstance(plot_type, str):
+        plot_type = [plot_type]
+    plot_type = [str(p).lower() for p in plot_type]
+    do_prior = 'prior' in plot_type
+    do_data = 'data' in plot_type
+    if not (do_prior or do_data):
+        raise ValueError("plot_type must contain 'prior' and/or 'data', got %s" % plot_type)
+
     with h5py.File(f_data_h5,'r') as f_data, h5py.File(f_prior_data_h5,'r') as f_prior_data:
 
         # Get data dimensions to determine plot type
@@ -3218,37 +3233,39 @@ def plot_data_prior(f_prior_data_h5,
             name_attr = name_attr.decode('utf-8')
 
         # Load prior data
-        dh5_str_prior = 'D%d' % (id)
-        if dh5_str_prior in f_prior_data:
-            npr = f_prior_data[dh5_str_prior].shape[0]
-            nr_prior = np.min([nr, npr])
-            i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
-            prior_data = f_prior_data[dh5_str_prior][i_use]
+        if do_prior:
+            dh5_str_prior = 'D%d' % (id)
+            if dh5_str_prior in f_prior_data:
+                npr = f_prior_data[dh5_str_prior].shape[0]
+                nr_prior = np.min([nr, npr])
+                i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
+                prior_data = f_prior_data[dh5_str_prior][i_use]
 
-            # Check if data is 1D (only one column)
-            if prior_data.shape[1] == 1:
-                is_1d = True
-                prior_data = prior_data.flatten()
-        else:
-            print('%s not in f_prior_data' % dh5_str_prior)
+                # Check if data is 1D (only one column)
+                if prior_data.shape[1] == 1:
+                    is_1d = True
+                    prior_data = prior_data.flatten()
+            else:
+                print('%s not in f_prior_data' % dh5_str_prior)
 
         # Load observed data
-        dh5_str_obs = 'D%d/%s' % (id_data, d_str)
-        if dh5_str_obs in f_data:
-            d_obs_full = f_data[dh5_str_obs][:]
-            if len(d_obs_full.shape) == 1:
-                d_obs_full = d_obs_full.reshape(-1, 1)
-            ns, nd = d_obs_full.shape
-            nr_obs = np.min([nr, ns])
-            i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
-            obs_data = d_obs_full[i_use_d, :]
+        if do_data:
+            dh5_str_obs = 'D%d/%s' % (id_data, d_str)
+            if dh5_str_obs in f_data:
+                d_obs_full = f_data[dh5_str_obs][:]
+                if len(d_obs_full.shape) == 1:
+                    d_obs_full = d_obs_full.reshape(-1, 1)
+                ns, nd = d_obs_full.shape
+                nr_obs = np.min([nr, ns])
+                i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
+                obs_data = d_obs_full[i_use_d, :]
 
-            # Check if observed data is also 1D
-            if obs_data.shape[1] == 1:
-                is_1d = True
-                obs_data = obs_data.flatten()
-        else:
-            print('%s not in f_data' % dh5_str_obs)
+                # Check if observed data is also 1D
+                if obs_data.shape[1] == 1:
+                    is_1d = True
+                    obs_data = obs_data.flatten()
+            else:
+                print('%s not in f_data' % dh5_str_obs)
 
     plt.figure(figsize=(7,6))
 
@@ -3268,7 +3285,10 @@ def plot_data_prior(f_prior_data_h5,
         plt.ylabel('Probability Density')
         plt.legend()
         name_suffix = ': %s' % name_attr if name_attr else ''
-        plt.title('D%d%s: Prior vs Observed (1D Histogram)' % (id_data, name_suffix))
+        shown = ' vs '.join([s for s, ok in
+                             (('Prior', prior_data is not None),
+                              ('Observed', obs_data is not None)) if ok])
+        plt.title('D%d%s: %s (1D Histogram)' % (id_data, name_suffix, shown))
     else:
         # Original 2D line plot
         if prior_data is not None:
@@ -3282,7 +3302,10 @@ def plot_data_prior(f_prior_data_h5,
         plt.xlabel('Data #')
         plt.ylabel('Data Value')
         name_suffix = ': %s' % name_attr if name_attr else ''
-        plt.title('D%d%s: Prior (black) vs Observed (red)' % (id_data, name_suffix))
+        shown = ' vs '.join([s for s, ok in
+                             (('Prior (black)', prior_data is not None),
+                              ('Observed (red)', obs_data is not None)) if ok])
+        plt.title('D%d%s: %s' % (id_data, name_suffix, shown))
 
     if ylim is not None:
         if is_1d:
@@ -3298,7 +3321,8 @@ def plot_data_prior(f_prior_data_h5,
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # strip the filename from f_data_h5
-        plt.savefig('%s_%s_id%d_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str), bbox_inches='tight')
+        pt_tag = '_'.join(plot_type)
+        plt.savefig('%s_%s_id%d_%s_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str,pt_tag), bbox_inches='tight')
     plt.show()
     
     return True
