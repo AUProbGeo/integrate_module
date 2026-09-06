@@ -262,7 +262,8 @@ def plot_xy(values, X=None, Y=None,
             cmap=None, clim=None, norm=None, uselog=False,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
-            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', fontsize=None, **kwargs):
+            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.',
+            plotPoints_size=None, plotPoints_alpha=0.6, fontsize=None, **kwargs):
     """
     Core 2D scatter map: plot any array of values at survey (X, Y) locations.
 
@@ -334,8 +335,15 @@ def plot_xy(values, X=None, Y=None,
     plotPoints_color : str or colour, optional
         Colour for the background dots when ``plotPoints=True`` (default ``'0.7'``
         — light grey). Using a neutral grey avoids confusion with class colours.
+    plotPoints_marker : str, optional
+        Marker style for the background dots when ``plotPoints=True`` (default ``'.'``).
+    plotPoints_size : float, optional
+        Marker size for the background dots when ``plotPoints=True``
+        (default: ``max(0.3, s * 0.4)``).
+    plotPoints_alpha : float, optional
+        Marker alpha for the background dots when ``plotPoints=True`` (default ``0.6``).
     **kwargs
-        Forwarded to ``ax.scatter()``.
+        Forwarded to ``ax.scatter()`` for the main (coloured) scatter.
 
     Returns
     -------
@@ -392,7 +400,8 @@ def plot_xy(values, X=None, Y=None,
 
     # --- Background points ---
     if plotPoints:
-        ax.scatter(X, Y, color=plotPoints_color, s=max(0.3, s * 0.4), marker=plotPoints_marker, alpha=0.6, zorder=1)
+        _plotPoints_size = plotPoints_size if plotPoints_size is not None else max(0.3, s * 0.4)
+        ax.scatter(X, Y, color=plotPoints_color, s=_plotPoints_size, marker=plotPoints_marker, alpha=plotPoints_alpha, zorder=1)
 
     # --- Scatter ---
     vmin = clim[0] if clim is not None else None
@@ -3137,13 +3146,14 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
 
 
 def plot_data_prior(f_prior_data_h5,
-                    f_data_h5, 
+                    f_data_h5,
                     nr=1000,
                     id=1,
                     id_data = None,
-                    d_str='d_obs', 
+                    d_str='d_obs',
                     alpha=0.5,
-                    ylim=None, 
+                    ylim=None,
+                    plot_type=['prior', 'data'],
                     **kwargs):
     """
     Compare observed data with prior model predictions.
@@ -3170,6 +3180,11 @@ def plot_data_prior(f_prior_data_h5,
         Transparency level for prior realization lines, range 0-1 (default is 0.5).
     ylim : tuple or list, optional
         Y-axis limits as (ymin, ymax). If None, uses automatic scaling (default is None).
+    plot_type : str or list of str, optional
+        Which data to show: 'prior' (prior realizations only), 'data' (observed
+        data only), or both. Accepts a single string or a list, e.g.
+        plot_type='prior' or plot_type=['prior', 'data'] (default is
+        ['prior', 'data'], i.e. show both).
     **kwargs : dict
         Additional keyword arguments:
         - hardcopy : bool, save plot as PNG file (default True)
@@ -3195,6 +3210,15 @@ def plot_data_prior(f_prior_data_h5,
     
     cols=['wheat','black','red']
 
+    # Normalize plot_type to a list and decide what to show
+    if isinstance(plot_type, str):
+        plot_type = [plot_type]
+    plot_type = [str(p).lower() for p in plot_type]
+    do_prior = 'prior' in plot_type
+    do_data = 'data' in plot_type
+    if not (do_prior or do_data):
+        raise ValueError("plot_type must contain 'prior' and/or 'data', got %s" % plot_type)
+
     with h5py.File(f_data_h5,'r') as f_data, h5py.File(f_prior_data_h5,'r') as f_prior_data:
 
         # Get data dimensions to determine plot type
@@ -3209,37 +3233,39 @@ def plot_data_prior(f_prior_data_h5,
             name_attr = name_attr.decode('utf-8')
 
         # Load prior data
-        dh5_str_prior = 'D%d' % (id)
-        if dh5_str_prior in f_prior_data:
-            npr = f_prior_data[dh5_str_prior].shape[0]
-            nr_prior = np.min([nr, npr])
-            i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
-            prior_data = f_prior_data[dh5_str_prior][i_use]
+        if do_prior:
+            dh5_str_prior = 'D%d' % (id)
+            if dh5_str_prior in f_prior_data:
+                npr = f_prior_data[dh5_str_prior].shape[0]
+                nr_prior = np.min([nr, npr])
+                i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
+                prior_data = f_prior_data[dh5_str_prior][i_use]
 
-            # Check if data is 1D (only one column)
-            if prior_data.shape[1] == 1:
-                is_1d = True
-                prior_data = prior_data.flatten()
-        else:
-            print('%s not in f_prior_data' % dh5_str_prior)
+                # Check if data is 1D (only one column)
+                if prior_data.shape[1] == 1:
+                    is_1d = True
+                    prior_data = prior_data.flatten()
+            else:
+                print('%s not in f_prior_data' % dh5_str_prior)
 
         # Load observed data
-        dh5_str_obs = 'D%d/%s' % (id_data, d_str)
-        if dh5_str_obs in f_data:
-            d_obs_full = f_data[dh5_str_obs][:]
-            if len(d_obs_full.shape) == 1:
-                d_obs_full = d_obs_full.reshape(-1, 1)
-            ns, nd = d_obs_full.shape
-            nr_obs = np.min([nr, ns])
-            i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
-            obs_data = d_obs_full[i_use_d, :]
+        if do_data:
+            dh5_str_obs = 'D%d/%s' % (id_data, d_str)
+            if dh5_str_obs in f_data:
+                d_obs_full = f_data[dh5_str_obs][:]
+                if len(d_obs_full.shape) == 1:
+                    d_obs_full = d_obs_full.reshape(-1, 1)
+                ns, nd = d_obs_full.shape
+                nr_obs = np.min([nr, ns])
+                i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
+                obs_data = d_obs_full[i_use_d, :]
 
-            # Check if observed data is also 1D
-            if obs_data.shape[1] == 1:
-                is_1d = True
-                obs_data = obs_data.flatten()
-        else:
-            print('%s not in f_data' % dh5_str_obs)
+                # Check if observed data is also 1D
+                if obs_data.shape[1] == 1:
+                    is_1d = True
+                    obs_data = obs_data.flatten()
+            else:
+                print('%s not in f_data' % dh5_str_obs)
 
     plt.figure(figsize=(7,6))
 
@@ -3259,7 +3285,10 @@ def plot_data_prior(f_prior_data_h5,
         plt.ylabel('Probability Density')
         plt.legend()
         name_suffix = ': %s' % name_attr if name_attr else ''
-        plt.title('D%d%s: Prior vs Observed (1D Histogram)' % (id_data, name_suffix))
+        shown = ' vs '.join([s for s, ok in
+                             (('Prior', prior_data is not None),
+                              ('Observed', obs_data is not None)) if ok])
+        plt.title('D%d%s: %s (1D Histogram)' % (id_data, name_suffix, shown))
     else:
         # Original 2D line plot
         if prior_data is not None:
@@ -3273,7 +3302,10 @@ def plot_data_prior(f_prior_data_h5,
         plt.xlabel('Data #')
         plt.ylabel('Data Value')
         name_suffix = ': %s' % name_attr if name_attr else ''
-        plt.title('D%d%s: Prior (black) vs Observed (red)' % (id_data, name_suffix))
+        shown = ' vs '.join([s for s, ok in
+                             (('Prior (black)', prior_data is not None),
+                              ('Observed (red)', obs_data is not None)) if ok])
+        plt.title('D%d%s: %s' % (id_data, name_suffix, shown))
 
     if ylim is not None:
         if is_1d:
@@ -3289,7 +3321,8 @@ def plot_data_prior(f_prior_data_h5,
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # strip the filename from f_data_h5
-        plt.savefig('%s_%s_id%d_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str), bbox_inches='tight')
+        pt_tag = '_'.join(plot_type)
+        plt.savefig('%s_%s_id%d_%s_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str,pt_tag), bbox_inches='tight')
     plt.show()
     
     return True
@@ -3879,23 +3912,23 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         ax_left = fig.add_subplot(gs[0])
 
         if show_stats:
-            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M.flatten()
                 M_hist = M_hist[M_hist > 0]
                 if len(M_hist) > 0:
-                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                    m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
-                    m1 = ax_left.hist([], 101, orientation='horizontal')
-                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
-                ticks = ax_left.get_yticks()
-                ax_left.set_yticks(ticks)
-                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                    m1 = ax_left.hist([], 101)
+                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_xticks()
+                ax_left.set_xticks(ticks)
+                ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
             else:
                 M_hist = M.flatten()
-                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-                ax_left.set_ylabel(name, **fs_kw)
-            ax_left.set_xlabel('Counts', **fs_kw)
+                m1 = ax_left.hist(M_hist, 101)
+                ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_ylabel('Counts', **fs_kw)
         else:
             # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M.flatten()
@@ -4355,35 +4388,35 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         ax_left = fig.add_subplot(gs[0])
 
         if show_stats:
-            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M_all.flatten()
                 M_hist = M_hist[M_hist > 0]
                 if len(M_hist) > 0:
-                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                    m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
-                    m1 = ax_left.hist([], 101, orientation='horizontal')
-                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
-                ticks = ax_left.get_yticks()
-                ax_left.set_yticks(ticks)
-                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                    m1 = ax_left.hist([], 101)
+                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_xticks()
+                ax_left.set_xticks(ticks)
+                ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
                 if stat_mean is not None:
                     mean_pos = stat_mean[stat_mean > 0]
                     if len(mean_pos) > 0:
-                        ax_left.axhline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
+                        ax_left.axvline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
                     median_pos = stat_median[stat_median > 0]
                     if len(median_pos) > 0:
-                        ax_left.axhline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
+                        ax_left.axvline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
             else:
                 M_hist = M_all.flatten()
-                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-                ax_left.set_ylabel(name, **fs_kw)
+                m1 = ax_left.hist(M_hist, 101)
+                ax_left.set_xlabel(name, **fs_kw)
                 if stat_mean is not None:
-                    ax_left.axhline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
+                    ax_left.axvline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
-                    ax_left.axhline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
-            ax_left.set_xlabel('Counts', **fs_kw)
+                    ax_left.axvline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
+            ax_left.set_ylabel('Counts', **fs_kw)
             if stat_mean is not None or stat_median is not None:
                 ax_left.legend(loc='best', fontsize=legend_fs)
         else:
