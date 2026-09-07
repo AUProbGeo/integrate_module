@@ -90,7 +90,7 @@ hardcopy = True
 # --- run-size settings -------------------------------------------------
 N = 1_000_001   # production-scale
 #N = 100_000      # demo-scale; increase for a production-quality run
-#N = 12_000      # demo-scale; increase for a production-quality run
+#N = 10_000      # demo-scale; increase for a production-quality run
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -277,6 +277,16 @@ ig.plot_T_EV(f_post_generic_h5, pl='CHI2', hardcopy=hardcopy)
 ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'std'],
                 xaxis='x', gap_threshold=100, hardcopy=hardcopy,
                 txt='probabilistic_generic')
+
+# %% same but with alpha scaled by std
+# alpha>0 fades the harmonic-mean panel by uncertainty, normalised in the same
+# log10(std) space shown in the 'std' panel (default logstd_min=0.5, logstd_max=1.0):
+# opaque at LogStd<=0.5, fully transparent at LogStd>=1.0.
+ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'std'],
+                xaxis='x', gap_threshold=100, hardcopy=hardcopy, alpha=.95,
+                logstd_min=0.1, logstd_max=1.0,
+                txt='probabilistic_generic_alpha')
+
 
 # %% [markdown]
 # ### Deterministic (WorkBench LSQ) inversion
@@ -510,8 +520,26 @@ ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
 # %%
 ig.plot_profile(f_post_h5, im=1, ii=id_line, key='HarmonicMean', gap_threshold=100,
                 xaxis='x', hardcopy=hardcopy)
+
+ig.plot_profile(f_post_h5, ii=id_line, im=1,
+                xaxis='x', gap_threshold=100, hardcopy=hardcopy, alpha=.95,
+                logstd_min=0.1, logstd_max=1.0,
+                txt='_alpha'
+                )
+
+# %% 
 ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100,
-                xaxis='x', hardcopy=hardcopy)
+                xaxis='x', 
+                hardcopy=hardcopy)
+
+ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100,
+                xaxis='x', 
+                alpha=0.95, entropy_min=0.1, entropy_max=1.0,
+                txt='_alpha',
+                hardcopy=hardcopy)
+
+
+
 
 # %%  plot posterior models at selected data locations (similar the prior realisationz)
 for i_plot in pl_data:
