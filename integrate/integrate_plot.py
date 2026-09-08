@@ -4816,6 +4816,11 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             ``depth_bottom`` value across all boreholes.
         title : str, optional
             Overall figure title.
+        fontsize : int or float, optional
+            Font size applied to all text elements (per-well headers, axis
+            label, tick labels, legend); the overall ``title`` is drawn two
+            points larger. If None, the module's default sizes are used
+            (default None).
 
     Returns
     -------
@@ -4838,6 +4843,16 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     _fname_kw = kwargs.get('name', None)
     depth_max = kwargs.get('depth_max', None)
     title     = kwargs.get('title', None)
+
+    # Font sizes: a single ``fontsize`` kwarg overrides every text element,
+    # matching the convention used by the other plot_* functions in this
+    # module.  When None, the previous hard-coded sizes are kept.
+    fontsize   = kwargs.get('fontsize', None)
+    fs_sub     = fontsize if fontsize is not None else 8    # per-well header
+    fs_tick    = fontsize if fontsize is not None else 7    # y tick labels
+    fs_legend  = fontsize if fontsize is not None else 8    # class legend
+    fs_ylabel  = {'fontsize': fontsize} if fontsize is not None else {}
+    fs_suptitle = (fontsize + 2) if fontsize is not None else 10
 
     # --- normalise input to a list of dicts ---
     if isinstance(W, str):
@@ -5012,7 +5027,7 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
                 subtitle = f'X={x_coord:.0f}\nY={y_coord:.0f}'
         else:
             subtitle = ''
-        ax.set_title(f'{bh_name}\n{subtitle}', fontsize=8)
+        ax.set_title(f'{bh_name}\n{subtitle}', fontsize=fs_sub)
         ax.set_xlim(-0.05, 1.05)
         if use_elevation:
             ax.set_ylim(y_min_global, y_max_global)   # high elevation at top
@@ -5020,9 +5035,10 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             ax.set_ylim(y_max_global, y_min_global)   # depth increases downward
         ax.set_xticks([])
         ax.set_xlabel('')
-        ax.tick_params(axis='y', labelsize=7)
+        ax.tick_params(axis='y', labelsize=fs_tick)
 
-    axes[0].set_ylabel('Elevation (m a.s.l.)' if use_elevation else 'Depth (m)')
+    axes[0].set_ylabel('Elevation (m a.s.l.)' if use_elevation else 'Depth (m)',
+                       **fs_ylabel)
 
     # --- shared legend ---
     patches = [
@@ -5032,16 +5048,16 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     ]
     if n_wells == 1:
         fig.legend(handles=patches, loc='center left',
-                   fontsize=8, frameon=True,
+                   fontsize=fs_legend, frameon=True,
                    bbox_to_anchor=(1.0, 0.5))
     else:
         fig.legend(handles=patches, loc='lower center',
                    ncol=min(len(patches), 6),
-                   fontsize=8, frameon=True,
+                   fontsize=fs_legend, frameon=True,
                    bbox_to_anchor=(0.5, 0.0))
 
     if title:
-        fig.suptitle(title, fontsize=10, y=1.01)
+        fig.suptitle(title, fontsize=fs_suptitle, y=1.01)
 
     plt.tight_layout(rect=[0, 0.06, 1, 1])
 
