@@ -35,6 +35,9 @@ dependencies = [
     "jax",
     "fastapi",
     "uvicorn[standard]",
+    "python-fasthtml",
+    "openpyxl",
+    "httpx",
 ]
 
 [project.optional-dependencies]
@@ -73,18 +76,24 @@ Repository = "https://github.com/AUProbGeo/integrate_module"
 Issues = "https://github.com/AUProbGeo/integrate_module/issues"
 
 [project.scripts]
-integrate = "integrate.integrate_www_cli:main"
+integrate = "frontend.app:main"
+integrate_www = "integrate.integrate_www_cli:main"
 integrate_timing = "integrate.integrate_timing_cli:main"
 integrate_rejection = "integrate.integrate_rejection_cli:main"
 hdf5_info = "integrate.integrate_hdf5_info_cli:main"
 integrate_ui = "ui.backend.main:main"
 
 [tool.setuptools]
-packages = ["integrate", "ui", "ui.backend", "ui.backend.routers"]
+packages = [
+    "integrate", "ui", "ui.backend", "ui.backend.routers",
+    "frontend", "frontend.pages", "frontend.services",
+]
 
 [tool.setuptools.package-data]
 # Ship the built frontend (run ui/dev.sh build before packaging).
 ui = ["frontend/dist/**/*"]
+# Ship the FastHTML frontend's static assets (CSS, JS, fonts).
+frontend = ["static/**/*"]
 
 [dependency-groups]
 dev = [

@@ -1,0 +1,63 @@
+"""App boots and every nav route returns 200."""
+
+from pathlib import Path
+
+from starlette.testclient import TestClient
+
+from frontend.app import app
+from frontend.components import leaf_slugs
+
+
+def _client():
+    return TestClient(app)
+
+
+def test_home_ok():
+    r = _client().get("/")
+    assert r.status_code == 200
+    assert "INTEGRATE" in r.text
+    assert "Data files" in r.text
+
+
+def test_all_nav_routes_ok():
+    c = _client()
+    for slug in leaf_slugs():
+        path = "/" if slug == "files" else f"/{slug}"
+        assert c.get(path).status_code == 200, path
+
+
+def test_files_list_partial():
+    c = _client()
+    assert c.get("/files/list?ffilter=all").status_code == 200
+    assert c.get("/files/list?ffilter=data").status_code == 200
+
+
+def test_static_assets():
+    c = _client()
+    assert c.get("/static/modernist.css").status_code == 200
+    assert c.get("/static/htmx.min.js").status_code == 200
+
+
+def test_workspace_controls():
+    import tempfile
+
+    from frontend import config
+
+    c = _client()
+    saved = config.get_workspace()
+    try:
+        assert "WORKING FOLDER" in c.get("/").text
+        assert c.get("/workspace/edit").status_code == 200
+        assert c.get("/workspace/cancel").status_code == 200
+        # bad path -> re-rendered bar with an error, still 200
+        r = c.post("/workspace", data={"path_text": "/no/such/folder/xyz"})
+        assert r.status_code == 200
+        assert "Not a folder" in r.text
+        # good path -> 204 + HX-Redirect, and it takes effect
+        with tempfile.TemporaryDirectory() as d:
+            r = c.post("/workspace", data={"path_text": d}, follow_redirects=False)
+            assert r.status_code == 204
+            assert r.headers.get("hx-redirect") == "/"
+            assert config.get_workspace() == Path(d).resolve()
+    finally:
+        config.set_workspace(str(saved))
