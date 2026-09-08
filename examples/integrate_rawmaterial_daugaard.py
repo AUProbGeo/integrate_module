@@ -62,6 +62,10 @@ except Exception:
 
 # %%
 import os
+
+# Set XLA GPU compiler optimization level to 1 to speed up compilation times
+os.environ["XLA_FLAGS"] = "--xla_gpu_extra_compiler_flags=--opt-level=1"
+
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
@@ -91,6 +95,7 @@ hardcopy = True
 N = 1_000_001   # production-scale
 #N = 100_000      # demo-scale; increase for a production-quality run
 #N = 10_000      # demo-scale; increase for a production-quality run
+N = 1_000_005
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -468,7 +473,7 @@ if not os.path.exists(f_post_h5) and not os.path.exists(f_prior_data_bh_h5):
     ig.copy_hdf5_file(f_prior_data_h5, f_prior_data_bh_h5)
     id_prior_list, id_borehole_list = ig.save_borehole_data(
         f_prior_data_bh_h5, f_data_h5, BHOLES,
-        im_prior=im_prior, range_xyz=100,
+        im_prior=im_prior, range_xyz=50,
         doPlot=False, showInfo=0)
 else:
     print("Skipping borehole prior-data build (posterior or %s already exists)."
