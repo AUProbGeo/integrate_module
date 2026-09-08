@@ -64,7 +64,7 @@ except Exception:
 import os
 
 # Set XLA GPU compiler optimization level to 1 to speed up compilation times
-os.environ["XLA_FLAGS"] = "--xla_gpu_extra_compiler_flags=--opt-level=1"
+os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=1"
 
 import h5py
 import numpy as np
@@ -93,9 +93,9 @@ hardcopy = True
 # %%
 # --- run-size settings -------------------------------------------------
 N = 1_000_001   # production-scale
-#N = 100_000      # demo-scale; increase for a production-quality run
 #N = 10_000      # demo-scale; increase for a production-quality run
-N = 1_000_005
+N = 10_005
+N = 1_000_006
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -126,6 +126,7 @@ f_prior_merged_h5  = '%sDAUGAARD_PRIOR_MERGED%s.h5'          % (PREFIX, SUFFIX)
 f_prior_data_h5    = '%sDAUGAARD_PRIOR_MERGED_DATA%s.h5'     % (PREFIX, SUFFIX)
 f_prior_data_bh_h5 = '%sDAUGAARD_PRIOR_MERGED_DATA_BH%s.h5'  % (PREFIX, SUFFIX)
 f_post_h5          = '%sDAUGAARD_POSTERIOR%s.h5'             % (PREFIX, SUFFIX)
+f_post_jax_h5          = '%sDAUGAARD_POSTERIOR%s_jax.h5'             % (PREFIX, SUFFIX)
 
 # %% [markdown]
 # ## 1. Load the data
@@ -391,14 +392,9 @@ ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'st
 # %% [markdown]
 # # Part B -- The full INTEGRATE workflow (informed prior + boreholes)
 #
-# ### B1. Boreholes
-
-# %%
-BHOLES = ig.read_borehole('daugaard_12boreholes.json', showInfo=1)
-ig.plot_boreholes(BHOLES)
 
 # %% [markdown]
-# ### B2. Informed prior from two geological scenarios
+# ### B1. Informed prior from two geological scenarios
 #
 # The prior for the real workflow is built with `geoprior1d`
 # (https://github.com/GEUSjesper/geoprior1d) from Excel specifications of the
@@ -444,6 +440,13 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 ig.prior_describe(f_prior_h5)
 
 # %% [markdown]
+# ### B2. Boreholes
+# %%
+BHOLES = ig.read_borehole('daugaard_12boreholes.json', showInfo=1)
+ig.plot_boreholes(BHOLES, f_prior_h5, fontsize=17, hardcopy=hardcopy);
+
+
+# %% [markdown]
 # ### B3. Prior tTEM data
 #
 # Forward-model the merged prior once (this is the expensive step; the result
@@ -473,8 +476,10 @@ if not os.path.exists(f_post_h5) and not os.path.exists(f_prior_data_bh_h5):
     ig.copy_hdf5_file(f_prior_data_h5, f_prior_data_bh_h5)
     id_prior_list, id_borehole_list = ig.save_borehole_data(
         f_prior_data_bh_h5, f_data_h5, BHOLES,
-        im_prior=im_prior, range_xyz=50,
-        doPlot=False, showInfo=0)
+        im_prior=im_prior, 
+        range_xyz=100,
+        range_data=1, range_data_i_use=[17,18,19,20],
+        doPlot=True, showInfo=0)
 else:
     print("Skipping borehole prior-data build (posterior or %s already exists)."
           % f_prior_data_bh_h5)
@@ -510,7 +515,16 @@ if not os.path.exists(f_post_h5):
     ig.integrate_rejection(
         f_prior_data_bh_h5, f_data_h5, f_post_h5=f_post_h5,
         N_use=N_use, id_use=id_use, nr=1000, T_N_above=50, T_P_acc_level=0.2,
-        autoT=1, showInfo=1, updatePostStat=True)
+        autoT=1, showInfo=1, updatePostStat=True,
+        backend ='numpy')
+
+    id_use = [1]
+    ig.integrate_rejection(
+        f_prior_data_bh_h5, f_data_h5, f_post_h5=f_post_jax_h5,
+        N_use=N_use, id_use=id_use, nr=1000, T_N_above=50, T_P_acc_level=0.2,
+        autoT=1, showInfo=1, updatePostStat=True,
+        backend ='jax')
+
 else:
     print("Using existing posterior: %s" % f_post_h5)
 
