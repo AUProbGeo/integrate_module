@@ -31,6 +31,9 @@ from integrate.integrate import synthetic_case
 from integrate.integrate import prior_model_layered
 from integrate.integrate import prior_model_workbench
 from integrate.integrate import prior_model_workbench_direct
+from integrate.integrate import prior_model_smooth
+from integrate.integrate import prior_model_blocky
+from integrate.integrate import prior_model_sharp
 from integrate.integrate import posterior_cumulative_thickness
 #from integrate.integrate import integrate_rejection_multi  
 from integrate.integrate import use_parallel

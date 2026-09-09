@@ -233,12 +233,70 @@ f_prior_direct_10lay = ig.prior_model_workbench_direct(
 )
 
 # %% [markdown]
-# ## 4. Summary and Visualization
+# ## 4. prior_model_smooth / blocky / sharp() Examples
+# Aarhus Workbench Smooth (L2), Blocky (L1) and Sharp (MGS) 1D model types,
+# generated as sample ensembles on a fixed geometric layer stack. All three
+# share the discretization and differ only in the vertical prior on
+# log-resistivity between adjacent layers.
+
+# %%
+print(f"\n{'='*60}")
+print("4. WORKBENCH SMOOTH / BLOCKY / SHARP PRIORS")
+print(f"{'='*60}")
+
+# ### 4a. Smooth (L2): correlated Gaussian process in depth
+print(f"\n4a. Smooth: L2 vertical constraint, corr_length=15 m")
+f_prior_smooth = ig.prior_model_smooth(
+    N=N,
+    nlayers=30,
+    z1=0,
+    z_max=z_max,
+    corr_length=15.0,           # vertical correlation length (m)
+    sigma_logrho=0.25,          # prior std of log-resistivity (BetaV)
+    RHO_ref=100.0,
+    RHO_min=RHO_min,
+    RHO_max=RHO_max,
+    f_prior_h5='PRIOR_smooth_N%d.h5' % N,
+    showInfo=1
+)
+
+# ### 4b. Blocky (L1): cumulative Laplace increments -> sparse steps
+print(f"\n4b. Blocky: L1 vertical constraint, blocky_scale=0.3")
+f_prior_blocky = ig.prior_model_blocky(
+    N=N,
+    nlayers=30,
+    z1=0,
+    z_max=z_max,
+    blocky_scale=0.3,
+    RHO_ref=100.0,
+    RHO_min=RHO_min,
+    RHO_max=RHO_max,
+    f_prior_h5='PRIOR_blocky_N%d.h5' % N,
+    showInfo=1
+)
+
+# ### 4c. Sharp (MGS): sparse sharp interfaces on the fixed grid
+print(f"\n4c. Sharp: ~3 sharp jumps, log-uniform inter-jump resistivity")
+f_prior_sharp = ig.prior_model_sharp(
+    N=N,
+    nlayers=30,
+    z1=0,
+    z_max=z_max,
+    n_jumps_mean=3.0,
+    RHO_dist='log-uniform',
+    RHO_min=RHO_min,
+    RHO_max=RHO_max,
+    f_prior_h5='PRIOR_sharp_N%d.h5' % N,
+    showInfo=1
+)
+
+# %% [markdown]
+# ## 5. Summary and Visualization
 # Display summary information and create comparison plots
 
 # %%
 print(f"\n{'='*60}")
-print("4. SUMMARY OF GENERATED PRIOR MODELS")
+print("5. SUMMARY OF GENERATED PRIOR MODELS")
 print(f"{'='*60}")
 
 # List all generated prior files
@@ -251,7 +309,10 @@ prior_files = [
     f_prior_workbench_lognormal,
     f_prior_direct_4lay,
     f_prior_direct_6lay_chi2,
-    f_prior_direct_10lay
+    f_prior_direct_10lay,
+    f_prior_smooth,
+    f_prior_blocky,
+    f_prior_sharp
 ]
 
 print(f"\nGenerated {len(prior_files)} prior model files:")
@@ -263,12 +324,12 @@ for i, fname in enumerate(prior_files, 1):
         print(f"  {i:2d}. {fname} (FILE NOT FOUND)")
 
 # %% [markdown]
-# ## 5. Plot Prior Statistics 
+# ## 6. Plot Prior Statistics
 # Generate comparison plots for selected prior models
 
 # %%
 print(f"\n{'='*60}")
-print("5. PLOTTING PRIOR STATISTICS")
+print("6. PLOTTING PRIOR STATISTICS")
 print(f"{'='*60}")
 
 # Plot statistics for a few representative examples

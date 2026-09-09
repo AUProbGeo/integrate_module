@@ -2349,6 +2349,228 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     return f_prior_h5
 
 
+def _draw_rho(RHO_dist, size, RHO_min, RHO_max, RHO_mean, RHO_std):
+    """Draw resistivity values from a named distribution.
+
+    Shared helper for the piecewise-constant (Sharp/MGS) prior. Mirrors the
+    distribution ladder used by prior_model_workbench_direct.
+    """
+    if RHO_dist == 'uniform':
+        return np.random.uniform(RHO_min, RHO_max, size=size)
+    if RHO_dist == 'log-uniform':
+        return np.exp(np.random.uniform(np.log(RHO_min), np.log(RHO_max), size=size))
+    if RHO_dist == 'normal':
+        return np.random.normal(RHO_mean, RHO_std, size=size)
+    if RHO_dist == 'log-normal' or RHO_dist == 'lognormal':
+        return np.random.lognormal(np.log(RHO_mean), RHO_std / RHO_mean, size=size)
+    raise ValueError('RHO_dist=%s not supported' % RHO_dist)
+
+
+def prior_model_smooth(N=100000, regularization='L2',
+                       z1=0, z_max=100, nlayers=0, p=2,
+                       corr_length=15.0, sigma_logrho=0.25,
+                       blocky_scale=0.25, n_jumps_mean=3.0,
+                       RHO_dist='log-uniform', RHO_ref=100.0,
+                       RHO_min=1, RHO_max=300, RHO_mean=180, RHO_std=80,
+                       RHO_threshold=0.001, save_sparse=False, **kwargs):
+    """
+    Generate a prior model on a fixed geometric layer stack with a vertical
+    regularization prior, reproducing the Aarhus Workbench Smooth / Blocky /
+    Sharp 1D model types as sample ensembles.
+
+    All three Workbench types share the same discretization (a fixed stack of
+    geometrically thickening layers); they differ only in the norm applied to
+    the vertical constraint between adjacent layers. This function selects that
+    norm through ``regularization``:
+
+    - ``'L2'`` (Smooth): log-resistivity is a correlated Gaussian process in
+      depth with exponential covariance
+      ``C(z_i, z_j) = sigma_logrho**2 * exp(-|z_i - z_j| / corr_length)`` and
+      mean ``log(RHO_ref)``. Continuously varying models.
+    - ``'L1'`` (Blocky): log-resistivity is a cumulative sum of i.i.d. Laplace
+      increments with scale ``blocky_scale`` about ``log(RHO_ref)``.
+      Piecewise-near-constant models with occasional larger steps.
+    - ``'MGS'`` (Sharp): piecewise-constant models with a sparse set of sharp
+      interfaces, ``K ~ Poisson(n_jumps_mean)`` jumps placed on the fixed
+      grid, resistivity between jumps drawn from ``RHO_dist``.
+
+    Parameters
+    ----------
+    N : int, optional
+        Number of prior models to generate. Default is 100000.
+    regularization : str, optional
+        Vertical prior type: ``'L2'`` (default), ``'L1'`` or ``'MGS'``.
+    z1 : float, optional
+        Minimum depth value. Default is 0.
+    z_max : float, optional
+        Maximum depth value. Default is 100.
+    nlayers : int, optional
+        Number of layers in the fixed stack. Default is 0 (uses 30).
+    p : int, optional
+        Power parameter for the geometric thickness increase. Default is 2.
+    corr_length : float, optional
+        Vertical correlation length (m) of the log-resistivity Gaussian
+        process. Only used for ``regularization='L2'``. Default is 15.0.
+    sigma_logrho : float, optional
+        Prior standard deviation of log-resistivity (natural log). Analogous to
+        the Workbench BetaV vertical constraint strength. Only used for
+        ``regularization='L2'``. Default is 0.25.
+    blocky_scale : float, optional
+        Laplace scale of the per-interface log-resistivity increment. Only used
+        for ``regularization='L1'``. Default is 0.25.
+    n_jumps_mean : float, optional
+        Poisson mean number of sharp interfaces. Only used for
+        ``regularization='MGS'``. Default is 3.0.
+    RHO_dist : str, optional
+        Distribution of resistivity between jumps (``'log-uniform'``,
+        ``'uniform'``, ``'normal'``, ``'lognormal'``). Only used for
+        ``regularization='MGS'``. Default is ``'log-uniform'``.
+    RHO_ref : float, optional
+        Reference resistivity used as the process mean (in log space) for the
+        L2 and L1 priors. Default is 100.0.
+    RHO_min, RHO_max : float, optional
+        Hard resistivity clip bounds in Ohm.m. Defaults are 1 and 300.
+    RHO_mean, RHO_std : float, optional
+        Parameters for ``'normal'`` / ``'lognormal'`` inter-jump draws (MGS).
+        Defaults are 180 and 80.
+    RHO_threshold : float, optional
+        Minimum physical resistivity threshold in Ohm.m applied before
+        clipping. Default is 0.001.
+    save_sparse : bool, optional
+        Also write an ``/M2`` depth-resistivity sparse array. Default is False.
+    f_prior_h5 : str, optional
+        Output path. Default is '' (auto-generated from the parameters).
+    showInfo : int, optional
+        Verbosity level.
+
+    Returns
+    -------
+    str
+        Filepath of the saved prior model.
+    """
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
+        return None
+
+    import integrate as ig
+
+    showInfo = kwargs.get('showInfo', 0)
+    f_prior_h5 = kwargs.get('f_prior_h5', '')
+    progress_callback = kwargs.get('progress_callback', None)
+
+    if regularization not in ('L2', 'L1', 'MGS'):
+        raise ValueError("regularization must be 'L2', 'L1' or 'MGS', got %r"
+                         % regularization)
+
+    _report_progress(progress_callback, 0, 100,
+                     'generating', 'Generating prior realizations')
+
+    if nlayers < 1:
+        nlayers = 30
+
+    z = z1 + (z_max - z1) * np.linspace(0, 1, nlayers) ** p
+    nz = len(z)
+
+    if regularization == 'L2':
+        dz_mat = np.abs(z[:, None] - z[None, :])
+        C = sigma_logrho ** 2 * np.exp(-dz_mat / corr_length)
+        Lc = np.linalg.cholesky(C + 1e-10 * np.eye(nz))
+        log_rho = np.log(RHO_ref) + (Lc @ np.random.randn(nz, N)).T
+        M_rho = np.exp(log_rho)
+        if len(f_prior_h5) < 1:
+            f_prior_h5 = 'PRIOR_SMOOTH_L%g_S%g_N%d.h5' % (corr_length, sigma_logrho, N)
+
+    elif regularization == 'L1':
+        incr = np.random.laplace(0.0, blocky_scale, size=(N, nz))
+        incr[:, 0] = 0.0
+        M_rho = np.exp(np.log(RHO_ref) + np.cumsum(incr, axis=1))
+        if len(f_prior_h5) < 1:
+            f_prior_h5 = 'PRIOR_BLOCKY_B%g_N%d.h5' % (blocky_scale, N)
+
+    else:  # 'MGS'
+        M_rho = np.zeros((N, nz), dtype=np.float64)
+        K = np.clip(np.random.poisson(n_jumps_mean, N), 0, nz - 1)
+        progress_step = max(1, N // 100)
+        interior = np.arange(1, nz)
+        for i in range(N):
+            if progress_callback and ((i + 1) % progress_step == 0 or i + 1 == N):
+                _report_progress(progress_callback, i + 1, N,
+                                 'generating', 'Generating prior realizations')
+            k = int(K[i])
+            seg_rho = _draw_rho(RHO_dist, k + 1, RHO_min, RHO_max, RHO_mean, RHO_std)
+            M_rho[i, :] = seg_rho[0]
+            if k > 0:
+                cuts = np.sort(np.random.choice(interior, k, replace=False))
+                for j, c in enumerate(cuts):
+                    M_rho[i, c:] = seg_rho[j + 1]
+        if len(f_prior_h5) < 1:
+            f_prior_h5 = 'PRIOR_SHARP_K%g_%s_N%d.h5' % (n_jumps_mean, RHO_dist, N)
+
+    # Ensure physical resistivity values (positive), then clip to bounds.
+    M_rho = np.maximum(M_rho, RHO_threshold)
+    effective_rho_min = max(RHO_min, RHO_threshold)
+    M_rho = np.clip(M_rho, effective_rho_min, RHO_max)
+
+    if showInfo > 0:
+        print("prior_model_smooth: Saving prior model to %s" % f_prior_h5)
+    _report_progress(progress_callback, 80, 100,
+                     'saving', 'Saving prior model to %s' % f_prior_h5)
+
+    save_kwargs = {}
+    if 'compression' in kwargs:
+        save_kwargs['compression'] = kwargs['compression']
+    if 'compression_opts' in kwargs:
+        save_kwargs['compression_opts'] = kwargs['compression_opts']
+
+    if showInfo > 1:
+        print("Saving '/M1' prior model  %s" % f_prior_h5)
+    ig.save_prior_model(f_prior_h5, M_rho.astype(np.float32),
+                        im=1,
+                        name='Resistivity',
+                        is_discrete=0,
+                        x=z,
+                        z=z,
+                        delete_if_exist=True,
+                        force_replace=True,
+                        showInfo=showInfo,
+                        **save_kwargs,
+                        )
+
+    if save_sparse:
+        nm_sparse = nz + nz - 1
+        M_rho_sparse = np.ones((N, nm_sparse), dtype=np.float32) * np.nan
+        M_rho_sparse[:, :nz - 1] = z[:-1]
+        M_rho_sparse[:, nz - 1:] = M_rho
+        if showInfo > 1:
+            print("Saving '/M2' prior model  %s" % f_prior_h5)
+        ig.save_prior_model(f_prior_h5, M_rho_sparse,
+                            im=2,
+                            name='sparse - depth-resistivity',
+                            is_discrete=0,
+                            x=np.arange(0, nm_sparse),
+                            z=np.arange(0, nm_sparse),
+                            force_replace=True,
+                            showInfo=showInfo,
+                            **save_kwargs,
+                            )
+
+    _report_progress(progress_callback, 100, 100,
+                     'completed', 'Prior model saved to %s' % f_prior_h5)
+
+    return f_prior_h5
+
+
+def prior_model_blocky(**kwargs):
+    """Blocky (L1 vertical constraint) prior. See prior_model_smooth."""
+    kwargs.setdefault('regularization', 'L1')
+    return prior_model_smooth(**kwargs)
+
+
+def prior_model_sharp(**kwargs):
+    """Sharp / MGS (sparse vertical jumps) prior. See prior_model_smooth."""
+    kwargs.setdefault('regularization', 'MGS')
+    return prior_model_smooth(**kwargs)
+
 
 def posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], usePrior=False, **kwargs):
     """

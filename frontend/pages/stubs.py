@@ -7,7 +7,7 @@ from fasthtml.common import Div, P
 from frontend.components import leaf_slugs, shell
 
 _TODO = {
-    "prior": "Generate prior ensembles — prior_model_layered / workbench / workbench_direct.",
+    "prior": "Generate prior ensembles — prior_model_layered / workbench / workbench_direct / smooth / blocky / sharp.",
     "forward": "Compute prior data with GA-AEM (prior_data_gaaem).",
     "inversion": "Localized rejection sampling (integrate_rejection).",
     "results": "Posterior statistics and profile plots.",

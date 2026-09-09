@@ -1,7 +1,8 @@
 """Module 02 — Prior model (generic resistivity priors).
 
 ``ig.prior_model_layered`` / ``prior_model_workbench`` /
-``prior_model_workbench_direct``. Runs in a child process
+``prior_model_workbench_direct`` / ``prior_model_smooth`` /
+``prior_model_blocky`` / ``prior_model_sharp``. Runs in a child process
 (``services/jobs`` + ``services/worker``); the run panel polls for progress.
 
 geoprior1d lives on its own page (``pages/geoprior.py``) because it needs an
@@ -86,6 +87,48 @@ MODELS: dict[str, dict] = {
             F("RHO_dist", "RHO_dist", _RHO_DIST_CHI2, "log-uniform"),
             *_RHO,
             F("chi2_deg", "chi2_deg", "int", "100"),
+        ],
+    },
+    "smooth": {
+        "label": "prior_model_smooth (Workbench Smooth / L2)",
+        "fields": [
+            F("N", "N (realizations)", "int", "100000"),
+            F("z1", "z1 (m)", "float", "0"),
+            F("z_max", "z_max (m)", "float", "100"),
+            F("nlayers", "nlayers (0 → 30)", "int", "0"),
+            F("p", "p (thickness power)", "int", "2"),
+            F("corr_length", "corr_length (m)", "float", "15.0"),
+            F("sigma_logrho", "sigma_logrho (BetaV)", "float", "0.25"),
+            F("RHO_ref", "RHO_ref (process mean)", "float", "100.0"),
+            F("RHO_min", "RHO_min", "float", "1"),
+            F("RHO_max", "RHO_max", "float", "300"),
+        ],
+    },
+    "blocky": {
+        "label": "prior_model_blocky (Workbench Blocky / L1)",
+        "fields": [
+            F("N", "N (realizations)", "int", "100000"),
+            F("z1", "z1 (m)", "float", "0"),
+            F("z_max", "z_max (m)", "float", "100"),
+            F("nlayers", "nlayers (0 → 30)", "int", "0"),
+            F("p", "p (thickness power)", "int", "2"),
+            F("blocky_scale", "blocky_scale (Laplace)", "float", "0.25"),
+            F("RHO_ref", "RHO_ref (process mean)", "float", "100.0"),
+            F("RHO_min", "RHO_min", "float", "1"),
+            F("RHO_max", "RHO_max", "float", "300"),
+        ],
+    },
+    "sharp": {
+        "label": "prior_model_sharp (Workbench Sharp / MGS)",
+        "fields": [
+            F("N", "N (realizations)", "int", "100000"),
+            F("z1", "z1 (m)", "float", "0"),
+            F("z_max", "z_max (m)", "float", "100"),
+            F("nlayers", "nlayers (0 → 30)", "int", "0"),
+            F("p", "p (thickness power)", "int", "2"),
+            F("n_jumps_mean", "n_jumps_mean (Poisson)", "float", "3.0"),
+            F("RHO_dist", "RHO_dist", _RHO_DIST, "log-uniform"),
+            *_RHO,
         ],
     },
 }

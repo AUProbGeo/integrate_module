@@ -103,7 +103,7 @@ def _run(queue, workspace, out_key: str, label: str, call):
 
 
 def run_prior_job(params: dict, queue) -> None:
-    """Dispatch to ig.prior_model_{layered,workbench,workbench_direct}."""
+    """Dispatch to ig.prior_model_{layered,workbench,workbench_direct,smooth,blocky,sharp}."""
     workspace = _prep(params)
     params = dict(params)
     model = params.pop("model", "layered")
@@ -115,6 +115,9 @@ def run_prior_job(params: dict, queue) -> None:
             "layered": ig.prior_model_layered,
             "workbench": ig.prior_model_workbench,
             "workbench_direct": ig.prior_model_workbench_direct,
+            "smooth": ig.prior_model_smooth,
+            "blocky": ig.prior_model_blocky,
+            "sharp": ig.prior_model_sharp,
         }[model]
         return fn(**_clean(params), progress_callback=_progress_cb(queue))
 
@@ -215,3 +218,8 @@ def run_geoprior_job(params: dict, queue) -> None:
         queue.put({"type": "error", "traceback": traceback.format_exc()})
     finally:
         queue.put({"type": "exit"})
+
+
+# NOTE: geoprior1d live-preview runs inline in a worker thread
+# (``integrate_api.geoprior_preview_run``), not here — the child-process spawn
+# cost (~2 s of interpreter + imports) dwarfs the <1 s generation itself.
