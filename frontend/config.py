@@ -13,6 +13,9 @@ from pathlib import Path
 PKG_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PKG_DIR / "static"
 FIGURES_DIR = STATIC_DIR / "figures"
+# Scratch area for throwaway artefacts (geoprior1d live-preview .xlsx / .h5).
+# Never the workspace — previews must not touch the user's real files.
+SCRATCH_DIR = PKG_DIR / "_scratch"
 
 APP_TITLE = "INTEGRATE Workbench"
 DEFAULT_PORT = 8051

@@ -59,6 +59,28 @@ def test_file_detail_prior():
     assert types_seen <= {"CONTINUOUS", "DISCRETE", "SCALAR"}
 
 
+@pytest.mark.skipif(not (EXAMPLES / "daugaard_standard.xlsx").exists(), reason="no xlsx example")
+def test_cond_resistivity_figure(tmp_path):
+    xl = str(EXAMPLES / "daugaard_standard.xlsx")
+
+    # analytic-only render -> a cached PNG under FIGURES_DIR
+    url = api.cond_resistivity_figure(xl)
+    assert url and url.endswith(".png")
+    assert (config.FIGURES_DIR / Path(url).name).exists()
+
+    # with an empirical overlay from a freshly generated scratch .h5
+    h5 = tmp_path / "cond.h5"
+    api.geoprior_preview_run(xl, str(h5), Nreals=30, dmax=90, dz=1)
+    url2 = api.cond_resistivity_figure(xl, h5_path=str(h5), overlay=True)
+    assert url2 and url2.endswith(".png")
+    assert url2 != url  # overlay + new .h5 -> different cache key
+
+    # malformed workbook -> None, no exception
+    bad = tmp_path / "bad.xlsx"
+    bad.write_bytes(b"not a workbook")
+    assert api.cond_resistivity_figure(str(bad)) is None
+
+
 @pytest.mark.skipif(not (EXAMPLES / "DAUGAARD_POSTERIOR.h5").exists(), reason="no POSTERIOR example")
 def test_file_detail_posterior():
     d = api.file_detail("DAUGAARD_POSTERIOR.h5")

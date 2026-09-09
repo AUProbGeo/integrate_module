@@ -184,3 +184,23 @@ table.wb-sheet .cell:focus-visible { outline: 2px solid var(--color-accent); out
 #gp-grid .actions .btn { font-size: 12px; padding: 4px 10px; }
 .wb-err { border: 1px solid var(--color-accent); background: var(--color-accent-100);
   color: var(--color-accent-800); padding: 10px 14px; font-size: 13px; }
+
+/* geoprior live summary-stats preview */
+#gp-preview .wb-eyebrow { margin-bottom: 8px; }
+.gp-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 760px) { .gp-preview-grid { grid-template-columns: 1fr; } }
+.gp-preview-grid .wb-panel { padding: 10px; min-width: 0; }
+.gp-preview-grid .wb-eyebrow { margin-bottom: 6px; }
+.gp-preview-fig {
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  height: 300px; display: grid; place-items: center; overflow: hidden;
+}
+.gp-preview-fig img { width: 100%; height: 100%; object-fit: contain; }
+
+/* ρ | lithology conditional-prior panel — full width, its own row */
+#gp-cond { border-top: 1px solid var(--color-divider); padding-top: 12px; }
+.gp-cond-fig, .gp-cond-img { max-width: 940px; }
+.gp-cond-img img {
+  width: 100%; height: auto; display: block;
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+}

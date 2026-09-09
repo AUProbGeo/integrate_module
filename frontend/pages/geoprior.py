@@ -8,18 +8,27 @@ place (save-on-change into a session copy), Save it back to disk, then run
 
 from __future__ import annotations
 
+import contextlib
 import json
 import time
 from dataclasses import dataclass
 
-from fasthtml.common import Div, Form, Input, P, Span, Table, Tbody, Td, Th, Thead, Tr
+from fasthtml.common import (
+    Div, Form, HttpHeader, Img, Input, Label, P, Span, Table, Tbody, Td, Th, Thead, Tr,
+)
 
-from frontend.components import btn, error_box, field, figure_panel, select, shell, text_input
+from frontend.components import btn, eyebrow, error_box, field, figure_panel, select, shell, text_input
+from frontend.config import SCRATCH_DIR
 from frontend.pages._jobs_ui import register_job_routes, run_panel
 from frontend.services import integrate_api as api
 from frontend.services import jobs, xlsx
 from frontend.services.session import state_for
 from frontend.services.workspace import safe_path
+
+# live-preview: realization counts offered, and a hard cap
+_PREVIEW_N_CHOICES = ["50", "100", "200", "500", "1000"]
+_PREVIEW_MAX = 2000
+_PREVIEW_DEBOUNCE_MS = 800
 
 
 @dataclass(frozen=True)
@@ -138,8 +147,128 @@ def _editor(st: dict):
             f"{tgt} looks open in another app (.~lock file present) — "
             "saving may clobber unsaved changes there."
         ))
-    parts += [_savebar(st), _grid(st)]
+    parts += [_savebar(st), _grid(st), _preview_block(st)]
     return Div(*parts)
+
+
+# --------------------------------------------------------------------------- #
+# live summary-stats preview
+# --------------------------------------------------------------------------- #
+def _preview_n(st: dict) -> int:
+    try:
+        return max(1, min(_PREVIEW_MAX, int(st.get("gp_preview_n", 100))))
+    except (TypeError, ValueError):
+        return 100
+
+
+def _preview_listener():
+    """Always-present element that refreshes the preview when it hears the
+    ``gp-changed`` body event (dispatched via an ``HX-Trigger`` response
+    header from the cell / +row / +col handlers while auto-update is on).
+
+    ``delay:`` debounces — each new event resets the timer, so a burst of
+    edits yields one run. Being persistent (never swapped) it dodges the
+    unreliable ``load``-on-OOB-content path.
+    """
+    return Div(
+        id="gp-preview-trigger",
+        hx_post="/geoprior/preview", hx_target="#gp-preview-figs", hx_swap="innerHTML",
+        hx_include="#gp-preview-form, #gp-runform", hx_indicator="#gp-preview-spin",
+        hx_trigger=f"gp-changed from:body delay:{_PREVIEW_DEBOUNCE_MS}ms",
+    )
+
+
+def _changed(st: dict):
+    """`(HttpHeader,)` firing the client events an edit should trigger — splat
+    into a route's return tuple.
+
+    ``gp-cond`` always (the analytic ρ|lithology panel is instant, so it
+    tracks every edit); ``gp-changed`` only while auto-update is on (that one
+    runs geoprior1d).
+    """
+    events = ["gp-cond"] + (["gp-changed"] if st.get("gp_autopreview") else [])
+    return (HttpHeader("HX-Trigger", ", ".join(events)),)
+
+
+def _cond_listener():
+    """Persistent element that redraws the ρ|lithology panel on the
+    ``gp-cond`` body event (and once on load)."""
+    return Div(
+        id="gp-cond-trigger",
+        hx_post="/geoprior/cond", hx_target="#gp-cond-fig", hx_swap="innerHTML",
+        hx_include="#gp-cond-form", hx_indicator="#gp-cond-spin",
+        hx_trigger="load, gp-cond from:body delay:400ms",
+    )
+
+
+def _cond_block(st: dict):
+    ov = bool(st.get("gp_cond_overlay"))
+    return Div(
+        eyebrow("ρ | lithology — conditional resistivity priors"),
+        Form(
+            Label(
+                Input(type="checkbox", name="cond_overlay", checked=ov,
+                      hx_post="/geoprior/cond/toggle", hx_trigger="change",
+                      hx_include="#gp-cond-form", hx_swap="none"),
+                Span(cls="dot"), " overlay sampled (needs a preview run)", cls="radio",
+            ),
+            id="gp-cond-form", style="margin-bottom:10px;",
+        ),
+        Div(_cond_listener()),
+        Div(P(Span("● ", style="color:var(--color-accent);"), "Drawing…",
+              cls="wb-wait-msg", style="font-size:13px;"),
+            id="gp-cond-spin", cls="htmx-indicator wb-wait"),
+        Div(P("Analytic log-normal ρ priors, one per lithology.", cls="wb-empty"),
+            id="gp-cond-fig", cls="gp-cond-fig"),
+        id="gp-cond", style="margin-bottom:24px;",
+    )
+
+
+def _preview_block(st: dict):
+    on = bool(st.get("gp_autopreview"))
+    n = _preview_n(st)
+    toggle_hx = dict(hx_post="/geoprior/preview/toggle", hx_trigger="change",
+                     hx_include="#gp-preview-form", hx_swap="none")
+    form = Form(
+        Label(
+            Input(type="checkbox", name="autopreview", checked=on, **toggle_hx),
+            Span(cls="dot"), " Auto-update summary stats", cls="radio",
+        ),
+        field("realizations", select("preview_n", _PREVIEW_N_CHOICES, value=str(n), **toggle_hx)),
+        btn("Refresh preview", kind="secondary",
+            hx_post="/geoprior/preview", hx_target="#gp-preview-figs", hx_swap="innerHTML",
+            hx_include="#gp-preview-form, #gp-runform", hx_indicator="#gp-preview-spin"),
+        id="gp-preview-form",
+        style="display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin-bottom:12px;",
+    )
+    return Div(
+        _cond_block(st),
+        eyebrow("Summary statistics — prior realizations"),
+        form,
+        Div(_preview_listener()),
+        Div(P(Span("● ", style="color:var(--color-accent);"),
+              "Generating realizations…", cls="wb-wait-msg", style="font-size:13px;"),
+            id="gp-preview-spin", cls="htmx-indicator wb-wait"),
+        Div(P("Enable auto-update, or hit Refresh preview, to generate a small "
+              "sample and see the realization panels.", cls="wb-empty"),
+            id="gp-preview-figs", cls="gp-preview-figs"),
+        id="gp-preview", style="margin-top:24px;border-top:2px solid var(--color-divider);padding-top:16px;",
+    )
+
+
+def _preview_figs(h5: str, n: int):
+    figs = []
+    for im, lbl in ((2, "Lithology (M2)"), (1, "Resistivity (M1)")):
+        url = api.geoprior_preview_figure(h5, im=im, nr=n)
+        if url:
+            figs.append(Div(
+                Div(f"M{im} — {lbl}  ·  {n} realizations", cls="wb-eyebrow"),
+                Div(Img(src=url, alt=lbl), cls="gp-preview-fig"),
+                cls="wb-panel",
+            ))
+    if not figs:
+        return P("Preview ran but produced no /M1 or /M2 realizations.", cls="wb-empty")
+    return Div(*figs, cls="gp-preview-grid")
 
 
 def _run_form(st: dict):
@@ -214,6 +343,29 @@ def _save_to(st: dict, target: str) -> str:
     return name
 
 
+def _scratch_paths(session: dict):
+    """Per-session throwaway (xlsx, h5) under the frontend scratch dir."""
+    sid = session.get("wb_sid", "anon")
+    SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+    return SCRATCH_DIR / f"gp_{sid}.xlsx", SCRATCH_DIR / f"gp_{sid}.h5"
+
+
+def _preview_lock(st: dict):
+    lk = st.get("gp_preview_lock")
+    if lk is None:
+        import threading
+
+        lk = st["gp_preview_lock"] = threading.Lock()
+    return lk
+
+
+def _reset_preview(st: dict, session: dict | None = None) -> None:
+    if session is not None:
+        for p in _scratch_paths(session):
+            with contextlib.suppress(OSError):
+                p.unlink()
+
+
 def register(rt) -> None:
     register_job_routes(rt, "/geoprior", out_key="f_prior_h5", done_extra=_done_extra)
 
@@ -237,6 +389,7 @@ def register(rt) -> None:
         st = state_for(session)
         if file not in set(api.list_xlsx()):
             return error_box("Pick an .xlsx in the working folder first.")
+        _reset_preview(st, session)
         _load_into(st, file)
         return _editor(st), _run_form_oob(st)
 
@@ -245,6 +398,7 @@ def register(rt) -> None:
         st = state_for(session)
         if "gp_file" not in st:
             return Span()
+        _reset_preview(st, session)
         _load_into(st, st["gp_file"])
         return _editor(st)
 
@@ -265,7 +419,7 @@ def register(rt) -> None:
             st["gp_dirty"] = True
         except (ValueError, KeyError) as e:
             return _status_span(st, oob=True), Span(str(e), hx_swap_oob="false")
-        return _status_span(st, oob=True)
+        return _status_span(st, oob=True), *_changed(st)
 
     @rt("/geoprior/addrow", methods=["POST"])
     def addrow(session, sheet: str):
@@ -273,7 +427,7 @@ def register(rt) -> None:
         if "gp_book" in st:
             xlsx.add_row(st["gp_book"], sheet)
             st["gp_dirty"] = True
-        return _grid(st)
+        return _grid(st), *_changed(st)
 
     @rt("/geoprior/addcol", methods=["POST"])
     def addcol(session, sheet: str):
@@ -281,7 +435,7 @@ def register(rt) -> None:
         if "gp_book" in st:
             xlsx.add_col(st["gp_book"], sheet)
             st["gp_dirty"] = True
-        return _grid(st)
+        return _grid(st), *_changed(st)
 
     @rt("/geoprior/save", methods=["POST"])
     def save(session, target: str = ""):
@@ -318,6 +472,82 @@ def register(rt) -> None:
     def figure(name: str):
         return figure_panel("ig.plot_prior_stats()", api.prior_stats_figure(name),
                             "no figure produced")
+
+    # ----- live summary-stats preview -----------------------------------
+    @rt("/geoprior/preview/toggle", methods=["POST"])
+    def preview_toggle(session, autopreview: str = "", preview_n: str = ""):
+        st = state_for(session)
+        st["gp_autopreview"] = bool(autopreview)
+        if preview_n:
+            st["gp_preview_n"] = preview_n
+        # turning it on (or changing N while on) kicks an immediate refresh
+        return "", *_changed(st)
+
+    @rt("/geoprior/preview", methods=["POST"])
+    async def preview(session, request):
+        import asyncio
+
+        st = state_for(session)
+        if "gp_book" not in st:
+            return P("Load an .xlsx first.", cls="wb-empty")
+        form = await request.form()
+        if form.get("preview_n"):
+            st["gp_preview_n"] = form.get("preview_n")
+        n = _preview_n(st)
+        try:
+            dmax = float(form.get("dmax") or 90)
+            dz = float(form.get("dz") or 1)
+        except ValueError:
+            dmax, dz = 90.0, 1.0
+
+        xlsx_path, h5_path = _scratch_paths(session)
+        try:
+            xlsx.save_book(st["gp_book"], xlsx_path)
+        except OSError as e:
+            return error_box(f"Could not write preview spec: {e}")
+
+        def _work():
+            with _preview_lock(st):  # serialise overlapping refreshes
+                return api.geoprior_preview_run(str(xlsx_path), str(h5_path),
+                                                Nreals=n, dmax=dmax, dz=dz)
+
+        try:
+            h5 = await asyncio.to_thread(_work)
+        except Exception as e:  # noqa: BLE001
+            return error_box(f"Preview failed: {str(e).splitlines()[-1]}")
+        return _preview_figs(h5, n)
+
+    # ----- ρ | lithology conditional-prior panel (analytic, always live) --
+    @rt("/geoprior/cond/toggle", methods=["POST"])
+    def cond_toggle(session, cond_overlay: str = ""):
+        st = state_for(session)
+        st["gp_cond_overlay"] = bool(cond_overlay)
+        return "", HttpHeader("HX-Trigger", "gp-cond")
+
+    @rt("/geoprior/cond", methods=["POST"])
+    def cond(session):
+        st = state_for(session)
+        if "gp_book" not in st:
+            return P("Load an .xlsx first.", cls="wb-empty")
+        xlsx_path, h5_path = _scratch_paths(session)
+        with _preview_lock(st):  # don't collide with a running preview save
+            try:
+                xlsx.save_book(st["gp_book"], xlsx_path)
+            except OSError as e:
+                return error_box(f"Could not write spec: {e}")
+            overlay = bool(st.get("gp_cond_overlay"))
+            url = api.cond_resistivity_figure(
+                str(xlsx_path),
+                h5_path=str(h5_path) if h5_path.exists() else None,
+                overlay=overlay,
+            )
+        if not url:
+            return error_box("Could not read the Resistivity / Geology1 sheets — "
+                             "check the class names and numbers line up.")
+        note = (None if not overlay or h5_path.exists()
+                else P("Run a preview to see the sampled histograms.",
+                       cls="wb-empty", style="margin-top:6px;"))
+        return Div(Img(src=url, alt="rho | lithology priors"), note, cls="gp-cond-img")
 
 
 def _run_form_oob(st):

@@ -38,6 +38,34 @@ def test_static_assets():
     assert c.get("/static/htmx.min.js").status_code == 200
 
 
+def test_geoprior_preview_controls():
+    """Preview toggle + a no-workbook preview POST return partials, not 500s."""
+    c = _client()
+    hx = {"HX-Request": "true"}
+    # auto-update on -> HX-Trigger fires gp-cond (analytic panel) + gp-changed
+    r = c.post("/geoprior/preview/toggle", data={"autopreview": "on", "preview_n": "50"}, headers=hx)
+    assert r.status_code == 200
+    events = {e.strip() for e in r.headers.get("hx-trigger", "").split(",")}
+    assert events == {"gp-cond", "gp-changed"}
+    # auto-update off -> only gp-cond
+    r = c.post("/geoprior/preview/toggle", data={"preview_n": "50"}, headers=hx)
+    assert r.status_code == 200
+    assert r.headers.get("hx-trigger") == "gp-cond"
+    # a cell edit with no workbook loaded -> no crash
+    r = c.post("/geoprior/cell", data={"sheet": "S", "r": "0", "c": "0", "v": "x"}, headers=hx)
+    assert r.status_code == 200
+    # no .xlsx loaded -> graceful messages, not errors
+    r = c.post("/geoprior/preview", data={"preview_n": "50", "dmax": "90", "dz": "1"}, headers=hx)
+    assert r.status_code == 200
+    assert "Load an .xlsx" in r.text
+    r = c.post("/geoprior/cond", headers=hx)
+    assert r.status_code == 200
+    assert "Load an .xlsx" in r.text
+    r = c.post("/geoprior/cond/toggle", data={"cond_overlay": "on"}, headers=hx)
+    assert r.status_code == 200
+    assert r.headers.get("hx-trigger") == "gp-cond"
+
+
 def test_workspace_controls():
     import tempfile
 

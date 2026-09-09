@@ -9,6 +9,7 @@ heavy scientific stack.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 
@@ -122,6 +123,141 @@ def start_geoprior_job(kwargs: dict) -> str:
     from frontend.services import jobs, worker
 
     return jobs.start("geoprior", worker.run_geoprior_job, kwargs).id
+
+
+def geoprior_preview_run(xlsx_path: str, h5_path: str, *, Nreals: int,
+                         dmax: float, dz: float) -> str:
+    """Run ``geoprior1d`` synchronously into a scratch ``.h5`` for the preview.
+
+    Fast enough (<1 s for a few hundred realizations with ``n_processes=1``)
+    to run in a worker thread instead of a spawned process — the ~2 s the
+    child-process path costs is almost all interpreter spawn + imports. The
+    web process is ``MainProcess`` and ``n_processes=1`` means geoprior1d
+    starts no pool of its own. Returns the abs path; raises on failure.
+    """
+    import os
+
+    from geoprior1d import geoprior1d
+
+    with contextlib.suppress(OSError):
+        os.unlink(h5_path)
+    name, _flags = geoprior1d(xlsx_path, Nreals=int(Nreals), dmax=float(dmax),
+                              dz=float(dz), n_processes=1, output_file=h5_path)
+    if not name or not os.path.exists(name):
+        raise RuntimeError("geoprior1d produced no output file")
+    return os.path.abspath(name)
+
+
+def geoprior_preview_figure(h5_abspath: str, im: int, nr: int = 100) -> str | None:
+    """The right-hand 'realizations' panel of ``ig.plot_prior_stats`` for /M<im>.
+
+    ``h5_abspath`` is an absolute scratch prior file (not workspace-relative).
+    Returns a cached PNG URL, or ``None`` if that /M<im> is absent / on error.
+    """
+    from pathlib import Path
+
+    p = Path(h5_abspath)
+    if not p.is_file():
+        return None
+    key = figures.figure_key("gp-preview", str(p), int(im), int(nr), salt=p)
+
+    def _call():
+        import integrate.integrate_plot as igp
+
+        igp.plot_prior_stats(str(p), Mkey=f"M{int(im)}", nr=int(nr),
+                             panels="reals", hardcopy=False, title="")
+
+    try:
+        return figures.render(_call, key=key)
+    except Exception:
+        return None
+
+
+def cond_resistivity_figure(xlsx_path: str, h5_path: str | None = None,
+                            overlay: bool = False) -> str | None:
+    """Overlaid analytic ρ|lithology priors from a geoprior1d ``.xlsx`` spec.
+
+    One log-normal PDF per lithology on a shared log-ρ axis, coloured by the
+    class RGB from the spec (via ``geoprior1d.io.extract_prior_info``). The
+    curve is analytic — median from the *Resistivity* sheet, σ (in log10
+    space) = log10(uncertainty factor) / 3, matching what geoprior1d samples.
+
+    ``overlay`` + a scratch ``h5_path`` (with ``/M1`` resistivity, ``/M2``
+    class code) adds a step-histogram of the sampled values per class.
+    Returns a cached PNG URL, or ``None`` on any parse / render failure.
+    """
+    import os
+
+    import numpy as np
+
+    try:
+        from geoprior1d.io import extract_prior_info
+
+        info, cmaps = extract_prior_info(xlsx_path)
+        res = np.asarray(info["Resistivity"]["res"], dtype=float)
+        sig = np.asarray(info["Resistivity"]["res_unc"], dtype=float)
+        names = list(info["Classes"]["names"])
+        codes = list(info["Classes"]["codes"])
+        colors = np.asarray(cmaps["Classes"], dtype=float)
+        if res.size == 0 or res.size != sig.size:
+            return None
+    except Exception:
+        return None
+
+    use_overlay = bool(overlay) and bool(h5_path) and os.path.exists(h5_path)
+
+    def _mt(p: str | None) -> int:
+        try:
+            return os.stat(p).st_mtime_ns  # type: ignore[arg-type]
+        except (OSError, TypeError):
+            return 0
+
+    key = figures.figure_key("gp-cond", str(xlsx_path), _mt(xlsx_path),
+                             _mt(h5_path) if use_overlay else 0, use_overlay)
+
+    lo = float(np.log10(res).min() - 4.0 * max(sig.max(), 1e-3))
+    hi = float(np.log10(res).max() + 4.0 * max(sig.max(), 1e-3))
+    x = np.linspace(lo, hi, 400)
+
+    def _draw():
+        import h5py
+        import matplotlib.pyplot as plt
+        from scipy.stats import norm
+
+        fig = plt.figure(figsize=(9.0, 4.2))
+        ax = fig.add_subplot(111)
+        for i, _code in enumerate(codes):
+            col = colors[i] if i < len(colors) else (0.5, 0.5, 0.5)
+            s = max(float(sig[i]), 1e-3)
+            pdf = norm.pdf(x, float(np.log10(res[i])), s)
+            ax.fill_between(10.0 ** x, pdf, color=col, alpha=0.12)
+            ax.plot(10.0 ** x, pdf, color=col, lw=1.6, label=names[i])
+
+        if use_overlay:
+            with h5py.File(h5_path, "r") as f:
+                m1 = np.asarray(f["M1"][:]).ravel()
+                m2 = np.asarray(f["M2"][:]).ravel()
+            bins = np.logspace(lo, hi, 60)
+            for i, code in enumerate(codes):
+                v = m1[(m2 == code) & np.isfinite(m1) & (m1 > 0)]
+                if v.size:
+                    col = colors[i] if i < len(colors) else (0.5, 0.5, 0.5)
+                    ax.hist(v, bins=bins, density=True, histtype="step",
+                            color=col, alpha=0.8, lw=1.3)
+
+        ax.set_xscale("log")
+        ax.set_xlabel("Resistivity [Ω·m]")
+        ax.set_ylabel("density (over log₁₀ ρ)")
+        ax.set_title("ρ | lithology — assumed prior"
+                     + ("  ·  sampled overlaid" if use_overlay else ""))
+        ax.legend(fontsize=8, ncol=2, loc="upper right")
+        ax.margins(x=0)
+        fig.tight_layout()
+
+    try:
+        return figures.render(_draw, key=key)
+    except Exception:
+        return None
 
 
 # --------------------------------------------------------------------------- #

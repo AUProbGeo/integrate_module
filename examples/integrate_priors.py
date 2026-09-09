@@ -41,6 +41,7 @@ print("="*60)
 # %%
 # Number of realizations to generate for each prior model
 N = 500000  # Adjust this value as needed
+N = 10000
 
 # Common depth parameters  
 z_max = 90      # Maximum depth (m)
@@ -235,9 +236,11 @@ f_prior_direct_10lay = ig.prior_model_workbench_direct(
 # %% [markdown]
 # ## 4. prior_model_smooth / blocky / sharp() Examples
 # Aarhus Workbench Smooth (L2), Blocky (L1) and Sharp (MGS) 1D model types,
-# generated as sample ensembles on a fixed geometric layer stack. All three
-# share the discretization and differ only in the vertical prior on
-# log-resistivity between adjacent layers.
+# generated as sample ensembles. Like prior_model_workbench, each writes
+# /M1 (realizations on a regular dz grid, used for forward modelling),
+# /M2 (realizations in the native formulation) and /M3 (native layer count).
+# Smooth/Blocky share a fixed geometric native stack and differ only in the
+# vertical prior on log-resistivity; Sharp uses a sparse Poisson jump model.
 
 # %%
 print(f"\n{'='*60}")
@@ -248,9 +251,10 @@ print(f"{'='*60}")
 print(f"\n4a. Smooth: L2 vertical constraint, corr_length=15 m")
 f_prior_smooth = ig.prior_model_smooth(
     N=N,
-    nlayers=30,
+    nlayers=30,                 # native geometric layers
     z1=0,
     z_max=z_max,
+    dz=dz,                      # regular /M1 output grid
     corr_length=15.0,           # vertical correlation length (m)
     sigma_logrho=0.25,          # prior std of log-resistivity (BetaV)
     RHO_ref=100.0,
@@ -267,6 +271,7 @@ f_prior_blocky = ig.prior_model_blocky(
     nlayers=30,
     z1=0,
     z_max=z_max,
+    dz=dz,
     blocky_scale=0.3,
     RHO_ref=100.0,
     RHO_min=RHO_min,
@@ -279,9 +284,9 @@ f_prior_blocky = ig.prior_model_blocky(
 print(f"\n4c. Sharp: ~3 sharp jumps, log-uniform inter-jump resistivity")
 f_prior_sharp = ig.prior_model_sharp(
     N=N,
-    nlayers=30,
     z1=0,
     z_max=z_max,
+    dz=dz,
     n_jumps_mean=3.0,
     RHO_dist='log-uniform',
     RHO_min=RHO_min,

@@ -1,3 +1,4 @@
 # paths are relative to this file (frontend/)
 static/figures/
+_scratch/
 **/__pycache__/

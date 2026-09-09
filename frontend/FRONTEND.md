@@ -401,9 +401,74 @@ re-opening the mockup. All numeric inputs are text fields coerced server-side.
   `jobs.start("geoprior", worker.run_geoprior_job, …)` → `run_panel(job, "/geoprior")`.
 - `done_extra` = geoprior `flags` + **Plot prior stats**
   (`GET /geoprior/figure/{name}`).
+- **Live summary-stats preview** (`#gp-preview`, below the grid):
+  - A **☐ Auto-update summary stats** checkbox + a **realizations** select
+    (50 / 100 / 200 / 500 / 1000, capped at `_PREVIEW_MAX` = 2000) +
+    **Refresh preview** button, all in `#gp-preview-form`.
+  - Every `/geoprior/cell` `/addrow` `/addcol` response (and the toggle
+    itself) carries an **`HX-Trigger`** header from `_changed(st)`:
+    always `gp-cond` (drives the instant analytic ρ|lithology panel below),
+    plus `gp-changed` when `gp_autopreview` is on (drives this geoprior1d
+    preview). Two **persistent** listener `Div`s consume them —
+    `#gp-preview-trigger` (`gp-changed from:body delay:800ms` → `POST
+    /geoprior/preview`) and `#gp-cond-trigger` (`load, gp-cond from:body
+    delay:400ms` → `POST /geoprior/cond`). `delay:` debounces (each event
+    resets the timer). Persistent listeners + `HX-Trigger` were chosen over
+    an OOB `Div` with `hx-trigger="load"` because htmx 2.0.4 does not
+    reliably re-fire `load` on OOB-swapped content.
+  - `POST /geoprior/preview` (async): saves the live workbook to a
+    **scratch** `frontend/_scratch/gp_<sid>.xlsx` (never `gp_target`), then
+    `await asyncio.to_thread` → `api.geoprior_preview_run` =
+    `geoprior1d(..., n_processes=1, output_file=<scratch gp_<sid>.h5>)`
+    **inline in a worker thread — no child process**. geoprior1d generation
+    is <1 s for a few hundred realizations; the child-process path's ~2 s is
+    almost all interpreter spawn + imports, so the preview skips it (the web
+    process is `MainProcess` and `n_processes=1` starts no pool). A
+    per-session `threading.Lock` serialises overlapping refreshes; an
+    `#gp-preview-spin` `htmx-indicator` shows "Generating realizations…"
+    while the POST is in flight.
+  - The route returns the figure grid directly (no polling): two panels from
+    `api.geoprior_preview_figure(<abs scratch .h5>, im, nr)` =
+    `ig.plot_prior_stats(Mkey='M{im}', panels='reals', title='', hardcopy=False)`
+    — just the **right-hand realizations panel** (= the Matlab GUI's
+    "Lithostratigraphy" `/M2` and "Resistivity" `/M1` views). `im` 2 then 1;
+    missing ones skipped. Laid out side by side in `.gp-preview-grid`
+    (`1fr 1fr`, stacks < 760 px), each in a 300 px `object-fit:contain` box.
+  - `dmax` / `dz` for the preview come from `#gp-runform` via `hx-include`.
+    `POST /geoprior/preview/toggle` persists `gp_autopreview` / `gp_preview_n`
+    and, when turned on, returns the trigger to fire an immediate run.
+  - `/geoprior/load` + `/reload` call `_reset_preview` (cancel job, unlink
+    scratch). Scratch dir = `config.SCRATCH_DIR` (`frontend/_scratch/`,
+    gitignored) — **never the workspace**.
+- **ρ | lithology conditional-prior panel** (`#gp-cond`, last block in
+  `#gp-preview`) — the *assumed* resistivity prior per lithology, live on
+  every Resistivity/Geology1 edit **regardless of the Auto-update toggle**
+  (it is analytic, ~150 ms, runs in the web process):
+  - `POST /geoprior/cond` saves the workbook to the same scratch `.xlsx`
+    (under `_preview_lock` so it can't collide with a running preview save),
+    then `api.cond_resistivity_figure(xlsx, h5_path=<scratch .h5 if it
+    exists>, overlay=st['gp_cond_overlay'])`.
+  - `cond_resistivity_figure` parses the spec with
+    **`geoprior1d.io.extract_prior_info`** (medians, `res_unc` = log10(unc
+    factor)/3, class names, RGB colours) and draws one `scipy.stats.norm`
+    log-normal PDF per class on a shared **log-ρ** axis, coloured by the
+    class RGB — matching the sampler's `10**(log10(res) + res_unc·N(0,1))`.
+    With `overlay` + a scratch `.h5`, adds a `histtype='step'` density hist
+    of `/M1` grouped by `/M2` per class. One `figures.render`-cached PNG
+    (key salted on both file mtimes + the overlay flag). Returns `None` on
+    any parse/render failure → the route shows an inline `error_box`.
+  - `☐ overlay sampled` checkbox (`#gp-cond-form`) → `POST
+    /geoprior/cond/toggle` stores `gp_cond_overlay`, replies
+    `HX-Trigger: gp-cond` to redraw. Overlay on with no `.h5` yet → analytic
+    only + a "run a preview" note.
+  - `#gp-cond-trigger` also fires once on `load`, so the panel is populated
+    as soon as the editor renders (and after every `/geoprior/load`
+    `/reload`, which are normal swaps).
 - Routes: `/geoprior`, `/geoprior/load` `/reload` `/cell` `/addrow` `/addcol`
-  `/save` `/run` (POST), `/geoprior/sheet`, `/geoprior/figure/{name}` + shared
-  `_jobs_ui` routes at base `/geoprior`.
+  `/save` `/run` (POST), `/geoprior/sheet`, `/geoprior/figure/{name}`,
+  `/geoprior/preview` `/geoprior/preview/toggle` `/geoprior/cond`
+  `/geoprior/cond/toggle` (POST) + shared `_jobs_ui` routes at base
+  `/geoprior`.
 - Nav: `02 Prior model` is a **section label** with two children —
   `Generic` (`/prior`) and `geoprior1d` (`/geoprior`). `components.PAGES`
   entries are `(slug, num, label, children)` where `children` is
@@ -634,7 +699,11 @@ prior_data_gaaem(...)                       # exported via integrate.integrate
 # plotting (integrate.integrate_plot, also re-exported on ig)
 plot_geometry, plot_profile, plot_profile_continuous, plot_profile_discrete,
 plot_T_EV, plot_data_xy, plot_data, plot_prior_stats, plot_post_stats,
-plot_feature_2d, plot_cumulative_probability_profile, ...
+plot_feature_2d, plot_cumulative_probability_profile, plot_boreholes, ...
+# plot_prior_stats(f_prior_h5, Mkey, nr=100, panels=('hist','stats','reals'),
+#   fontsize=None, ...) — panels= selects a subset of the 1x3 layout;
+#   'reals' alone = just the right-hand realizations panel (added for the
+#   geoprior1d live preview).  plot_boreholes(..., fontsize=None).
 
 integrate_posterior_stats(...)              # T / EV / N_UNIQUE series
 get_geometry(f_h5)                          # UTMX/UTMY/LINE for maps
@@ -795,6 +864,8 @@ Legend: **impl** / **tested** each ∈ `⬜ 🟡 ✅ ⛔`
 | F3.1a | Inspect panel — **class-specific** stats + detail table (see §7.01): DATA = Soundings / Data types / Continuous / Discrete + per-`/D{i}` table (kind from `noise_model`); PRIOR = Realizations / Model types / Prior-data types + per-`/M{i}` table (Type + Dimension=`len(x)` + depth range + classes, via `ig.get_prior_model_info`); POSTERIOR = Soundings / Realizations-per-sounding (`/i_use` is [Np,Nr]) / Model types / Mean T / Mean EV + per-`/M{i}` posterior-stats table + Run details (linked files, `inv_time`, dates) | ✅ | ✅ (browser: DATA/PRIOR/POSTERIOR on `examples/`) |
 | F3.2 | **02 Prior model** — model dropdown (layered / workbench / workbench_direct), per-model field grid (HTMX-swapped `<form>`), Run → child-process job, self-polling run panel, Cancel + Clear, on done: output + "Open in Data files" + **Plot prior stats** | ✅ | ✅ (browser: layered N=1234 custom-name → valid PRIOR .h5) |
 | F3.2b | **geoprior1d** (own page `/geoprior`, nav slot) — `.xlsx` picker + **live spreadsheet editor** (`services/xlsx.py`, session-held `openpyxl.Workbook`): sheet tabs, editable cells (`/geoprior/cell` coerces per old type, marks dirty), + Row / + Col, **editable SAVE TO field** (write edits to a different file, leave original alone), Save, **Reload original**, `.~lock` warning. Run form (`Nreals/dmax/dz/n_processes`) → **Save & run** (writes `gp_target` first) → `geoprior1d(...)` child-process job, shared run panel, flags + Plot prior stats | ✅ | ✅ (browser + curl: load daugaard_standard.xlsx, edit cell, **Save as `MY_EDITED_SPEC` → new file gets the edit, original B2 stays 30**, run N=250 → valid PRIOR .h5) |
+| F3.2c | **geoprior1d live summary-stats preview** — ☐ Auto-update + realizations select (50–1000, cap 2000) + Refresh; while on, cell/+row/+col/toggle responses send `HX-Trigger: gp-changed` → a persistent `#gp-preview-trigger` (`gp-changed from:body delay:800ms`, debounced) → `POST /geoprior/preview` saves a **scratch** `.xlsx` (never `gp_target`) then `asyncio.to_thread`→`api.geoprior_preview_run` = `geoprior1d(n_processes=1, output_file=<scratch .h5>)` **inline (no child spawn)**, per-session lock, `#gp-preview-spin` indicator; returns two side-by-side panels (`.gp-preview-grid` 1fr 1fr, 300 px boxes) from `api.geoprior_preview_figure` = `plot_prior_stats(Mkey='M{im}', panels='reals')` for M2 then M1. `_reset_preview` unlinks scratch on load/reload. Needs core `plot_prior_stats(panels=…)`. | ✅ | ✅ (browser: toggle on → immediate render; cell edit → htmx log shows gp-changed→/geoprior/preview→both panels refresh; ~1.9 s for 200 reals) |
+| F3.2d | **geoprior1d ρ\|lithology conditional-prior panel** (`#gp-cond`) — analytic overlaid log-normal ρ priors, one per lithology, coloured by spec RGB, on a log-ρ axis; `api.cond_resistivity_figure` parses via `geoprior1d.io.extract_prior_info`, draws `scipy.stats.norm` PDFs (σ = log10(unc)/3, matching the sampler). Live on **every** Resistivity/Geology1 edit via a second `HX-Trigger` event `gp-cond` (fires regardless of Auto-update) → persistent `#gp-cond-trigger` (`load, gp-cond from:body delay:400ms`) → `POST /geoprior/cond` (web-process, ~150 ms, `_preview_lock`-guarded save). ☐ `overlay sampled` (`/geoprior/cond/toggle` → `gp_cond_overlay`) adds `/M1`-by-`/M2` step-hists from the scratch preview `.h5` when one exists. Malformed sheet → inline `error_box`. | ✅ | ✅ (unit test `test_cond_resistivity_figure`: analytic + overlay + bad-file→None; browser: renders on load, redraws on a Resistivity median edit with Auto-update **off**; smoke test for `/geoprior/cond*` routes + `gp-cond` header) |
 | F2.7 | `pages/_jobs_ui.py` — shared `register_job_routes` + `run_panel` (used by /prior + /geoprior) | ✅ | ✅ |
 | F3.8 | `services/xlsx.py` + `tests/test_xlsx.py` (edit round-trip, type coercion, add row/col) | ✅ | ✅ |
 | F3.3 | **04 Inversion** — 2-col layout; **3 essential fields** (PRIOR, DATA, N_use — default = prior's realization count, live-updated on prior change via `/inversion/nuse`) + collapsed `<details>` Advanced (nr=100, f_post_h5, id_use/ip_range, autoT/T_base, Ncpu/Nchunks/use_N_best, backend, parallel) → `ig.integrate_rejection` child job → shared run panel | ✅ | ✅ (curl + browser: N_use tracks the prior; id_use=1, ip_range=0:2 → POSTERIOR .h5) |

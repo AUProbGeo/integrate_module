@@ -3714,7 +3714,8 @@ def find_points_along_line_segments(X, Y, Xl, Yl, ID=None, tolerance=None, metho
             closest_segments[selected_indices])
 
 
-def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=None, **kwargs):
+def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=None,
+                     panels=('hist', 'stats', 'reals'), **kwargs):
     """
     Visualize prior model parameter distributions and sample realizations.
 
@@ -3743,6 +3744,13 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
     showInfo : int, optional
         Verbosity level for diagnostic output. If > 0, prints data range and
         auto-selected scale choice (default is 0).
+    panels : str or sequence of str, optional
+        Which of the sub-panels to draw, any subset of
+        ``('hist', 'stats', 'reals')`` (left histogram, middle stats-vs-depth,
+        right realizations panel). Order is fixed regardless of how it is
+        given; a single string is accepted. Panels not available for the
+        parameter (e.g. ``'stats'`` for a scalar) are silently skipped.
+        Default is all three.
     hardcopy : bool, optional
         Save plots as PNG files (default True).
 
@@ -3753,7 +3761,8 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
 
     Notes
     -----
-    Creates a 1x3 subplot layout with custom width ratios.
+    Creates a 1x3 subplot layout with custom width ratios (fewer if ``panels``
+    selects a subset).
 
     For continuous parameters: left panel (width 1) shows a histogram,
     middle panel (width 1.5) shows statistics vs depth (Mean, Median, ±1 Std),
@@ -3805,7 +3814,8 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         if len(Mkey)==0:
             for key in f_prior.keys():
                 if (key[0]=='M'):
-                    plot_prior_stats(f_prior_h5, Mkey=key, nr=nr, use_log=use_log, showInfo=showInfo, **kwargs)
+                    plot_prior_stats(f_prior_h5, Mkey=key, nr=nr, use_log=use_log,
+                                     showInfo=showInfo, panels=panels, **kwargs)
             return
 
         if Mkey[0]!='/':
@@ -3892,24 +3902,38 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
     title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
     legend_fs = fontsize if fontsize is not None else 8
 
+    # --- resolve which sub-panels to draw --------------------------------
+    _PANEL_ORDER = ('hist', 'stats', 'reals')
+    _req = (panels,) if isinstance(panels, str) else tuple(panels)
+    _want = [p for p in _PANEL_ORDER if p in _req] or list(_PANEL_ORDER)
+
+    def _panel_grid(avail, width_ratios):
+        """1xN GridSpec over the requested + available panels.
+
+        ``avail`` maps panel name -> bool, ``width_ratios`` panel name ->
+        float. Returns ``(fig, {panel: axes})`` with axes only for the
+        panels actually drawn (always at least ``'reals'``).
+        """
+        import matplotlib.gridspec as _gs
+        cols = [p for p in _want if avail.get(p, False)] or ['reals']
+        ratios = [width_ratios[p] for p in cols]
+        fig_w = {1: 7, 2: 12, 3: 18}.get(len(cols), 6 * len(cols))
+        _fig = plt.figure(figsize=(fig_w, 6))
+        _grid = _gs.GridSpec(1, len(cols), width_ratios=ratios, figure=_fig)
+        return _fig, {p: _fig.add_subplot(_grid[i]) for i, p in enumerate(cols)}
+
     if not is_discrete:
         # CONTINUOUS
 
-        import matplotlib.gridspec as gridspec
         show_stats = (Nm > 1)
 
-        if show_stats:
-            fig = plt.figure(figsize=(18, 6))
-            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
-            idx_right = 2
-        else:
-            fig = plt.figure(figsize=(12, 6))
-            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2], figure=fig)
-            idx_right = 1
+        fig, _ax = _panel_grid(
+            {'hist': True, 'stats': show_stats, 'reals': True},
+            {'hist': 1.0, 'stats': 1.5, 'reals': 2.0},
+        )
+        ax_left, ax_middle, ax_right = _ax.get('hist'), _ax.get('stats'), _ax.get('reals')
 
-        ax_left = fig.add_subplot(gs[0])
-
-        if show_stats:
+        if ax_left is not None and show_stats:
             # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M.flatten()
@@ -3927,19 +3951,19 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                 m1 = ax_left.hist(M_hist, 101)
                 ax_left.set_xlabel(name, **fs_kw)
             ax_left.set_ylabel('Counts', **fs_kw)
-        else:
+        elif ax_left is not None:
             # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M.flatten()
             m1 = ax_left.hist(M_hist, 101)
             ax_left.set_xlabel(name, **fs_kw)
             ax_left.set_ylabel('Counts', **fs_kw)
 
-        if fontsize is not None:
-            ax_left.tick_params(labelsize=fontsize)
-        ax_left.grid()
+        if ax_left is not None:
+            if fontsize is not None:
+                ax_left.tick_params(labelsize=fontsize)
+            ax_left.grid()
 
-        if show_stats:
-            ax_middle = fig.add_subplot(gs[1])
+        if ax_middle is not None:
 
             M_mean = np.mean(M, axis=0)
             M_median = np.median(M, axis=0)
@@ -3972,34 +3996,33 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             if fontsize is not None:
                 ax_middle.tick_params(labelsize=fontsize)
 
-        ax_right = fig.add_subplot(gs[idx_right])
-
-        X,Y = np.meshgrid(np.arange(1,nr+1),z)
-        ax_right.invert_yaxis()
-        if Nm>1:
-            if use_log_scale:
-                m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
-                                cmap=cmap,
-                                shading='auto',
-                                norm=LogNorm())
+        if ax_right is not None:
+            X,Y = np.meshgrid(np.arange(1,nr+1),z)
+            ax_right.invert_yaxis()
+            if Nm>1:
+                if use_log_scale:
+                    m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
+                                    cmap=cmap,
+                                    shading='auto',
+                                    norm=LogNorm())
+                else:
+                    m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
+                                    cmap=cmap,
+                                    shading='auto')
+                m2.set_clim(clim[0],clim[1])
+                cbar_label = '%s: %s' % (Mkey[1::], name)
+                cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
+                if fontsize is not None:
+                    cbar.set_label(cbar_label, **fs_kw)
+                    cbar.ax.tick_params(labelsize=fontsize)
             else:
-                m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
-                                cmap=cmap,
-                                shading='auto')
-            m2.set_clim(clim[0],clim[1])
-            cbar_label = '%s: %s' % (Mkey[1::], name)
-            cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
-            if fontsize is not None:
-                cbar.set_label(cbar_label, **fs_kw)
-                cbar.ax.tick_params(labelsize=fontsize)
-        else:
-            m2 = ax_right.plot(np.arange(1,nr+1),M[0:nr,:].flatten())
-            ax_right.set_xlim(1,nr)
+                m2 = ax_right.plot(np.arange(1,nr+1),M[0:nr,:].flatten())
+                ax_right.set_xlim(1,nr)
 
-        ax_right.set_xlabel('Realization #', **fs_kw)
-        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
-        if fontsize is not None:
-            ax_right.tick_params(labelsize=fontsize)
+            ax_right.set_xlabel('Realization #', **fs_kw)
+            ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+            if fontsize is not None:
+                ax_right.tick_params(labelsize=fontsize)
 
         tit = kwargs.get('title', None)
         if tit is None:
@@ -4016,21 +4039,15 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         class_name = _class_name
         n_class = len(class_name)
 
-        import matplotlib.gridspec as gridspec
         show_histogram = (Nm > 1)
 
-        if show_histogram:
-            fig = plt.figure(figsize=(18, 6))
-            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
-            ax_left = fig.add_subplot(gs[0])
-            idx_middle, idx_right = 1, 2
-        else:
-            fig = plt.figure(figsize=(12, 6))
-            gs = gridspec.GridSpec(1, 2, width_ratios=[2, 3], figure=fig)
-            ax_left = None
-            idx_middle, idx_right = 0, 1
+        fig, _ax = _panel_grid(
+            {'hist': show_histogram, 'stats': True, 'reals': True},
+            {'hist': 1.0, 'stats': 2.0, 'reals': 3.0},
+        )
+        ax_left, ax_middle, ax_right = _ax.get('hist'), _ax.get('stats'), _ax.get('reals')
 
-        if show_histogram:
+        if ax_left is not None:
             m1 = ax_left.hist(M.flatten(), bins=np.arange(0.5, n_class+1.5, 1), orientation='horizontal')
             ax_left.set_ylabel(name, **fs_kw)
             ax_left.set_xlabel('Counts', **fs_kw)
@@ -4040,9 +4057,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                 ax_left.tick_params(labelsize=fontsize)
             ax_left.grid()
 
-        ax_middle = fig.add_subplot(gs[idx_middle])
-
-        if Nm > 1:
+        if ax_middle is not None and Nm > 1:
             from scipy import stats
             import matplotlib.cm as cm
 
@@ -4070,8 +4085,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             ax_middle.set_xlabel('Probability', **fs_kw)
             ax_middle.set_ylabel('Depth (m)', **fs_kw)
             ax_middle.grid(True, alpha=0.3)
-        else:
-            import matplotlib.cm as cm
+        elif ax_middle is not None:
 
             class_counts = np.zeros(n_class)
             for c in range(n_class):
@@ -4088,38 +4102,37 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             ax_middle.set_xlim([0, 1])
             ax_middle.grid(True, alpha=0.3)
 
-        if fontsize is not None:
+        if ax_middle is not None and fontsize is not None:
             ax_middle.tick_params(labelsize=fontsize)
 
-        ax_right = fig.add_subplot(gs[idx_right])
+        if ax_right is not None:
+            X,Y = np.meshgrid(np.arange(1,nr+1),z)
+            ax_right.invert_yaxis()
+            if Nm>1:
+                m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
+                                cmap=cmap,
+                                shading='auto')
+                m2.set_clim(clim[0]-.5,clim[1]+.5)
+                cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],name))
+                cbar1.set_ticks(np.arange(n_class)+1)
+                cbar1.set_ticklabels(class_name)
+                cbar1.ax.invert_yaxis()
+                if fontsize is not None:
+                    cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
+                    cbar1.ax.tick_params(labelsize=fontsize)
+            else:
+                m2 = ax_right.plot(np.arange(1,nr+1), M[0:nr,:].flatten(), '.', markersize=4)
+                ax_right.set_xlim(1,nr)
+                if class_id is not None and class_name is not None:
+                    ax_right.set_yticks(class_id)
+                    ax_right.set_yticklabels(class_name)
+                ax_right.yaxis.tick_right()
+                ax_right.yaxis.set_label_position('right')
 
-        X,Y = np.meshgrid(np.arange(1,nr+1),z)
-        ax_right.invert_yaxis()
-        if Nm>1:
-            m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
-                            cmap=cmap,
-                            shading='auto')
-            m2.set_clim(clim[0]-.5,clim[1]+.5)
-            cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],name))
-            cbar1.set_ticks(np.arange(n_class)+1)
-            cbar1.set_ticklabels(class_name)
-            cbar1.ax.invert_yaxis()
+            ax_right.set_xlabel('Realization #', **fs_kw)
+            ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
             if fontsize is not None:
-                cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
-                cbar1.ax.tick_params(labelsize=fontsize)
-        else:
-            m2 = ax_right.plot(np.arange(1,nr+1), M[0:nr,:].flatten(), '.', markersize=4)
-            ax_right.set_xlim(1,nr)
-            if class_id is not None and class_name is not None:
-                ax_right.set_yticks(class_id)
-                ax_right.set_yticklabels(class_name)
-            ax_right.yaxis.tick_right()
-            ax_right.yaxis.set_label_position('right')
-
-        ax_right.set_xlabel('Realization #', **fs_kw)
-        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
-        if fontsize is not None:
-            ax_right.tick_params(labelsize=fontsize)
+                ax_right.tick_params(labelsize=fontsize)
 
         tit = kwargs.get('title', None)
         if tit is None:
