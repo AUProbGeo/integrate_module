@@ -368,7 +368,8 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     tx_height = np.asarray(tx_height, dtype=float).ravel()
     varying = tx_height.size > 1 and not np.allclose(tx_height, tx_height[0])
 
-    forward_anemone.last_calibration = {"mode": "factor", "k": {}, "residual": {}}
+    forward_anemone.last_calibration = {
+        "mode": "uncalibrated", "k": {}, "residual": {}}
     if calibration_factor:
         k_by_moment = dict(calibration_factor)
         forward_anemone.last_calibration = {
@@ -387,6 +388,8 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
             "per-moment reference dB/dt) or calibration_factor")
     else:  # auto, no reference -> uncalibrated k=1 (parity with fixed-height Task 4)
         k_by_moment = None
+        forward_anemone.last_calibration = {
+            "mode": "uncalibrated", "k": {}, "residual": {}}
 
     scale = _moment_scale(system, k_by_moment)
     thk_t = torch.as_tensor(thickness, dtype=torch.float64)
