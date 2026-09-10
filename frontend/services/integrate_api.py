@@ -237,12 +237,16 @@ def cond_resistivity_figure(xlsx_path: str, h5_path: str | None = None,
             with h5py.File(h5_path, "r") as f:
                 m1 = np.asarray(f["M1"][:]).ravel()
                 m2 = np.asarray(f["M2"][:]).ravel()
-            bins = np.logspace(lo, hi, 60)
+            # histogram log10(ρ) with linear bins over the SAME log10 range as
+            # the analytic curves, density=True -> density per log10-unit, so
+            # the step-hist and the norm.pdf share one amplitude scale.
+            lbins = np.linspace(lo, hi, 60)
             for i, code in enumerate(codes):
                 v = m1[(m2 == code) & np.isfinite(m1) & (m1 > 0)]
                 if v.size:
                     col = colors[i] if i < len(colors) else (0.5, 0.5, 0.5)
-                    ax.hist(v, bins=bins, density=True, histtype="step",
+                    h, e = np.histogram(np.log10(v), bins=lbins, density=True)
+                    ax.step(10.0 ** e, np.append(h, h[-1]), where="post",
                             color=col, alpha=0.8, lw=1.3)
 
         ax.set_xscale("log")
@@ -287,9 +291,31 @@ def start_borehole_job(kwargs: dict) -> str:
     return jobs.start("borehole", worker.run_borehole_job, kwargs).id
 
 
-def prior_stats_figure(name: str) -> str | None:
-    """Render ``ig.plot_prior_stats(<file>)`` -> PNG URL, or ``None``."""
-    return render_plot("plot_prior_stats", name, {})
+def prior_model_ims(name: str) -> list[tuple[int, str]]:
+    """``[(im, "M<im> — <name>")]`` for the ``/M<n>`` datasets in a PRIOR file,
+    for a model-parameter picker. Empty on any read failure."""
+    try:
+        models = files.summary(safe_path(name)).get("models", [])
+    except Exception:
+        return []
+    out: list[tuple[int, str]] = []
+    for m in models:
+        mo = re.match(r"M(\d+)$", str(m.get("id", "")))
+        if mo:
+            im = int(mo.group(1))
+            nm = str(m.get("name") or "").strip()
+            out.append((im, f"M{im} — {nm}" if nm else f"M{im}"))
+    return out
+
+
+def prior_stats_figure(name: str, im: int | None = None) -> str | None:
+    """Render ``ig.plot_prior_stats(<file>, im=<im>)`` -> PNG URL, or ``None``.
+
+    ``im`` selects one ``/M<im>`` model parameter; ``None`` lets
+    ``plot_prior_stats`` recurse over all of them (only the last is saved).
+    """
+    params = {} if im is None else {"im": int(im)}
+    return render_plot("plot_prior_stats", name, params)
 
 
 # --------------------------------------------------------------------------- #

@@ -21,7 +21,8 @@ from frontend.config import APP_TITLE, get_workspace
 # not itself a link.
 PAGES: list[tuple[str, str, str, tuple]] = [
     ("files", "01", "Data files", ()),
-    ("prior", "02", "Prior model", (("prior", "Generic"), ("geoprior", "geoprior1d"))),
+    ("prior", "02", "Prior model",
+     (("prior", "Generic"), ("prior-wb", "WB"), ("geoprior", "geoprior1d"))),
     ("forward", "03", "Forward", (("forward", "GA-AEM"), ("forward-bh", "Boreholes"))),
     ("inversion", "04", "Inversion", ()),
     ("results", "05", "Results", ()),

@@ -12,7 +12,7 @@ from frontend.pages import (
 
 # slugs with a real page module (stubs.py covers the rest)
 IMPLEMENTED = {
-    "files", "prior", "geoprior", "forward", "forward-bh", "inversion",
+    "files", "prior", "prior-wb", "geoprior", "forward", "forward-bh", "inversion",
     "results", "plotting", "profile", "query",
 }
 

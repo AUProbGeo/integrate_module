@@ -344,30 +344,63 @@ re-opening the mockup. All numeric inputs are text fields coerced server-side.
   (`hx-target="this" hx-swap="outerHTML"`); the terminal panel has no trigger.
 - Used by `/prior` and `/geoprior`; Forward/Inversion will reuse it.
 
-### 02 — Prior model (`pages/prior.py`, `/prior`) — IMPLEMENTED (generic priors only)
-- **Model dropdown** (`name="model"`, HTMX `change` → `GET /prior/form` swaps
-  the whole `<form>#wb-prior-form` outerHTML): `layered` / `workbench` /
-  `workbench_direct`. (geoprior1d moved to its own page — see below.)
-- Field specs: `pages/prior.py::MODELS` as `F(name, label, kind, default)`
-  (`kind` ∈ `int|float|str|("select",[…])`). `_cast` coerces on POST.
-  - **layered**: `N` 100000, `lay_dist` uniform|chi2, `dz` 1.0, `z_max` 90,
-    `NLAY_min` 3, `NLAY_max` 6, `NLAY_deg` 6, `RHO_dist`
-    log-uniform|uniform|normal|lognormal, `RHO_min` 0.1, `RHO_max` 100,
-    `RHO_mean` 100, `RHO_std` 80.
-  - **workbench**: + `p` 2, `z1` 0, `dz` 1, `nlayers` 0, `chi2_deg` 100;
-    `RHO_dist` also `chi2`; `NLAY_deg` 5; `z_max` 100, RHO_min/max 1/300,
-    RHO_mean 180.
-  - **workbench_direct**: `N, p, z1, z_max, nlayers, NLAY_min, NLAY_max,
-    RHO_dist(+chi2), RHO_min/max/mean/std, chi2_deg`.
+### 02 — Prior model (`pages/prior.py`) — IMPLEMENTED
+Two pages built by one parametrised `_register(rt, base=…, models=…, …)`:
+
+| Page | base | nav | models |
+|---|---|---|---|
+| **Generic** | `/prior` | `("prior","Generic")` | `layered` |
+| **WB** | `/prior-wb` | `("prior-wb","WB")` | `smooth` (L2) · `blocky` (L1) · `sharp` (MGS) |
+
+- `ig.prior_model_workbench` / `prior_model_workbench_direct` stay in the core
+  module for reference but are **no longer in the UI** — the smooth/blocky/
+  sharp generators supersede them (and `smooth` with `corr_length<=0` gives an
+  uncorrelated i.i.d.-per-layer prior, `RHO_dist='log-uniform'` a log-uniform
+  marginal — see the core note below).
+- **Model dropdown** (`name="model"`, HTMX `change` → `GET {base}/form` swaps
+  `<form>#wb-prior-form` outerHTML); hidden when a page has one model.
+- Field specs: `pages/prior.py` `GENERIC_MODELS` / `WB_MODELS` dicts of
+  `F(name, label, kind, default)` (`kind` ∈ `int|float|str|("select",[…])`).
+  `_cast` coerces on POST.
+  - **layered**: `N`, `lay_dist` uniform|chi2, `dz` 1, `z_max` 90,
+    `NLAY_min/max/deg` 3/6/6, `RHO_dist` log-uniform|uniform|normal|lognormal,
+    `RHO_min/max/mean/std` 0.1/100/100/80.
+  - **smooth**: `N`, `z1` 0, `z_max` 100, `dz` 1, `nlayers` 0, `p` 2,
+    `corr_length` 15 (**≤0 → i.i.d.**), `sigma_logrho` 0.25, **`RHO_dist`
+    lognormal|log-uniform|uniform|normal** (default `lognormal`),
+    `RHO_ref` 100, `RHO_min/max` 1/300.
+  - **blocky**: as smooth but `blocky_scale` 0.25 instead of
+    `corr_length`/`sigma_logrho`/`RHO_dist` (L1 ignores `RHO_dist`).
+  - **sharp**: `n_jumps_mean` 3, `RHO_dist` (log-uniform default),
+    `RHO_min/max/mean/std`.
 - Output name `out_name` → `f_prior_h5` (blank ⇒ auto).
-- The field region **must be a `<form>`** (id `wb-prior-form`) so the Run
-  button's `hx-include="closest form"` picks up every value.
-- **Run** (`POST /prior/run`) → `api.start_prior_job(model, kwargs, out)` →
-  `jobs.start("prior", worker.run_prior_job, …)` → `run_panel(job, "/prior")`.
-- `done_extra` = **Plot prior stats** button → `GET /prior/figure/{name}` →
-  `ig.plot_prior_stats` PNG into `#wb-fig`.
-- Routes: `/prior`, `/prior/form`, `/prior/run` (POST), `/prior/figure/{name}`
-  + the shared `_jobs_ui` routes at base `/prior`.
+- **Run** (`POST {base}/run`) → `api.start_prior_job(model, kwargs, out)` →
+  `jobs.start("prior", worker.run_prior_job, …)` → `run_panel(job, base)`.
+  `worker.run_prior_job` dispatches all six `prior_model_*` (workbench* kept in
+  the dispatch, just unreachable from the UI).
+- `done_extra` = a **model-parameter `<select>`** (`im`, from
+  `api.prior_model_ims` = the file's `/M<n>` datasets + their names,
+  defaulting to **M1**) + a **Plot prior stats** button → `GET
+  /prior/figure/{name}?im=<im>` → `api.prior_stats_figure(name, im)` =
+  `ig.plot_prior_stats(path, im=<im>)` into `#wb-fig`. Rendered with
+  `figure_panel(..., tall=True)` (natural height + scroll) so the wide 1×3
+  panel isn't clipped by the 260px `.wb-figure` box. Without `im`,
+  `plot_prior_stats` recurses over every M and only the last is saved — the
+  picker fixes that.
+- Routes (per page, `base` ∈ `/prior`, `/prior-wb`): `{base}`, `{base}/form`,
+  `{base}/run` (POST), `{base}/figure/{name}` (`?im=`) + the shared `_jobs_ui`
+  routes at that base. (`/geoprior/figure/{name}` takes the same `?im=` and
+  `tall=True`.)
+
+**Core note — `ig.prior_model_smooth` (for the WB page):** signature default
+`RHO_dist` is now `None`, resolved per branch (`'lognormal'` for L2 —
+unchanged historical output; `'log-uniform'` for MGS — unchanged). Explicit
+`RHO_dist='log-uniform'` / `'uniform'` on **L2** applies a Gaussian copula:
+the correlated GP is kept, the per-layer marginal becomes (log-)uniform on
+`[RHO_min, RHO_max]`. `corr_length <= 0` builds `C = sigma_logrho²·I`
+(uncorrelated layers, no NaN). L1 (blocky) ignores `RHO_dist`. Covered by
+`tests/test_prior_model_smooth.py` (18 pass; default L2 / MGS behaviour
+asserted unchanged).
 
 ### geoprior1d (`pages/geoprior.py`, `/geoprior`) — IMPLEMENTED
 - Split from module 02: geoprior1d is driven by an `.xlsx` geological spec, so
@@ -862,7 +895,7 @@ Legend: **impl** / **tested** each ∈ `⬜ 🟡 ✅ ⛔`
 |----|------|------|--------|
 | F3.1 | **01 Data files** — list, filter seg (by class), rescan, `ig.plot_geometry` figure on demand, datasets list | ✅ | ✅ (browser on `examples/`) |
 | F3.1a | Inspect panel — **class-specific** stats + detail table (see §7.01): DATA = Soundings / Data types / Continuous / Discrete + per-`/D{i}` table (kind from `noise_model`); PRIOR = Realizations / Model types / Prior-data types + per-`/M{i}` table (Type + Dimension=`len(x)` + depth range + classes, via `ig.get_prior_model_info`); POSTERIOR = Soundings / Realizations-per-sounding (`/i_use` is [Np,Nr]) / Model types / Mean T / Mean EV + per-`/M{i}` posterior-stats table + Run details (linked files, `inv_time`, dates) | ✅ | ✅ (browser: DATA/PRIOR/POSTERIOR on `examples/`) |
-| F3.2 | **02 Prior model** — model dropdown (layered / workbench / workbench_direct), per-model field grid (HTMX-swapped `<form>`), Run → child-process job, self-polling run panel, Cancel + Clear, on done: output + "Open in Data files" + **Plot prior stats** | ✅ | ✅ (browser: layered N=1234 custom-name → valid PRIOR .h5) |
+| F3.2 | **02 Prior model** — **two pages** from one parametrised register: **Generic** (`/prior`, `layered`) and **WB** (`/prior-wb`, `smooth`/`blocky`/`sharp`); old `workbench`/`workbench_direct` dropped from the UI (core fns kept). Per-model field grid (HTMX-swapped `<form>`), Run → child job, self-polling run panel, Cancel + Clear, on done: output + "Open in Data files" + **Plot prior stats** (`im` picker default M1; `tall=True`). WB `smooth` exposes `RHO_dist` (L2 copula → log-uniform marginal) + `corr_length≤0` = i.i.d. | ✅ | ✅ (curl: `/prior-wb` page + `smooth`/`blocky`/`sharp` form swaps; `RHO_dist` on smooth not blocky; ran `smooth RHO_dist=log-uniform corr_length=0 N=800` → M1 ∈ [10,1000], lag-1 corr ≈ 0. `tests/test_prior_model_smooth.py` 18 pass) |
 | F3.2b | **geoprior1d** (own page `/geoprior`, nav slot) — `.xlsx` picker + **live spreadsheet editor** (`services/xlsx.py`, session-held `openpyxl.Workbook`): sheet tabs, editable cells (`/geoprior/cell` coerces per old type, marks dirty), + Row / + Col, **editable SAVE TO field** (write edits to a different file, leave original alone), Save, **Reload original**, `.~lock` warning. Run form (`Nreals/dmax/dz/n_processes`) → **Save & run** (writes `gp_target` first) → `geoprior1d(...)` child-process job, shared run panel, flags + Plot prior stats | ✅ | ✅ (browser + curl: load daugaard_standard.xlsx, edit cell, **Save as `MY_EDITED_SPEC` → new file gets the edit, original B2 stays 30**, run N=250 → valid PRIOR .h5) |
 | F3.2c | **geoprior1d live summary-stats preview** — ☐ Auto-update + realizations select (50–1000, cap 2000) + Refresh; while on, cell/+row/+col/toggle responses send `HX-Trigger: gp-changed` → a persistent `#gp-preview-trigger` (`gp-changed from:body delay:800ms`, debounced) → `POST /geoprior/preview` saves a **scratch** `.xlsx` (never `gp_target`) then `asyncio.to_thread`→`api.geoprior_preview_run` = `geoprior1d(n_processes=1, output_file=<scratch .h5>)` **inline (no child spawn)**, per-session lock, `#gp-preview-spin` indicator; returns two side-by-side panels (`.gp-preview-grid` 1fr 1fr, 300 px boxes) from `api.geoprior_preview_figure` = `plot_prior_stats(Mkey='M{im}', panels='reals')` for M2 then M1. `_reset_preview` unlinks scratch on load/reload. Needs core `plot_prior_stats(panels=…)`. | ✅ | ✅ (browser: toggle on → immediate render; cell edit → htmx log shows gp-changed→/geoprior/preview→both panels refresh; ~1.9 s for 200 reals) |
 | F3.2d | **geoprior1d ρ\|lithology conditional-prior panel** (`#gp-cond`) — analytic overlaid log-normal ρ priors, one per lithology, coloured by spec RGB, on a log-ρ axis; `api.cond_resistivity_figure` parses via `geoprior1d.io.extract_prior_info`, draws `scipy.stats.norm` PDFs (σ = log10(unc)/3, matching the sampler). Live on **every** Resistivity/Geology1 edit via a second `HX-Trigger` event `gp-cond` (fires regardless of Auto-update) → persistent `#gp-cond-trigger` (`load, gp-cond from:body delay:400ms`) → `POST /geoprior/cond` (web-process, ~150 ms, `_preview_lock`-guarded save). ☐ `overlay sampled` (`/geoprior/cond/toggle` → `gp_cond_overlay`) adds `/M1`-by-`/M2` step-hists from the scratch preview `.h5` when one exists. Malformed sheet → inline `error_box`. | ✅ | ✅ (unit test `test_cond_resistivity_figure`: analytic + overlay + bad-file→None; browser: renders on load, redraws on a Resistivity median edit with Auto-update **off**; smoke test for `/geoprior/cond*` routes + `gp-cond` header) |

@@ -469,9 +469,10 @@ def register(rt) -> None:
         return run_panel(jobs.get(job_id), "/geoprior")
 
     @rt("/geoprior/figure/{name}")
-    def figure(name: str):
-        return figure_panel("ig.plot_prior_stats()", api.prior_stats_figure(name),
-                            "no figure produced")
+    def figure(name: str, im: int = 1):
+        return figure_panel(f"ig.plot_prior_stats(im={im})",
+                            api.prior_stats_figure(name, im),
+                            "no figure produced", tall=True)
 
     # ----- live summary-stats preview -----------------------------------
     @rt("/geoprior/preview/toggle", methods=["POST"])

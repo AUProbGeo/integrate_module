@@ -2376,7 +2376,7 @@ def prior_model_smooth(N=100000, regularization='L2',
                        z1=0, z_max=100, dz=1, nlayers=0, p=2,
                        corr_length=15.0, sigma_logrho=0.25,
                        blocky_scale=0.25, n_jumps_mean=3.0,
-                       RHO_dist='log-uniform', RHO_ref=100.0,
+                       RHO_dist=None, RHO_ref=100.0,
                        RHO_min=1, RHO_max=300, RHO_mean=180, RHO_std=80,
                        RHO_threshold=0.001, **kwargs):
     """
@@ -2401,7 +2401,11 @@ def prior_model_smooth(N=100000, regularization='L2',
     - ``'L2'`` (Smooth): ``nlayers`` geometrically thickening layers; native
       log-resistivity is a correlated Gaussian process with exponential
       covariance ``C(z_i, z_j) = sigma_logrho**2 * exp(-|z_i - z_j| /
-      corr_length)`` and mean ``log(RHO_ref)``.
+      corr_length)`` and mean ``log(RHO_ref)``. Set ``corr_length <= 0`` for
+      i.i.d. (uncorrelated) layers. ``RHO_dist='log-uniform'`` / ``'uniform'``
+      swaps the per-layer marginal to a (log-)uniform on
+      ``[RHO_min, RHO_max]`` via a Gaussian copula, keeping the vertical
+      correlation structure.
     - ``'L1'`` (Blocky): same ``nlayers`` geometric stack; native
       log-resistivity is a cumulative sum of i.i.d. Laplace increments with
       scale ``blocky_scale`` about ``log(RHO_ref)``.
@@ -2429,7 +2433,8 @@ def prior_model_smooth(N=100000, regularization='L2',
         Default is 2.
     corr_length : float, optional
         Vertical correlation length (m) of the native log-resistivity Gaussian
-        process. Only used for ``regularization='L2'``. Default is 15.0.
+        process. Only used for ``regularization='L2'``. ``<= 0`` gives
+        uncorrelated (i.i.d.) layers. Default is 15.0.
     sigma_logrho : float, optional
         Prior standard deviation of log-resistivity (natural log). Analogous to
         the Workbench BetaV vertical constraint strength. Only used for
@@ -2440,10 +2445,14 @@ def prior_model_smooth(N=100000, regularization='L2',
     n_jumps_mean : float, optional
         Poisson mean number of sharp interfaces. Only used for
         ``regularization='MGS'``. Default is 3.0.
-    RHO_dist : str, optional
-        Distribution of resistivity between jumps (``'log-uniform'``,
-        ``'uniform'``, ``'normal'``, ``'lognormal'``). Only used for
-        ``regularization='MGS'``. Default is ``'log-uniform'``.
+    RHO_dist : str or None, optional
+        Per-layer / per-segment resistivity marginal. ``None`` (default) uses
+        each branch's native form: ``'lognormal'`` for L2 (correlated GP in log
+        space about ``log(RHO_ref)``), ``'log-uniform'`` for MGS. Explicit
+        values: L2 accepts ``'log-uniform'`` / ``'uniform'`` (Gaussian-copula,
+        marginal on ``[RHO_min, RHO_max]``) or ``'lognormal'`` / ``'normal'``;
+        MGS accepts ``'log-uniform'`` / ``'uniform'`` / ``'normal'`` /
+        ``'lognormal'``. L1 (Blocky) ignores it.
     RHO_ref : float, optional
         Reference resistivity used as the process mean (in log space) for the
         L2 and L1 priors. Default is 100.0.
@@ -2479,6 +2488,13 @@ def prior_model_smooth(N=100000, regularization='L2',
         raise ValueError("regularization must be 'L2', 'L1' or 'MGS', got %r"
                          % regularization)
 
+    # RHO_dist default is branch-specific (kept backward-compatible):
+    #   L2 -> 'lognormal' (correlated GP in log space, the historical L2 output)
+    #   MGS -> 'log-uniform' (per-segment draw, the historical Sharp output)
+    # L1 (Blocky) ignores RHO_dist entirely (a log-space Laplace random walk).
+    _rd_l2 = 'lognormal' if RHO_dist is None else RHO_dist
+    _rd_mgs = 'log-uniform' if RHO_dist is None else RHO_dist
+
     _report_progress(progress_callback, 0, 100,
                      'generating', 'Generating prior realizations')
 
@@ -2495,11 +2511,26 @@ def prior_model_smooth(N=100000, regularization='L2',
 
         if regularization == 'L2':
             dz_mat = np.abs(z_native[:, None] - z_native[None, :])
-            C = sigma_logrho ** 2 * np.exp(-dz_mat / corr_length)
+            if corr_length is not None and corr_length > 0:
+                C = sigma_logrho ** 2 * np.exp(-dz_mat / corr_length)
+            else:
+                # corr_length <= 0  ->  no vertical correlation (i.i.d. layers)
+                C = sigma_logrho ** 2 * np.eye(nlayers)
             Lc = np.linalg.cholesky(C + 1e-10 * np.eye(nlayers))
-            rho_native = np.exp(np.log(RHO_ref) + (Lc @ np.random.randn(nlayers, N)).T)
+            u = (Lc @ np.random.randn(nlayers, N)).T   # (N, nlayers), u_i ~ N(0, sigma_logrho**2)
+            if _rd_l2 in ('log-uniform', 'uniform'):
+                # Gaussian copula: keep the GP vertical correlation, swap the
+                # per-layer marginal to (log-)uniform on [RHO_min, RHO_max].
+                from scipy.stats import norm as _norm
+                q = _norm.cdf(u / max(sigma_logrho, 1e-12))   # ~ Uniform(0, 1) per layer
+                if _rd_l2 == 'log-uniform':
+                    rho_native = RHO_min * (RHO_max / RHO_min) ** q
+                else:
+                    rho_native = RHO_min + (RHO_max - RHO_min) * q
+            else:  # 'lognormal' / 'normal' / 'log-normal'  ->  GP in log space
+                rho_native = np.exp(np.log(RHO_ref) + u)
             if len(f_prior_h5) < 1:
-                f_prior_h5 = 'PRIOR_SMOOTH_L%g_S%g_N%d.h5' % (corr_length, sigma_logrho, N)
+                f_prior_h5 = 'PRIOR_SMOOTH_L%g_S%g_N%d.h5' % (corr_length or 0, sigma_logrho, N)
         else:  # 'L1'
             incr = np.random.laplace(0.0, blocky_scale, size=(N, nlayers))
             incr[:, 0] = 0.0
@@ -2540,7 +2571,7 @@ def prior_model_smooth(N=100000, regularization='L2',
                 _report_progress(progress_callback, i + 1, N,
                                  'generating', 'Generating prior realizations')
             k = int(K[i])
-            seg_rho = _draw_rho(RHO_dist, k + 1, RHO_min, RHO_max, RHO_mean, RHO_std)
+            seg_rho = _draw_rho(_rd_mgs, k + 1, RHO_min, RHO_max, RHO_mean, RHO_std)
             seg_rho = _clip_rho(seg_rho, RHO_threshold, RHO_min, RHO_max)
             if k > 0:
                 bnd = np.sort(np.random.uniform(z1, z_max, k))
@@ -2558,7 +2589,7 @@ def prior_model_smooth(N=100000, regularization='L2',
             NLAY[i, 0] = k + 1
 
         if len(f_prior_h5) < 1:
-            f_prior_h5 = 'PRIOR_SHARP_K%g_%s_N%d.h5' % (n_jumps_mean, RHO_dist, N)
+            f_prior_h5 = 'PRIOR_SHARP_K%g_%s_N%d.h5' % (n_jumps_mean, _rd_mgs, N)
 
     M_rho = _clip_rho(M_rho, RHO_threshold, RHO_min, RHO_max)
 

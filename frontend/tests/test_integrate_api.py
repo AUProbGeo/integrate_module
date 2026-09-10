@@ -48,6 +48,25 @@ def test_file_detail_data():
 
 
 @pytest.mark.skipif(not (EXAMPLES / "DAUGAARD_PRIOR_GENERIC.h5").exists(), reason="no PRIOR example")
+def test_prior_model_ims_and_stats_figure():
+    ims = api.prior_model_ims("DAUGAARD_PRIOR_GENERIC.h5")
+    assert [i for i, _ in ims] == [1, 2, 3]
+    assert "resistivity" in ims[0][1].lower()  # M1 label carries the name
+
+    # a specific im renders; different im -> different cached PNG
+    u1 = api.prior_stats_figure("DAUGAARD_PRIOR_GENERIC.h5", im=1)
+    u3 = api.prior_stats_figure("DAUGAARD_PRIOR_GENERIC.h5", im=3)
+    assert u1 and u1.endswith(".png") and (config.FIGURES_DIR / Path(u1).name).exists()
+    assert u3 and u3 != u1
+
+    # no im -> back-compat, still returns something
+    assert api.prior_stats_figure("DAUGAARD_PRIOR_GENERIC.h5")
+
+    # missing file -> no ims, no crash
+    assert api.prior_model_ims("nope.h5") == []
+
+
+@pytest.mark.skipif(not (EXAMPLES / "DAUGAARD_PRIOR_GENERIC.h5").exists(), reason="no PRIOR example")
 def test_file_detail_prior():
     d = api.file_detail("DAUGAARD_PRIOR_GENERIC.h5")
     assert d["kind"] == "PRIOR"

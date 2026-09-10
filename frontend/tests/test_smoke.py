@@ -32,6 +32,22 @@ def test_files_list_partial():
     assert c.get("/files/list?ffilter=data").status_code == 200
 
 
+def test_prior_wb_page_and_forms():
+    c = _client()
+    # WB page + model-swap fragment for each of the three generators
+    assert "prior_model_smooth" in c.get("/prior-wb").text
+    for m in ("smooth", "blocky", "sharp"):
+        t = c.get(f"/prior-wb/form?model={m}").text
+        assert f"Run prior_model_{m}" in t
+    # RHO_dist is exposed for smooth (L2 copula) + sharp, not for blocky
+    assert 'name="RHO_dist"' in c.get("/prior-wb/form?model=smooth").text
+    assert 'name="RHO_dist"' not in c.get("/prior-wb/form?model=blocky").text
+    # the Generic page no longer offers the old workbench models
+    gen = c.get("/prior").text
+    assert "prior_model_workbench" not in gen
+    assert "prior_model_layered" in gen
+
+
 def test_static_assets():
     c = _client()
     assert c.get("/static/modernist.css").status_code == 200
