@@ -130,15 +130,17 @@ def run_forward_job(params: dict, queue) -> None:
     params = dict(params)
     backend = params.pop("backend", "ga-aem")
 
+    # Validate backend early, before _run
+    if backend not in ("ga-aem", "anemone"):
+        raise ValueError(f"unknown forward backend: {backend!r}")
+
     def call():
         import integrate as ig
 
         if backend == "ga-aem":
             fn = ig.prior_data_gaaem
-        elif backend == "anemone":
+        else:  # backend == "anemone" (validated above)
             fn = ig.prior_data_anemone
-        else:
-            raise ValueError(f"unknown forward backend: {backend!r}")
         return fn(**_clean(params), progress_callback=_progress_cb(queue))
 
     _run(queue, workspace, "f_prior_data_h5",
