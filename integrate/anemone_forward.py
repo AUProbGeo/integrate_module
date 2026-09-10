@@ -111,9 +111,19 @@ def _remake_loop(loop, tx_z, torch):
     return Loop(loop.x.clone(), loop.y.clone(), z)
 
 
+def _filter_sig(fc):
+    """Return signature (fcut, order) tuples for a FilterChain."""
+    return [(round(float(f.fcut), 3), int(f.order)) for f in fc]
+
+
 def _build_forward(system, tx_z, device):
-    anemone, torch = _require_anemone()
+    _, torch = _require_anemone()
     from anemone.forwards import Forward
+
+    n_moments = len(system["moments"])
+    if n_moments not in (1, 2):
+        raise NotImplementedError(
+            "anemone backend: only 1 or 2 moments supported")
 
     tx_z_key = "src" if tx_z is None else round(float(tx_z), 3)
     key = (system["gex_signature"], tx_z_key, str(device))
@@ -121,32 +131,34 @@ def _build_forward(system, tx_z, device):
         return _FORWARD_CACHE[key]
 
     dev = torch.device(device)
+
+    # Hoist and build shared source, receiver, filterfunc from first moment
+    m0 = system["moments"][0]
+    shared_src = _remake_loop(m0["source"], tx_z, torch)
+    shared_rcv = m0["receiver"]
+    shared_filt = m0["filterfunc"]
+    shared_filt_sig = _filter_sig(shared_filt)
+
     fwr = None
-    shared_src = None
-    shared_rcv = None
-    shared_wf = None
-    shared_filt = None
-    for m in system["moments"]:
-        src = _remake_loop(m["source"], tx_z, torch)
-        # All moments must share the same source, receiver, waveform, and filters for anemone
-        if shared_src is None:
-            shared_src = src
-        else:
-            src = shared_src
-        if shared_rcv is None:
-            shared_rcv = m["receiver"]
+    for i, m in enumerate(system["moments"]):
+        src = shared_src
         rcv = shared_rcv
-        if shared_wf is None:
-            shared_wf = m["waveform"]
-        wf = shared_wf
-        if shared_filt is None:
-            shared_filt = m["filterfunc"]
+
+        # Per-moment filter guard: verify identical receiver filters
+        if i > 0:
+            if _filter_sig(m["filterfunc"]) != shared_filt_sig:
+                raise NotImplementedError(
+                    "anemone backend: per-moment receiver filters differ; a combined "
+                    "dual-moment Forward requires identical filters across moments")
         filt = shared_filt
+
+        # Each moment uses its own waveform (LM vs HM transmitter waveforms differ)
+        wf = m["waveform"]
         times = torch.as_tensor(m["gate_times"], dtype=torch.float64).to(dev)
         part = Forward(src, rcv, times, wf, filt, tolerance=1e-6)
         fwr = part if fwr is None else (fwr + part)
 
-    if len(system["moments"]) == 2:
+    if n_moments == 2:
         slices = [fwr.t1slc, fwr.t2slc]
     else:
         slices = [slice(None)]
