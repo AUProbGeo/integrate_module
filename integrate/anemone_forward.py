@@ -96,6 +96,65 @@ def _gex_signature(g):
     return hashlib.md5(repr(sorted(str(d).encode())[:0] or str(d)).encode()).hexdigest()
 
 
+_FORWARD_CACHE = {}
+
+
+def _clear_forward_cache():
+    _FORWARD_CACHE.clear()
+
+
+def _remake_loop(loop, tx_z, torch):
+    from anemone.system import Loop
+    if tx_z is None:
+        return loop
+    z = torch.full_like(loop.x, float(tx_z))
+    return Loop(loop.x.clone(), loop.y.clone(), z)
+
+
+def _build_forward(system, tx_z, device):
+    anemone, torch = _require_anemone()
+    from anemone.forwards import Forward
+
+    tx_z_key = "src" if tx_z is None else round(float(tx_z), 3)
+    key = (system["gex_signature"], tx_z_key, str(device))
+    if key in _FORWARD_CACHE:
+        return _FORWARD_CACHE[key]
+
+    dev = torch.device(device)
+    fwr = None
+    shared_src = None
+    shared_rcv = None
+    shared_wf = None
+    shared_filt = None
+    for m in system["moments"]:
+        src = _remake_loop(m["source"], tx_z, torch)
+        # All moments must share the same source, receiver, waveform, and filters for anemone
+        if shared_src is None:
+            shared_src = src
+        else:
+            src = shared_src
+        if shared_rcv is None:
+            shared_rcv = m["receiver"]
+        rcv = shared_rcv
+        if shared_wf is None:
+            shared_wf = m["waveform"]
+        wf = shared_wf
+        if shared_filt is None:
+            shared_filt = m["filterfunc"]
+        filt = shared_filt
+        times = torch.as_tensor(m["gate_times"], dtype=torch.float64).to(dev)
+        part = Forward(src, rcv, times, wf, filt, tolerance=1e-6)
+        fwr = part if fwr is None else (fwr + part)
+
+    if len(system["moments"]) == 2:
+        slices = [fwr.t1slc, fwr.t2slc]
+    else:
+        slices = [slice(None)]
+
+    _FORWARD_CACHE[key] = (fwr, slices)
+    return _FORWARD_CACHE[key]
+
+
 def gex_to_anemone_system(gex, showInfo=0):
     anemone, torch = _require_anemone()
     from anemone.system import (Loop, Receiver, Waveform, FilterChain,
