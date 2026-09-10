@@ -32,6 +32,8 @@ dependencies = [
     "litellm",
     "streamlit",
     "libaarhusxyz",
+    "torch",
+    "anemone @ file:///home/tmeha/PROGRAMMING/anemone",
     "jax",
     "fastapi",
     "uvicorn[standard]",

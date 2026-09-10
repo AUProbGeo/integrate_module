@@ -27,6 +27,9 @@ from integrate.integrate import prior_data
 from integrate.integrate import prior_data_gaaem
 from integrate.integrate import prior_data_identity
 from integrate.integrate import forward_gaaem
+from integrate.anemone_forward import forward_anemone
+from integrate.anemone_forward import prior_data_anemone
+from integrate.anemone_forward import gex_to_anemone_system
 from integrate.integrate import synthetic_case
 from integrate.integrate import prior_model_layered
 from integrate.integrate import prior_model_workbench
