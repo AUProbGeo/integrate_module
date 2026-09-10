@@ -280,7 +280,7 @@ def _moment_scale(system, calibration_factor):
     return out  # sign is +1 in the evaluator (parity with ga-aem's -fm.SZ)
 
 
-def _raw_signed_by_moment(system, M, thickness, tx_height, device):
+def _raw_by_moment(system, M, thickness, tx_height, device):
     """Uncalibrated raw dB/dt per moment, shape (nd, n_used_m).
 
     anemone raw and ``forward_gaaem`` are both positive -> no sign flip
@@ -306,7 +306,9 @@ def _raw_signed_by_moment(system, M, thickness, tx_height, device):
 
 def _loglog_resample(x_src, y_src, x_dst):
     good = np.isfinite(y_src) & (y_src != 0)
-    if good.sum() < 2 or np.allclose(x_src, x_dst):
+    if good.sum() < 2:
+        return y_src
+    if x_src.shape == x_dst.shape and np.allclose(x_src, x_dst):
         return y_src
     sign = np.sign(np.nanmedian(y_src[good]))
     return sign * 10 ** np.interp(np.log10(x_dst), np.log10(x_src[good]),
@@ -315,7 +317,7 @@ def _loglog_resample(x_src, y_src, x_dst):
 
 def _fit_calibration(system, M, thickness, tx_height, device, reference, tol,
                      showInfo=0):
-    raw_by_m = _raw_signed_by_moment(system, M, thickness, tx_height, device)
+    raw_by_m = _raw_by_moment(system, M, thickness, tx_height, device)
     times, names = _used_gate_times(system)
     k_out, resid_out = {}, {}
     for i, name in enumerate(names):
@@ -324,19 +326,31 @@ def _fit_calibration(system, M, thickness, tx_height, device, reference, tol,
         ref = np.asarray(reference[name], dtype=float)
         ref_t = np.asarray(reference.get(name + "_times", times[i]), dtype=float)
         raw_m = np.asarray(raw_by_m[i][0], dtype=float)  # first model row
-        raw_on_ref = _loglog_resample(times[i], raw_m, ref_t)
+        raw_on_ref = _loglog_resample(np.asarray(times[i], dtype=float), raw_m,
+                                      ref_t)
         det = system["moments"][i]["tx_current"] * system["moments"][i]["n_turns"]
-        r = np.abs(ref) / np.abs(det * raw_on_ref)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            r = np.abs(ref) / np.abs(det * raw_on_ref)
         good = np.isfinite(r) & (r > 0)
-        k = float(np.exp(np.median(np.log(r[good]))))
-        model = k * det * raw_on_ref
-        rel = np.abs(np.abs(model) - np.abs(ref)) / np.abs(ref)
-        resid = float(np.median(rel[np.isfinite(rel)]))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            k = float(np.exp(np.median(np.log(r[good])))) if good.any() else np.nan
+            model = k * det * raw_on_ref
+            rel = np.abs(np.abs(model) - np.abs(ref)) / np.abs(ref)
+        rel_fin = rel[np.isfinite(rel)]
+        resid = float(np.median(rel_fin)) if rel_fin.size else np.nan
+        if good.sum() == 0 or not np.isfinite(k) or not np.isfinite(resid):
+            forward_anemone.last_calibration = {
+                "mode": "failed", "k": dict(k_out), "residual": dict(resid_out)}
+            raise RuntimeError(
+                f"anemone calibration for {name}: could not fit "
+                f"(no finite gates / nan)")
         if resid > tol:
+            forward_anemone.last_calibration = {
+                "mode": "failed", "k": dict(k_out), "residual": dict(resid_out)}
             raise RuntimeError(
                 f"anemone calibration for {name}: residual {resid:.3f} "
                 f"> tol {tol:.3f}")
-        if showInfo >= 0:
+        if showInfo > 0:
             print(f"anemone calibration {name}: k={k:.4g} residual={resid:.3f}")
         k_out[name], resid_out[name] = k, resid
     return k_out, resid_out
