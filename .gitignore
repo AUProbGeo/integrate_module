@@ -168,3 +168,4 @@ cython_debug/
 ui/frontend/node_modules/
 # ...but keep the app source under src/lib/ (the generic `lib/` rule above hides it)
 !ui/frontend/src/lib/
+.superpowers/
