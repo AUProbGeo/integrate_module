@@ -280,6 +280,68 @@ def _moment_scale(system, calibration_factor):
     return out  # sign is +1 in the evaluator (parity with ga-aem's -fm.SZ)
 
 
+def _raw_signed_by_moment(system, M, thickness, tx_height, device):
+    """Uncalibrated raw dB/dt per moment, shape (nd, n_used_m).
+
+    anemone raw and ``forward_gaaem`` are both positive -> no sign flip
+    (Controller Ruling 4).
+    """
+    anemone, torch = _require_anemone()
+    txh = np.asarray(tx_height, dtype=float).ravel()
+    tx_z = None
+    if txh.size >= 1:
+        tx_z = float(np.median(txh))
+    elif not system["has_tx_coil_position"]:
+        tx_z = 40.0
+    fwr, slices = _build_forward(system, tx_z, device)
+    M_t = torch.as_tensor(np.atleast_2d(M), dtype=torch.float64).to(
+        torch.device(device))
+    thk_t = torch.as_tensor(np.asarray(thickness, dtype=float),
+                            dtype=torch.float64).to(torch.device(device))
+    with torch.no_grad():
+        raw = fwr(M_t.T, thk_t).detach().cpu().numpy()
+    raw = np.atleast_2d(raw)  # anemone squeezes model axis for n_models==1
+    return [(raw[:, s]) for s in slices]
+
+
+def _loglog_resample(x_src, y_src, x_dst):
+    good = np.isfinite(y_src) & (y_src != 0)
+    if good.sum() < 2 or np.allclose(x_src, x_dst):
+        return y_src
+    sign = np.sign(np.nanmedian(y_src[good]))
+    return sign * 10 ** np.interp(np.log10(x_dst), np.log10(x_src[good]),
+                                  np.log10(np.abs(y_src[good])))
+
+
+def _fit_calibration(system, M, thickness, tx_height, device, reference, tol,
+                     showInfo=0):
+    raw_by_m = _raw_signed_by_moment(system, M, thickness, tx_height, device)
+    times, names = _used_gate_times(system)
+    k_out, resid_out = {}, {}
+    for i, name in enumerate(names):
+        if name not in reference:
+            raise ValueError(f"calibration_reference missing moment '{name}'")
+        ref = np.asarray(reference[name], dtype=float)
+        ref_t = np.asarray(reference.get(name + "_times", times[i]), dtype=float)
+        raw_m = np.asarray(raw_by_m[i][0], dtype=float)  # first model row
+        raw_on_ref = _loglog_resample(times[i], raw_m, ref_t)
+        det = system["moments"][i]["tx_current"] * system["moments"][i]["n_turns"]
+        r = np.abs(ref) / np.abs(det * raw_on_ref)
+        good = np.isfinite(r) & (r > 0)
+        k = float(np.exp(np.median(np.log(r[good]))))
+        model = k * det * raw_on_ref
+        rel = np.abs(np.abs(model) - np.abs(ref)) / np.abs(ref)
+        resid = float(np.median(rel[np.isfinite(rel)]))
+        if resid > tol:
+            raise RuntimeError(
+                f"anemone calibration for {name}: residual {resid:.3f} "
+                f"> tol {tol:.3f}")
+        if showInfo >= 0:
+            print(f"anemone calibration {name}: k={k:.4g} residual={resid:.3f}")
+        k_out[name], resid_out[name] = k, resid
+    return k_out, resid_out
+
+
 def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     GEX=None, tx_height=np.array(()), altitude_bin_width=1.0,
                     is_log=False, device="cpu", calibration="auto",
@@ -306,13 +368,25 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     tx_height = np.asarray(tx_height, dtype=float).ravel()
     varying = tx_height.size > 1 and not np.allclose(tx_height, tx_height[0])
 
-    # k_moment: from calibration_factor now; Task 5 fills the fitted path.
-    if calibration in ("auto", "gex") and calibration_factor:
-        k_by_moment = calibration_factor
+    forward_anemone.last_calibration = {"mode": "factor", "k": {}, "residual": {}}
+    if calibration_factor:
+        k_by_moment = dict(calibration_factor)
+        forward_anemone.last_calibration = {
+            "mode": "factor", "k": dict(calibration_factor), "residual": {}}
     elif calibration == "gex":
         raise ValueError("calibration='gex' needs calibration_factor per moment")
-    else:
-        k_by_moment = calibration_factor  # may be None -> k=1 (Task 5 overrides)
+    elif calibration_reference is not None:  # auto / fitted + reference -> fit
+        k_by_moment, resid = _fit_calibration(
+            system, M[:1], thickness, tx_height, device,
+            calibration_reference, calibration_tol, showInfo)
+        forward_anemone.last_calibration = {
+            "mode": "fitted", "k": k_by_moment, "residual": resid}
+    elif calibration == "fitted":  # explicit fit requested but nothing to fit to
+        raise ValueError(
+            "anemone calibration='fitted' needs calibration_reference (dict of "
+            "per-moment reference dB/dt) or calibration_factor")
+    else:  # auto, no reference -> uncalibrated k=1 (parity with fixed-height Task 4)
+        k_by_moment = None
 
     scale = _moment_scale(system, k_by_moment)
     thk_t = torch.as_tensor(thickness, dtype=torch.float64)
@@ -346,6 +420,9 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     if is_log:
         D = np.log10(D)
     return D[0] if one_d else D
+
+
+forward_anemone.last_calibration = {"mode": None, "k": {}, "residual": {}}
 
 
 def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
