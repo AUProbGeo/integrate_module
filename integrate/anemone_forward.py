@@ -444,7 +444,43 @@ forward_anemone.last_calibration = {"mode": None, "k": {}, "residual": {}}
 
 def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
                             device, progress_callback, showInfo):
-    raise NotImplementedError  # Task 6
+    anemone, torch = _require_anemone()
+    from integrate.integrate import _report_progress
+
+    tx_height = np.asarray(tx_height, dtype=float).ravel()
+    nd = M.shape[0]
+    if bin_width and bin_width > 0:
+        bin_id = np.round(tx_height / bin_width).astype(np.int64)
+        z_of = lambda b: float(b) * bin_width
+    else:
+        uniq = {v: i for i, v in enumerate(np.unique(tx_height))}
+        bin_id = np.array([uniq[v] for v in tx_height], dtype=np.int64)
+        z_of = lambda b: float(np.unique(tx_height)[b])
+
+    dev = torch.device(device)
+    M_t = torch.as_tensor(M, dtype=torch.float64).to(dev)
+    thk = thk_t.to(dev)
+
+    n_used = None
+    D = None
+    done = 0
+    for b in np.unique(bin_id):
+        rows = np.where(bin_id == b)[0]
+        fwr, slices = _build_forward(system, z_of(b), device)
+        with torch.no_grad():
+            raw = fwr(M_t[rows].T, thk).detach().cpu().numpy()
+        raw = np.atleast_2d(raw)  # anemone squeezes model axis for n_models==1
+        cols = [(sc * raw[:, s]) for s, sc in zip(slices, scale)]
+        block = np.concatenate(cols, axis=1)
+        if D is None:
+            n_used = block.shape[1]
+            D = np.empty((nd, n_used), dtype=float)
+        D[rows] = block
+        done += rows.size
+        if progress_callback is not None:
+            _report_progress(progress_callback, done, nd, "computing",
+                             "Forward modeling (%d/%d soundings)" % (done, nd))
+    return D
 
 
 def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
