@@ -489,4 +489,104 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        calibration="auto", calibration_reference=None,
                        calibration_factor=None, calibration_tol=0.05,
                        force_replace=False, f_prior_data_h5="", **kwargs):
-    raise NotImplementedError  # Task 7
+    """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
+
+    Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
+    resistivity** (no ``1/``) and forwards it through :func:`forward_anemone`.
+    Returns the path to the prior-data h5 (always the return value).
+    """
+    import multiprocessing
+    import time
+    import h5py
+    import integrate as ig
+    from integrate.integrate import _report_progress
+
+    if multiprocessing.current_process().name != "MainProcess":
+        return None
+
+    anemone, _torch = _require_anemone()
+    showInfo = kwargs.get("showInfo", 0)
+    progress_callback = kwargs.pop("progress_callback", None)
+
+    with h5py.File(f_prior_h5, "r") as f:
+        N_in = f["M1"].shape[0]
+    if N == 0 or N > N_in:
+        N = N_in
+
+    if file_gex is not None and not os.path.isfile(file_gex):
+        print("ERROR: file_gex=%s does not exist" % file_gex)
+
+    if doMakePriorCopy:
+        if not f_prior_data_h5:
+            base = (os.path.splitext(os.path.basename(file_gex))[0]
+                    if file_gex else "ANEMONE")
+            stem = os.path.splitext(f_prior_h5)[0]
+            f_prior_data_h5 = ("%s_%s_N%d_anemone.h5" % (stem, base, N)
+                               if N < N_in else
+                               "%s_%s_anemone.h5" % (stem, base))
+        ig.copy_hdf5_file(f_prior_h5, f_prior_data_h5, N, showInfo=showInfo)
+    else:
+        f_prior_data_h5 = f_prior_h5
+
+    Mname, Dname = "/M%d" % im, "/D%d" % id
+    Mheight = "/M%d" % im_height
+
+    with h5py.File(f_prior_data_h5, "r") as f:
+        zattr = f[Mname].attrs["x" if "x" in f[Mname].attrs else "z"]
+        thickness = np.diff(np.asarray(zattr, dtype=float))
+        M = np.asarray(f[Mname][:], dtype=float)          # resistivity
+        tx_height = (np.asarray(f[Mheight][:], dtype=float).ravel()
+                     if im_height > 0 else np.array(()))
+
+    t1 = time.time()
+    D = forward_anemone(M=M, thickness=thickness, file_gex=file_gex,
+                        tx_height=tx_height,
+                        altitude_bin_width=altitude_bin_width, is_log=is_log,
+                        device=device, calibration=calibration,
+                        calibration_reference=calibration_reference,
+                        calibration_factor=calibration_factor,
+                        calibration_tol=calibration_tol,
+                        progress_callback=progress_callback, showInfo=showInfo)
+    if showInfo > -1:
+        dt = time.time() - t1
+        print("prior_data_anemone: %.1fs / %d soundings (%.1f ms/sounding)"
+              % (dt, M.shape[0], 1000 * dt / max(M.shape[0], 1)))
+
+    _report_progress(progress_callback, N, N, "saving",
+                     "Saving forward data to %s" % f_prior_data_h5)
+
+    cal = getattr(forward_anemone, "last_calibration", {"mode": None, "k": {},
+                                                        "residual": {}})
+    with h5py.File(f_prior_data_h5, "a") as f:
+        if Dname in f:
+            if force_replace:
+                del f[Dname]
+            else:
+                print("Key '%s' already exists in %s. Use force_replace=True."
+                      % (Dname, f_prior_data_h5))
+                return f_prior_data_h5
+        f[Dname] = D
+        a = f[Dname].attrs
+        a["method"] = "anemone"
+        a["type"] = "TDEM"
+        a["im"] = im
+        a["id"] = id
+        a["is_log"] = bool(is_log)
+        a["altitude_bin_width"] = float(altitude_bin_width)
+        a["device"] = str(device)
+        a["calibration"] = str(cal.get("mode") or "uncalibrated")
+        a["anemone_version"] = str(getattr(anemone, "__version__", "unknown"))
+        for name, kval in (cal.get("k") or {}).items():
+            a["calibration_factor_%s" % name] = float(kval)
+        for name, rval in (cal.get("residual") or {}).items():
+            a["calibration_residual_%s" % name] = float(rval)
+
+    if cal.get("mode") == "uncalibrated" and showInfo > -1:
+        print("WARNING: anemone prior data %s written UNCALIBRATED — dB/dt "
+              "will NOT match observed data units. Pass calibration_reference "
+              "or calibration_factor to prior_data_anemone." % Dname)
+
+    ig.integrate_update_prior_attributes(f_prior_data_h5)
+    _report_progress(progress_callback, N, N, "completed",
+                     "Forward data saved to %s" % f_prior_data_h5)
+    return f_prior_data_h5
