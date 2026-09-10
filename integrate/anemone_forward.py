@@ -263,13 +263,94 @@ def gex_to_anemone_system(gex, showInfo=0):
     }
 
 
+def _used_gate_times(system):
+    times = [m["gate_times"] for m in system["moments"]]
+    names = [m["name"] or f"CH{i + 1}" for i, m in enumerate(system["moments"])]
+    return times, names
+
+
+def _moment_scale(system, calibration_factor):
+    """Deterministic per-moment factor  k * I_approx * n_turns  (k defaults 1)."""
+    cf = calibration_factor or {}
+    out = []
+    for i, m in enumerate(system["moments"]):
+        name = m["name"] or f"CH{i + 1}"
+        k = float(cf.get(name, cf.get(i, 1.0)))
+        out.append(k * m["tx_current"] * m["n_turns"])
+    return out  # sign handled in the evaluator
+
+
 def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     GEX=None, tx_height=np.array(()), altitude_bin_width=1.0,
                     is_log=False, device="cpu", calibration="auto",
                     calibration_reference=None, calibration_factor=None,
                     calibration_tol=0.05, showtime=False, showInfo=0,
                     progress_callback=None, **kwargs):
-    raise NotImplementedError  # Tasks 3-6
+    anemone, torch = _require_anemone()
+    import time
+
+    M = np.asarray(M, dtype=float)
+    thickness = np.asarray(thickness, dtype=float)
+    one_d = M.ndim == 1
+    if one_d:
+        M = M[None, :]
+    nd, nl = M.shape
+    if thickness.shape[0] != nl - 1:
+        raise ValueError(
+            "thickness array (nt=%d) does not match number of layers minus 1 "
+            "(nl=%d)" % (thickness.shape[0], nl))
+
+    system = gex_to_anemone_system(GEX if GEX is not None else file_gex,
+                                   showInfo=showInfo)
+
+    tx_height = np.asarray(tx_height, dtype=float).ravel()
+    varying = tx_height.size > 1 and not np.allclose(tx_height, tx_height[0])
+
+    # k_moment: from calibration_factor now; Task 5 fills the fitted path.
+    if calibration in ("auto", "gex") and calibration_factor:
+        k_by_moment = calibration_factor
+    elif calibration == "gex":
+        raise ValueError("calibration='gex' needs calibration_factor per moment")
+    else:
+        k_by_moment = calibration_factor  # may be None -> k=1 (Task 5 overrides)
+
+    scale = _moment_scale(system, k_by_moment)
+    thk_t = torch.as_tensor(thickness, dtype=torch.float64)
+
+    t0 = time.time()
+    if varying:
+        D = _forward_varying_height(system, M, thk_t, tx_height,
+                                    altitude_bin_width, scale, device,
+                                    progress_callback, showInfo)  # Task 6
+    else:
+        tx_z = None
+        if tx_height.size >= 1:
+            tx_z = float(tx_height[0])
+        elif not system["has_tx_coil_position"]:
+            tx_z = 40.0
+        fwr, slices = _build_forward(system, tx_z, device)
+        M_t = torch.as_tensor(M, dtype=torch.float64).to(torch.device(device))
+        with torch.no_grad():
+            raw = fwr(M_t.T, thk_t.to(torch.device(device)))
+        raw = np.asarray(raw.detach().cpu().numpy(), dtype=float)
+        raw = np.atleast_2d(raw)
+        cols = []
+        for s, sc in zip(slices, scale):
+            cols.append(-sc * raw[:, s])
+        D = np.concatenate(cols, axis=1)
+
+    if showtime:
+        print("forward_anemone: %.1f ms/model (%d models)"
+              % (1000 * (time.time() - t0) / nd, nd))
+
+    if is_log:
+        D = np.log10(D)
+    return D[0] if one_d else D
+
+
+def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
+                            device, progress_callback, showInfo):
+    raise NotImplementedError  # Task 6
 
 
 def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
