@@ -32,8 +32,6 @@ dependencies = [
     "litellm",
     "streamlit",
     "libaarhusxyz",
-    "torch",
-    "anemone @ file:///home/tmeha/PROGRAMMING/anemone",
     "jax",
     "fastapi",
     "uvicorn[standard]",
@@ -68,6 +66,11 @@ docs = [
 ]
 jax-cuda = [
     "jax[cuda12]",
+]
+anemone = [
+    "torch",
+    # local path until anemone is published
+    "anemone @ file:///home/tmeha/PROGRAMMING/anemone",
 ]
 
 

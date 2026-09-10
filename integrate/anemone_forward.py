@@ -119,6 +119,7 @@ def _filter_sig(fc):
 def _build_forward(system, tx_z, device):
     _, torch = _require_anemone()
     from anemone.forwards import Forward
+    from anemone.system import Receiver
 
     n_moments = len(system["moments"])
     if n_moments not in (1, 2):
@@ -135,10 +136,19 @@ def _build_forward(system, tx_z, device):
     # Hoist and build shared source, receiver, filterfunc from first moment
     m0 = system["moments"][0]
     shared_src = _remake_loop(m0["source"], tx_z, torch)
-    shared_rcv = m0["receiver"]
+    # The Rx coil position in the GEX is an OFFSET from the Tx frame, so the
+    # receiver height tracks the loop height: receiver_z = loop_z + dz.
+    # anemone uses sfield_dz = |srcz| + |rz| and pfield_dz = |srcz - rz|, so
+    # both must be positive heights above ground (parity with GA-AEM's
+    # tx_height / txrx_dz).
+    loop_z = float(shared_src.z[0])
+    dx, dy, _dz = system.get("rx_offset", (0.0, 0.0, 0.0))
+    receiver_z = loop_z + float(system.get("rx_offset_z_rel_tx", 0.0))
+    shared_rcv = Receiver(x=float(dx), y=float(dy), z=float(receiver_z))
     shared_filt = m0["filterfunc"]
     shared_filt_sig = _filter_sig(shared_filt)
 
+    parts = []
     fwr = None
     for i, m in enumerate(system["moments"]):
         src = shared_src
@@ -156,12 +166,17 @@ def _build_forward(system, tx_z, device):
         wf = m["waveform"]
         times = torch.as_tensor(m["gate_times"], dtype=torch.float64).to(dev)
         part = Forward(src, rcv, times, wf, filt, tolerance=1e-6)
+        parts.append(part)
         fwr = part if fwr is None else (fwr + part)
 
     if n_moments == 2:
         slices = [fwr.t1slc, fwr.t2slc]
     else:
         slices = [slice(None)]
+
+    # Expose the per-moment Forward objects for introspection/tests (the
+    # combined Forward keeps only the first moment's waveform).
+    fwr.moment_parts = parts
 
     _FORWARD_CACHE[key] = (fwr, slices)
     return _FORWARD_CACHE[key]
@@ -179,12 +194,20 @@ def gex_to_anemone_system(gex, showInfo=0):
     has_txpos = any(k.startswith("TxCoilPosition") for k in G)
     if has_txpos:
         txkey = "TxCoilPosition1" if "TxCoilPosition1" in G else "TxCoilPosition"
-        tx_z = abs(float(np.atleast_1d(G[txkey])[2]))
+        tx_pos_z = float(np.atleast_1d(np.asarray(G[txkey], dtype=float))[2])
+        tx_z = abs(tx_pos_z)
     else:
+        tx_pos_z = 0.0
         tx_z = 0.0
 
     rxkey = "RxCoilPosition1" if "RxCoilPosition1" in G else "RxCoilPosition"
-    rx_xyz = np.abs(np.atleast_1d(np.asarray(G[rxkey], dtype=float)))
+    # Signed Rx coil position; it is an OFFSET from the transmitter frame, not
+    # an absolute height (parity with forward_gaaem's txrx_dx/dy/dz).
+    rx_offset = np.atleast_1d(np.asarray(G[rxkey], dtype=float))
+    if has_txpos:  # ground system (tTEM): offset relative to the Tx coil
+        rx_offset_z_rel_tx = float(rx_offset[2]) - tx_pos_z
+    else:          # airborne system (SkyTEM): offset relative to the Tx frame
+        rx_offset_z_rel_tx = float(rx_offset[2])
 
     tx_pts = G.get("TxLoopPoint")
     if tx_pts is None:  # dict form: TxLoopPoint1..N
@@ -210,11 +233,15 @@ def gex_to_anemone_system(gex, showInfo=0):
 
         zs = np.full_like(xs, tx_z)
         source = Loop(torch.tensor(xs), torch.tensor(ys), torch.tensor(zs))
-        receiver = Receiver(x=float(rx_xyz[0]), y=float(rx_xyz[1]),
-                            z=float(rx_xyz[2]))
+        # Placeholder receiver; the real one is rebuilt per tx_z in
+        # _build_forward() at loop_z + rx_offset_z_rel_tx.
+        receiver = Receiver(x=float(rx_offset[0]), y=float(rx_offset[1]),
+                            z=float(tx_z + rx_offset_z_rel_tx))
 
-        wf_key = ("WaveformLM" if name == "LM" else "WaveformHM"
-                  if name == "HM" else "WaveformLM")
+        # Waveform/turns are keyed off the CHANNEL INDEX, never the free-text
+        # TransmitterMoment label (which is only used as the moment's name).
+        mom = "LM" if ch == 1 else "HM"
+        wf_key = "WaveformLM" if mom == "LM" else "WaveformHM"
         wf = G.get(wf_key)
         if wf is None:
             wf = G.get(f"{wf_key}Point")  # Try WaveformLMPoint or WaveformHMPoint
@@ -238,7 +265,7 @@ def gex_to_anemone_system(gex, showInfo=0):
         i1 = int(g.no_gates(ch))
         gate_times = np.asarray(g.gate_times(ch), dtype=float)[i0:i1, 0]
 
-        turns_key = "NumberOfTurnsLM" if name == "LM" else "NumberOfTurnsHM"
+        turns_key = "NumberOfTurnsLM" if mom == "LM" else "NumberOfTurnsHM"
         moments.append({
             "name": name,
             "source": source,
@@ -257,6 +284,9 @@ def gex_to_anemone_system(gex, showInfo=0):
     return {
         "n_moments": n_moments,
         "has_tx_coil_position": bool(has_txpos),
+        "rx_offset": (float(rx_offset[0]), float(rx_offset[1]),
+                      float(rx_offset[2])),
+        "rx_offset_z_rel_tx": float(rx_offset_z_rel_tx),
         "moments": moments,
         "gex_signature": _gex_signature(g),
         "gex": g,
@@ -275,7 +305,17 @@ def _moment_scale(system, calibration_factor):
     out = []
     for i, m in enumerate(system["moments"]):
         name = m["name"] or f"CH{i + 1}"
-        k = float(cf.get(name, cf.get(i, 1.0)))
+        if cf:
+            if name in cf:
+                k = float(cf[name])
+            elif i in cf:
+                k = float(cf[i])
+            else:
+                raise ValueError(
+                    f"calibration_factor is missing moment '{name}' "
+                    f"(have keys {list(cf)})")
+        else:
+            k = 1.0
         out.append(k * m["tx_current"] * m["n_turns"])
     return out  # sign is +1 in the evaluator (parity with ga-aem's -fm.SZ)
 
@@ -290,7 +330,9 @@ def _raw_by_moment(system, M, thickness, tx_height, device):
     txh = np.asarray(tx_height, dtype=float).ravel()
     tx_z = None
     if txh.size >= 1:
-        tx_z = float(np.median(txh))
+        # The calibration reference is the FIRST sounding (M[:1]), so fit at
+        # that sounding's altitude, not the survey median.
+        tx_z = float(txh[0])
     elif not system["has_tx_coil_position"]:
         tx_z = 40.0
     fwr, slices = _build_forward(system, tx_z, device)
@@ -380,6 +422,9 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                                    showInfo=showInfo)
 
     tx_height = np.asarray(tx_height, dtype=float).ravel()
+    if tx_height.size > 1 and tx_height.size != nd:
+        raise ValueError(
+            f"tx_height length {tx_height.size} != number of soundings {nd}")
     varying = tx_height.size > 1 and not np.allclose(tx_height, tx_height[0])
 
     forward_anemone.last_calibration = {
@@ -474,7 +519,7 @@ def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
         block = np.concatenate(cols, axis=1)
         if D is None:
             n_used = block.shape[1]
-            D = np.empty((nd, n_used), dtype=float)
+            D = np.full((nd, n_used), np.nan, dtype=float)
         D[rows] = block
         done += rows.size
         if progress_callback is not None:
