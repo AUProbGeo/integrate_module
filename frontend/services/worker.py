@@ -125,16 +125,24 @@ def run_prior_job(params: dict, queue) -> None:
 
 
 def run_forward_job(params: dict, queue) -> None:
-    """ig.prior_data_gaaem(f_prior_h5, file_gex, …) -> prior-data .h5."""
+    """ig.prior_data_{gaaem,anemone}(f_prior_h5, file_gex, …) -> prior-data .h5."""
     workspace = _prep(params)
     params = dict(params)
+    backend = params.pop("backend", "ga-aem")
 
     def call():
         import integrate as ig
 
-        return ig.prior_data_gaaem(**_clean(params), progress_callback=_progress_cb(queue))
+        if backend == "ga-aem":
+            fn = ig.prior_data_gaaem
+        elif backend == "anemone":
+            fn = ig.prior_data_anemone
+        else:
+            raise ValueError(f"unknown forward backend: {backend!r}")
+        return fn(**_clean(params), progress_callback=_progress_cb(queue))
 
-    _run(queue, workspace, "f_prior_data_h5", "prior_data_gaaem", call)
+    _run(queue, workspace, "f_prior_data_h5",
+         f"prior_data_{'gaaem' if backend == 'ga-aem' else 'anemone'}", call)
 
 
 def run_rejection_job(params: dict, queue) -> None:
