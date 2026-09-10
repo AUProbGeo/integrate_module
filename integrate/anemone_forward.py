@@ -581,7 +581,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
         for name, rval in (cal.get("residual") or {}).items():
             a["calibration_residual_%s" % name] = float(rval)
 
-    if cal.get("mode") == "uncalibrated" and showInfo > -1:
+    if cal.get("mode") == "uncalibrated" and showInfo >= -1:
         print("WARNING: anemone prior data %s written UNCALIBRATED — dB/dt "
               "will NOT match observed data units. Pass calibration_reference "
               "or calibration_factor to prior_data_anemone." % Dname)
