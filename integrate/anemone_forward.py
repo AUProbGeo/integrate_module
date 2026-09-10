@@ -277,7 +277,7 @@ def _moment_scale(system, calibration_factor):
         name = m["name"] or f"CH{i + 1}"
         k = float(cf.get(name, cf.get(i, 1.0)))
         out.append(k * m["tx_current"] * m["n_turns"])
-    return out  # sign handled in the evaluator
+    return out  # sign is +1 in the evaluator (parity with ga-aem's -fm.SZ)
 
 
 def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
@@ -336,7 +336,7 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         raw = np.atleast_2d(raw)
         cols = []
         for s, sc in zip(slices, scale):
-            cols.append(-sc * raw[:, s])
+            cols.append(sc * raw[:, s])
         D = np.concatenate(cols, axis=1)
 
     if showtime:
