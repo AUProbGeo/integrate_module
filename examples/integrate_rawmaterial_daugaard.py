@@ -95,7 +95,7 @@ hardcopy = True
 N = 1_000_001   # production-scale
 #N = 10_000      # demo-scale; increase for a production-quality run
 N = 10_005
-N = 1_000_006
+N = 100_006
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
