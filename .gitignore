@@ -191,6 +191,13 @@ examples/*.stm
 
 # Personal reference material / scratch, not project source
 examples/ReferenceProjects/
+docs/
+pdf/
+com.txt
+ANEMONE_VS_GAAEM_VS_AI.md
+PROMPT_QUERY.md
+PROMPT_QUERY_instructrions.md
+WORKBENCH_SMOOTH_PRIOR.md
 
 # Editor/tool backup and lock files
 *~
