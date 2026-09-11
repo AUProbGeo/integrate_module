@@ -61,9 +61,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 # %%
 # Select how many prior model realizations (N) should be generated
-N=2000000
-N=1000000
-N=5000
+N=100_000
 f_prior_h5 = ig.prior_model_layered(N=N,
                                     lay_dist='uniform', 
                                     NLAY_min=5,
