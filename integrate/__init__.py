@@ -25,8 +25,10 @@ from integrate.integrate import logl_T_est
 from integrate.integrate import lu_post_sample_logl
 from integrate.integrate import prior_data
 from integrate.integrate import prior_data_gaaem
+from integrate.integrate import prior_data_em
 from integrate.integrate import prior_data_identity
 from integrate.integrate import forward_gaaem
+from integrate.integrate import forward_em
 from integrate.anemone_forward import forward_anemone
 from integrate.anemone_forward import prior_data_anemone
 from integrate.anemone_forward import gex_to_anemone_system

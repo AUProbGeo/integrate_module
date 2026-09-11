@@ -1640,6 +1640,107 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     return f_prior_data_h5
 
 
+_EM_METHODS = {'ga-aem': 'ga-aem', 'gaaem': 'ga-aem', 'anemone': 'anemone'}
+
+
+def _em_method(method):
+    """Normalise/validate a method string for forward_em / prior_data_em."""
+    key = str(method).lower()
+    if key not in _EM_METHODS:
+        raise ValueError(
+            "unknown EM forward method %r; use 'ga-aem' or 'anemone'" % (method,))
+    return _EM_METHODS[key]
+
+
+def forward_em(M, thickness, file_gex=None, method='ga-aem', **kwargs):
+    """
+    Forward EM response, dispatching to GA-AEM or anemone.
+
+    A thin wrapper around :func:`forward_gaaem` and
+    :func:`integrate.anemone_forward.forward_anemone` that lets the two
+    backends be called identically: both take **resistivity** ``M`` here
+    (``forward_gaaem`` itself takes conductivity ``C = 1/M``; this wrapper
+    does that conversion so the caller never has to).
+
+    Parameters
+    ----------
+    M : array_like
+        Resistivity, shape ``(nl,)`` or ``(nd, nl)`` [ohm.m].
+    thickness : array_like
+        Layer thickness, shape ``(nl-1,)`` [m].
+    file_gex : str, optional
+        Path to the GEX system file.
+    method : str, optional
+        ``'ga-aem'`` (default) or ``'anemone'``. Raises ``ValueError`` for
+        anything else.
+    **kwargs
+        Passed through to the selected backend.
+
+    Returns
+    -------
+    numpy.ndarray
+        Forward-modelled data, same shape/units/gate-layout for both methods.
+
+    Raises
+    ------
+    ImportError
+        If ``method='anemone'`` and the ``anemone``/``torch`` packages are
+        not installed (the error names the pip install command).
+    """
+    import numpy as np
+    method = _em_method(method)
+    if method == 'ga-aem':
+        C = 1.0 / np.asarray(M, dtype=float)
+        return forward_gaaem(C=C, thickness=thickness, file_gex=file_gex, **kwargs)
+    from integrate.anemone_forward import forward_anemone
+    return forward_anemone(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
+
+
+def prior_data_em(f_prior_h5, file_gex=None, method='ga-aem', **kwargs):
+    """
+    Generate prior data, dispatching to GA-AEM or anemone.
+
+    A thin wrapper around :func:`prior_data_gaaem` and
+    :func:`integrate.anemone_forward.prior_data_anemone`. Both already share
+    the same calling convention (``f_prior_h5``, ``file_gex``, ``N``, ``im``,
+    ``id``, ``doMakePriorCopy``, ``force_replace``, ``f_prior_data_h5``,
+    ``showInfo``, ...), so this only selects which one runs.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Path to the prior HDF5 file.
+    file_gex : str, optional
+        Path to the GEX system file.
+    method : str, optional
+        ``'ga-aem'`` (default) or ``'anemone'``. Raises ``ValueError`` for
+        anything else.
+    **kwargs
+        Passed through to the selected backend.
+
+    Returns
+    -------
+    str
+        Path to the prior-data HDF5 file (always the return value).
+
+    Raises
+    ------
+    ImportError
+        If ``method='anemone'`` and the ``anemone``/``torch`` packages are
+        not installed (the error names the pip install command).
+
+    Examples
+    --------
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')
+    """
+    method = _em_method(method)
+    if method == 'ga-aem':
+        return prior_data_gaaem(f_prior_h5, file_gex=file_gex, **kwargs)
+    from integrate.anemone_forward import prior_data_anemone
+    return prior_data_anemone(f_prior_h5, file_gex=file_gex, **kwargs)
+
+
 def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kwargs):
     """
     Generate data D{id} from model M{im} in the prior file f_prior_h5 as an identity of M{im}.

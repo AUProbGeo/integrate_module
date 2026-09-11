@@ -300,7 +300,16 @@ def _used_gate_times(system):
 
 
 def _moment_scale(system, calibration_factor):
-    """Deterministic per-moment factor  k * I_approx * n_turns  (k defaults 1)."""
+    """Per-moment factor turning anemone's raw output into ``dB/dt [V/(A m^4)]``.
+
+    anemone returns dBz/dt for the real loop polygon carrying 1 A x 1 turn,
+    i.e. for transmitter moment ``A_tx``.  The Workbench/AarhusInv data unit
+    ``V/(A m^4)`` is dB/dt **per unit transmitter moment**, so the conversion
+    is simply ``raw / A_tx`` -- no current or turns involved (they cancel).
+    Verified on Daugaard tTEM and Marocco SkyTEM to 1-4 % (see repo
+    ``ANEMONE_VS_GAAEM_VS_AI.md``).  ``k`` (default 1) is an optional extra
+    multiplier per moment; ``_fit_calibration`` estimates it as a *check*.
+    """
     cf = calibration_factor or {}
     out = []
     for i, m in enumerate(system["moments"]):
@@ -316,8 +325,48 @@ def _moment_scale(system, calibration_factor):
                     f"(have keys {list(cf)})")
         else:
             k = 1.0
-        out.append(k * m["tx_current"] * m["n_turns"])
+        out.append(k / m["tx_area"])
     return out  # sign is +1 in the evaluator (parity with ga-aem's -fm.SZ)
+
+
+def _compress_batch(M, thickness):
+    """Merge adjacent layers with identical resistivity, per sounding.
+
+    Mirrors ``forward_gaaem``'s ``doCompress``: a run of adjacent layers with the
+    same resistivity is replaced by one layer of the summed thickness.  Because
+    every sounding compresses to a different layer count / thickness vector, the
+    result is padded to a common ``K`` with zero-thickness trailing layers
+    (physically transparent in anemone -- verified exact), so the whole batch
+    still goes through one ``Forward`` call with per-model thicknesses.
+
+    Parameters
+    ----------
+    M : ndarray (nd, nl)      resistivity
+    thickness : ndarray (nl-1,)   shared fine-grid thicknesses
+
+    Returns
+    -------
+    M_c : ndarray (nd, K)         compressed + padded resistivity
+    T_c : ndarray (nd, K-1)       per-sounding compressed thicknesses (0-padded)
+    """
+    M = np.asarray(M, dtype=float)
+    nd, nl = M.shape
+    thickness = np.asarray(thickness, dtype=float)
+    cz = np.concatenate([[0.0], np.cumsum(thickness)])          # interface depths
+    comp = []
+    for row in M:
+        edges = np.concatenate([[0], np.where(np.diff(row) != 0)[0] + 1])
+        comp.append((row[edges], np.diff(cz[edges])))          # (k,), (k-1,)
+    # anemone's RTE recursion needs >= 2 layers; never exceed the input count
+    K = min(max(max(len(r) for r, _ in comp), 2), nl)
+    M_c = np.empty((nd, K), dtype=float)
+    T_c = np.zeros((nd, K - 1), dtype=float)
+    for j, (rho_c, thk_c) in enumerate(comp):
+        k = len(rho_c)
+        M_c[j, :k] = rho_c
+        M_c[j, k:] = rho_c[-1]                                 # pad = half-space
+        T_c[j, :k - 1] = thk_c
+    return M_c, T_c
 
 
 def _raw_by_moment(system, M, thickness, tx_height, device):
@@ -370,7 +419,7 @@ def _fit_calibration(system, M, thickness, tx_height, device, reference, tol,
         raw_m = np.asarray(raw_by_m[i][0], dtype=float)  # first model row
         raw_on_ref = _loglog_resample(np.asarray(times[i], dtype=float), raw_m,
                                       ref_t)
-        det = system["moments"][i]["tx_current"] * system["moments"][i]["n_turns"]
+        det = 1.0 / system["moments"][i]["tx_area"]   # per-unit-moment convention
         with np.errstate(divide="ignore", invalid="ignore"):
             r = np.abs(ref) / np.abs(det * raw_on_ref)
         good = np.isfinite(r) & (r > 0)
@@ -402,8 +451,8 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     GEX=None, tx_height=np.array(()), altitude_bin_width=1.0,
                     is_log=False, device="cpu", calibration="auto",
                     calibration_reference=None, calibration_factor=None,
-                    calibration_tol=0.05, showtime=False, showInfo=0,
-                    progress_callback=None, **kwargs):
+                    calibration_tol=0.05, doCompress=True, showtime=False,
+                    showInfo=0, progress_callback=None, **kwargs):
     anemone, torch = _require_anemone()
     import time
 
@@ -427,14 +476,14 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
             f"tx_height length {tx_height.size} != number of soundings {nd}")
     varying = tx_height.size > 1 and not np.allclose(tx_height, tx_height[0])
 
-    forward_anemone.last_calibration = {
-        "mode": "uncalibrated", "k": {}, "residual": {}}
+    # Output is dB/dt per unit transmitter moment [V/(A m^4)] straight from the
+    # GEX (mode "gex", k=1).  An explicit calibration_factor overrides k; a
+    # calibration_reference fits k as a check (should come out ~1).
+    _, names = _used_gate_times(system)
     if calibration_factor:
         k_by_moment = dict(calibration_factor)
         forward_anemone.last_calibration = {
             "mode": "factor", "k": dict(calibration_factor), "residual": {}}
-    elif calibration == "gex":
-        raise ValueError("calibration='gex' needs calibration_factor per moment")
     elif calibration_reference is not None:  # auto / fitted + reference -> fit
         k_by_moment, resid = _fit_calibration(
             system, M[:1], thickness, tx_height, device,
@@ -445,17 +494,27 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         raise ValueError(
             "anemone calibration='fitted' needs calibration_reference (dict of "
             "per-moment reference dB/dt) or calibration_factor")
-    else:  # auto, no reference -> uncalibrated k=1 (parity with fixed-height Task 4)
+    else:  # "auto" / "gex": per-unit-moment from the GEX, nothing to fit
         k_by_moment = None
         forward_anemone.last_calibration = {
-            "mode": "uncalibrated", "k": {}, "residual": {}}
+            "mode": "gex", "k": {n: 1.0 for n in names}, "residual": {}}
 
     scale = _moment_scale(system, k_by_moment)
-    thk_t = torch.as_tensor(thickness, dtype=torch.float64)
+
+    # Compress adjacent identical layers (exact; mirrors forward_gaaem doCompress).
+    # M_c (nd, K) resistivity, T_c (nd, K-1) per-sounding thicknesses.
+    if doCompress and nl > 2:
+        M_c, T_c = _compress_batch(M, thickness)
+        if showInfo > 0:
+            print("forward_anemone: compressed %d -> %d layers (batch max)"
+                  % (nl, M_c.shape[1]))
+    else:
+        M_c = M
+        T_c = np.tile(np.asarray(thickness, dtype=float), (nd, 1))
 
     t0 = time.time()
     if varying:
-        D = _forward_varying_height(system, M, thk_t, tx_height,
+        D = _forward_varying_height(system, M_c, T_c, tx_height,
                                     altitude_bin_width, scale, device,
                                     progress_callback, showInfo)  # Task 6
     else:
@@ -465,9 +524,11 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         elif not system["has_tx_coil_position"]:
             tx_z = 40.0
         fwr, slices = _build_forward(system, tx_z, device)
-        M_t = torch.as_tensor(M, dtype=torch.float64).to(torch.device(device))
+        dev = torch.device(device)
+        M_t = torch.as_tensor(M_c, dtype=torch.float64).to(dev)
+        T_t = torch.as_tensor(T_c, dtype=torch.float64).to(dev)
         with torch.no_grad():
-            raw = fwr(M_t.T, thk_t.to(torch.device(device)))
+            raw = fwr(M_t.T, T_t.T)
         raw = np.asarray(raw.detach().cpu().numpy(), dtype=float)
         raw = np.atleast_2d(raw)
         cols = []
@@ -487,13 +548,15 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
 forward_anemone.last_calibration = {"mode": None, "k": {}, "residual": {}}
 
 
-def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
+def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
                             device, progress_callback, showInfo):
+    """M_c (nd, K) resistivity, T_c (nd, K-1) per-sounding thicknesses
+    (already layer-compressed by the caller)."""
     anemone, torch = _require_anemone()
     from integrate.integrate import _report_progress
 
     tx_height = np.asarray(tx_height, dtype=float).ravel()
-    nd = M.shape[0]
+    nd = M_c.shape[0]
     if bin_width and bin_width > 0:
         bin_id = np.round(tx_height / bin_width).astype(np.int64)
         z_of = lambda b: float(b) * bin_width
@@ -503,8 +566,8 @@ def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
         z_of = lambda b: float(np.unique(tx_height)[b])
 
     dev = torch.device(device)
-    M_t = torch.as_tensor(M, dtype=torch.float64).to(dev)
-    thk = thk_t.to(dev)
+    M_t = torch.as_tensor(M_c, dtype=torch.float64).to(dev)
+    T_t = torch.as_tensor(T_c, dtype=torch.float64).to(dev)
 
     n_used = None
     D = None
@@ -513,7 +576,7 @@ def _forward_varying_height(system, M, thk_t, tx_height, bin_width, scale,
         rows = np.where(bin_id == b)[0]
         fwr, slices = _build_forward(system, z_of(b), device)
         with torch.no_grad():
-            raw = fwr(M_t[rows].T, thk).detach().cpu().numpy()
+            raw = fwr(M_t[rows].T, T_t[rows].T).detach().cpu().numpy()
         raw = np.atleast_2d(raw)  # anemone squeezes model axis for n_models==1
         cols = [(sc * raw[:, s]) for s, sc in zip(slices, scale)]
         block = np.concatenate(cols, axis=1)
@@ -533,7 +596,8 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        altitude_bin_width=1.0, device="cpu",
                        calibration="auto", calibration_reference=None,
                        calibration_factor=None, calibration_tol=0.05,
-                       force_replace=False, f_prior_data_h5="", **kwargs):
+                       doCompress=True, force_replace=False, f_prior_data_h5="",
+                       **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
     Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
@@ -590,7 +654,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                         device=device, calibration=calibration,
                         calibration_reference=calibration_reference,
                         calibration_factor=calibration_factor,
-                        calibration_tol=calibration_tol,
+                        calibration_tol=calibration_tol, doCompress=doCompress,
                         progress_callback=progress_callback, showInfo=showInfo)
     if showInfo > -1:
         dt = time.time() - t1
@@ -619,17 +683,12 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
         a["is_log"] = bool(is_log)
         a["altitude_bin_width"] = float(altitude_bin_width)
         a["device"] = str(device)
-        a["calibration"] = str(cal.get("mode") or "uncalibrated")
+        a["calibration"] = str(cal.get("mode") or "gex")
         a["anemone_version"] = str(getattr(anemone, "__version__", "unknown"))
         for name, kval in (cal.get("k") or {}).items():
             a["calibration_factor_%s" % name] = float(kval)
         for name, rval in (cal.get("residual") or {}).items():
             a["calibration_residual_%s" % name] = float(rval)
-
-    if cal.get("mode") == "uncalibrated" and showInfo >= -1:
-        print("WARNING: anemone prior data %s written UNCALIBRATED — dB/dt "
-              "will NOT match observed data units. Pass calibration_reference "
-              "or calibration_factor to prior_data_anemone." % Dname)
 
     ig.integrate_update_prior_attributes(f_prior_data_h5)
     _report_progress(progress_callback, N, N, "completed",

@@ -708,6 +708,24 @@ def load_data(f_data_h5, id_arr=[], ii=None, **kwargs):
 
 ## def ###################################################
 
+def _stm_lowpass_lists(GEX, ch):
+    """Cut-off frequencies / orders for the STM ``LowPassFilter`` block of channel ``ch``.
+
+    AarhusInv applies the channel's ``TiBLowPassFilter`` *and* every
+    ``General.RxCoilLPFilter*`` entry (each ``[order, fcut]``).  GA-AEM accepts
+    several filters only as space-separated lists inside ONE ``LowPassFilter``
+    block (extra blocks are silently ignored), so both are returned as strings.
+    Orders are rounded to integers (GA-AEM Butterworth order is integral).
+    """
+    rows = [np.atleast_1d(GEX['Channel%d' % ch]['TiBLowPassFilter']).astype(float)]
+    for key in sorted(k for k in GEX['General'] if k.startswith('RxCoilLPFilter')):
+        v = np.atleast_2d(np.asarray(GEX['General'][key], dtype=float))
+        rows.extend(v[i] for i in range(v.shape[0]))
+    fcut = ' '.join('%.0f' % r[1] for r in rows)
+    order = ' '.join('%d' % int(round(r[0])) for r in rows)
+    return fcut, order
+
+
 #def write_stm_files(GEX, Nhank=140, Nfreq=6, Ndig=7, **kwargs):
 def write_stm_files(GEX, **kwargs):
     """
@@ -871,11 +889,10 @@ def write_stm_files(GEX, **kwargs):
         #np.savetxt(fID_LM, windows_LM, fmt='%23.6e', delimiter=' ')
         np.savetxt(fID_LM, windows_LM[:,1::], fmt='%23.6e', delimiter=' ')
         fID_LM.write('\t\tWindowTimes End\n\n')
-        TiBFilt = GEX['Channel1']['TiBLowPassFilter']
-
+        fcut, order = _stm_lowpass_lists(GEX, 1)
         fID_LM.write('\t\tLowPassFilter Begin\n')
-        fID_LM.write('\t\t\tCutOffFrequency = %10.0f\n' % (TiBFilt[1]))
-        fID_LM.write('\t\t\tOrder = %d\n' % (TiBFilt[0]))
+        fID_LM.write('\t\t\tCutOffFrequency = %s\n' % fcut)
+        fID_LM.write('\t\t\tOrder = %s\n' % order)
         fID_LM.write('\t\tLowPassFilter End\n\n')
         
         fID_LM.write('\tReceiver End\n\n')
@@ -918,11 +935,10 @@ def write_stm_files(GEX, **kwargs):
         #np.savetxt(fID_HM, windows_HM, fmt='%23.6e', delimiter=' ')
         np.savetxt(fID_HM, windows_HM[:,1::], fmt='%23.6e', delimiter=' ')
         fID_HM.write('\t\tWindowTimes End\n\n')
-        TiBFilt = GEX['Channel2']['TiBLowPassFilter']
-        
+        fcut, order = _stm_lowpass_lists(GEX, 2)
         fID_HM.write('\t\tLowPassFilter Begin\n')
-        fID_HM.write('\t\t\tCutOffFrequency = %10.0f\n' % (TiBFilt[1]))
-        fID_HM.write('\t\t\tOrder = %d\n' % (TiBFilt[0]))
+        fID_HM.write('\t\t\tCutOffFrequency = %s\n' % fcut)
+        fID_HM.write('\t\t\tOrder = %s\n' % order)
         fID_HM.write('\t\tLowPassFilter End\n\n')
         
         fID_HM.write('\tReceiver End\n\n')
