@@ -25,8 +25,7 @@ print("Using GEX file: %s" % file_gex)
 forward_models = ['gaaem','anemone']
 
 # %% [markdown]
-# ### Plot the geometry and data
-ig.plot_geometry(f_data_h5, pl='ELEVATION')
+# Select a profile
 
 # %%
 X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
@@ -111,7 +110,7 @@ f_prior_data_h5 = ig.prior_data_em(f_prior_data_h5, file_gex,
                                 device = 'cpu'
                                 )
 t_anemone_cpu=time.time()-t0
-
+id_anemone  = 2
 # anemone GPU
 t0=time.time()
 try:
@@ -122,6 +121,8 @@ try:
                                     method=forward_models[1], # 'anemone' # anemone is the forward type
                                     device = 'cuda'
                                     )
+    id_anemone  = 3
+
 except:
     print('GPU not available for anemone')
 t_anemone_gpu=time.time()-t0
@@ -173,7 +174,7 @@ T_base = 1  # Base annealing temperature for rejection sampling
 autoT = 1   # Automatically estimate optimal annealing temperature
 
 f_post_h5_arr = []
-for id in [1,2]:
+for id in [1,id_anemone]: # Loop over the two forward models
     f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
                                     f_data_h5,
                                     f_post_h5 = 'POST_D%d.h5' % (id),
@@ -201,20 +202,7 @@ for f_post_h5 in f_post_h5_arr:
 # The evidence quantifies how well the data fits the model,
 # while temperature controls the acceptance rate in rejection sampling.
 
-# %%
-# Plot the annealing temperature used for inversion
-for f_post_h5 in f_post_h5_arr:
-    ig.plot_T_EV(f_post_h5, pl='T',hardcopy=hardcopy)
-# Plot the evidence (log-likelihood) estimated during inversion
-for f_post_h5 in f_post_h5_arr:
-    ig.plot_T_EV(f_post_h5, pl='EV',hardcopy=hardcopy)
-# Plot the chi-squared data fit (normalized mean-loglikelihood)
-# Values less than one suggest overfitting
-# Values above one suggest underfitting
-for f_post_h5 in f_post_h5_arr:
-    ig.plot_T_EV(f_post_h5, pl='CHI2',hardcopy=hardcopy)
-
-# %% read CHI2 form f_post_5
+# %% 
 import h5py
 CHI2 = []
 EV = []
