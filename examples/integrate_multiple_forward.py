@@ -102,20 +102,42 @@ f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex,
                                 )
 t_gaaem=time.time()-t0
 
-    # %% Now use AnEMone
+# %% Now use AnEMone
+# anemone CPU
 t0=time.time()
 f_prior_data_h5 = ig.prior_data_em(f_prior_data_h5, file_gex, 
                                 doMakePriorCopy=False,   # We KEEP also the ga-aem data                                                                    
                                 id=2, # The id '/D2' of the prior data. Incremented from above
                                 im=1, # The resistivity is still '/M1'
-                                method=forward_models[1] # 'anemone' # anemone is the forward type
+                                method=forward_models[1], # 'anemone' # anemone is the forward type
+                                device = 'cpu'
                                 )
-t_anemone=time.time()-t0
+t_anemone_cpu=time.time()-t0
+
+# anemone GPU
+t0=time.time()
+try:
+    f_prior_data_h5 = ig.prior_data_em(f_prior_data_h5, file_gex, 
+                                    doMakePriorCopy=False,   # We KEEP also the ga-aem data                                                                    
+                                    id=3, # The id '/D2' of the prior data. Incremented from above
+                                    im=1, # The resistivity is still '/M1'
+                                    method=forward_models[1], # 'anemone' # anemone is the forward type
+                                    device = 'cuda'
+                                    )
+except:
+    print('GPU not available for anemone')
+t_anemone_gpu=time.time()-t0
+    
 
 #%% 
 print('t_gaaem = %3.1fs' % (t_gaaem))
-print('t_anemone = %3.1fs' % (t_anemone))
-print('t_anemone vs ga-aem speedup = %3.1f' % (t_gaaem/t_anemone))
+print('t_anemone_cpu = %3.1fs' % (t_anemone_cpu))
+print('t_anemone vs ga-aem speedup = %3.1f' % (t_gaaem/t_anemone_cpu))
+try:
+    print('t_anemone_gpu = %3.1fs' % (t_anemone_gpu))
+    print('t_anemone_gpu vs ga-aem speedup = %3.1f' % (t_gaaem/t_anemone_gpu))  
+except:
+    pass
 print('%s is used to hold prior model and data realizations' % (f_prior_data_h5))
 
 # %%
