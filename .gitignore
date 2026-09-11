@@ -180,6 +180,15 @@ examples/SCI7_40_ml_sharp2_Daugaard.gdb
 examples/PROPR_WB_UNIFORM_3-6_N100000_log-uniform*
 !ui/frontend/src/assets/*.png
 
+# Example datasets -- fetched on demand by get_case_data() / the example
+# scripts themselves, not source; do not commit them
+examples/*.xlsx
+examples/*.pdf
+examples/*.npz
+examples/*.json
+examples/*.gex
+examples/*.stm
+
 # Personal reference material / scratch, not project source
 examples/ReferenceProjects/
 
