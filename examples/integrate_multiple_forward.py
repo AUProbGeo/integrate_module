@@ -11,7 +11,7 @@ import numpy as np
 import time
 
 #
-N=500_000
+N=4_000_000
 
 
 # %% [markdown]
@@ -34,15 +34,17 @@ X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
 # Find points within buffer distance
 Xl = np.array([544000, 543550])
 Yl = np.array([6174500, 6176500])
-#Xl = np.array([544000, 543550, 543000])
-#Yl = np.array([6174500, 6176500, 6176400])
+Xl = np.array([543000, 544000, 545400])
+Yl = np.array([6176400, 6176000, 6174800])
+
 buffer = 10.0
 indices, distances, segment_ids = ig.find_points_along_line_segments(
     X, Y, Xl, Yl, tolerance=buffer
 )
 i_line = indices
 
-ig.plot_geometry(f_data_h5, pl='ELEVATION')   # opens its own figure
+plt.figure()
+fig = ig.plot_geometry(f_data_h5, pl='ELEVATION');
 plt.plot(Xl, Yl,'ko', markersize=15)
 plt.plot(X[i_line], Y[i_line], 'ko', markersize=5, zorder=3)
 plt.title('Profile line')
@@ -54,7 +56,7 @@ i_use = np.arange(len(X))
 # The electromagnetic data (d_obs and d_std) can be plotted using ig.plot_data:
 #ig.plot_data(f_data_h5, hardcopy=hardcopy)
 # Plot data channel 15 in an XY grid
-ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
+#ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 # %% [markdown]
 # ## 1. Set up the prior model ($\rho(\mathbf{m},\mathbf{d})$)
@@ -67,8 +69,8 @@ f_prior_h5 = ig.prior_model_layered(N=N,
                                     NLAY_max=5,                 # Minimum 3 layer
                                     #lay_dist='chi2',
                                     #NLAY_max=6,
-                                    RHO_deg=3,
-                                    RHO_max=3000,
+                                    RHO_min=1,
+                                    RHO_max=1000,
                                     f_prior_h5='PRIOR_N%d.h5' % N,
                                     showInfo=1)
 print('%s is used to hold prior realizations' % (f_prior_h5))
@@ -91,8 +93,8 @@ ig.plot_prior_stats(f_prior_h5, im=1, panels=['hist'],hardcopy=hardcopy)
 # whatever N is. So to run each forward on a different N, each forward gets its
 # own copy of the prior. The data is '/D1' in each file.
 N_anemone_gpu = N
-N_anemone_cpu = int(N/5)
-N_gaaem       = int(N/10)
+N_anemone_cpu = int(N/(10*4))
+N_gaaem       = int(N/(20*4))
 
 f_stem = '%s_%s' % (f_prior_h5[:-3], file_gex[:-4])
 f_prior_data_h5_anemone_gpu = '%s_anemone_gpu_N%d.h5' % (f_stem, N_anemone_gpu)
@@ -179,14 +181,14 @@ f_prior_data_h5_arr.append(f_prior_data_h5_anemone_cpu); labels_arr.append('anem
 f_prior_data_h5_arr.append(f_prior_data_h5_gaaem);       labels_arr.append('gaaem')
 
 #%%
-print('t_gaaem = %3.1fs/s' % (rps_gaaem))
-print('t_anemone_cpu = %3.1fs/s' % (rps_anemone_cpu))
-print('t_anemone vs ga-aem speedup = %3.1f' % (rps_gaaem/rps_anemone_cpu))
+print('t_gaaem       = %7.1f ite/s' % (rps_gaaem))
+print('t_anemone_cpu = %7.1f ite/s' % (rps_anemone_cpu))
 if rps_anemone_gpu is not None:
-    print('t_anemone_gpu = %3.1fs/s' % (rps_anemone_gpu))
-    print('t_anemone_gpu vs ga-aem speedup = %3.1f' % (rps_gaaem/rps_anemone_gpu))
-for f_, lab_ in zip(f_prior_data_h5_arr, labels_arr):
-    print('%s holds prior model and data realizations for %s' % (f_, lab_))
+    print('t_anemone_gpu = %7.1f ite/s' % (rps_anemone_gpu))
+print('--')
+print('t_anemone vs ga-aem speedup     = %6.1f' % (rps_anemone_cpu/rps_gaaem))
+if rps_anemone_gpu is not None:
+    print('t_anemone_gpu vs ga-aem speedup = %6.1f' % (rps_anemone_gpu/rps_gaaem))
 
 # %%
 # Read '/D1' from each of the prior-data files. The copies were made with
@@ -248,10 +250,10 @@ for f_prior_data_h5_, lab_ in zip(f_prior_data_h5_arr, labels_arr):
 # ## 3. Plot statistics from the posterior $\sigma(\mathbf{m})$
 #
 # ### Compare prior and posterior data
-for f_post_h5 in f_post_h5_arr:
-    ig.plot_data_prior_post(f_post_h5, i_plot=i_line[0],hardcopy=hardcopy)
-for f_post_h5 in f_post_h5_arr:
-    ig.plot_data_prior_post(f_post_h5, i_plot=i_line[-1],hardcopy=hardcopy)
+#for f_post_h5 in f_post_h5_arr:
+#    ig.plot_data_prior_post(f_post_h5, i_plot=i_line[0],hardcopy=hardcopy)
+#for f_post_h5 in f_post_h5_arr:
+#    ig.plot_data_prior_post(f_post_h5, i_plot=i_line[-1],hardcopy=hardcopy)
 
 # %% [markdown]
 # ### Evidence and annealing temperature
@@ -307,4 +309,8 @@ plt.show()
 # %%
 # Plot resistivity profile for model M1, one figure per forward model
 for f_post_h5 in f_post_h5_arr:
-    ig.plot_profile(f_post_h5, ii=i_line, im=1, key='HarmonicMean', hardcopy=hardcopy)
+    ig.plot_profile(f_post_h5, ii=i_line, im=1, 
+                    xaxis='x', gap_threshold=50, 
+                    key='HarmonicMean', hardcopy=hardcopy)
+
+# %%
