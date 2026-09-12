@@ -64,11 +64,11 @@ i_use = np.arange(len(X))
 # %%
 # Select how many prior model realizations (N) should be generated
 f_prior_h5 = ig.prior_model_layered(N=N,
-                                    lay_dist='uniform',
+                                    #lay_dist='uniform',
                                     NLAY_min=5,
                                     NLAY_max=5,                 # Minimum 3 layer
-                                    #lay_dist='chi2',
-                                    #NLAY_max=6,
+                                    ##lay_dist='chi2',
+                                    NLAY_deg=6,
                                     RHO_min=1,
                                     RHO_max=1000,
                                     f_prior_h5='PRIOR_N%d.h5' % N,
@@ -78,7 +78,7 @@ print('%s is used to hold prior realizations' % (f_prior_h5))
 
 # %%
 # Plot summary statistics of the prior model for quality control of the prior choice
-ig.plot_prior_stats(f_prior_h5, im=1, panels=['hist'],hardcopy=hardcopy)
+#ig.plot_prior_stats(f_prior_h5, im=1, panels=['hist'],hardcopy=hardcopy)
 
 
 # %% [markdown]
