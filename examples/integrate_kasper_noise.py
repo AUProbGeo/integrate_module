@@ -226,6 +226,8 @@ f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_noise_h5, f_post_h5,
                                    ip_range=id_line,
                                    nr=nr,
                                    updatePostStat=True,
+                                   autoT=False,
+                                   normalize_likelihood=True, # important to get the full Evidence!
                                    showInfo=1)
 
 # %% [markdown]
