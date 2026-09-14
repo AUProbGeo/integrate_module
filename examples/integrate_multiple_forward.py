@@ -12,7 +12,7 @@ import time
 
 #
 N=4_000_000
-
+N=100_000
 
 # %% [markdown]
 # ## 0. Get TTEM data

@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from frontend.pages import (
     borehole, files, forward, geoprior, inversion, plotting, prior, profile,
-    query, results, stubs, workspace_ui,
+    query, results, stubs, workflow, workspace_ui,
 )
 
 # slugs with a real page module (stubs.py covers the rest)
 IMPLEMENTED = {
     "files", "prior", "prior-wb", "geoprior", "forward", "forward-bh", "inversion",
-    "results", "plotting", "profile", "query",
+    "results", "plotting", "profile", "query", "workflow",
 }
 
 
@@ -29,4 +29,5 @@ def register_all(rt) -> None:
     plotting.register(rt)
     profile.register(rt)
     query.register(rt)
+    workflow.register(rt)
     stubs.register(rt, skip=IMPLEMENTED)

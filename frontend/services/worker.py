@@ -233,3 +233,98 @@ def run_geoprior_job(params: dict, queue) -> None:
 # NOTE: geoprior1d live-preview runs inline in a worker thread
 # (``integrate_api.geoprior_preview_run``), not here — the child-process spawn
 # cost (~2 s of interpreter + imports) dwarfs the <1 s generation itself.
+
+
+# --------------------------------------------------------------------------- #
+# Simple workflow: prior -> prior_data_em -> integrate_rejection in one process
+# --------------------------------------------------------------------------- #
+WORKFLOW_STEPS = ("Sampling prior", "Computing prior data", "Inversion")
+
+
+def _step_progress_cb(queue, *, step: int, n_steps: int, label: str):
+    """Like ``_progress_cb`` but tags every event with its workflow step so
+    the run panel can draw a step bar above the per-step 0–100 % bar."""
+    def progress_callback(current, total, info_dict=None):
+        info = dict(info_dict or {})
+        info.update(step=step, n_steps=n_steps, step_label=label)
+        with contextlib.suppress(Exception):
+            queue.put({
+                "type": "progress",
+                "current": int(current),
+                "total": int(total),
+                "info": info,
+            })
+
+    return progress_callback
+
+
+def run_workflow_job(params: dict, queue) -> None:
+    """``params = {"prior": {...}, "forward": {...}, "inversion": {...}}``.
+
+    * ``prior["kind"]`` ∈ {"layered", "geoprior"}; the rest are that
+      generator's kwargs (``geoprior1d`` takes ``file_xlsx/Nreals/dmax/dz/
+      n_processes``).
+    * ``forward["method"]`` ∈ {"ga-aem", "anemone"} + ``prior_data_em`` kwargs
+      (``file_gex`` or ``stmfiles``, ``im``, ``id``, …).
+    * ``inversion`` = ``integrate_rejection`` kwargs minus ``f_prior_h5``.
+
+    Each step's output file feeds the next; the done event carries all three.
+    """
+    workspace = _prep(params)
+    prior = dict(params["prior"])
+    forward = dict(params["forward"])
+    inversion = dict(params["inversion"])
+    n = len(WORKFLOW_STEPS)
+
+    def cb(step):
+        return _step_progress_cb(queue, step=step, n_steps=n, label=WORKFLOW_STEPS[step - 1])
+
+    writer = _QueueWriter(queue)
+    try:
+        with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+            import integrate as ig
+
+            # a) prior ------------------------------------------------------
+            cb(1)(0, 0, {"phase": "initializing"})
+            kind = prior.pop("kind", "layered")
+            if kind == "geoprior":
+                from geoprior1d import geoprior1d
+
+                f_prior_h5, _flags = geoprior1d(
+                    prior["file_xlsx"],
+                    Nreals=int(prior["Nreals"]),
+                    dmax=float(prior["dmax"]),
+                    dz=float(prior["dz"]),
+                    n_processes=int(prior.get("n_processes", -1)),
+                )
+            else:
+                f_prior_h5 = ig.prior_model_layered(**_clean(prior), progress_callback=cb(1))
+            print(f"[workflow] prior -> {f_prior_h5}")
+
+            # b) forward ----------------------------------------------------
+            cb(2)(0, 0, {"phase": "initializing"})
+            method = forward.pop("method", "ga-aem")
+            f_prior_data_h5 = ig.prior_data_em(
+                f_prior_h5, method=method, **_clean(forward), progress_callback=cb(2))
+            print(f"[workflow] prior data ({method}) -> {f_prior_data_h5}")
+
+            # c) inversion --------------------------------------------------
+            cb(3)(0, 0, {"phase": "initializing"})
+            f_post_h5 = ig.integrate_rejection(
+                f_prior_h5=f_prior_data_h5, **_clean(inversion), progress_callback=cb(3))
+            print(f"[workflow] posterior -> {f_post_h5}")
+        writer.flush()
+        rel = _relpath(f_post_h5, workspace)
+        if rel:
+            queue.put({
+                "type": "done",
+                "f_prior_h5": _relpath(f_prior_h5, workspace),
+                "f_prior_data_h5": _relpath(f_prior_data_h5, workspace),
+                "f_post_h5": rel,
+            })
+        else:
+            queue.put({"type": "error", "traceback": "integrate_rejection returned no output file"})
+    except BaseException:  # noqa: BLE001 — report everything to the UI
+        queue.put({"type": "error", "traceback": traceback.format_exc()})
+    finally:
+        queue.put({"type": "exit"})

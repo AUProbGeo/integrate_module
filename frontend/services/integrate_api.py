@@ -283,6 +283,30 @@ def start_inversion_job(kwargs: dict) -> str:
     return jobs.start("rejection", worker.run_rejection_job, kwargs).id
 
 
+def start_workflow_job(params: dict) -> str:
+    """Kick off the simple workflow (prior → prior_data_em → integrate_rejection)
+    as one child process. ``params`` = ``{"prior", "forward", "inversion"}``
+    sub-dicts (see ``worker.run_workflow_job``). Returns job id."""
+    from frontend.services import jobs, worker
+
+    return jobs.start("workflow", worker.run_workflow_job, params).id
+
+
+def save_upload(filename: str, data: bytes, *, suffix: str) -> str:
+    """Write an uploaded file into the workspace; returns the stored name.
+
+    The name is reduced to its basename and must carry *suffix* (e.g.
+    ``".xlsx"``). Existing files are overwritten."""
+    import os
+
+    name = os.path.basename(filename or "").strip()
+    if not name or not name.lower().endswith(suffix.lower()):
+        raise ValueError(f"expected a {suffix} file, got {filename!r}")
+    path = safe_path(name)
+    path.write_bytes(data)
+    return name
+
+
 def start_borehole_job(kwargs: dict) -> str:
     """Kick off borehole forward-data (``ig.save_borehole_data``) in a child process."""
     from frontend.services import jobs, worker

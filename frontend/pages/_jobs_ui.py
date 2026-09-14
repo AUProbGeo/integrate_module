@@ -35,6 +35,36 @@ def register_job_routes(rt, base: str, *, out_key: str = "f_prior_h5",
         return Span()
 
 
+def _step_bar(job) -> list:
+    """Overall step bar for multi-step jobs (progress ``info`` carries
+    ``step``/``n_steps``/``step_label``); empty for ordinary jobs."""
+    info = job.progress.get("info") or {}
+    step, n = info.get("step"), info.get("n_steps")
+    if not step or not n:
+        return []
+    if job.status == "done":
+        frac, step = 1.0, n
+    else:
+        frac = ((step - 1) + (job.pct or 0) / 100) / n
+    labels = list(info.get("step_labels") or [])
+    if len(labels) != n:
+        from frontend.services.worker import WORKFLOW_STEPS
+        labels = list(WORKFLOW_STEPS) if len(WORKFLOW_STEPS) == n else [f"Step {i}" for i in range(1, n + 1)]
+    chips = [
+        Span(f"{chr(96 + i)}) {lbl}",
+             cls="wb-step" + (" done" if i < step or job.status == "done" else
+                               " active" if i == step else ""))
+        for i, lbl in enumerate(labels, start=1)
+    ]
+    return [
+        Div(Span(f"Step {step}/{n}", cls="status"),
+            Span(info.get("step_label", ""), cls="status"),
+            style="display:flex;gap:12px;"),
+        Div(I(style=f"width:{int(round(100 * frac))}%"), cls="wb-bar wb-bar-steps"),
+        Div(*chips, cls="wb-steps"),
+    ]
+
+
 def run_panel(job, base: str):
     if job is None:
         return Span()
@@ -55,6 +85,7 @@ def run_panel(job, base: str):
         status = f"{job.status} in {job.elapsed:.0f} s"
 
     body = [
+        *_step_bar(job),
         Div(Span(big, cls="big"), Span(job.phase or job.kind, cls="status"),
             style="display:flex;align-items:baseline;gap:12px;"),
         Div(I(style=f"width:{width}"), cls=bar_cls),
