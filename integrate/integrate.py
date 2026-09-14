@@ -1308,7 +1308,7 @@ def get_process_handle_count():
     import os
     return psutil.Process(os.getpid()).num_handles()
 
-def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, force_replace=False, f_prior_data_h5='', **kwargs):
+def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, force_replace=False, f_prior_data_h5='', randomize=True, **kwargs):
     """
     Generate prior data for the GA-AEM method.
 
@@ -1330,6 +1330,10 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         ``doMakePriorCopy=True``). If empty (default), a name is generated
         automatically as ``'<prior-stem>_<gex/stm-basename>[_N<N>]_Nh<Nhank>_Nf<Nfreq>.h5'``.
         The path actually used is always the return value.
+    randomize : bool, optional
+        When ``doMakePriorCopy=True`` and ``N < N_in``: draw ``N`` random
+        realizations (True, default) or copy the first ``N`` sequentially
+        (False). Only used when a copy is made.
     im : int, optional
         Index of the model. Default is 1.
     id : int, optional
@@ -1454,7 +1458,7 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
                 print('  using N=%d of N_in=%d data' % (N,N_in))
         
         # make a copy of the prior file
-        ig.copy_hdf5_file(f_prior_h5, f_prior_data_h5,N,showInfo=showInfo)
+        ig.copy_hdf5_file(f_prior_h5, f_prior_data_h5,N,randomize=randomize,showInfo=showInfo)
             
     else:
         f_prior_data_h5 = f_prior_h5

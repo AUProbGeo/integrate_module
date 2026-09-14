@@ -443,6 +443,9 @@ def plot_xy(values, X=None, Y=None,
         if fontsize is not None:
             cbar.set_label(colorbar_label or '', fontsize=fontsize)
             cbar.ax.tick_params(labelsize=fontsize - 2)
+        # append_axes() made the colorbar the current axes; restore the map
+        # axes so callers can keep using plt.plot()/plt.title() afterwards.
+        plt.sca(ax)
 
     # --- Decoration ---
     if fontsize is not None:

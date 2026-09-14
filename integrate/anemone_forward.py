@@ -29,11 +29,17 @@ def _require_anemone():
 
 
 def _load_gex(gex):
-    """Return a libaarhusxyz GEX object, parsing a path or wrapping a dict."""
+    """Return a libaarhusxyz GEX object, parsing a path or wrapping a dict.
+
+    libaarhusxyz.GEX prints one "header [...] parsed" line per section; that
+    chatter is swallowed here since it cannot be turned off in the library.
+    """
     if isinstance(gex, str):
         try:
+            import contextlib, io
             from libaarhusxyz import GEX
-            return GEX(gex)
+            with contextlib.redirect_stdout(io.StringIO()):
+                return GEX(gex)
         except Exception:
             import integrate as ig
             return _DictGex(ig.read_gex_workbench(gex))
@@ -369,6 +375,31 @@ def _compress_batch(M, thickness):
     return M_c, T_c
 
 
+def _run_batched(fwr, M_t, T_t, batch_size, torch):
+    """Run ``fwr`` over the model axis of ``M_t``/``T_t`` in chunks.
+
+    anemone's intermediates scale linearly with the number of models
+    (models x layers x frequencies x Hankel-filter length, complex128), so a
+    single call with many thousands of soundings can exhaust GPU memory even
+    though the input itself is small. Chunking bounds the peak memory at
+    roughly ``batch_size`` models regardless of the total.
+
+    M_t: (nd, K) resistivity, T_t: (nd, K-1) thicknesses (both torch tensors
+    already on the target device). Returns raw as an (nd, n_gates) ndarray.
+    """
+    nd = M_t.shape[0]
+    if not batch_size or batch_size <= 0 or batch_size >= nd:
+        batch_size = nd
+    blocks = []
+    with torch.no_grad():
+        for i0 in range(0, nd, batch_size):
+            i1 = min(i0 + batch_size, nd)
+            raw = fwr(M_t[i0:i1].T, T_t[i0:i1].T).detach().cpu().numpy()
+            blocks.append(np.atleast_2d(raw))  # anemone squeezes for n_models==1
+            del raw
+    return np.concatenate(blocks, axis=0) if len(blocks) > 1 else blocks[0]
+
+
 def _raw_by_moment(system, M, thickness, tx_height, device):
     """Uncalibrated raw dB/dt per moment, shape (nd, n_used_m).
 
@@ -452,7 +483,14 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     is_log=False, device="cpu", calibration="auto",
                     calibration_reference=None, calibration_factor=None,
                     calibration_tol=0.05, doCompress=True, showtime=False,
-                    showInfo=0, progress_callback=None, **kwargs):
+                    showInfo=0, progress_callback=None, batch_size=1000,
+                    **kwargs):
+    """Forward TDEM data for one or more resistivity models with anemone.
+
+    batch_size : int, optional
+        Number of soundings sent through anemone per call (default 1000).
+        Bounds peak (GPU) memory; ``0``/``None`` forwards everything at once.
+    """
     anemone, torch = _require_anemone()
     import time
 
@@ -516,7 +554,8 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     if varying:
         D = _forward_varying_height(system, M_c, T_c, tx_height,
                                     altitude_bin_width, scale, device,
-                                    progress_callback, showInfo)  # Task 6
+                                    progress_callback, showInfo,
+                                    batch_size)  # Task 6
     else:
         tx_z = None
         if tx_height.size >= 1:
@@ -527,10 +566,8 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         dev = torch.device(device)
         M_t = torch.as_tensor(M_c, dtype=torch.float64).to(dev)
         T_t = torch.as_tensor(T_c, dtype=torch.float64).to(dev)
-        with torch.no_grad():
-            raw = fwr(M_t.T, T_t.T)
-        raw = np.asarray(raw.detach().cpu().numpy(), dtype=float)
-        raw = np.atleast_2d(raw)
+        raw = np.asarray(_run_batched(fwr, M_t, T_t, batch_size, torch),
+                         dtype=float)
         cols = []
         for s, sc in zip(slices, scale):
             cols.append(sc * raw[:, s])
@@ -549,7 +586,8 @@ forward_anemone.last_calibration = {"mode": None, "k": {}, "residual": {}}
 
 
 def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
-                            device, progress_callback, showInfo):
+                            device, progress_callback, showInfo,
+                            batch_size=1000):
     """M_c (nd, K) resistivity, T_c (nd, K-1) per-sounding thicknesses
     (already layer-compressed by the caller)."""
     anemone, torch = _require_anemone()
@@ -575,9 +613,7 @@ def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
     for b in np.unique(bin_id):
         rows = np.where(bin_id == b)[0]
         fwr, slices = _build_forward(system, z_of(b), device)
-        with torch.no_grad():
-            raw = fwr(M_t[rows].T, T_t[rows].T).detach().cpu().numpy()
-        raw = np.atleast_2d(raw)  # anemone squeezes model axis for n_models==1
+        raw = _run_batched(fwr, M_t[rows], T_t[rows], batch_size, torch)
         cols = [(sc * raw[:, s]) for s, sc in zip(slices, scale)]
         block = np.concatenate(cols, axis=1)
         if D is None:
@@ -597,11 +633,15 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        calibration="auto", calibration_reference=None,
                        calibration_factor=None, calibration_tol=0.05,
                        doCompress=True, force_replace=False, f_prior_data_h5="",
-                       **kwargs):
+                       batch_size=1000, randomize=True, **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
     Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
     resistivity** (no ``1/``) and forwards it through :func:`forward_anemone`.
+    ``batch_size`` soundings are forwarded per anemone call (bounds peak GPU
+    memory; ``0`` forwards all ``N`` at once). ``randomize`` controls whether a
+    copy with ``N < N_in`` draws ``N`` random realizations (default) or the
+    first ``N`` sequentially.
     Returns the path to the prior-data h5 (always the return value).
     """
     import multiprocessing
@@ -633,7 +673,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
             f_prior_data_h5 = ("%s_%s_N%d_anemone.h5" % (stem, base, N)
                                if N < N_in else
                                "%s_%s_anemone.h5" % (stem, base))
-        ig.copy_hdf5_file(f_prior_h5, f_prior_data_h5, N, showInfo=showInfo)
+        ig.copy_hdf5_file(f_prior_h5, f_prior_data_h5, N, randomize=randomize, showInfo=showInfo)
     else:
         f_prior_data_h5 = f_prior_h5
 
@@ -655,11 +695,14 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                         calibration_reference=calibration_reference,
                         calibration_factor=calibration_factor,
                         calibration_tol=calibration_tol, doCompress=doCompress,
+                        batch_size=batch_size,
                         progress_callback=progress_callback, showInfo=showInfo)
     if showInfo > -1:
         dt = time.time() - t1
-        print("prior_data_anemone: %.1fs / %d soundings (%.1f ms/sounding)"
-              % (dt, M.shape[0], 1000 * dt / max(M.shape[0], 1)))
+        n_sound = M.shape[0]
+        dev_label = "cpu" if str(device).split(":")[0] == "cpu" else "gpu"
+        print("prior_data_anemone[%s]: Time=%5.1fs/%d soundings. %4.1fms/sounding, %3.1fit/s"
+              % (dev_label, dt, n_sound, 1000 * dt / max(n_sound, 1), n_sound / max(dt, 1e-12)))
 
     _report_progress(progress_callback, N, N, "saving",
                      "Saving forward data to %s" % f_prior_data_h5)
@@ -683,6 +726,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
         a["is_log"] = bool(is_log)
         a["altitude_bin_width"] = float(altitude_bin_width)
         a["device"] = str(device)
+        a["batch_size"] = int(batch_size or 0)
         a["calibration"] = str(cal.get("mode") or "gex")
         a["anemone_version"] = str(getattr(anemone, "__version__", "unknown"))
         for name, kval in (cal.get("k") or {}).items():

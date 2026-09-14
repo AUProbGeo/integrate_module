@@ -423,7 +423,10 @@ def load_prior_data(f_prior_h5, id_use=[], idx=[], N_use=0, Randomize=False, **k
             id_use = np.arange(1,Ndt+1) 
 
     with h5py.File(f_prior_h5, 'r') as f_prior:
-        N = f_prior['/D1'].shape[0]
+        # The requested datasets may hold a different number of realizations
+        # (e.g. when forwards were run with different N), so index by the
+        # smallest one rather than assuming /D1 sets the size.
+        N = min(f_prior['/D%d' % id].shape[0] for id in id_use)
         if N_use == 0:
             N_use = N    
         if N_use>N:
@@ -2160,7 +2163,7 @@ def post_to_csv(f_post_h5='', Mstr='/M1'):
 '''
 HDF% related functions
 '''
-def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, compress=True, **kwargs):
+def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, compress=True, randomize=True, **kwargs):
     """
     Copy the contents of an HDF5 file to another HDF5 file.
 
@@ -2174,6 +2177,10 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
     :type loadToMemory: bool, optional
     :param compress: Whether to compress the output dataset. Default is True.
     :type compress: bool, optional
+    :param randomize: When N < N_in, pick N realizations at random (True, default)
+        or copy the first N sequentially (False). Sequential copies made from the
+        same input file with different N share their leading realizations.
+    :type randomize: bool, optional
 
     :return: output_filename
     """
@@ -2232,7 +2239,7 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
                             N = N_in
                         if N > N_in:
                             N = N_in
-                        if N == N_in:
+                        if N == N_in or not randomize:
                             i_use = np.arange(N)
                         else:
                             i_use = np.sort(np.random.choice(N_in, N, replace=False))
