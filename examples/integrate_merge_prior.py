@@ -137,7 +137,7 @@ f_prior_data_files = []
 for i in range(len(f_prior_files)):
     f_prior = f_prior_files[i]
     print(f_prior)
-    f_prior_data = ig.prior_data_gaaem(f_prior, file_gex, showInfo=0)
+    f_prior_data = ig.prior_data_em(f_prior, file_gex, showInfo=0)
     f_prior_data_files.append(f_prior_data)
 
 

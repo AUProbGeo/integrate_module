@@ -139,11 +139,11 @@ if useExistingData:
     # if exist f_post_data_h5 then used it, otherwise create it
     import os 
     if not os.path.exists(f_prior_data_h5):
-        f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=True, f_prior_data_h5=f_prior_data_h5)
+        f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=True, f_prior_data_h5=f_prior_data_h5)
     else:
         print('Using existing prior data file: %s' % f_prior_data_h5)
 
-#f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
+#f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 print('Updated %s to hold prior data (forward-modeled responses)' % (f_prior_data_h5))
 

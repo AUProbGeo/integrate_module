@@ -396,7 +396,7 @@ ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
 #       f_prior_h5_list.append(f_prior_h5)
 #   f_prior_h5 = ig.merge_prior(f_prior_h5_list,
 #                                f_prior_merged_h5='daugaard_merged_prior_N%d.h5' % N)
-#   f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
+#   f_prior_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)
 #
 # Here we assume the prior already exists (produced by integrate_workflow.py):
 import glob

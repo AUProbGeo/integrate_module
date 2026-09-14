@@ -264,7 +264,7 @@ ig.plot_prior_stats(f_prior_generic_h5, hardcopy=hardcopy)
 
 # %%
 if not os.path.exists(f_prior_generic_data_h5):
-    ig.prior_data_gaaem(f_prior_generic_h5, file_gex, doMakePriorCopy=True,
+    ig.prior_data_em(f_prior_generic_h5, file_gex, doMakePriorCopy=True,
                         f_prior_data_h5=f_prior_generic_data_h5)
 
 # %%
@@ -454,7 +454,7 @@ ig.plot_boreholes(BHOLES, f_prior_h5, fontsize=17, hardcopy=hardcopy);
 
 # %%
 if not os.path.exists(f_prior_data_h5):
-    ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=True,
+    ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=True,
                         f_prior_data_h5=f_prior_data_h5)
 
 # %% [markdown]

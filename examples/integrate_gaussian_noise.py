@@ -111,7 +111,7 @@ f_prior_h5 = ig.prior_model_layered(N=N,
                                     RHO_dist='uniform', RHO_min=0.5*min(rho), RHO_max=2*max(rho))
 
 # make prior data realizations
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex)
 
 # Plot some statistics about the prior model parameters
 ig.plot_prior_stats(f_prior_h5)
@@ -331,7 +331,7 @@ lCd_single
 # %%
 recomputePriorData = False
 if recomputePriorData:
-    f_prior_log_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N-1, is_log=True)
+    f_prior_log_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, N=N-1, is_log=True)
 else:
     # Simple load the old data and save it in log-space
     f_prior_log_data_h5  = 'd_log.h5'

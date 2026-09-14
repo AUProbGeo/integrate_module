@@ -45,7 +45,7 @@ print("Using GEX file: %s" % file_gex)
 N=25000
 # Layered model
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000)
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, showInfo=0)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, showInfo=0)
 ig.integrate_update_prior_attributes(f_prior_data_h5)
 
 # %%

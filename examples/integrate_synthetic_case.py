@@ -105,7 +105,7 @@ f_prior_h5 = ig.prior_model_layered(N=N,
 ig.plot_prior_stats(f_prior_h5)
 
 # %%
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex)
 
 # plot prior and observed data to chech that the prior data span the same range as the observed data
 ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,alpha=1, ylim=[1e-13,1e-5], hardcopy=hardcopy) 

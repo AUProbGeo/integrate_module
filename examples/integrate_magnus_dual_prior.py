@@ -83,7 +83,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 # %%
 for f_prior_h5 in f_prior_h5_list:
-    f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
+    f_prior_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 
 # %% [markdown]

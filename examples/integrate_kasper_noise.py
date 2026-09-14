@@ -138,7 +138,7 @@ ig.prior_describe(f_prior_h5)
 
 # %%
 # Prior data in log10 space (written to /D1 in f_prior_h5)
-f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False, is_log=True)
+f_prior_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False, is_log=True)
 
 # %% [markdown]
 # ## 4. Noise model: correlated Gaussian noise in log10 space

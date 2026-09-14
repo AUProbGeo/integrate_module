@@ -55,7 +55,7 @@ f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='uniform', NLAY_min=1, NLAY_max
 # ### 1b. Then, a corresponding sample of $\rho(\mathbf{d})$, will be generated
 
 # %%
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, showInfo=0)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, showInfo=0)
 
 
 # %%

@@ -367,7 +367,7 @@ print("- Various resistivity distributions (log-uniform, uniform, normal, lognor
 print("- Different layer number distributions (uniform, chi2)")
 print("- Range of model complexities (2-10 layers)")
 print(f"\nAll files contain {N:,} realizations and are ready for:")
-print("- Forward modeling with prior_data_gaaem()")
+print("- Forward modeling with prior_data_em()")
 print("- Probabilistic inversion with integrate_rejection()")
 print("- Model analysis and visualization")
 

@@ -94,7 +94,7 @@ if useSubset:
         f_prior_h5_list.append(f_prior_data_h5)
 # %%
 
-# Go through f_prior_data_h5_list. If the file does not exist the compute, it by runinng ig.prior_data_gaaem
+# Go through f_prior_data_h5_list. If the file does not exist the compute, it by running ig.prior_data_em
 f_prior_data_h5_list = []
 for i in range(len(f_prior_h5_list)):
     f_prior_h5= f_prior_h5_list[i]
@@ -105,7 +105,7 @@ for i in range(len(f_prior_h5_list)):
             #print('Dataset /D1 not found in %s' % f_prior_h5)
             print('Prior data file %s does not exist. Computing it.' % f_prior_h5)
             # Compute prior data
-            f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N_use)
+            f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, N=N_use)
             f_prior_data_h5_list.append(f_prior_data_h5)
 
         else:

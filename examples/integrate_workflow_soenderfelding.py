@@ -239,7 +239,7 @@ for i in range(0, len(BHOLES), n_plots_per_figure):
 f_prior_sub = []
 for i in range(len(f_data_sub)):
     file_gex = ig.get_gex_file_from_data(f_data_sub[i])
-    f_prior_sub_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, N=N, doMakePriorCopy=True, )
+    f_prior_sub_h5 = ig.prior_data_em(f_prior_h5, file_gex, N=N, doMakePriorCopy=True, )
     f_prior_sub.append(f_prior_sub_h5)
 f_prior_h5 = f_prior_sub[0]    
 

@@ -85,10 +85,10 @@ print('%s is used to hold prior realizations' % (f_prior_h5))
 # %%
 # Compute prior data in linear space
 f_prior_data_h5 = ig.copy_hdf5_file(f_prior_h5,'PRIOR_DATA_linear.h5')
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_data_h5, file_gex, doMakePriorCopy=False)
+f_prior_data_h5 = ig.prior_data_em(f_prior_data_h5, file_gex, doMakePriorCopy=False)
 # Compute prior data in log space
 f_prior_data_log_h5 = ig.copy_hdf5_file(f_prior_h5,'PRIOR_DATA_log.h5')
-f_prior_data_log_h5 = ig.prior_data_gaaem(f_prior_data_log_h5, file_gex, doMakePriorCopy=False, is_log=True)
+f_prior_data_log_h5 = ig.prior_data_em(f_prior_data_log_h5, file_gex, doMakePriorCopy=False, is_log=True)
 
 
 # %%

@@ -186,7 +186,7 @@ ig.plot_boreholes(BHOLES, f_prior_h5)
 
 
 # %%
-f_prior_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
+f_prior_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)
 
 
 # %%

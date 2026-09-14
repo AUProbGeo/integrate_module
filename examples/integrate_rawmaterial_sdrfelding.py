@@ -193,7 +193,7 @@ raw_classes, coarse_classes = rmu.resolve_material_classes(f_prior_h5, im=2)
 # %%
 N_use = 200_000   # demo-scale; increase (up to N) for a production-quality run
 
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, f_gex, N=N_use, doMakePriorCopy=True)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, f_gex, N=N_use, doMakePriorCopy=True)
 
 # %%
 im_prior, r_data, r_dis = 2, 1, 1000   # radii tuned for many, sparsely-spaced boreholes
