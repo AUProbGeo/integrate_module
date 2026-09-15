@@ -993,6 +993,26 @@ def _em_method(method=None):
     return _EM_METHODS[key]
 
 
+_EM_DEVICE_ENV = 'EM_FORWARD_DEVICE'
+_EM_DEVICE_DEFAULT = 'cpu'
+
+
+def _em_device(device=None):
+    """
+    Resolve the ``device`` kwarg used by the anemone EM forward backend.
+
+    If ``device`` is None, the environment variable ``EM_FORWARD_DEVICE`` is
+    used (e.g. ``EM_FORWARD_DEVICE=cuda``); if that is unset or empty,
+    ``'cpu'`` is used.
+    """
+    import os
+    if device is None:
+        device = os.environ.get(_EM_DEVICE_ENV, '').strip() or None
+    if device is None:
+        return _EM_DEVICE_DEFAULT
+    return device
+
+
 def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     """
     Forward EM response, dispatching to GA-AEM or anemone.
@@ -1045,7 +1065,7 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     raise ValueError("unhandled EM forward method %r" % method)
 
 
-def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
+def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs):
     """
     Generate prior data, dispatching to GA-AEM or anemone.
 
@@ -1065,6 +1085,11 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
         ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
         environment variable ``EM_FORWARD_METHOD`` is used, falling back to
         ``'ga-aem'``. Raises ``ValueError`` for anything else.
+    device : str, optional
+        Torch device (e.g. ``'cpu'``, ``'cuda'``) used only when
+        ``method='anemone'``. If not given, the environment variable
+        ``EM_FORWARD_DEVICE`` is used, falling back to ``'cpu'``. Ignored for
+        ``'ga-aem'`` and ``'simpeg'``.
     **kwargs
         Passed through to the selected backend.
 
@@ -1084,6 +1109,7 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
     --------
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone', device='cuda')
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')
     """
     method = _em_method(method)
@@ -1092,7 +1118,8 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
         return prior_data_gaaem(f_prior_h5, file_gex=file_gex, **kwargs)
     if method == 'anemone':
         from integrate.anemone_forward import prior_data_anemone
-        return prior_data_anemone(f_prior_h5, file_gex=file_gex, **kwargs)
+        return prior_data_anemone(f_prior_h5, file_gex=file_gex,
+                                   device=_em_device(device), **kwargs)
     if method == 'simpeg':
         from integrate.simpeg_forward import prior_data_simpeg
         return prior_data_simpeg(f_prior_h5, file_gex=file_gex, **kwargs)

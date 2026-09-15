@@ -69,11 +69,19 @@ os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=1"
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
-
+import time
 import integrate as ig
 import integrate_rawmaterial_utils as rmu
 
 hardcopy = True
+
+# Choose the forward model (the default is ga-aem)
+os.environ["EM_FORWARD_METHOD"] = "anemone"
+os.environ["EM_FORWARD_DEVICE"] = "cuda"
+#os.environ["EM_FORWARD_DEVICE"] = "cpu"
+#os.environ["EM_FORWARD_METHOD"] = "ga-aem"
+
+t_start = time.time()
 
 # %% [markdown]
 # ## 0. Settings and fixed file names
@@ -95,7 +103,7 @@ hardcopy = True
 N = 1_000_001   # production-scale
 #N = 10_000      # demo-scale; increase for a production-quality run
 N = 10_005
-N = 100_006
+N = 100_006+1
 # Prior size used everywhere: the generic prior (Part A) and each of the two
 # geological-scenario priors merged into the informed prior (Part B, N // 2
 # realizations each).
@@ -255,6 +263,8 @@ plt.show()
 # The point of this part is only to show how the probabilistic
 # resistivity-only result and the deterministic result relate to each other.
 
+t_generic_start = time.time()
+
 # %%
 if not os.path.exists(f_prior_generic_h5):
     ig.prior_model_layered(
@@ -273,6 +283,9 @@ if not os.path.exists(f_post_generic_h5):
         f_prior_generic_data_h5, f_data_h5, f_post_h5=f_post_generic_h5,
         N_use=N, id_use=[1], autoT=1, T_base=1, showInfo=0,
         updatePostStat=True, backend='jax')
+
+t_generic_end = time.time()
+
 
 ig.plot_T_EV(f_post_generic_h5, pl='CHI2', hardcopy=hardcopy)
 
@@ -393,6 +406,8 @@ ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'st
 # # Part B -- The full INTEGRATE workflow (informed prior + boreholes)
 #
 
+t_full_start = time.time()
+
 # %% [markdown]
 # ### B1. Informed prior from two geological scenarios
 #
@@ -453,9 +468,11 @@ ig.plot_boreholes(BHOLES, f_prior_h5, fontsize=17, hardcopy=hardcopy);
 # is reused for the borehole prior data below).
 
 # %%
+t_full_start_prior_data_em = time.time()
 if not os.path.exists(f_prior_data_h5):
     ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=True,
                         f_prior_data_h5=f_prior_data_h5)
+t_full_end_prior_data_em = time.time()
 
 # %% [markdown]
 # ### B4. Borehole prior data
@@ -469,6 +486,8 @@ if not os.path.exists(f_prior_data_h5):
 # posterior already exists.
 
 # %%
+t_full_start_prior_data_bd = time.time()
+
 im_prior = 2
 id_borehole_list = list(range(2, 2 + len(BHOLES)))   # deterministic /D indices (cached path)
 
@@ -483,6 +502,8 @@ if not os.path.exists(f_post_h5) and not os.path.exists(f_prior_data_bh_h5):
 else:
     print("Skipping borehole prior-data build (posterior or %s already exists)."
           % f_prior_data_bh_h5)
+
+t_full_end_prior_data_bd = time.time()
 
 
 # %%
@@ -508,6 +529,8 @@ fig.savefig('DAUGAARD_entropy_with_boreholes_N%d.png' % (N), dpi=150, bbox_inche
 # ### B5. Joint (tTEM + borehole) rejection inversion
 
 # %%
+t_full_start_rejection = time.time()
+
 N_use = N   # subset of the merged prior used in the rejection sampler
 
 if not os.path.exists(f_post_h5):
@@ -527,6 +550,9 @@ if not os.path.exists(f_post_h5):
 
 else:
     print("Using existing posterior: %s" % f_post_h5)
+
+t_full_end_rejection = time.time()
+
 
 ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
 
@@ -632,13 +658,18 @@ else:
 raw_classes = query_raw['constraints'][0]['classes']    # sand + gravel: coarse raw material
 fine_classes = query_raw['constraints'][1]['classes']    # everything else: fine, non-raw material (overburden)
 
+t_query1_start = time.time()
+
 P_raw, meta_raw = ig.query(f_post_h5, query_raw)
+
+
 
 ig.query_plot(P_raw, meta_raw,
               query_text="P(raw material)",
               text_panel=True,
               hardcopy=PREFIX + 'daugaard_P_raw' + SUFFIX if hardcopy else False)
 
+t_query1_start = time.time()
 
 
 # %% [markdown]
@@ -763,9 +794,13 @@ PCT = [5, 50, 95]      # -> low / median / high
 query_overburden   = {"im": 2, "classes": fine_classes, "thickness_mode": "cumulative", "depth_min": 0.0}
 query_raw_material = {"im": 2, "classes": raw_classes,  "thickness_mode": "cumulative", "depth_min": 0.0}
 
+t_query2_start = time.time()
+
 pct_overburden, _   = ig.query(f_post_h5, {"metric": query_overburden, "percentiles": PCT})
 pct_raw_material, _ = ig.query(f_post_h5, {"metric": query_raw_material, "percentiles": PCT})
 # each: (N_sounding, len(PCT)) posterior thickness percentiles [m], one row per sounding
+
+t_query2_end = time.time()
 
 # ---- B. volume per grown area (one entry per AREA in AREA_LIST) -----------
 AREA_NAMES         = ['Area %d' % i for i in range(len(AREA_LIST))]
@@ -924,4 +959,25 @@ rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, quantities=('overburd
 # geological judgement call that should be reviewed before treating this as a
 # strict apples-to-apples comparison (see Part B's printed class list).
 
-# %%
+t_end = time.time()
+t_full_end = time.time()
+# %% TIMING, print timings for each major step in the workflow
+# total running time 
+print("Total running time: %.1f s" % (t_end - t_start))
+print(32*"*")
+# generic 
+print("Generic posterior: %.1f s" % (t_generic_end - t_generic_start))
+print(32*"*")
+print("Total running time (full workflow): %.1f s" % (t_full_end - t_full_start))
+# prior data (tTEM)
+print("Prior data (tTEM): %.1f s" % (t_full_end_prior - t_full_start_prior))
+# prior data (boreholes)
+print("Prior data (boreholes): %.1f s" % (t_full_end_prior_data_bd - t_full_start_prior_data_bd))  
+# rejection inversion
+print("Rejection inversion: %.1f s" % (t_full_end_rejection - t_full_start_rejection))
+# query
+print("Query: %.1f s" % (t_query1_end - t_query1_start))
+# percentile query  
+print("Percentile query: %.1f s" % (t_query2_end - t_query2_start))     
+                                     
+
