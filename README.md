@@ -165,6 +165,23 @@ First install Homebrew, then run:
     pip install .
 
 
+## Alternative EM forward backends (anemone, SimPEG)
+
+GA-AEM is the default TDEM forward modeller. Two pure-Python alternatives can be
+selected with `method=` in `ig.forward_em()` / `ig.prior_data_em()` (or via the
+`EM_FORWARD_METHOD` environment variable):
+
+    ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')    # default
+    ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')   # PyTorch, GPU-capable
+    ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')    # SimPEG 1D layered TDEM
+
+* **anemone** (`pip install "integrate[anemone]"`): see `ANEMONE_VS_GAAEM_VS_AI.md`.
+* **SimPEG** (`pip install "integrate[simpeg]"`, or `uv pip install -e ../simpeg` from a
+  checkout): `ig.forward_simpeg()` / `ig.prior_data_simpeg()`. The `.gex` low-pass filters
+  and gate integration are applied by INTEGRATE on top of SimPEG's
+  `Simulation1DLayered`; agreement with GA-AEM is ~1 % (LM) / ~0.2 % (HM) on Daugaard tTEM,
+  see `SIMPEG_VS_GAAEM.md`.
+
 ## Development
 
 The `main` branch is the most stable, with less frequent updates but larger changes.

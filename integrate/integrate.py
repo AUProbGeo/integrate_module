@@ -18,7 +18,7 @@ Main Functions:
     - integrate_rejection(): Main rejection sampling workflow (now in integrate_rejection module)
     - prior_data(): Integration of forward modeling with prior structure
     - forward_em()/prior_data_em(): EM forward modeling dispatch (backends in
-      gaaem_forward and anemone_forward modules)
+      gaaem_forward, anemone_forward and simpeg_forward modules)
     - likelihood_*(): Various likelihood calculation functions (now in integrate_rejection module)
     - posterior_*(): Posterior analysis and statistics
 
@@ -962,7 +962,8 @@ def prior_data(f_prior_in_h5, f_forward_h5, id=1, im=1, doMakePriorCopy=0, paral
     return f_prior_h5
 
 
-_EM_METHODS = {'ga-aem': 'ga-aem', 'gaaem': 'ga-aem', 'anemone': 'anemone'}
+_EM_METHODS = {'ga-aem': 'ga-aem', 'gaaem': 'ga-aem', 'anemone': 'anemone',
+               'simpeg': 'simpeg'}
 
 
 _EM_METHOD_ENV = 'EM_FORWARD_METHOD'
@@ -987,7 +988,7 @@ def _em_method(method=None):
     key = str(method).lower()
     if key not in _EM_METHODS:
         raise ValueError(
-            "unknown EM forward method %r (from %s); use 'ga-aem' or 'anemone'"
+            "unknown EM forward method %r (from %s); use 'ga-aem', 'anemone' or 'simpeg'"
             % (method, source))
     return _EM_METHODS[key]
 
@@ -1011,9 +1012,9 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     file_gex : str, optional
         Path to the GEX system file.
     method : str, optional
-        ``'ga-aem'`` or ``'anemone'``. If not given, the environment variable
-        ``EM_FORWARD_METHOD`` is used, falling back to ``'ga-aem'``. Raises
-        ``ValueError`` for anything else.
+        ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
+        environment variable ``EM_FORWARD_METHOD`` is used, falling back to
+        ``'ga-aem'``. Raises ``ValueError`` for anything else.
     **kwargs
         Passed through to the selected backend.
 
@@ -1025,8 +1026,9 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     Raises
     ------
     ImportError
-        If ``method='anemone'`` and the ``anemone``/``torch`` packages are
-        not installed (the error names the pip install command).
+        If ``method='anemone'`` (``anemone``/``torch``) or ``method='simpeg'``
+        (``simpeg``) is requested but the package is not installed (the error
+        names the pip install command).
     """
     import numpy as np
     method = _em_method(method)
@@ -1034,8 +1036,13 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
         from integrate.gaaem_forward import forward_gaaem
         C = 1.0 / np.asarray(M, dtype=float)
         return forward_gaaem(C=C, thickness=thickness, file_gex=file_gex, **kwargs)
-    from integrate.anemone_forward import forward_anemone
-    return forward_anemone(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
+    if method == 'anemone':
+        from integrate.anemone_forward import forward_anemone
+        return forward_anemone(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
+    if method == 'simpeg':
+        from integrate.simpeg_forward import forward_simpeg
+        return forward_simpeg(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
+    raise ValueError("unhandled EM forward method %r" % method)
 
 
 def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
@@ -1055,9 +1062,9 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
     file_gex : str, optional
         Path to the GEX system file.
     method : str, optional
-        ``'ga-aem'`` or ``'anemone'``. If not given, the environment variable
-        ``EM_FORWARD_METHOD`` is used, falling back to ``'ga-aem'``. Raises
-        ``ValueError`` for anything else.
+        ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
+        environment variable ``EM_FORWARD_METHOD`` is used, falling back to
+        ``'ga-aem'``. Raises ``ValueError`` for anything else.
     **kwargs
         Passed through to the selected backend.
 
@@ -1069,20 +1076,27 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, **kwargs):
     Raises
     ------
     ImportError
-        If ``method='anemone'`` and the ``anemone``/``torch`` packages are
-        not installed (the error names the pip install command).
+        If ``method='anemone'`` (``anemone``/``torch``) or ``method='simpeg'``
+        (``simpeg``) is requested but the package is not installed (the error
+        names the pip install command).
 
     Examples
     --------
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')
     """
     method = _em_method(method)
     if method == 'ga-aem':
         from integrate.gaaem_forward import prior_data_gaaem
         return prior_data_gaaem(f_prior_h5, file_gex=file_gex, **kwargs)
-    from integrate.anemone_forward import prior_data_anemone
-    return prior_data_anemone(f_prior_h5, file_gex=file_gex, **kwargs)
+    if method == 'anemone':
+        from integrate.anemone_forward import prior_data_anemone
+        return prior_data_anemone(f_prior_h5, file_gex=file_gex, **kwargs)
+    if method == 'simpeg':
+        from integrate.simpeg_forward import prior_data_simpeg
+        return prior_data_simpeg(f_prior_h5, file_gex=file_gex, **kwargs)
+    raise ValueError("unhandled EM forward method %r" % method)
 
 
 def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kwargs):

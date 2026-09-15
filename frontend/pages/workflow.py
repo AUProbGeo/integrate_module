@@ -49,7 +49,7 @@ def _ns(specs, prefix: str) -> list[F]:
 
 # b) forward — form names ``fwd_*`` ------------------------------------------
 _FWD = "fwd_"
-_METHOD = F(_FWD + "method", "Forward method", ("select", ["ga-aem", "anemone"]), "ga-aem")
+_METHOD = F(_FWD + "method", "Forward method", ("select", ["ga-aem", "anemone", "simpeg"]), "ga-aem")
 _FWD_FIELDS = _ns(_FWD_ADV, _FWD)
 _FWD_NUM = [f for f in _FWD_FIELDS if f.kind in ("int", "float")]
 _FWD_BOOL = [f for f in _FWD_FIELDS if f.kind == "bool"]

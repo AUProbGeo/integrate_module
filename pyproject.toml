@@ -72,6 +72,10 @@ anemone = [
     # local path until anemone is published
     "anemone @ file:///home/tmeha/PROGRAMMING/anemone",
 ]
+simpeg = [
+    # local checkout until pinned to a release (needs simpeg >= 0.22)
+    "simpeg @ file:///home/tmeha/PROGRAMMING/simpeg",
+]
 
 
 [project.urls]

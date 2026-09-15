@@ -12,6 +12,8 @@ import os
 
 import numpy as np
 
+from integrate.em_system import _butter_rows, _polygon_area  # shared geometry helpers
+
 _IMPORT_HINT = (
     "anemone backend requires 'anemone' and 'torch': "
     "pip install torch && pip install -e /home/tmeha/PROGRAMMING/anemone"
@@ -80,20 +82,6 @@ class _DictGex:
     def no_gates(self, ch):
         return float(np.atleast_1d(self._chan(ch).get("NoGates",
                     self._gate_array(ch).shape[0]))[0])
-
-
-def _butter_rows(arr):
-    """Normalise an RxCoilLPFilter value to a list of (order, fcut) rows."""
-    a = np.atleast_2d(np.asarray(arr, dtype=float))
-    if a.shape == (1, 2):
-        return [(a[0, 0], a[0, 1])]
-    return [(row[0], row[1]) for row in a]
-
-
-def _polygon_area(x, y):
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-    return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
 
 
 def _gex_signature(g):

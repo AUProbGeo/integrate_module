@@ -370,7 +370,10 @@ Not yet implemented
 
 
 ``/type='SimPEG'``.
-[SimPEG]_. Python only.
+[SimPEG]_. Python only. Implemented as ``ig.prior_data_simpeg`` /
+``ig.prior_data_em(..., method='simpeg')`` (writes ``/D<id>`` with
+``attrs['method']='simpeg'``); see ``SIMPEG_VS_GAAEM.md`` for validation
+against GA-AEM and AarhusInv.
 
 LOG: Well log conditioning, method='log'
 """"""""""""""""""""""""""""""""""""""""

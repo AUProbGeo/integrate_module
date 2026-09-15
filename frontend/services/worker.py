@@ -124,27 +124,27 @@ def run_prior_job(params: dict, queue) -> None:
     _run(queue, workspace, "f_prior_h5", model, call)
 
 
+_FORWARD_BACKENDS = ("ga-aem", "anemone", "simpeg")
+
+
 def run_forward_job(params: dict, queue) -> None:
-    """ig.prior_data_{gaaem,anemone}(f_prior_h5, file_gex, …) -> prior-data .h5."""
+    """ig.prior_data_{gaaem,anemone,simpeg}(f_prior_h5, file_gex, …) -> prior-data .h5."""
     workspace = _prep(params)
     params = dict(params)
     backend = params.pop("backend", "ga-aem")
 
     # Validate backend early, before _run
-    if backend not in ("ga-aem", "anemone"):
+    if backend not in _FORWARD_BACKENDS:
         raise ValueError(f"unknown forward backend: {backend!r}")
+    name = {"ga-aem": "gaaem", "anemone": "anemone", "simpeg": "simpeg"}[backend]
 
     def call():
         import integrate as ig
 
-        if backend == "ga-aem":
-            fn = ig.prior_data_gaaem
-        else:  # backend == "anemone" (validated above)
-            fn = ig.prior_data_anemone
+        fn = getattr(ig, f"prior_data_{name}")
         return fn(**_clean(params), progress_callback=_progress_cb(queue))
 
-    _run(queue, workspace, "f_prior_data_h5",
-         f"prior_data_{'gaaem' if backend == 'ga-aem' else 'anemone'}", call)
+    _run(queue, workspace, "f_prior_data_h5", f"prior_data_{name}", call)
 
 
 def run_rejection_job(params: dict, queue) -> None:
@@ -264,7 +264,7 @@ def run_workflow_job(params: dict, queue) -> None:
     * ``prior["kind"]`` ∈ {"layered", "geoprior"}; the rest are that
       generator's kwargs (``geoprior1d`` takes ``file_xlsx/Nreals/dmax/dz/
       n_processes``).
-    * ``forward["method"]`` ∈ {"ga-aem", "anemone"} + ``prior_data_em`` kwargs
+    * ``forward["method"]`` ∈ {"ga-aem", "anemone", "simpeg"} + ``prior_data_em`` kwargs
       (``file_gex`` or ``stmfiles``, ``im``, ``id``, …).
     * ``inversion`` = ``integrate_rejection`` kwargs minus ``f_prior_h5``.
 
