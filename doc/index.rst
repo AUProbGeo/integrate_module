@@ -93,6 +93,7 @@ The manual
    format
    format_wells
    format_query
+   prior_data
    rejection
    workflow
    notebooks
