@@ -22,8 +22,12 @@ The following HDF files are used for any INTEGRATE project
 
 DATA.h5
 =======
-DATA.h5 contains observed data, and its associated geometry. 
+DATA.h5 contains observed data, and its associated geometry.
 The observed data can be of many types, such as TEM data and well-log data
+
+A DATA.h5 file can be created from an AarhusInv-style XYZ data file and its
+corresponding GEX system file using :func:`integrate.xyz_to_h5`, which reads
+both formats with the ``libaarhusxyz`` library [libaarhusxyz]_.
 
 
 By default, observed data in ``/D1`` is compared with prior data in ``/D1``, ``/D2`` with ``/D2``, etc.
@@ -353,6 +357,7 @@ The attribute ``/method`` refer to a specific choice of forward method.
 ``/method`` can, for example, be ``TDEM`` for Time Domain EM (The default in INTEGRATE),
 or can be ``identity`` for an identity mapping (useful to represent log data).
 
+"""""""""""""""""""""""""""""""""""""
 TDEM: Time domain EM, method='tdem'.
 """""""""""""""""""""""""""""""""""""
 
@@ -375,6 +380,7 @@ Not yet implemented
 ``attrs['method']='simpeg'``); see ``SIMPEG_VS_GAAEM.md`` for validation
 against GA-AEM and AarhusInv.
 
+""""""""""""""""""""""""""""""""""""""""
 LOG: Well log conditioning, method='log'
 """"""""""""""""""""""""""""""""""""""""
 
@@ -461,6 +467,7 @@ Statistics are written by :func:`integrate.integrate_posterior_stats`.
      - Line number, copied from DATA.h5.
 
 
+"""""""""""""""""""""
 Continuous parameters
 """""""""""""""""""""
 
@@ -505,6 +512,7 @@ Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
      - KL divergence D_KL(posterior ∥ prior) in bits (log base 2), estimated from log10-space histograms (50 bins). No fixed upper bound for continuous parameters.
 
 
+"""""""""""""""""""
 Discrete parameters
 """""""""""""""""""
 
@@ -546,6 +554,7 @@ All HDF5 files created by INTEGRATE use compression by default to reduce file si
 - **Performance**: Write overhead of ~3× compared to no compression, but results in significantly smaller files
 - **Customizable**: Compression can be configured per-function call or globally
 
+"""""""""""""""""""""""""""
 Per-function Configuration
 """""""""""""""""""""""""""
 
@@ -568,6 +577,7 @@ Example usage::
     # Same parameters work for data functions
     ig.save_data_gaussian(D_obs, compression='gzip', compression_opts=9)
 
+"""""""""""""""""""""""""""""
 Global Default Configuration
 """""""""""""""""""""""""""""
 
@@ -582,6 +592,7 @@ You can modify the module-wide compression defaults in ``integrate_io.py``::
     # Now all functions use the new defaults
     ig.prior_model_layered(N=50000)  # Will use lzf compression
 
+"""""""""""""""""""""""""""""""""""
 Compression Performance Comparison
 """""""""""""""""""""""""""""""""""
 
@@ -607,6 +618,7 @@ Based on benchmarks with N=50,000 models:
 
 **Note**: The difference between gzip levels 1 and 9 is only ~2% in file size but 4.6× difference in write time. Level 1 is recommended for most use cases.
 
+"""""""""""""""""""""""""""""""""
 Functions Supporting Compression
 """""""""""""""""""""""""""""""""
 

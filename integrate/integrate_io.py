@@ -3323,6 +3323,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         starting at ``id=3`` instead of ``id=2``.
     altitude_std : str, float, or None, optional
         Uncertainty for ``altitude``.
+
         - A **string** is treated as another flightlines column name
           (case-insensitive) holding the absolute std directly.
         - A **number** with ``abs(altitude_std) < 1`` is treated as a

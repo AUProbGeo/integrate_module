@@ -885,4 +885,4 @@ See Also
 * :doc:`format` — General HDF5 data format specifications
 * :doc:`format_wells` — Borehole data format and integration workflow
 * :doc:`workflow` — Complete inversion workflow
-* :doc:`notebooks` — Jupyter notebook examples
+* :doc:`auto_examples/index` — worked examples

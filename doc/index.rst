@@ -14,7 +14,7 @@ The aim is to provide methods for the following tasks, that together represent a
 
 Prior modeling
    Tools will be developed to quantify (through forward simulation) as much information as possible about the subsurface, such as the expected distribution of lithological layers and a model that links resistivity to lithology.
-   See, for example, [MADSEN2023]_ and [GEOPRIOR1D]_.
+   See, for example, [MADSEN2023]_, [NORGAARD2026]_ and [GEOPRIOR1D]_.
   
 Forward modeling
    For each type of data considered a forward model must be available. 
@@ -40,7 +40,7 @@ Getting started
 ===============
 Refer to the documentation in :doc:`install` for installation instructions.
 
-Examples of using the module can be found in the :doc:`notebooks`.
+Examples of using the module can be found in the :doc:`example gallery <auto_examples/index>`.
 
 
 
@@ -96,7 +96,7 @@ The manual
    prior_data
    rejection
    workflow
-   notebooks
+   auto_examples/index
    contributions
    references
    modules

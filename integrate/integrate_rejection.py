@@ -124,7 +124,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
         Computation backend to use.  ``'numpy'`` uses the original
         NumPy/multiprocessing implementation.  ``'jax'`` uses a JIT-compiled,
         vmapped JAX implementation that processes data points in batches; pass
-        ``Nbatch=<int>`` (via **kwargs, default 64) to tune the batch size.
+        ``Nbatch=<int>`` (via ``**kwargs``, default 64) to tune the batch size.
         JAX must be installed separately: ``pip install jax``.
         Default is None, in which case the backend is taken from the
         ``REJECTION_BACKEND`` environment variable if set (e.g.

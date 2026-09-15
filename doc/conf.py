@@ -60,12 +60,8 @@ else:
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-#extensions = ['myst_parser']
-#extensions = ['nbsphinx']
-#extensions = ['myst_nb']
 extensions = [
-    'nbsphinx',
-    'sphinx_gallery.load_style',
+    'sphinx_gallery.gen_gallery',
     'sphinx.ext.duration',
     'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
@@ -75,12 +71,80 @@ extensions = [
 ]
 autosummary_generate = True
 
+# -- Gallery -----------------------------------------------------------------
+# Which examples are *executed* is chosen per run; everything in the gallery is
+# always rendered, executed or not. See doc/Makefile and DOC_REFACTOR.md.
+#
+#   make html                   no execution (GALLERY_TIER=none)
+#   make gallery                the cheap, self-contained examples
+#   make gallery TIER=all       adds the slow but still self-contained ones
+#   make gallery FILE=x.py      one specific example
+import re
+
+from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
+
+_GALLERY_TIER = os.environ.get('GALLERY_TIER', 'cheap')
+_GALLERY_FILE = os.environ.get('GALLERY_FILE', '')
+
+# Self-contained (data fetched via ig.get_case_data) and small enough to run
+# routinely.
+_TIER_CHEAP = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
+               r'|dual_data|priors|merge_prior|query)\.py')
+# Also self-contained, but slow: N up to 2e6, or a full timing sweep.
+_TIER_ALL = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
+             r'|dual_data|priors|merge_prior|query|gaussian_noise|esbjerg'
+             r'|merge_data|timing_example)\.py')
+
+if _GALLERY_FILE:
+    _filename_pattern = re.escape(_GALLERY_FILE) + r'$'
+elif _GALLERY_TIER == 'none':
+    _filename_pattern = r'(?!)'          # matches nothing
+elif _GALLERY_TIER == 'all':
+    _filename_pattern = _TIER_ALL
+else:
+    _filename_pattern = _TIER_CHEAP
+
+sphinx_gallery_conf = {
+    'examples_dirs': '../examples/gallery',
+    'gallery_dirs': 'auto_examples',
+    'filename_pattern': _filename_pattern,
+    # A helper imported by the rawmaterial examples, not an example itself.
+    'ignore_pattern': r'integrate_rawmaterial_utils\.py',
+    'subsection_order': ExplicitOrder([
+        '../examples/gallery/10_getting_started',
+        '../examples/gallery/20_workflow',
+        '../examples/gallery/30_data',
+        '../examples/gallery/40_noise',
+        '../examples/gallery/50_hypothesis',
+        '../examples/gallery/60_query',
+        '../examples/gallery/70_synthetic',
+        '../examples/gallery/80_plotting',
+        '../examples/gallery/85_rawmaterial',
+        '../examples/gallery/90_other',
+    ]),
+    'within_subsection_order': FileNameSortKey,
+    # Gives each section its own index page, so the sidebar nests as
+    # Example Gallery > section > example. This requires every subsection
+    # GALLERY_HEADER.rst to underline its title with '-', one level below the
+    # root gallery's '='; using '=' there makes the sections siblings of the
+    # gallery title instead, and the sidebar then lists them twice.
+    'nested_sections': True,
+    'remove_config_comments': True,
+    # An example that fails must not take the whole doc build down with it.
+    'abort_on_example_error': False,
+    'download_all_examples': False,
+}
+
 # Napoleon settings (for allowing using Google and NumPy style docstrings)
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 
+# sphinx_gallery_conf holds class and function objects (the sort keys), which
+# Sphinx cannot pickle into its environment cache. Harmless, but noisy.
+suppress_warnings = ['config.cache']
+
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.md']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.md', 'tools']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
@@ -103,10 +167,6 @@ html_theme = 'furo'
 html_baseurl = 'https://cultpenguin.github.io/integrate_module/'
 html_copy_source = False
 html_show_sourcelink = False
-
-# Ensure proper handling of notebooks and static files
-nbsphinx_allow_errors = True
-nbsphinx_execute = 'never'  # Don't execute notebooks during build
 
 def setup(app):
     """Custom setup function to add .nojekyll file to output."""

@@ -133,6 +133,7 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
     ----------
     cmap_type : str, optional
         Type of colormap to return (default is 'default'):
+
         - 'default': Red-white-blue-black colormap for general use
         - 'resistivity': Log-scale colormap optimized for resistivity data
         - 'entropy': Grayscale colormap for uncertainty visualization
@@ -499,6 +500,7 @@ def plot_posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], property='med
         Whether to use prior data instead of posterior data (default is False).
     **kwargs : dict
         Additional keyword arguments:
+
         - hardcopy : bool, save plot as PNG file (default False)
         - s : float, scatter point size (default 10)
 
@@ -1000,6 +1002,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         Save plots as PNG files with descriptive names (default is False).
     **kwargs : dict
         Additional keyword arguments:
+
         - s : int, marker size (default is 1)
         - plotPoints : bool, plot grey background dots at all data locations
           (default is False). ``plot_data_locations`` is accepted as a

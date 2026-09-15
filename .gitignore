@@ -5,7 +5,20 @@ __pycache__/
 
 # doc
 doc/_build/
-doc/notebooks
+doc/auto_examples/
+doc/sg_execution_times.rst
+
+# Notebooks are no longer used; the examples are plain .py (see DOC_REFACTOR.md)
+*.ipynb
+
+# The gallery examples run with their own directory as the working directory,
+# so case data downloaded by ig.get_case_data() and figures written by
+# hardcopy=True land next to them. Track only the sources.
+examples/gallery/**
+!examples/gallery/**/
+!examples/gallery/**/*.py
+!examples/gallery/GALLERY_HEADER.rst
+!examples/gallery/**/GALLERY_HEADER.rst
 
 # C extensions
 *.so

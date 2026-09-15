@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "integrate_module"
-version = "0.99.7"
+version = "0.99.8"
 description = "Localized probabilistic data integration"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -56,12 +56,12 @@ examples = [
 ]
 docs = [
     "sphinx",
-    "nbsphinx",
     "sphinx-gallery",
     "pandoc",
     "myst-parser",
     "sphinx-rtd-theme",
     "furo",
+    "ghp-import",
     "tomli; python_version < '3.11'",
 ]
 jax-cuda = [

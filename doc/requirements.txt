@@ -1,8 +1,8 @@
 sphinx
-nbsphinx
 sphinx-gallery
 pandoc
 myst_parser
 sphinx_rtd_theme
 furo
+ghp-import
 tomli; python_version < "3.11"
