@@ -63,8 +63,13 @@ except Exception:
 # %%
 import os
 
-# Set XLA GPU compiler optimization level to 1 to speed up compilation times
-os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=1"
+# to avoid long compilation times on the first run:
+# - xla_gpu_autotune_level=1 skips exhaustive GEMM/conv autotuning
+# - xla_backend_optimization_level=1 lowers LLVM codegen effort, which is what
+#   actually dominates compile time for the large reduce fusions in the JAX
+#   rejection-sampling kernel (sort/cumsum/searchsorted over N~1M samples)
+os.environ["XLA_FLAGS"] = "--xla_gpu_autotune_level=1 --xla_backend_optimization_level=1"
+
 
 import h5py
 import numpy as np
@@ -427,6 +432,8 @@ t_full_start = time.time()
 # `integrate_daugaard_multi_prior.py`.
 
 # %%
+t_full_start_prior = time.time()
+
 from geoprior1d import geoprior1d
 
 ig.get_case_data(case=case, filelist=['daugaard_standard.xlsx', 'daugaard_valley.xlsx'])
@@ -450,6 +457,8 @@ if not os.path.exists(f_prior_merged_h5):
 else:
     print("Using existing merged prior: %s" % f_prior_merged_h5)
 f_prior_h5 = f_prior_merged_h5
+
+t_full_end_prior = time.time()
 
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 ig.prior_describe(f_prior_h5)
@@ -669,7 +678,7 @@ ig.query_plot(P_raw, meta_raw,
               text_panel=True,
               hardcopy=PREFIX + 'daugaard_P_raw' + SUFFIX if hardcopy else False)
 
-t_query1_start = time.time()
+t_query1_end = time.time()
 
 
 # %% [markdown]

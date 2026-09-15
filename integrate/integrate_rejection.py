@@ -43,7 +43,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
                               T_P_acc_level=None,
                               progress_callback=None,
                               console_progress=None,
-                              backend='numpy',
+                              backend=None,
                               **kwargs):
     """
     Perform probabilistic inversion using rejection sampling.
@@ -120,12 +120,17 @@ def integrate_rejection(f_prior_h5='prior.h5',
     console_progress : bool, optional
         Whether to show console TQDM progress bar. If None, auto-detects based on progress_callback.
         Default is None.
-    backend : str, optional
-        Computation backend to use.  ``'numpy'`` (default) uses the original
+    backend : str or None, optional
+        Computation backend to use.  ``'numpy'`` uses the original
         NumPy/multiprocessing implementation.  ``'jax'`` uses a JIT-compiled,
         vmapped JAX implementation that processes data points in batches; pass
         ``Nbatch=<int>`` (via **kwargs, default 64) to tune the batch size.
         JAX must be installed separately: ``pip install jax``.
+        Default is None, in which case the backend is taken from the
+        ``REJECTION_BACKEND`` environment variable if set (e.g.
+        ``os.environ['REJECTION_BACKEND'] = 'jax'``), else ``'numpy'``.
+        Passing ``backend`` explicitly always overrides the environment
+        variable.
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
         Nbatch (batch size for backend='jax'), and normalize_likelihood (bool,
@@ -161,6 +166,11 @@ def integrate_rejection(f_prior_h5='prior.h5',
         return None
 
     import integrate as ig
+
+    # Resolve backend: explicit argument wins, else REJECTION_BACKEND env
+    # var, else the 'numpy' default.
+    if backend is None:
+        backend = os.environ.get('REJECTION_BACKEND', 'numpy')
 
     # get optional arguments
     showInfo = kwargs.get('showInfo', 0)
