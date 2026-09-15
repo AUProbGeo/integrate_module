@@ -63,11 +63,15 @@ except Exception:
 # %%
 import os
 
-# to avoid long compilation times on the first run:
+# Trim JAX/XLA compile time on the first run:
 # - xla_gpu_autotune_level=1 skips exhaustive GEMM/conv autotuning
-# - xla_backend_optimization_level=1 lowers LLVM codegen effort, which is what
-#   actually dominates compile time for the large reduce fusions in the JAX
-#   rejection-sampling kernel (sort/cumsum/searchsorted over N~1M samples)
+# - xla_backend_optimization_level=1 lowers XLA/LLVM optimisation effort
+# Neither affects the ptxas (PTX -> SASS) step.  If compilation still takes
+# many minutes with a `ptxas` process at 100 % CPU, XLA is using the wrong
+# (system) ptxas -- see _ensure_bundled_ptxas in integrate_rejection_jax.py.
+# NOTE: XLA_FLAGS is read when jax is first imported (via `import integrate`
+# below), so in a notebook this cell must run before that -- restart the
+# kernel after editing it.
 os.environ["XLA_FLAGS"] = "--xla_gpu_autotune_level=1 --xla_backend_optimization_level=1"
 
 

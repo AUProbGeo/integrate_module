@@ -65,7 +65,7 @@ docs = [
     "tomli; python_version < '3.11'",
 ]
 jax-cuda = [
-    "jax[cuda12]",
+    "jax[cuda13]",
 ]
 #anemone = [
 #    "torch",

@@ -28,11 +28,48 @@ from tqdm import tqdm
 # Must be set before `import jax`.
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
+
+def _ensure_bundled_ptxas():
+    """
+    Point XLA at the pip-installed CUDA toolkit (ptxas) if JAX cannot find it.
+
+    Works around a bug in jax._src.lib._cuda_path() (seen in jax 0.11.1): it
+    tries ``import nvidia.cu13`` before ``nvidia.cuda_nvcc`` and, when the
+    cu13 namespace exists but has no ``bin/ptxas`` (e.g. a cu12 JAX installed
+    next to a cu13 torch), returns the *string* ``'None'`` instead of falling
+    back.  XLA then silently uses whatever ``ptxas`` is on $PATH -- typically
+    an old system CUDA -- and compiling the large rejection kernels can take
+    10+ minutes and >10 GB RAM instead of ~40 s.
+
+    ``CUDA_ROOT`` is the first thing _cuda_path() honours, so set it to the
+    first nvidia package dir that actually contains ``bin/ptxas``.  A user-set
+    CUDA_ROOT is left untouched.  Must run before ``import jax``.
+    """
+    if os.environ.get("CUDA_ROOT"):
+        return
+    import importlib.util
+    for mod in ("nvidia.cu13", "nvidia.cuda_nvcc"):
+        try:
+            spec = importlib.util.find_spec(mod)
+        except (ImportError, ValueError):
+            spec = None
+        if spec is None:
+            continue
+        for p in (spec.submodule_search_locations or []):
+            if os.path.exists(os.path.join(p, "bin", "ptxas")):
+                os.environ["CUDA_ROOT"] = p
+                return
+
+
+_ensure_bundled_ptxas()
+
 try:
     import jax
     import jax.numpy as jnp
     # Cache compiled GPU kernels to disk.  GPU kernel compilation for large
     # static shapes (N=1M sort, cumsum, searchsorted) takes ~40s on first run.
+    # (If it takes many minutes, XLA is most likely using the wrong ptxas --
+    # see _ensure_bundled_ptxas above.)
     # With the cache, every subsequent run reloads compiled kernels and warmup
     # drops to ~1s.  Must be set via jax.config.update (not an env var) in
     # JAX 0.10+; the cache is keyed on kernel + GPU arch so it is safe to share.
@@ -88,10 +125,20 @@ def _get_jax_kernels():
         dd = D - d_obs_s
         return -0.5 * jnp.sum(valid * (dd / d_std_s) ** 2, axis=1)
 
-    # Vectorise over a batch of data points; D is shared (in_axes=(None, 0, 0))
-    _likelihood_gaussian_diagonal_batch_jax = jax.jit(
-        jax.vmap(_likelihood_gaussian_diagonal_jax, in_axes=(None, 0, 0))
-    )
+    # Batch over data points with lax.map (a sequential on-device loop), NOT
+    # jax.vmap.  vmap fuses the whole (bsz, N, Nf) reduction into one giant
+    # unrolled XLA kernel that takes many minutes to compile for N~1e5-1e6
+    # (XLA even emits "Very slow compile?"), whereas lax.map compiles the
+    # single (N, Nf) -> (N,) kernel once (<1 s) and each iteration already
+    # saturates the GPU.  Measured at N=1e5, Nf=70, bsz=64: vmap >5 min
+    # compile vs. lax.map 0.3 s, identical results, 2 ms per batch.
+    @jax.jit
+    def _likelihood_gaussian_diagonal_batch_jax(D, d_obs_batch, d_std_batch):
+        """Batched log-likelihood: D (N, Nf), d_obs/d_std (bsz, Nf) -> (bsz, N)."""
+        return jax.lax.map(
+            lambda od: _likelihood_gaussian_diagonal_jax(D, od[0], od[1]),
+            (d_obs_batch, d_std_batch),
+        )
 
     _single_kernel = _likelihood_gaussian_diagonal_jax
     _batch_kernel = _likelihood_gaussian_diagonal_batch_jax
