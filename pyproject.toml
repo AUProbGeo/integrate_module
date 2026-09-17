@@ -23,6 +23,7 @@ dependencies = [
     "tqdm",
     "requests",
     "geoprior1d>=0.9",
+    "shapely",
     "ga-aem-forward-win; platform_system == 'Windows'",
     "jupyter>=1.0.0",
     "jupytext",
