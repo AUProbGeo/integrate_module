@@ -1,0 +1,972 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="integrate_query" href="integrate_query.html"><link rel="prev" title="integrate_plot" href="integrate_plot.html">
+        <link rel="canonical" href="https://cultpenguin.github.io/integrate_module/modules/integrate_borehole.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>integrate_borehole - INTEGRATE 0.99.8 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">INTEGRATE 0.99.8 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">INTEGRATE 0.99.8 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gettingstarted.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format.html">Data format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format_wells.html">Borehole Data Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format_query.html">Query Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prior_data.html">Prior Data Generation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rejection.html">Rejection Sampling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflows</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../auto_examples/index.html">Example Gallery</a><input aria-label="Toggle navigation of Example Gallery" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/10_getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started.html">Getting started with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started_no_forward.html">Getting started with INTEGRATE - with no forward code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started_posterior_only.html">Getting started with INTEGRATE - posterior analysis only</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/20_workflow/index.html">The Complete Workflow</a><input aria-label="Toggle navigation of The Complete Workflow" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/20_workflow/integrate_workflow.html">The complete INTEGRATE workflow: from data to posterior</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/30_data/index.html">Data</a><input aria-label="Toggle navigation of Data" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/30_data/integrate_boreholes.html">Borehole data in INTEGRATE – representation and integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/30_data/integrate_dual_data.html">Dual data types (low and high moment seperately)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/40_noise/index.html">Noise</a><input aria-label="Toggle navigation of Noise" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/40_noise/integrate_gaussian_noise.html">Synthetic Case Study example with different noise models (uncorrelated/correlated)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/50_hypothesis/index.html">Hypothesis Testing</a><input aria-label="Toggle navigation of Hypothesis Testing" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/50_hypothesis/integrate_daugaard_multi_prior.html">Daugaard Case Study with three lithology-resistivity prior models.</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/50_hypothesis/integrate_daugaard_multi_prior_multi_data.html">Daugaard Case Study with geology-resistivity-category prior models.</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/60_query/index.html">Querying the Posterior</a><input aria-label="Toggle navigation of Querying the Posterior" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/60_query/integrate_query.html">query: Posterior Query Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/70_synthetic/index.html">Synthetic Case</a><input aria-label="Toggle navigation of Synthetic Case" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/70_synthetic/integrate_synthetic_case.html">INTEGRATE Synthetic Case Study example</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/80_plotting/index.html">Plotting</a><input aria-label="Toggle navigation of Plotting" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/80_plotting/integrate_profiles.html">Profile Visualization in INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/85_rawmaterial/index.html">Raw Material Assessment</a><input aria-label="Toggle navigation of Raw Material Assessment" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/85_rawmaterial/integrate_rawmaterial_daugaard.html">Daugaard: probabilistic raw-material assessment with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/85_rawmaterial/integrate_rawmaterial_sdrfelding.html">Sdr. Felding: probabilistic raw-material assessment with INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/90_other/index.html">Other Examples</a><input aria-label="Toggle navigation of Other Examples" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_esbjerg.html">INTEGRATE on ESBJERG data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_linear_logspace.html">Data, and noise, in linear or log space</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_merge_data.html">Merging multiple data files from the same survey (ESBJERG)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_merge_prior.html">INTEGRATE - Demonstration of merge_prior() function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_priors.html">INTEGRATE -Generic Prior Model Generation Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_timing_example.html">INTEGRATE Timing Analysis Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../contributions.html">Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../modules.html">Modules (documentation)</a><input aria-label="Toggle navigation of Modules (documentation)" checked="" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="integrate.html">integrate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_rejection.html">integrate_rejection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_io.html">integrate_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_plot.html">integrate_plot</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">integrate_borehole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_query.html">integrate_query</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          
+
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="integrate-borehole">
+<h1>integrate_borehole<a class="headerlink" href="#integrate-borehole" title="Link to this heading">¶</a></h1>
+<p>Functions related to borehole data integration in the INTEGRATE module.</p>
+<dl class="py function" id="module-integrate.integrate_borehole">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.Pobs_to_datagrid">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">Pobs_to_datagrid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_xyz</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">doPlot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_data_nan_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_data_i_use</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.Pobs_to_datagrid" title="Link to this definition">¶</a></dt>
+<dd><p>Convert point-based discrete probability observations to gridded data with distance-based weighting.</p>
+<p>This function distributes discrete probability observations (e.g., from a borehole) across
+a spatial grid using distance-based weighting. Observations at location (X, Y) are applied
+to nearby grid points with decreasing influence based on distance. Temperature annealing
+is used to reduce the strength of observations far from the source point.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>P_obs</strong> (<em>ndarray</em>) – Probability matrix of shape (nclass, nm) where nclass is the number of classes
+and nm is the number of model parameters (e.g., depth points).
+Each column represents a probability distribution over discrete classes.</p></li>
+<li><p><strong>X</strong> (<em>float</em>) – X coordinate (e.g., UTM Easting) of the observation point.</p></li>
+<li><p><strong>Y</strong> (<em>float</em>) – Y coordinate (e.g., UTM Northing) of the observation point.</p></li>
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to HDF5 data file containing survey geometry (X, Y coordinates).</p></li>
+<li><p><strong>range_data</strong> (<em>float</em><em>, </em><em>optional</em>) – Inner radius in meters within which observations have full strength.
+Default is 10 meters.</p></li>
+<li><p><strong>range_xyz</strong> (<em>float</em><em>, </em><em>optional</em>) – Outer radius in meters for distance-based weighting. Beyond this distance,
+observations are fully attenuated (temperature → ∞). Default is 100 meters.</p></li>
+<li><p><strong>doPlot</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, creates diagnostic plots showing weight distributions.
+Default is False.</p></li>
+<li><p><strong>range_data_nan_freq</strong> (<em>float</em><em>, </em><em>optional</em>) – NaN-frequency threshold for automatic data-gate selection inside
+<a class="reference internal" href="#integrate.integrate_borehole.get_weight_from_position" title="integrate.integrate_borehole.get_weight_from_position"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_weight_from_position()</span></code></a>. Gates where the fraction of
+non-NaN values is below this threshold are excluded. Default 0.8.
+Ignored when <code class="docutils literal notranslate"><span class="pre">range_data_i_use</span></code> is provided.</p></li>
+<li><p><strong>range_data_i_use</strong> (<em>array-like</em><em> of </em><em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Explicit gate/channel indices to use for data-distance computation
+inside <a class="reference internal" href="#integrate.integrate_borehole.get_weight_from_position" title="integrate.integrate_borehole.get_weight_from_position"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_weight_from_position()</span></code></a>. Overrides <code class="docutils literal notranslate"><span class="pre">range_data_nan_freq</span></code> when
+provided. Default None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>d_obs</strong> (<em>ndarray</em>) – Gridded observation data of shape (nd, nclass, nm) where nd is the number
+of spatial locations in the survey. Each location gets temperature-scaled
+probabilities based on distance from (X, Y).</p></li>
+<li><p><strong>i_use</strong> (<em>ndarray</em>) – Binary mask of shape (nd, 1) indicating which grid points should be used
+(1) or ignored (0) in the inversion. Points with temperature &lt; 100 are used.</p></li>
+<li><p><strong>T_all</strong> (<em>ndarray</em>) – Temperature values of shape (nd, 1) applied to each grid point based on distance
+from the observation point.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function uses distance-based temperature annealing:
+1. Computes distance-based weights using <cite>get_weight_from_position()</cite>
+2. Converts distance weight to temperature: T = 1 / w_dis
+3. Caps maximum temperature at 100 (very weak influence)
+4. For each grid point:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>If T &lt; 100: include point (i_use=1) and apply temperature scaling</p></li>
+<li><p>If T ≥ 100: exclude point (i_use=0) and set observations to NaN</p></li>
+</ul>
+</div></blockquote>
+<p>Temperature scaling reduces probability certainty with distance:</p>
+<ul class="simple">
+<li><p>T = 1 (close to observation): Original probabilities preserved</p></li>
+<li><p>T &gt; 1 (far from observation): Probabilities become more uniform</p></li>
+<li><p>T ≥ 100 (very far): Observations effectively ignored</p></li>
+</ul>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Borehole observation at specific location</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">compute_P_obs_discrete</span><span class="p">(</span><span class="n">depth_top</span><span class="p">,</span> <span class="n">depth_bottom</span><span class="p">,</span> <span class="n">lithology</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">class_id</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">X_well</span><span class="p">,</span> <span class="n">Y_well</span> <span class="o">=</span> <span class="mf">543000.0</span><span class="p">,</span> <span class="mf">6175800.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">d_obs</span><span class="p">,</span> <span class="n">i_use</span><span class="p">,</span> <span class="n">T_all</span> <span class="o">=</span> <span class="n">Pobs_to_datagrid</span><span class="p">(</span><span class="n">P_obs</span><span class="p">,</span> <span class="n">X_well</span><span class="p">,</span> <span class="n">Y_well</span><span class="p">,</span> <span class="s1">'survey_data.h5'</span><span class="p">,</span>
+<span class="gp">... </span>                                 <span class="n">range_data</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">range_xyz</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Write to data file</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">save_data_multinomial</span><span class="p">(</span><span class="n">d_obs</span><span class="p">,</span> <span class="n">i_use</span><span class="o">=</span><span class="n">i_use</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">f_data_h5</span><span class="o">=</span><span class="s1">'survey_data.h5'</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#integrate.integrate_borehole.rescale_P_obs_temperature" title="integrate.integrate_borehole.rescale_P_obs_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rescale_P_obs_temperature</span></code></a></dt><dd><p>Temperature scaling function</p>
+</dd>
+<dt><a class="reference internal" href="#integrate.integrate_borehole.compute_P_obs_discrete" title="integrate.integrate_borehole.compute_P_obs_discrete"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_P_obs_discrete</span></code></a></dt><dd><p>Create P_obs from depth intervals</p>
+</dd>
+<dt><a class="reference internal" href="#integrate.integrate_borehole.get_weight_from_position" title="integrate.integrate_borehole.get_weight_from_position"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_weight_from_position</span></code></a></dt><dd><p>Distance-based weighting function</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.compute_P_obs_discrete">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">compute_P_obs_discrete</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">depth_top</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_bottom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lithology_obs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lithology_prob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.compute_P_obs_discrete" title="Link to this definition">¶</a></dt>
+<dd><p>Compute discrete observation probability matrix from depth intervals and lithology observations.</p>
+<p>This function creates a probability matrix where each depth point is assigned
+probabilities based on observed lithology classes within specified depth intervals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>depth_top</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of top depths for each observation interval. Required if W is not provided.</p></li>
+<li><p><strong>depth_bottom</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of bottom depths for each observation interval. Required if W is not provided.</p></li>
+<li><p><strong>lithology_obs</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of observed lithology class IDs for each interval. Required if W is not provided.</p></li>
+<li><p><strong>z</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of depth/position values where probabilities are computed. Required if W is not provided.</p></li>
+<li><p><strong>class_id</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of unique class identifiers (e.g., [0, 1, 2] for 3 lithology types). Required if W is not provided.</p></li>
+<li><p><strong>lithology_prob</strong> (<em>float</em><em> or </em><em>array-like</em><em>, </em><em>optional</em>) – Probability assigned to the observed class. Can be:
+- float: Same probability for all intervals (default is 0.8)
+- array: Array of probabilities, one per interval (must match length of lithology_obs)</p></li>
+<li><p><strong>P_prior</strong> (<em>ndarray</em><em>, </em><em>optional</em>) – Prior probability matrix of shape (nclass, nm). If None, uses uniform distribution
+for depths not covered by observations. Default is None.</p></li>
+<li><p><strong>W</strong> (<em>dict</em><em>, </em><em>optional</em>) – Well/borehole dictionary containing observation data. If provided, overrides
+the individual parameters. Expected keys:
+- ‘depth_top’: Array of top depths
+- ‘depth_bottom’: Array of bottom depths
+- ‘class_obs’: Array of observed class IDs (e.g., lithology, soil type)
+- ‘class_prob’: Probability or array of probabilities (optional, defaults to 0.8)
+- ‘X’: X coordinate of well location (optional, not used in this function)
+- ‘Y’: Y coordinate of well location (optional, not used in this function)
+Default is None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>P_obs</strong> – Probability matrix of shape (nclass, nm) where nclass is the number of classes
+and nm is the number of depth points. For each depth point covered by observations,
+the observed class gets probability lithology_prob and other classes share (1-lithology_prob).
+Depths not covered by any observation contain NaN or prior probabilities if provided.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Traditional usage with individual parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">depth_top</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">depth_bottom</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lithology_obs</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c1"># clay, sand, clay</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">class_id</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>  <span class="c1"># gravel, clay, sand</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">compute_P_obs_discrete</span><span class="p">(</span><span class="n">depth_top</span><span class="p">,</span> <span class="n">depth_bottom</span><span class="p">,</span> <span class="n">lithology_obs</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">class_id</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P_obs</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># (3, 30)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># With different probabilities per interval</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lithology_prob</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">]</span>  <span class="c1"># Higher confidence in first interval</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">compute_P_obs_discrete</span><span class="p">(</span><span class="n">depth_top</span><span class="p">,</span> <span class="n">depth_bottom</span><span class="p">,</span> <span class="n">lithology_obs</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">class_id</span><span class="p">,</span> <span class="n">lithology_prob</span><span class="o">=</span><span class="n">lithology_prob</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Using well dictionary (cleaner interface)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">W</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'depth_top'</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">],</span> <span class="s1">'depth_bottom'</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">],</span>
+<span class="gp">... </span>     <span class="s1">'class_obs'</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s1">'class_prob'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">],</span>
+<span class="gp">... </span>     <span class="s1">'X'</span><span class="p">:</span> <span class="mf">543000.0</span><span class="p">,</span> <span class="s1">'Y'</span><span class="p">:</span> <span class="mf">6175800.0</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">compute_P_obs_discrete</span><span class="p">(</span><span class="n">z</span><span class="o">=</span><span class="n">z</span><span class="p">,</span> <span class="n">class_id</span><span class="o">=</span><span class="n">class_id</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.get_weight_from_position">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">get_weight_from_position</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_well</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_well</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_xyz</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">useLog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">doPlot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plFile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showInfo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_data_nan_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_data_i_use</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.get_weight_from_position" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate weights based on distance and data similarity to a reference point.</p>
+<p>This function computes three sets of weights:
+1. Combined weights based on both spatial distance and data similarity
+2. Distance-based weights
+3. Data similarity weights</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to HDF5 file containing geometry and observed data.</p></li>
+<li><p><strong>x_well</strong> (<em>float</em><em>, </em><em>optional</em>) – X coordinate of reference point (well). Default 0.</p></li>
+<li><p><strong>y_well</strong> (<em>float</em><em>, </em><em>optional</em>) – Y coordinate of reference point (well). Default 0.</p></li>
+<li><p><strong>i_ref</strong> (<em>int</em><em>, </em><em>optional</em>) – Index of reference point. Default -1 (auto-calculated as closest to x_well, y_well).</p></li>
+<li><p><strong>range_xyz</strong> (<em>float</em><em>, </em><em>optional</em>) – Geographic XY distance range [m] for spatial weighting. Default 400.</p></li>
+<li><p><strong>range_data</strong> (<em>float</em><em>, </em><em>optional</em>) – Data-space similarity range parameter for data weighting. Default 2.</p></li>
+<li><p><strong>useLog</strong> (<em>bool</em><em>, </em><em>optional</em>) – Apply log10 transform to data before computing similarity. Default True.</p></li>
+<li><p><strong>doPlot</strong> (<em>bool</em><em>, </em><em>optional</em>) – Create diagnostic weight plots. Default False.</p></li>
+<li><p><strong>plFile</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Output filename for the diagnostic plot. Auto-generated if None.</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Verbosity level. Default 0.</p></li>
+<li><p><strong>range_data_nan_freq</strong> (<em>float</em><em>, </em><em>optional</em>) – NaN-frequency threshold for automatic gate selection. Gates where the
+fraction of non-NaN values across all soundings is below this threshold
+are excluded from the data-distance computation. Default 0.8.
+Ignored when <code class="docutils literal notranslate"><span class="pre">range_data_i_use</span></code> is provided.</p></li>
+<li><p><strong>range_data_i_use</strong> (<em>array-like</em><em> of </em><em>int</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Explicit gate/channel indices to use for the data-distance computation.
+When provided, overrides the <code class="docutils literal notranslate"><span class="pre">range_data_nan_freq</span></code> automatic selection.
+A NaN check at the reference sounding is still applied.
+Default None (use <code class="docutils literal notranslate"><span class="pre">range_data_nan_freq</span></code> threshold).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>w_combined</strong> (<em>ndarray (N_data,)</em>) – Combined weights from spatial distance and data similarity.</p></li>
+<li><p><strong>w_dis</strong> (<em>ndarray (N_data,)</em>) – Geographic distance-based weights.</p></li>
+<li><p><strong>w_data</strong> (<em>ndarray (N_data,)</em>) – Data similarity-based weights.</p></li>
+<li><p><strong>i_ref</strong> (<em>int</em>) – Index of the reference sounding used.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Weights are calculated using Gaussian functions:
+- Distance weights: exp(-dis² / range_xyz²)
+- Data weights:     exp(-sum_dd² / range_data²)
+where dis is geographic distance and sum_dd is cumulative data difference.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.prior_data_borehole">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">prior_data_borehole</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im_prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BH</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.prior_data_borehole" title="Link to this definition">¶</a></dt>
+<dd><p>Compute prior data for a single borehole and save to the prior HDF5 file.</p>
+<p>Dispatches to the appropriate implementation based on BH[‘method’]:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">'mode_probability'</span></code>  → <a class="reference internal" href="#integrate.integrate_borehole.prior_data_borehole_class_mode" title="integrate.integrate_borehole.prior_data_borehole_class_mode"><code class="xref py py-func docutils literal notranslate"><span class="pre">prior_data_borehole_class_mode()</span></code></a>
+(recommended — fast and robust)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'layer_probability'</span></code> → <a class="reference internal" href="#integrate.integrate_borehole.prior_data_borehole_class_layer" title="integrate.integrate_borehole.prior_data_borehole_class_layer"><code class="xref py py-func docutils literal notranslate"><span class="pre">prior_data_borehole_class_layer()</span></code></a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'class_exact'</span></code> / <code class="docutils literal notranslate"><span class="pre">'layer_probability_independent'</span></code> → NotImplementedError</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em>) – Path to the prior HDF5 file.</p></li>
+<li><p><strong>im_prior</strong> (<em>int</em>) – Index of the discrete model parameter (e.g. 2 for /M2 lithology).</p></li>
+<li><p><strong>BH</strong> (<em>dict</em>) – Borehole dictionary. Key <code class="docutils literal notranslate"><span class="pre">'method'</span></code> selects the integration approach
+and defaults to <code class="docutils literal notranslate"><span class="pre">'mode_probability'</span></code> if absent.</p></li>
+<li><p><strong>parallel</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enable parallel mode computation for <code class="docutils literal notranslate"><span class="pre">'mode_probability'</span></code>. Default False.</p></li>
+<li><p><strong>**kwargs</strong> – <dl class="simple">
+<dt>showInfo<span class="classifier">int, optional</span></dt><dd><p>Verbosity level. Default is 1.</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>P_obs</strong> (<em>ndarray or None</em>) – Probability matrix, shape (nclass, n_intervals).</p></li>
+<li><p><strong>id_prior</strong> (<em>int or None</em>) – Dataset index of the new /D entry added to f_prior_h5.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">id_prior</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">prior_data_borehole</span><span class="p">(</span><span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">im_prior</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">BH</span><span class="o">=</span><span class="n">BH</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Then extrapolate to survey grid:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">d_obs</span><span class="p">,</span> <span class="n">i_use</span><span class="p">,</span> <span class="n">T_use</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">Pobs_to_datagrid</span><span class="p">(</span><span class="n">P_obs</span><span class="p">,</span> <span class="n">BH</span><span class="p">[</span><span class="s1">'X'</span><span class="p">],</span> <span class="n">BH</span><span class="p">[</span><span class="s1">'Y'</span><span class="p">],</span> <span class="n">f_data_h5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">id_out</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">save_data_multinomial</span><span class="p">(</span><span class="n">d_obs</span><span class="p">,</span> <span class="n">i_use</span><span class="o">=</span><span class="n">i_use</span><span class="p">,</span> <span class="n">id_prior</span><span class="o">=</span><span class="n">id_prior</span><span class="p">,</span> <span class="n">f_data_h5</span><span class="o">=</span><span class="n">f_data_h5</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.prior_data_borehole_class_layer">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">prior_data_borehole_class_layer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im_prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BH</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.prior_data_borehole_class_layer" title="Link to this definition">¶</a></dt>
+<dd><p>Compute layer-probability prior data for a borehole using identity mapping.</p>
+<p>Uses compute_P_obs_discrete (no prior ensemble needed) and stores an
+identity prior data reference in f_prior_h5 via prior_data_identity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em>) – Path to the prior HDF5 file.</p></li>
+<li><p><strong>im_prior</strong> (<em>int</em>) – Index of the discrete model parameter (e.g. 2 for /M2 lithology).</p></li>
+<li><p><strong>BH</strong> (<em>dict</em>) – Borehole dictionary with keys depth_top, depth_bottom, class_obs,
+class_prob, X, Y, name, method.</p></li>
+<li><p><strong>**kwargs</strong> – <dl class="simple">
+<dt>showInfo<span class="classifier">int, optional</span></dt><dd><p>Verbosity level. Default is 1.</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>P_obs</strong> (<em>ndarray</em>) – Probability matrix, shape (nclass, n_intervals).</p></li>
+<li><p><strong>id_prior</strong> (<em>int</em>) – Dataset index of the identity /D{id_prior} entry in f_prior_h5.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.prior_data_borehole_class_mode">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">prior_data_borehole_class_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im_prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BH</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.prior_data_borehole_class_mode" title="Link to this definition">¶</a></dt>
+<dd><p>Compute mode-class prior data for a borehole and save to prior HDF5 file.</p>
+<p>Reads M{im_prior} from f_prior_h5, extracts the most frequent class in
+each observed depth interval for every prior realization (via
+welllog_compute_P_obs_class_mode), then stores the result as a new dataset
+in f_prior_h5.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em>) – Path to the prior HDF5 file.</p></li>
+<li><p><strong>im_prior</strong> (<em>int</em>) – Index of the discrete model parameter (e.g. 2 for /M2 lithology).</p></li>
+<li><p><strong>BH</strong> (<em>dict</em>) – Borehole dictionary with keys depth_top, depth_bottom, class_obs,
+class_prob, X, Y, name, method.</p></li>
+<li><p><strong>parallel</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enable parallel mode computation. Default is False.</p></li>
+<li><p><strong>**kwargs</strong> – <dl class="simple">
+<dt>showInfo<span class="classifier">int, optional</span></dt><dd><p>Verbosity level. Default is 1.</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>P_obs</strong> (<em>ndarray</em>) – Probability matrix, shape (nclass, n_intervals).</p></li>
+<li><p><strong>id_prior</strong> (<em>int</em>) – Dataset index of the new /D{id_prior} entry added to f_prior_h5.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.rescale_P_obs_temperature">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">rescale_P_obs_temperature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.rescale_P_obs_temperature" title="Link to this definition">¶</a></dt>
+<dd><p>Rescale discrete observation probabilities by temperature and renormalize.</p>
+<p>This function applies temperature annealing to probability distributions by raising
+each probability to the power (1/T), then renormalizing each column (depth point)
+so that probabilities sum to 1. Higher temperatures (T &gt; 1) flatten the distribution,
+while lower temperatures (T &lt; 1) sharpen it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>P_obs</strong> (<em>ndarray</em>) – Probability matrix of shape (nclass, nm) where nclass is the number of classes
+and nm is the number of model parameters (e.g., depth points).
+Each column should represent a probability distribution over classes.</p></li>
+<li><p><strong>T</strong> (<em>float</em><em>, </em><em>optional</em>) – Temperature parameter for annealing. Default is 1.0 (no scaling).
+- T = 1.0: No change (original probabilities)
+- T &gt; 1.0: Flattens distribution (less certain)
+- T &lt; 1.0: Sharpens distribution (more certain)
+- T → ∞: Approaches uniform distribution
+- T → 0: Approaches one-hot distribution</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>P_obs_scaled</strong> – Temperature-scaled and renormalized probability matrix of shape (nclass, nm).
+Each column sums to 1.0. NaN values in input are preserved in output.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span>
+<span class="gp">... </span>                  <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span>
+<span class="gp">... </span>                  <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_scaled</span> <span class="o">=</span> <span class="n">rescale_P_obs_temperature</span><span class="p">(</span><span class="n">P_obs</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P_scaled</span><span class="p">)</span>  <span class="c1"># More uniform distribution</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_scaled</span> <span class="o">=</span> <span class="n">rescale_P_obs_temperature</span><span class="p">(</span><span class="n">P_obs</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P_scaled</span><span class="p">)</span>  <span class="c1"># Sharper distribution</span>
+</pre></div>
+</div>
+<p class="rubric">Notes</p>
+<dl class="simple">
+<dt>The temperature scaling follows the Boltzmann distribution:</dt><dd><p>P_new(c) ∝ P_old(c)^(1/T)</p>
+</dd>
+<dt>After scaling, each column (depth point) is renormalized:</dt><dd><p>P_new(c) = P_new(c) / sum_c(P_new(c))</p>
+</dd>
+</dl>
+<p>This is commonly used in simulated annealing and rejection sampling to control
+the strength of discrete observations during Bayesian inference.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.save_borehole_data">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">save_borehole_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">BH</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.save_borehole_data" title="Link to this definition">¶</a></dt>
+<dd><p>Compute and save prior and observed data for a single borehole in one call.</p>
+<p>Combines the three-step borehole ingestion workflow into a single function:</p>
+<ol class="arabic simple">
+<li><p>Compute mode-class prior data and save to f_prior_h5
+(via <a class="reference internal" href="#integrate.integrate_borehole.prior_data_borehole" title="integrate.integrate_borehole.prior_data_borehole"><code class="xref py py-func docutils literal notranslate"><span class="pre">prior_data_borehole()</span></code></a>)</p></li>
+<li><p>Extrapolate point observations to the survey grid with
+distance-based weighting (via <a class="reference internal" href="#integrate.integrate_borehole.Pobs_to_datagrid" title="integrate.integrate_borehole.Pobs_to_datagrid"><code class="xref py py-func docutils literal notranslate"><span class="pre">Pobs_to_datagrid()</span></code></a>)</p></li>
+<li><p>Save the gridded observations to f_data_h5
+(via <code class="docutils literal notranslate"><span class="pre">ig.save_data_multinomial</span></code>)</p></li>
+</ol>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em>) – Path to the prior HDF5 file.</p></li>
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to the observed-data HDF5 file.</p></li>
+<li><p><strong>BH</strong> (<em>dict</em><em> or </em><em>list</em><em> of </em><em>dict</em>) – <p>Borehole dictionary with keys depth_top, depth_bottom, class_obs,
+class_prob, X, Y, name, method. Two optional keys control the
+distance-weighting radii when range_data / range_xyz are not passed
+as explicit kwargs:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">range_data</span></code> (float, optional) — data-space similarity radius.
+Survey points whose EM data response is similar to the borehole
+location receive higher weight; points that are more dissimilar are
+down-weighted. Only used if present and non-negative; otherwise the
+default applies. Default: 1,000,000 (effectively no cutoff).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">range_xyz</span></code> (float, optional) — geographic XY distance [m] beyond
+which the borehole exerts no influence on nearby survey points.
+Only used if present and non-negative; otherwise the default
+applies. Default: 300 m.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">range_data_nan_freq</span></code> (float, optional) — NaN-frequency threshold for automatic
+data-gate selection. Default: 0.8.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">range_data_i_use</span></code> (list of int, optional) — explicit gate indices for
+data-distance computation; overrides <code class="docutils literal notranslate"><span class="pre">range_data_nan_freq</span></code> when provided.</p></li>
+</ul>
+<p>If <code class="docutils literal notranslate"><span class="pre">BH</span></code> is a list of dicts, each borehole is processed in turn
+(one call per element, in order) using the same <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code> for
+every borehole; a per-borehole <code class="docutils literal notranslate"><span class="pre">range_data</span></code>/<code class="docutils literal notranslate"><span class="pre">range_xyz</span></code>/etc. key
+set inside an individual dict still takes effect for that borehole
+exactly as in the single-dict case. See <code class="docutils literal notranslate"><span class="pre">Returns</span></code> below.</p>
+</p></li>
+<li><p><strong>**kwargs</strong> – <dl class="simple">
+<dt>im_prior<span class="classifier">int, optional</span></dt><dd><p>Index of the discrete model parameter in f_prior_h5 (e.g. 2 for /M2).
+Default is 2.</p>
+</dd>
+<dt>parallel<span class="classifier">bool, optional</span></dt><dd><p>Enable parallel mode computation. Default is False.</p>
+</dd>
+<dt>range_data<span class="classifier">float, optional</span></dt><dd><p>Data-space similarity radius. Overrides <code class="docutils literal notranslate"><span class="pre">BH['range_data']</span></code> when
+provided. Resolution order: explicit kwarg &gt; BH[‘range_data’]
+(if present and non-negative) &gt; 1,000,000 (no cutoff).</p>
+</dd>
+<dt>range_xyz<span class="classifier">float, optional</span></dt><dd><p>Geographic XY fade-out distance [m]. Overrides <code class="docutils literal notranslate"><span class="pre">BH['range_xyz']</span></code>
+when provided. Resolution order: explicit kwarg &gt; BH[‘range_xyz’]
+(if present and non-negative) &gt; 300 m.</p>
+</dd>
+<dt>range_data_nan_freq<span class="classifier">float, optional</span></dt><dd><p>NaN-frequency threshold for automatic data-gate selection. Gates
+where the fraction of non-NaN soundings is below this threshold are
+excluded from data-distance computation. Resolution order: explicit
+kwarg &gt; BH[‘range_data_nan_freq’] &gt; 0.8. Ignored when <code class="docutils literal notranslate"><span class="pre">range_data_i_use</span></code> is set.</p>
+</dd>
+<dt>range_data_i_use<span class="classifier">list of int or None, optional</span></dt><dd><p>Explicit gate/channel indices to use for data-distance computation.
+Overrides <code class="docutils literal notranslate"><span class="pre">range_data_nan_freq</span></code> when provided. Resolution order: explicit
+kwarg &gt; BH[‘range_data_i_use’] &gt; None.</p>
+</dd>
+<dt>doPlot<span class="classifier">bool, optional</span></dt><dd><p>Plot distance-weight maps. Default is False.</p>
+</dd>
+<dt>showInfo<span class="classifier">int, optional</span></dt><dd><p>Verbosity level (0 = silent, 1 = one summary line per borehole).
+Default is 1.</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>id_prior</strong> (<em>int</em>) – If <code class="docutils literal notranslate"><span class="pre">BH</span></code> is a single dict: dataset index of the new /D entry added
+to f_prior_h5.</p></li>
+<li><p><strong>id_out</strong> (<em>int</em>) – If <code class="docutils literal notranslate"><span class="pre">BH</span></code> is a single dict: dataset index of the new /D entry added
+to f_data_h5.</p></li>
+<li><p><strong>id_prior_list</strong> (<em>list of int</em>) – If <code class="docutils literal notranslate"><span class="pre">BH</span></code> is a list of dicts: dataset indices of the new /D entries
+added to f_prior_h5, one per borehole, same order as <code class="docutils literal notranslate"><span class="pre">BH</span></code>.</p></li>
+<li><p><strong>id_borehole_list</strong> (<em>list of int</em>) – If <code class="docutils literal notranslate"><span class="pre">BH</span></code> is a list of dicts: dataset indices of the new /D entries
+added to f_data_h5, one per borehole, same order as <code class="docutils literal notranslate"><span class="pre">BH</span></code>.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Single borehole</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">id_prior</span><span class="p">,</span> <span class="n">id_data</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">save_borehole_data</span><span class="p">(</span><span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">f_data_h5</span><span class="p">,</span> <span class="n">BH</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># All boreholes in one call — collect data IDs for joint inversion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">id_prior_list</span><span class="p">,</span> <span class="n">id_borehole_list</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">save_borehole_data</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">f_data_h5</span><span class="p">,</span> <span class="n">BHOLES</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">range_data</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">range_xyz</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f_post_h5</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">integrate_rejection</span><span class="p">(</span><span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">f_data_h5</span><span class="p">,</span>
+<span class="gp">... </span>                                   <span class="n">id_use</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">id_borehole_list</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_borehole.welllog_compute_P_obs_class_mode">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_borehole.</span></span><span class="sig-name descname"><span class="pre">welllog_compute_P_obs_class_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M_lithology</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_top</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_bottom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lithology_obs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lithology_prob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ncpu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showInfo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_borehole.welllog_compute_P_obs_class_mode" title="Link to this definition">¶</a></dt>
+<dd><p>Compute observation probability matrix from well log class observations by extracting mode class from prior models.</p>
+<p>This function processes discrete class models (e.g., lithology) from a prior ensemble to create
+well log observations. For each depth interval, it finds the most frequent (mode) class within
+that interval from each prior model, then creates a probability matrix based on how well these
+modes match the observed classes.</p>
+<p><strong>Simplified Usage</strong>: When called with only <cite>W=W</cite>, the function returns just the probability
+matrix <cite>P_obs</cite> without computing class mode, and class_mode is returned as None.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>M_lithology</strong> (<em>ndarray</em><em>, </em><em>optional</em>) – Array of lithology models from prior ensemble, shape (nreal, nz) where nreal is the
+number of realizations and nz is the number of depth points. If None, only P_obs
+is computed and lithology_mode is returned as None. Default is None.</p></li>
+<li><p><strong>depth_top</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of top depths for each observation interval. Required if W is not provided.</p></li>
+<li><p><strong>depth_bottom</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of bottom depths for each observation interval. Required if W is not provided.</p></li>
+<li><p><strong>lithology_obs</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of observed lithology class IDs for each interval. Required if W is not provided.</p></li>
+<li><p><strong>z</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of depth/position values corresponding to M_lithology depth discretization.
+Required if M_lithology is provided and W does not contain depth information.</p></li>
+<li><p><strong>class_id</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Array of unique class identifiers (e.g., [0, 1, 2] for 3 lithology types).
+Required if W is not provided.</p></li>
+<li><p><strong>lithology_prob</strong> (<em>float</em><em> or </em><em>array-like</em><em>, </em><em>optional</em>) – Probability assigned to the observed class. Can be:
+- float: Same probability for all intervals (default is 0.8)
+- array: Array of probabilities, one per interval (must match length of lithology_obs)</p></li>
+<li><p><strong>W</strong> (<em>dict</em><em>, </em><em>optional</em>) – Well/borehole dictionary containing observation data. If provided, overrides
+the individual parameters. Expected keys:
+- ‘depth_top’: Array of top depths
+- ‘depth_bottom’: Array of bottom depths
+- ‘class_obs’: Array of observed class IDs (e.g., lithology, soil type)
+- ‘class_prob’: Probability or array of probabilities (optional, defaults to 0.8)
+- ‘X’: X coordinate of well location (optional, not used in this function)
+- ‘Y’: Y coordinate of well location (optional, not used in this function)
+Default is None.</p></li>
+<li><p><strong>parallel</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enable parallel processing for large ensembles. Default is False.
+When True and parallel processing is available, distributes realization
+processing across multiple CPU cores for significant speedup.
+Recommended for N &gt; 10,000 realizations. Only used when M_lithology is provided.</p></li>
+<li><p><strong>Ncpu</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of CPU cores to use for parallel processing. Default is -1 (auto-detect).
+Only used when parallel=True and M_lithology is provided.</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Control information output level. Default is 1.
+- 0: No information printed
+- 1: Single line info (number of realizations, intervals)
+- &gt;1: Progress bar with tqdm, runtime statistics, and time per model
+Only applies when M_lithology is provided.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>P_obs</strong> (<em>ndarray</em>) – Probability matrix of shape (nclass, n_obs) where nclass is the number of classes
+and n_obs is the number of observation intervals. Each column represents the
+probability distribution for one depth interval.</p></li>
+<li><p><strong>class_mode</strong> (<em>ndarray or None</em>) – If M_lithology is provided: Array of mode class values extracted from prior models,
+shape (nreal, n_obs). For each realization and observation interval, contains the most
+frequent class ID within that depth range.
+If M_lithology is None: Returns None.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Full usage: Load prior lithology models and compute mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">M_lithology</span> <span class="o">=</span> <span class="n">f_prior</span><span class="p">[</span><span class="s1">'M2'</span><span class="p">][:]</span>  <span class="c1"># Shape: (100000, 50)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">class_id</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>  <span class="c1"># sand, clay, gravel</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Define observations</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">depth_top</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">depth_bottom</span> <span class="o">=</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">60</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lithology_obs</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c1"># clay, sand, clay</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Compute well log observations with class mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">class_mode</span> <span class="o">=</span> <span class="n">welllog_compute_P_obs_class_mode</span><span class="p">(</span><span class="n">M_lithology</span><span class="p">,</span> <span class="n">depth_top</span><span class="p">,</span> <span class="n">depth_bottom</span><span class="p">,</span>
+<span class="gp">... </span>                                                      <span class="n">lithology_obs</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">class_id</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P_obs</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># (3, 3) - 3 classes, 3 observations</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">class_mode</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># (100000, 3) - mode for each realization and interval</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Simplified usage: Only compute P_obs using well dictionary</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">W</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'depth_top'</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">],</span> <span class="s1">'depth_bottom'</span><span class="p">:</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">60</span><span class="p">],</span>
+<span class="gp">... </span>     <span class="s1">'class_obs'</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s1">'class_prob'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">],</span>
+<span class="gp">... </span>     <span class="s1">'X'</span><span class="p">:</span> <span class="mf">543000.0</span><span class="p">,</span> <span class="s1">'Y'</span><span class="p">:</span> <span class="mf">6175800.0</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">class_mode</span> <span class="o">=</span> <span class="n">welllog_compute_P_obs_class_mode</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">class_id</span><span class="o">=</span><span class="n">class_id</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P_obs</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># (3, 3) - 3 classes, 3 observations</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">class_mode</span><span class="p">)</span>  <span class="c1"># None (no prior models provided)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Using parallel processing for large ensembles</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">class_mode</span> <span class="o">=</span> <span class="n">welllog_compute_P_obs_class_mode</span><span class="p">(</span><span class="n">M_lithology</span><span class="p">,</span> <span class="n">depth_top</span><span class="p">,</span> <span class="n">depth_bottom</span><span class="p">,</span>
+<span class="gp">... </span>                                                      <span class="n">lithology_obs</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">class_id</span><span class="p">,</span>
+<span class="gp">... </span>                                                      <span class="n">parallel</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">Ncpu</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Control output verbosity</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">class_mode</span> <span class="o">=</span> <span class="n">welllog_compute_P_obs_class_mode</span><span class="p">(</span><span class="n">M_lithology</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">showInfo</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Silent</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">class_mode</span> <span class="o">=</span> <span class="n">welllog_compute_P_obs_class_mode</span><span class="p">(</span><span class="n">M_lithology</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">showInfo</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Single line info</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span><span class="p">,</span> <span class="n">class_mode</span> <span class="o">=</span> <span class="n">welllog_compute_P_obs_class_mode</span><span class="p">(</span><span class="n">M_lithology</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">showInfo</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Progress bar + timing</span>
+</pre></div>
+</div>
+<p class="rubric">Notes</p>
+<p>The function extracts class mode for each depth interval by:
+1. Finding depth indices corresponding to interval boundaries
+2. Extracting class values within the interval
+3. Computing the most frequent (mode) class
+4. Assigning probabilities based on match with observed class</p>
+<p>This approach is suitable for well log observations where each interval represents
+the dominant class within that depth range, rather than the full depth profile.</p>
+<p><strong>Simplified Mode</strong> (M_lithology=None):
+When M_lithology is not provided, the function only computes the P_obs probability matrix
+from the observed class data. This is useful when you only need the probability
+representation of observations without extracting mode class from prior models.</p>
+<p>Parallel processing uses shared memory for M_lithology array to minimize memory overhead.
+Expected speedup: 4-8x on 8-core machines for large ensembles (N &gt; 100,000 realizations).
+The parallel implementation distributes realizations across worker processes while
+maintaining identical results to the sequential version.</p>
+<p>Both sequential and parallel modes support timing information via showInfo parameter:
+- showInfo=0: Silent mode
+- showInfo=1: Single line summary (default)
+- showInfo&gt;1: Detailed timing (progress bar for sequential, runtime stats for both)</p>
+</dd></dl>
+
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="integrate_query.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">integrate_query</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="integrate_plot.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">integrate_plot</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023,2024,2025 INTEGRATE WORKING GROUP
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">integrate_borehole</a><ul>
+<li><a class="reference internal" href="#integrate.integrate_borehole.Pobs_to_datagrid"><code class="docutils literal notranslate"><span class="pre">Pobs_to_datagrid()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.compute_P_obs_discrete"><code class="docutils literal notranslate"><span class="pre">compute_P_obs_discrete()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.get_weight_from_position"><code class="docutils literal notranslate"><span class="pre">get_weight_from_position()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.prior_data_borehole"><code class="docutils literal notranslate"><span class="pre">prior_data_borehole()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.prior_data_borehole_class_layer"><code class="docutils literal notranslate"><span class="pre">prior_data_borehole_class_layer()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.prior_data_borehole_class_mode"><code class="docutils literal notranslate"><span class="pre">prior_data_borehole_class_mode()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.rescale_P_obs_temperature"><code class="docutils literal notranslate"><span class="pre">rescale_P_obs_temperature()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.save_borehole_data"><code class="docutils literal notranslate"><span class="pre">save_borehole_data()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_borehole.welllog_compute_P_obs_class_mode"><code class="docutils literal notranslate"><span class="pre">welllog_compute_P_obs_class_mode()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=f4d81ccd"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    </body>
+</html>

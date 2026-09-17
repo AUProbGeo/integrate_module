@@ -1,0 +1,1750 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="integrate_borehole" href="integrate_borehole.html"><link rel="prev" title="integrate_io" href="integrate_io.html">
+        <link rel="canonical" href="https://cultpenguin.github.io/integrate_module/modules/integrate_plot.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>integrate_plot - INTEGRATE 0.99.8 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">INTEGRATE 0.99.8 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">INTEGRATE 0.99.8 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gettingstarted.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format.html">Data format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format_wells.html">Borehole Data Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format_query.html">Query Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prior_data.html">Prior Data Generation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rejection.html">Rejection Sampling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflows</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../auto_examples/index.html">Example Gallery</a><input aria-label="Toggle navigation of Example Gallery" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/10_getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started.html">Getting started with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started_no_forward.html">Getting started with INTEGRATE - with no forward code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started_posterior_only.html">Getting started with INTEGRATE - posterior analysis only</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/20_workflow/index.html">The Complete Workflow</a><input aria-label="Toggle navigation of The Complete Workflow" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/20_workflow/integrate_workflow.html">The complete INTEGRATE workflow: from data to posterior</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/30_data/index.html">Data</a><input aria-label="Toggle navigation of Data" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/30_data/integrate_boreholes.html">Borehole data in INTEGRATE – representation and integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/30_data/integrate_dual_data.html">Dual data types (low and high moment seperately)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/40_noise/index.html">Noise</a><input aria-label="Toggle navigation of Noise" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/40_noise/integrate_gaussian_noise.html">Synthetic Case Study example with different noise models (uncorrelated/correlated)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/50_hypothesis/index.html">Hypothesis Testing</a><input aria-label="Toggle navigation of Hypothesis Testing" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/50_hypothesis/integrate_daugaard_multi_prior.html">Daugaard Case Study with three lithology-resistivity prior models.</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/50_hypothesis/integrate_daugaard_multi_prior_multi_data.html">Daugaard Case Study with geology-resistivity-category prior models.</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/60_query/index.html">Querying the Posterior</a><input aria-label="Toggle navigation of Querying the Posterior" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/60_query/integrate_query.html">query: Posterior Query Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/70_synthetic/index.html">Synthetic Case</a><input aria-label="Toggle navigation of Synthetic Case" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/70_synthetic/integrate_synthetic_case.html">INTEGRATE Synthetic Case Study example</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/80_plotting/index.html">Plotting</a><input aria-label="Toggle navigation of Plotting" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/80_plotting/integrate_profiles.html">Profile Visualization in INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/85_rawmaterial/index.html">Raw Material Assessment</a><input aria-label="Toggle navigation of Raw Material Assessment" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/85_rawmaterial/integrate_rawmaterial_daugaard.html">Daugaard: probabilistic raw-material assessment with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/85_rawmaterial/integrate_rawmaterial_sdrfelding.html">Sdr. Felding: probabilistic raw-material assessment with INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/90_other/index.html">Other Examples</a><input aria-label="Toggle navigation of Other Examples" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_esbjerg.html">INTEGRATE on ESBJERG data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_linear_logspace.html">Data, and noise, in linear or log space</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_merge_data.html">Merging multiple data files from the same survey (ESBJERG)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_merge_prior.html">INTEGRATE - Demonstration of merge_prior() function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_priors.html">INTEGRATE -Generic Prior Model Generation Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_timing_example.html">INTEGRATE Timing Analysis Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../contributions.html">Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../modules.html">Modules (documentation)</a><input aria-label="Toggle navigation of Modules (documentation)" checked="" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="integrate.html">integrate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_rejection.html">integrate_rejection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_io.html">integrate_io</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">integrate_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_borehole.html">integrate_borehole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_query.html">integrate_query</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          
+
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="integrate-plot">
+<h1>integrate_plot<a class="headerlink" href="#integrate-plot" title="Link to this heading">¶</a></h1>
+<p>Functions for plotting in the INTEGRATE module.</p>
+<p id="module-integrate.integrate_plot">INTEGRATE Plotting Module - Visualization and Analysis Tools</p>
+<p>This module provides comprehensive visualization capabilities for the INTEGRATE
+geophysical data integration package. It creates publication-quality plots for
+data analysis, prior/posterior visualization, and results interpretation.</p>
+<dl class="simple">
+<dt>Key Features:</dt><dd><ul class="simple">
+<li><p>1D profile plots for layered earth models</p></li>
+<li><p>2D spatial mapping and interpolation</p></li>
+<li><p>Data-model comparison visualizations</p></li>
+<li><p>Statistical plots (uncertainty, probability maps)</p></li>
+<li><p>Geometry and survey layout visualization</p></li>
+<li><p>Customizable plotting styles and colormaps</p></li>
+</ul>
+</dd>
+<dt>Main Function Categories:</dt><dd><ul class="simple">
+<li><p>plot_profile_*(): 1D vertical profile plotting</p></li>
+<li><p>plot_data_*(): Observational data visualization</p></li>
+<li><p>plot_geometry(): Survey geometry and layout</p></li>
+<li><p>plot_feature_2d(): 2D spatial parameter mapping</p></li>
+<li><p>plot_T_EV(): Temperature and evidence visualization</p></li>
+<li><p>plot_*_stats(): Statistical analysis plots</p></li>
+</ul>
+</dd>
+<dt>Plot Types:</dt><dd><ul class="simple">
+<li><p>Discrete categorical models (geological units)</p></li>
+<li><p>Continuous parameter models (resistivity, conductivity)</p></li>
+<li><p>Uncertainty and probability distributions</p></li>
+<li><p>Data fit and residual analysis</p></li>
+<li><p>Cumulative thickness and property maps</p></li>
+</ul>
+</dd>
+<dt>Output Formats:</dt><dd><ul class="simple">
+<li><p>Interactive matplotlib figures</p></li>
+<li><p>High-resolution PNG/PDF export</p></li>
+<li><p>Customizable figure sizing and DPI</p></li>
+</ul>
+</dd>
+</dl>
+<p>Author: Thomas Mejer Hansen
+Email: <a class="reference external" href="mailto:tmeha&#37;&#52;&#48;geo&#46;au&#46;dk">tmeha<span>&#64;</span>geo<span>&#46;</span>au<span>&#46;</span>dk</a></p>
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.find_points_along_line_segments">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">find_points_along_line_segments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Xl</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Yl</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ID</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'closest'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.find_points_along_line_segments" title="Link to this definition">¶</a></dt>
+<dd><p>Find point indices that lie along or near specified line segments.</p>
+<section id="parameters">
+<h2>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>X<span class="classifier">array-like</span></dt><dd><p>X coordinates of points</p>
+</dd>
+<dt>Y<span class="classifier">array-like</span></dt><dd><p>Y coordinates of points</p>
+</dd>
+<dt>Xl<span class="classifier">array-like</span></dt><dd><p>X coordinates defining line segment endpoints (length = number of segments)</p>
+</dd>
+<dt>Yl<span class="classifier">array-like</span></dt><dd><p>Y coordinates defining line segment endpoints (length = number of segments)</p>
+</dd>
+<dt>ID<span class="classifier">array-like, optional</span></dt><dd><p>Point identifiers (same length as X, Y)</p>
+</dd>
+<dt>tolerance<span class="classifier">float, optional</span></dt><dd><p>Maximum distance from line segments to include points
+If None, uses 1% of the maximum coordinate range</p>
+</dd>
+<dt>method<span class="classifier">str, optional</span></dt><dd><p>Selection method: ‘closest’ (default), ‘within_tolerance’, or ‘perpendicular’</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h2>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>indices<span class="classifier">numpy.ndarray</span></dt><dd><p>Indices of points that lie along the line segments</p>
+</dd>
+<dt>distances<span class="classifier">numpy.ndarray</span></dt><dd><p>Distances from selected points to their nearest line segments</p>
+</dd>
+<dt>segment_ids<span class="classifier">numpy.ndarray</span></dt><dd><p>Which line segment each selected point is closest to</p>
+</dd>
+</dl>
+</section>
+<section id="notes">
+<h2>Notes:<a class="headerlink" href="#notes" title="Link to this heading">¶</a></h2>
+<p>For 3 line segments, len(Xl) = len(Yl) = 3, defining segments:
+- Segment 0: from (Xl[0], Yl[0]) to (Xl[1], Yl[1])
+- Segment 1: from (Xl[1], Yl[1]) to (Xl[2], Yl[2])
+- etc.</p>
+</section>
+<section id="examples">
+<h2>Examples:<a class="headerlink" href="#examples" title="Link to this heading">¶</a></h2>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Xl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">])</span>  <span class="c1"># Two line segments</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Yl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">indices</span><span class="p">,</span> <span class="n">distances</span><span class="p">,</span> <span class="n">seg_ids</span> <span class="o">=</span> <span class="n">find_points_along_line_segments</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Xl</span><span class="p">,</span> <span class="n">Yl</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.get_colormap_and_limits">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">get_colormap_and_limits</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmap_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_clim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.get_colormap_and_limits" title="Link to this definition">¶</a></dt>
+<dd><p>Return colormap and associated limits for different visualization types.</p>
+<p>Creates various colormaps and their associated color limits for different
+geophysical data visualization needs, with a focus on resistivity and
+electromagnetic data plotting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cmap_type</strong> (<em>str</em><em>, </em><em>optional</em>) – <p>Type of colormap to return (default is ‘default’):</p>
+<ul>
+<li><p>’default’: Red-white-blue-black colormap for general use</p></li>
+<li><p>’resistivity’: Log-scale colormap optimized for resistivity data</p></li>
+<li><p>’entropy’: Grayscale colormap for uncertainty visualization</p></li>
+<li><p>’discrete_data_entropy’: Black-red-white colormap where 0 (informative)
+is black and 1 (uninformative) is white</p></li>
+<li><p>’discrete’: Categorical colormap for discrete classifications</p></li>
+<li><p>’temperature’: Hot colormap for temperature/evidence fields</p></li>
+<li><p>’elevation’: Terrain-like colormap for topographic data</p></li>
+<li><p>’seismic’: Blue-white-red colormap for seismic data</p></li>
+</ul>
+</p></li>
+<li><p><strong>custom_clim</strong> (<em>list</em><em> or </em><em>tuple</em><em>, </em><em>optional</em>) – Custom color limits as [min, max]. If provided, overrides default
+limits for the specified colormap type (default is None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>cmap</strong> (<em>matplotlib.colors.Colormap</em>) – The colormap object ready for use in matplotlib plotting functions.</p></li>
+<li><p><strong>clim</strong> (<em>list</em>) – Color scale limits as [min, max] values appropriate for the colormap.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Default colormap creates a smooth transition: red (low) → white (medium)
+→ blue (high) → black (very high), which is effective for resistivity
+visualization where extreme values need emphasis.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">cmap</span><span class="p">,</span> <span class="n">clim</span> <span class="o">=</span> <span class="n">get_colormap_and_limits</span><span class="p">(</span><span class="s1">'default'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Use with matplotlib: plt.imshow(data, cmap=cmap, vmin=clim[0], vmax=clim[1])</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">cmap</span><span class="p">,</span> <span class="n">clim</span> <span class="o">=</span> <span class="n">get_colormap_and_limits</span><span class="p">(</span><span class="s1">'resistivity'</span><span class="p">,</span> <span class="n">custom_clim</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">1000</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Custom limits override defaults for resistivity colormap</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.h5_get_clim_cmap">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">h5_get_clim_cmap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Mstr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/M1'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.h5_get_clim_cmap" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve color scale limits and colormap from prior model attributes.</p>
+<p>Extracts visualization parameters stored in HDF5 file attributes,
+providing default values when attributes are not present. Used by
+plotting functions for consistent color scaling across visualizations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em>) – Path to the HDF5 file containing prior model data.</p></li>
+<li><p><strong>Mstr</strong> (<em>str</em><em>, </em><em>optional</em>) – Model parameter key string (e.g., ‘/M1’, ‘/M2’, default is ‘/M1’).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>clim</strong> (<em>list</em>) – Color scale limits as [min_value, max_value]. Returns [10, 500]
+as default if ‘clim’ attribute is not found.</p></li>
+<li><p><strong>cmap</strong> (<em>matplotlib.colors.ListedColormap or str</em>) – Colormap object created from stored colormap array, or ‘jet’
+string as default if ‘cmap’ attribute is not found.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function automatically converts stored colormap arrays to matplotlib
+ListedColormap objects with proper transposition. Color limits and
+colormaps are typically set during prior model generation to ensure
+consistent visualization across different plotting functions.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_T_EV">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_T_EV</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_min</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_max</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_T_EV" title="Link to this definition">¶</a></dt>
+<dd><p>Plot temperature and evidence field values from posterior sampling results.</p>
+<p>Creates 2D spatial scatter plots showing the distribution of temperature (T),
+evidence (EV), and number of data points across the survey area. Temperature
+indicates sampling efficiency while evidence shows data fit quality.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting data point index for plotting (1-based indexing, default is 1).</p></li>
+<li><p><strong>i2</strong> (<em>float</em><em>, </em><em>optional</em>) – Ending data point index for plotting. If larger than data size,
+uses all available data (default is 1e+9).</p></li>
+<li><p><strong>s</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of scatter plot markers in points (default is 5).</p></li>
+<li><p><strong>T_min</strong> (<em>int</em><em>, </em><em>optional</em>) – Minimum temperature value for color scale normalization (default is 1).</p></li>
+<li><p><strong>T_max</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum temperature value for color scale normalization (default is 100).</p></li>
+<li><p><strong>pl</strong> (<em>{'all'</em><em>, </em><em>'T'</em><em>, </em><em>'EV'</em><em>, </em><em>'ND'</em><em>, </em><em>'CHI2'</em><em>, </em><em>'N_UNIQUE'}</em><em>, </em><em>optional</em>) – Type of plot to generate (default is ‘all’):
+- ‘all’: plot all available types
+- ‘T’: temperature field only
+- ‘EV’: evidence field only
+- ‘ND’: number of data points only
+- ‘CHI2’: reduced chi-squared (goodness of fit) only
+- ‘N_UNIQUE’: number of unique realizations per location</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plots as PNG files with descriptive names (default is False).</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – <p>Additional keyword arguments:</p>
+<ul>
+<li><p>s : int, marker size (default is 1)</p></li>
+<li><p>plotPoints : bool, plot grey background dots at all data locations
+(default is False). <code class="docutils literal notranslate"><span class="pre">plot_data_locations</span></code> is accepted as a
+deprecated alias.</p></li>
+<li><p>CHI2_min : float, minimum CHI2 color scale value (default is 0)</p></li>
+<li><p>CHI2_max : float, maximum CHI2 color scale value (default is 5)</p></li>
+<li><p>N_UNIQUE_min : float, minimum N_UNIQUE color scale value (default is auto)</p></li>
+<li><p>N_UNIQUE_max : float, maximum N_UNIQUE color scale value (default is auto)</p></li>
+<li><p>Other matplotlib scatter parameters</p></li>
+</ul>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays plots but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Temperature values are displayed on log10 scale. Evidence values are
+clamped to reasonable ranges (1st to 99th percentile) for better visualization.
+The number of data plot shows non-NaN data count per location.</p>
+<p>CHI2 color scale is fixed to [0, 5] by default for consistent comparison
+across different datasets. Values can be overridden via kwargs.</p>
+<p>N_UNIQUE shows the number of unique realizations accepted at each location.
+This indicates the diversity of accepted models. If N_UNIQUE is not available,
+run integrate_posterior_stats() first to compute it.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_boreholes">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_boreholes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Mstr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/M2'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_boreholes" title="Link to this definition">¶</a></dt>
+<dd><p>Plot borehole data as 1-D lithology sticks, one subplot per borehole.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>W</strong> (<em>dict</em><em>, </em><em>list</em><em> of </em><em>dict</em><em>, or </em><em>str</em>) – <p>Borehole data in one of three forms:</p>
+<ul>
+<li><p>A single borehole dict (keys: <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">X</span></code>, <code class="docutils literal notranslate"><span class="pre">Y</span></code>,
+<code class="docutils literal notranslate"><span class="pre">depth_top</span></code>, <code class="docutils literal notranslate"><span class="pre">depth_bottom</span></code>, <code class="docutils literal notranslate"><span class="pre">class_obs</span></code>, <code class="docutils literal notranslate"><span class="pre">class_prob</span></code>,
+and optionally <code class="docutils literal notranslate"><span class="pre">elevation</span></code>).</p></li>
+<li><p>A list of such dicts.</p></li>
+<li><p>A path to a JSON file written by <code class="xref py py-func docutils literal notranslate"><span class="pre">write_borehole()</span></code>.</p></li>
+</ul>
+<p>If any borehole dict contains a non-zero <code class="docutils literal notranslate"><span class="pre">elevation</span></code> key (float,
+metres above sea level), the function switches to <strong>elevation mode</strong>:
+the shared Y-axis shows absolute elevation instead of depth, and every
+borehole is vertically positioned at its ground-surface elevation.
+Boreholes without an <code class="docutils literal notranslate"><span class="pre">elevation</span></code> key (or with <code class="docutils literal notranslate"><span class="pre">elevation=0</span></code>) are
+treated as if they sit at elevation 0 m a.s.l.</p>
+</p></li>
+<li><p><strong>f_prior_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to an HDF5 prior file.  When supplied, class names and the
+RGB colormap stored on <code class="docutils literal notranslate"><span class="pre">Mstr</span></code> are used to colour and label the
+lithology intervals.  When omitted, a default <code class="docutils literal notranslate"><span class="pre">'tab10'</span></code> colormap
+is used and classes are labelled by their numeric ID.</p></li>
+<li><p><strong>Mstr</strong> (<em>str</em><em>, </em><em>optional</em>) – HDF5 dataset key that holds the discrete lithology model in
+<code class="docutils literal notranslate"><span class="pre">f_prior_h5</span></code> (default <code class="docutils literal notranslate"><span class="pre">'/M2'</span></code>).  Must point to a dataset with
+<code class="docutils literal notranslate"><span class="pre">is_discrete</span> <span class="pre">==</span> <span class="pre">1</span></code> and <code class="docutils literal notranslate"><span class="pre">class_id</span></code> / <code class="docutils literal notranslate"><span class="pre">class_name</span></code> attributes.</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save the figure to a PNG file.  Default is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>**kwargs</strong> – <dl class="simple">
+<dt>figsize<span class="classifier">tuple, optional</span></dt><dd><p>Figure size per subplot column, e.g. <code class="docutils literal notranslate"><span class="pre">(2,</span> <span class="pre">8)</span></code>.
+Default is <code class="docutils literal notranslate"><span class="pre">(2,</span> <span class="pre">8)</span></code> per well.</p>
+</dd>
+<dt>showInfo<span class="classifier">int, optional</span></dt><dd><p>Verbosity level. Default 0.</p>
+</dd>
+<dt>name<span class="classifier">str, optional</span></dt><dd><p>Base name for the saved PNG (without extension).
+Default is <code class="docutils literal notranslate"><span class="pre">'boreholes'</span></code>.</p>
+</dd>
+<dt>depth_max<span class="classifier">float, optional</span></dt><dd><p>Maximum depth shown on y-axis.  Defaults to the deepest
+<code class="docutils literal notranslate"><span class="pre">depth_bottom</span></code> value across all boreholes.</p>
+</dd>
+<dt>title<span class="classifier">str, optional</span></dt><dd><p>Overall figure title.</p>
+</dd>
+<dt>fontsize<span class="classifier">int or float, optional</span></dt><dd><p>Font size applied to all text elements (per-well headers, axis
+label, tick labels, legend); the overall <code class="docutils literal notranslate"><span class="pre">title</span></code> is drawn two
+points larger. If None, the module’s default sizes are used
+(default None).</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>fig</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_boreholes</span><span class="p">(</span><span class="n">BHOLES</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_boreholes</span><span class="p">(</span><span class="n">BHOLES</span><span class="p">,</span> <span class="n">f_prior_h5</span><span class="o">=</span><span class="s1">'PRIOR.h5'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_boreholes</span><span class="p">(</span><span class="s1">'all_boreholes.json'</span><span class="p">,</span> <span class="n">f_prior_h5</span><span class="o">=</span><span class="s1">'PRIOR.h5'</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_cumulative_probability_profile">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_cumulative_probability_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P_hypothesis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cumulative_probability_profile'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_cumulative_probability_profile" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the cumulative probability profile of different hypotheses.</p>
+<p>This function visualizes how the probability of different hypotheses accumulates
+over a sequence of data points, with each hypothesis represented as a colored
+area in a stacked plot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>P_hypothesis</strong> (<em>numpy.ndarray</em>) – A 2D array where each row represents a hypothesis and each column represents a data point. Values should be probabilities</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting index for the x-axis (data points)</p></li>
+<li><p><strong>i2</strong> (<em>int</em><em>, </em><em>optional</em>) – Ending index for the x-axis (data points). If 0, uses the number of data points in P_hypothesis</p></li>
+<li><p><strong>label</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – List of labels for each hypothesis. If None, generic labels will be created</p></li>
+<li><p><strong>colors</strong> (<em>list</em><em> or </em><em>numpy.ndarray</em><em>, </em><em>optional</em>) – List of colors for each hypothesis. If None, colors from the ‘hot’ colormap will be used</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, saves the figure to a file</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Base name for the output file when hardcopy is True</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None (displays the plot and optionally saves it to a file)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The plot shows how probabilities accumulate across hypotheses, with each hypothesis
+represented as a colored band. The total height of all bands at any x position equals 1.0
+(or the sum of probabilities for that data point).</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_data">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Dkey</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plType</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'imshow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uselog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_data" title="Link to this definition">¶</a></dt>
+<dd><p>Plot observational data from an HDF5 file.</p>
+<p>This function creates visualizations of electromagnetic data including time-series plots,
+2D image displays, and other data representations. Supports multiple data types and
+plotting styles for comprehensive data analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to the HDF5 file containing observational data</p></li>
+<li><p><strong>i_plot</strong> (<em>list</em><em> or </em><em>array-like</em><em>, </em><em>optional</em>) – Indices of data points to plot. If empty, plots all available data</p></li>
+<li><p><strong>Dkey</strong> (<em>str</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – Data keys/identifiers to plot. If empty, uses all available datasets</p></li>
+<li><p><strong>id</strong> (<em>int</em><em>, </em><em>optional</em>) – Dataset id to plot (e.g. id=1 plots only ‘D1’). If None (default) and
+Dkey is also unset, every dataset found in the file (D1, D2, …) is plotted.</p></li>
+<li><p><strong>plType</strong> (<em>str</em><em>, </em><em>optional</em>) – Plotting method - ‘imshow’ for 2D image display, ‘plot’ for line plots</p></li>
+<li><p><strong>uselog</strong> (<em>bool</em><em>, </em><em>optional</em>) – Apply logarithmic scaling to data visualization (default is True)</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em>) – Additional plotting arguments including hardcopy, figsize, colormap options</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None (creates matplotlib plots)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The function automatically handles different data formats and creates appropriate
+visualizations based on data dimensions and type. Supports saving plots to file
+when hardcopy=True is specified in kwargs.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_data_prior">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_data_prior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_str</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'d_obs'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ylim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['prior',</span> <span class="pre">'data']</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_data_prior" title="Link to this definition">¶</a></dt>
+<dd><p>Compare observed data with prior model predictions.</p>
+<p>Creates a logarithmic plot showing prior data realizations (model predictions)
+overlaid with observed data. Useful for validating forward models and
+assessing prior-data compatibility before inversion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_data_h5</strong> (<em>str</em>) – Path to the HDF5 file containing prior data realizations from forward modeling.</p></li>
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to the HDF5 file containing observed data.</p></li>
+<li><p><strong>nr</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of prior realizations to plot (default is 1000).</p></li>
+<li><p><strong>id</strong> (<em>int</em><em>, </em><em>optional</em>) – Data set identifier for prior data (default is 1).</p></li>
+<li><p><strong>id_data</strong> (<em>int</em><em>, </em><em>optional</em>) – Data set identifier for observed data. If None, uses same as id (default is None).</p></li>
+<li><p><strong>d_str</strong> (<em>str</em><em>, </em><em>optional</em>) – Data array key within the dataset (default is ‘d_obs’).</p></li>
+<li><p><strong>alpha</strong> (<em>float</em><em>, </em><em>optional</em>) – Transparency level for prior realization lines, range 0-1 (default is 0.5).</p></li>
+<li><p><strong>ylim</strong> (<em>tuple</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – Y-axis limits as (ymin, ymax). If None, uses automatic scaling (default is None).</p></li>
+<li><p><strong>plot_type</strong> (<em>str</em><em> or </em><em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – Which data to show: ‘prior’ (prior realizations only), ‘data’ (observed
+data only), or both. Accepts a single string or a list, e.g.
+plot_type=’prior’ or plot_type=[‘prior’, ‘data’] (default is
+[‘prior’, ‘data’], i.e. show both).</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments:
+- hardcopy : bool, save plot as PNG file (default True)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if plotting was successful.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Prior realizations are plotted as thin black lines with specified transparency.
+Observed data is plotted as thin red lines. The number of plotted realizations
+is limited by both the nr parameter and available data. Random sampling is
+used when more realizations are available than requested.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_data_prior_post">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_data_prior_post</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ylim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Dkey</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_data_prior_post" title="Link to this definition">¶</a></dt>
+<dd><p>Compare prior predictions, posterior predictions, and observed data.</p>
+<p>Creates logarithmic plots showing the evolution from prior to posterior
+predictions compared to observed data. Displays data fit quality and
+sampling results with temperature and evidence information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>i_plot</strong> (<em>int</em><em>, </em><em>optional</em>) – Index of specific observation to plot. If -1, plots random selection
+of data points (default is -1).</p></li>
+<li><p><strong>nr</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of realizations to plot for each type (default is 200).</p></li>
+<li><p><strong>id</strong> (<em>int</em><em> or </em><em>list</em><em> of </em><em>int</em><em>, </em><em>optional</em>) – Data set identifier(s) to plot. If 0, plots all available datasets.
+If list, plots each dataset separately (default is 0).</p></li>
+<li><p><strong>ylim</strong> (<em>tuple</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – Y-axis limits as (ymin, ymax). If None, uses automatic scaling (default is None).</p></li>
+<li><p><strong>Dkey</strong> (<em>list</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – Explicit data key specification. If empty, automatically detects
+available datasets (default is []).</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Level of debug output (0=none, &gt;0=verbose).</p></li>
+<li><p><strong>is_log</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use linear instead of logarithmic y-axis (default False).</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plot as PNG file (default False).</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Custom title for the plot. If not provided, uses default format
+<code class="docutils literal notranslate"><span class="pre">'Data</span> <span class="pre">set</span> <span class="pre">{Dkey},</span> <span class="pre">Observation</span> <span class="pre">#</span> <span class="pre">{i_plot+1}'</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays plots but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The plot shows three data types:
+- Prior realizations (wheat/gray lines): model predictions before inversion
+- Posterior realizations (black lines): model predictions after inversion
+- Observed data (red dots with error bars): actual measurements</p>
+<p>For specific observations (i_plot &gt;= 0), temperature and log evidence
+values are displayed. Random subsets are used when more realizations
+are available than requested.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_data_xy">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_data_xy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Dkey</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'D1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'d_obs'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_channel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uselog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_data_xy" title="Link to this definition">¶</a></dt>
+<dd><p>Create 2D spatial plot of actual data values from electromagnetic surveys.</p>
+<p>Generates a scatter plot showing the spatial distribution of survey data
+with color-coding based on actual measured values. Useful for visualizing
+data distribution and identifying spatial patterns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to the HDF5 file containing observational data.</p></li>
+<li><p><strong>Dkey</strong> (<em>str</em><em>, </em><em>optional</em>) – Data group identifier to plot (e.g., ‘D1’, ‘D2’, default is ‘D1’).</p></li>
+<li><p><strong>data_key</strong> (<em>str</em><em>, </em><em>optional</em>) – Data dataset to plot within the group (default is ‘d_obs’).
+Options: ‘d_obs’, ‘d_std’, or other datasets in the data group.</p></li>
+<li><p><strong>data_channel</strong> (<em>int</em><em>, </em><em>optional</em>) – Channel/gate number to plot for multi-channel data (default is 0).
+For data of shape [N_stations, N_channels], selects which channel to display.</p></li>
+<li><p><strong>uselog</strong> (<em>bool</em><em>, </em><em>optional</em>) – Apply logarithmic scaling to the colorbar (default is False).</p></li>
+<li><p><strong>clim</strong> (<em>list</em><em>, </em><em>optional</em>) – Color scale limits as [min, max]. If empty list, uses automatic limits
+(default is []).</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments:
+- hardcopy : bool, save plot as PNG file (default False)
+- s : int, marker size for scatter plot (default 20)
+- cmap : str, colormap name (default ‘viridis’)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The matplotlib figure object containing the plot.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Coordinates are automatically scaled to kilometers for better readability.
+The plot uses equal aspect ratio and includes grid lines. For multi-channel
+data, only the specified channel is displayed. Figure size is automatically
+adjusted based on the aspect ratio of the survey area.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_discrete_data_entropy">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_discrete_data_entropy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_reduce</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'min'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_discrete_data_entropy" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the pointwise entropy of one or more multinomial discrete data
+entries in a DATA HDF5 file, as a 2D map via <a class="reference internal" href="#integrate.integrate_plot.plot_xy" title="integrate.integrate_plot.plot_xy"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_xy()</span></code></a>.</p>
+<p>See <code class="xref py py-func docutils literal notranslate"><span class="pre">discrete_data_entropy()</span></code> for how the entropy value at each
+location is computed. Useful for visualizing, on a map, where one or
+more discrete-type observations (e.g. borehole-derived data written by
+<code class="xref py py-func docutils literal notranslate"><span class="pre">save_borehole_data()</span></code>) constrain the inversion versus where they
+don’t — low entropy marks confident/informative locations, high entropy
+marks uninformative ones.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to the DATA HDF5 file.</p></li>
+<li><p><strong>id_list</strong> (<em>int</em><em> or </em><em>list</em><em> of </em><em>int</em><em>, </em><em>optional</em>) – One or more dataset ids referencing multinomial /D{id} groups
+(e.g. from <code class="docutils literal notranslate"><span class="pre">save_borehole_data()</span></code>’s <code class="docutils literal notranslate"><span class="pre">id_out</span></code> / <code class="docutils literal notranslate"><span class="pre">id_borehole_list</span></code>).
+If <code class="docutils literal notranslate"><span class="pre">None</span></code> (default), every /D{id} group in the file with
+<code class="docutils literal notranslate"><span class="pre">noise_model</span> <span class="pre">==</span> <span class="pre">'multinomial'</span></code> is used.</p></li>
+<li><p><strong>depth_reduce</strong> (<em>{'min'</em><em>, </em><em>'mean'}</em><em>, </em><em>optional</em>) – See <code class="xref py py-func docutils literal notranslate"><span class="pre">discrete_data_entropy()</span></code>. Default <code class="docutils literal notranslate"><span class="pre">'min'</span></code>.</p></li>
+<li><p><strong>**kwargs</strong> – Forwarded to <a class="reference internal" href="#integrate.integrate_plot.plot_xy" title="integrate.integrate_plot.plot_xy"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_xy()</span></code></a> (e.g. cmap, clim, hardcopy, title, ax, …).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>As returned by <a class="reference internal" href="#integrate.integrate_plot.plot_xy" title="integrate.integrate_plot.plot_xy"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_xy()</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>fig, ax, sc</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">sc</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">plot_discrete_data_entropy</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">id_borehole_list</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_feature_2d">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_feature_2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iz</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elevation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uselog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_feature_2d" title="Link to this definition">¶</a></dt>
+<dd><p>Create 2D spatial scatter plot of model parameter features.</p>
+<p>Generates a 2D scatter plot showing the spatial distribution of a specific
+model parameter feature from posterior sampling results. Supports both
+continuous and discrete parameters with appropriate colormaps and scaling.
+For discrete model parameters (e.g., geological units), displays class
+names on the colorbar when plotting Mode or other discrete statistics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>key</strong> (<em>str</em><em>, </em><em>optional</em>) – <p>Dataset key within the model group to plot. If empty string,
+automatically selects ‘Median’ for continuous parameters or ‘Mode’
+for discrete parameters (default is ‘’).</p>
+<p><strong>Continuous parameters</strong>: ‘Mean’, ‘Median’, ‘Std’</p>
+<p><strong>Discrete parameters</strong>: ‘Mode’, ‘P’ (probability), ‘Entropy’</p>
+</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting data point index for plotting (1-based indexing, default is 1).</p></li>
+<li><p><strong>i2</strong> (<em>float</em><em>, </em><em>optional</em>) – Ending data point index for plotting. If larger than data size,
+uses all available data (default is 1e+9).</p></li>
+<li><p><strong>im</strong> (<em>int</em><em>, </em><em>optional</em>) – Model index to plot from (e.g., 1 for M1, 2 for M2, default is 1).</p></li>
+<li><p><strong>iz</strong> (<em>int</em><em>, </em><em>optional</em>) – Feature/layer index within the model parameter array (default is 0).
+Ignored if elevation is specified.</p></li>
+<li><p><strong>elevation</strong> (<em>float</em><em>, </em><em>optional</em>) – Absolute elevation in meters at which to extract and plot the feature.
+If provided, extracts values at this elevation using interpolation
+instead of using layer index iz (default is None).</p></li>
+<li><p><strong>ic</strong> (<em>int</em><em>, </em><em>optional</em>) – Class index for probability extraction when key=’P’. Required when
+plotting probabilities at a specific elevation or layer. If not provided,
+defaults to 0 (first class) when needed (default is None).</p></li>
+<li><p><strong>uselog</strong> (<em>int</em><em>, </em><em>optional</em>) – Apply logarithmic normalization to color scale (1=True, 0=False, default is 1).
+Automatically disabled for discrete statistics (Mode, P, Entropy).</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Custom plot title. If None, auto-generates descriptive title (default is None).</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save the plot as a PNG file with auto-generated filename (default is False).</p></li>
+<li><p><strong>cmap</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Colormap specification (e.g., ‘viridis’, ‘magma_r’, ‘RdYlBu’).
+If None, uses colormap from prior file for discrete parameters or
+default ‘resistivity’ colormap for continuous parameters (default is None).
+When explicitly provided, overrides discrete colormap from prior file.</p></li>
+<li><p><strong>clim</strong> (<em>list</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Color scale limits as [min, max]. If None, uses automatic limits
+(default is None). For discrete parameters, automatically set to span
+all class IDs unless explicitly provided. When explicitly provided,
+disables discrete colorbar with class labels.</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – <p>Additional keyword arguments:</p>
+<ul>
+<li><p><strong>plotPoints</strong> (bool): If True, overlay small black dots at each
+data point location (default is False). Useful for showing data
+coverage.</p></li>
+<li><p><strong>showInfo</strong> (int): Debug output level (0=none, 1=basic, 2=verbose,
+default is 0).</p></li>
+<li><p><strong>s</strong> (float): Marker size for scatter plot (default is 1).</p></li>
+<li><p>Other matplotlib scatter() parameters.</p></li>
+</ul>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays the plot but does not return a value.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p><strong>Automatic Parameter Type Detection</strong></p>
+<p>The function automatically detects whether the model parameter is discrete
+(e.g., geological unit classifications) or continuous (e.g., resistivity).</p>
+<p><strong>Discrete Parameters</strong>:</p>
+<ul class="simple">
+<li><p>Uses discrete colormap from prior file (unless user provides cmap)</p></li>
+<li><p>Creates colorbar with class names instead of numeric values (unless user provides clim)</p></li>
+<li><p>Applies linear scaling (logarithmic scaling is disabled)</p></li>
+<li><p>Inverts colorbar axis to match standard conventions</p></li>
+</ul>
+<p>Class information is retrieved from prior file attributes:
+‘class_id’, ‘class_name’, and ‘cmap’.</p>
+<p><strong>Continuous Parameters</strong>:</p>
+<ul class="simple">
+<li><p>Uses standard colormaps (resistivity, viridis, etc.)</p></li>
+<li><p>Logarithmic scaling by default (disable with uselog=0)</p></li>
+<li><p>Continuous colorbar with numeric values</p></li>
+</ul>
+<p><strong>Elevation vs Layer Modes</strong>:</p>
+<p>When elevation is specified:</p>
+<ul class="simple">
+<li><p>Uses extract_feature_at_elevation() to interpolate values at that elevation</p></li>
+<li><p>Works with all keys including ‘P’ (probability)</p></li>
+<li><p>For key=’P’, the ic parameter specifies which class probability to plot</p></li>
+<li><p>Title shows elevation (e.g., “M2/Median[elev=40.0m]”)</p></li>
+</ul>
+<p>When iz is specified (and elevation is None):</p>
+<ul class="simple">
+<li><p>Directly extracts values from layer iz</p></li>
+<li><p>For key=’P’, plots probability for class ic at layer iz</p></li>
+<li><p>Title shows layer index (e.g., “M1/Median[iz=5]”)</p></li>
+</ul>
+<p><strong>Colormap and Colorbar Control</strong>:</p>
+<ul class="simple">
+<li><p>Providing cmap overrides discrete colormap from prior file</p></li>
+<li><p>Providing clim disables discrete colorbar (useful for Entropy)</p></li>
+<li><p>This allows full customization of visualization</p></li>
+</ul>
+<p class="rubric">Examples</p>
+<p><strong>Continuous Parameters - Using Layer Index (iz)</strong></p>
+<p>Plot median resistivity at layer 5:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">integrate</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ig</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Median'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">iz</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot standard deviation at layer 3 with custom colormap:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Std'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">iz</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">cmap</span><span class="o">=</span><span class="s1">'viridis'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Continuous Parameters - Using Elevation</strong></p>
+<p>Plot median resistivity at 40m elevation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Median'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">elevation</span><span class="o">=</span><span class="mi">40</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot mean with data point overlay:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Mean'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">elevation</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">plotPoints</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Discrete Parameters - Using Layer Index (iz)</strong></p>
+<p>Plot most probable class (Mode) at layer 3:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Mode'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">iz</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot probability of class 2 at layer 4:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'P'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">iz</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">ic</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot entropy (uncertainty) at layer 2:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Entropy'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">iz</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Discrete Parameters - Using Elevation</strong></p>
+<p>Plot Mode at 30m elevation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Mode'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">elevation</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot probability of class 7 at -30m elevation with custom colormap:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'P'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">elevation</span><span class="o">=-</span><span class="mi">30</span><span class="p">,</span> <span class="n">ic</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">cmap</span><span class="o">=</span><span class="s1">'magma_r'</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Plot Entropy with continuous colorbar (override discrete):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Entropy'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">elevation</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+</pre></div>
+</div>
+<p><strong>Advanced Usage</strong></p>
+<p>Plot subset of data with custom settings:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="s1">'POST.h5'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'Median'</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">iz</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">i1</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">i2</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'RdYlBu'</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">100</span><span class="p">],</span> <span class="n">plotPoints</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_feature_at_elevation</span></code></dt><dd><p>Extract feature values at specific elevation</p>
+</dd>
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_discrete_classes</span></code></dt><dd><p>Retrieve class IDs and names for discrete parameters</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_geometry">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_geometry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ii</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([],</span> <span class="pre">dtype=float64)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pl</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ELEVATION'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_geometry" title="Link to this definition">¶</a></dt>
+<dd><p>Plot survey geometry data from INTEGRATE HDF5 files.</p>
+<p>Creates 2D scatter plots showing the spatial distribution of survey lines,
+elevation data, and data point indices. Useful for visualizing survey
+layout and data coverage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_data_h5</strong> (<em>str</em>) – Path to the HDF5 file containing geometry data. Can be either a data
+file or posterior file (function automatically detects and uses correct file).</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting index for data points to plot (0-based indexing, default is 0).</p></li>
+<li><p><strong>i2</strong> (<em>int</em><em>, </em><em>optional</em>) – Ending index for data points to plot. If 0, uses all available data
+(default is 0).</p></li>
+<li><p><strong>ii</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – Specific array of indices to plot. If provided, overrides i1 and i2
+(default is empty array).</p></li>
+<li><p><strong>pl</strong> (<em>{'all'</em><em>, </em><em>'LINE'</em><em>, </em><em>'ELEVATION'</em><em>, </em><em>'id'</em><em>, </em><em>'NDATA'}</em><em>, </em><em>optional</em>) – Type of geometry plot to generate (default is ‘all’):
+- ‘all’: plot all geometry types
+- ‘LINE’: survey line numbers only
+- ‘ELEVATION’: elevation data only
+- ‘id’: data point indices only
+- ‘NDATA’: number of valid (non-NaN) data points per location</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plots as PNG files with descriptive names (default is False).</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em><em>, </em><em>optional</em>) – Matplotlib axes object to plot on. If None, creates new figures
+(default is None).</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments passed to matplotlib scatter function.</p></li>
+<li><p><strong>s</strong> (<em>int</em><em>, </em><em>optional</em>) – Size of scatter plot markers in points (default is 1).</p></li>
+<li><p><strong>cmap</strong> (<em>str</em><em> or </em><em>matplotlib.colors.Colormap</em><em>, </em><em>optional</em>) – Colormap to use for color-coding the scatter plots (default is ‘jet’).
+Can be any valid matplotlib colormap name or colormap object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays plots but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function automatically extracts geometry data (X, Y, LINE, ELEVATION)
+and creates equal-aspect plots with appropriate colorbars and grid lines.
+All data points are shown as light gray background with selected points highlighted.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_post_stats">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_post_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Mkey</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showInfo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_post_stats" title="Link to this definition">¶</a></dt>
+<dd><p>Visualize posterior model parameter distributions and sample realizations.</p>
+<p>Creates comprehensive plots showing parameter histograms and spatial/temporal
+realizations for posterior model parameters at a specific data point. Similar
+to plot_prior_stats() but displays the posterior distribution (accepted samples)
+for a selected observation location.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>i_plot</strong> (<em>int</em><em>, </em><em>optional</em>) – Data point index to visualize (0-based indexing, default is 0).
+This selects which observation’s posterior to display.</p></li>
+<li><p><strong>Mkey</strong> (<em>str</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – Model parameter key(s) to plot (e.g., ‘M1’, ‘M2’). If empty list,
+plots statistics for all available model parameters (default is []).</p></li>
+<li><p><strong>nr</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of posterior realizations to display in realization plots.
+Actual number used is minimum of nr and available accepted samples (default is 100).</p></li>
+<li><p><strong>use_log</strong> (<em>bool</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Whether to use log10 scale for both histogram and realizations plot. If None
+(default), automatically determines scale based on data range:
+- Discrete parameters: always linear
+- Continuous parameters: log if data spans &gt; 2 orders of magnitude, else linear
+Set to True to force log10 scale, or False to force linear scale.</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Verbosity level for diagnostic output. If &gt; 0, prints data range and
+auto-selected scale choice (default is 0).</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plots as PNG files (default True).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays plots but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Creates a 1x3 subplot layout with custom width ratios.</p>
+<p>For continuous parameters: left panel (width 1) shows a histogram of posterior
+samples, middle panel (width 1.5) shows posterior statistics vs depth (Mean,
+Median, ±1 Std, using pre-computed stats when available), and right panel
+(width 2) shows the accepted realizations.</p>
+<p>For discrete parameters: left panel (width 1) shows a class distribution
+histogram, middle panel (width 2) shows class probabilities vs depth for the
+posterior, and right panel (width 3) shows categorical realizations.</p>
+<p>The function reads i_use[i_plot, :] to get accepted sample indices from the
+posterior file, then retrieves corresponding realizations from the referenced
+prior file.</p>
+<p>For continuous parameters, the histogram shows either log10(values) or linear
+values, and the realizations use corresponding LogNorm or linear colormap
+normalization.</p>
+<p>The layout uses matplotlib GridSpec with width_ratios=[1, 1.5, 2] for continuous
+and [1, 2, 3] for discrete parameters.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Plot posterior for first data point, all models</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plot_post_stats</span><span class="p">(</span><span class="s1">'posterior.h5'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Plot posterior for data point 100, model M1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plot_post_stats</span><span class="p">(</span><span class="s1">'posterior.h5'</span><span class="p">,</span> <span class="n">i_plot</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">Mkey</span><span class="o">=</span><span class="s1">'M1'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Force linear scale for continuous parameter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plot_post_stats</span><span class="p">(</span><span class="s1">'posterior.h5'</span><span class="p">,</span> <span class="n">i_plot</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">Mkey</span><span class="o">=</span><span class="s1">'M1'</span><span class="p">,</span> <span class="n">use_log</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_posterior_cumulative_thickness">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_posterior_cumulative_thickness</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">icat</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[0]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">property</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'median'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">usePrior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_posterior_cumulative_thickness" title="Link to this definition">¶</a></dt>
+<dd><p>Plot posterior cumulative thickness for specified categories.</p>
+<p>Creates a scatter plot showing the spatial distribution of cumulative thickness
+statistics (median, mean, standard deviation, or relative standard deviation)
+for selected geological categories from posterior sampling results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>im</strong> (<em>int</em><em>, </em><em>optional</em>) – Model index for thickness calculation (default is 2).</p></li>
+<li><p><strong>icat</strong> (<em>int</em><em> or </em><em>list</em><em> of </em><em>int</em><em>, </em><em>optional</em>) – Category index or list of category indices to include in thickness calculation
+(default is [0]).</p></li>
+<li><p><strong>property</strong> (<em>{'median'</em><em>, </em><em>'mean'</em><em>, </em><em>'std'</em><em>, </em><em>'relstd'}</em><em>, </em><em>optional</em>) – Statistical property to plot (default is ‘median’):
+- ‘median’: median thickness
+- ‘mean’: mean thickness
+- ‘std’: standard deviation of thickness
+- ‘relstd’: relative standard deviation (std/median)</p></li>
+<li><p><strong>usePrior</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to use prior data instead of posterior data (default is False).</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – <p>Additional keyword arguments:</p>
+<ul>
+<li><p>hardcopy : bool, save plot as PNG file (default False)</p></li>
+<li><p>s : float, scatter point size (default 10)</p></li>
+</ul>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The matplotlib figure object containing the plot.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function calls ig.posterior_cumulative_thickness() to compute thickness
+statistics and creates a 2D scatter plot with equal aspect ratio and colorbar.
+Output files are saved with descriptive names when hardcopy=True.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_prior_stats">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_prior_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Mkey</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showInfo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">panels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">('hist',</span> <span class="pre">'stats',</span> <span class="pre">'reals')</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_prior_stats" title="Link to this definition">¶</a></dt>
+<dd><p>Visualize prior model parameter distributions and sample realizations.</p>
+<p>Creates comprehensive plots showing parameter histograms, logarithmic
+distributions, and spatial/temporal realizations for prior model
+parameters. Useful for validating prior distributions before inversion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em>) – Path to the HDF5 file containing prior model realizations.</p></li>
+<li><p><strong>Mkey</strong> (<em>str</em><em> or </em><em>list</em><em>, </em><em>optional</em>) – Model parameter key(s) to plot (e.g., ‘M1’, ‘M2’). If empty list,
+plots statistics for all available model parameters (default is []).</p></li>
+<li><p><strong>nr</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of realizations to display in realization plots.
+Actual number used is minimum of nr and available realizations (default is 100).</p></li>
+<li><p><strong>use_log</strong> (<em>bool</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Whether to use log10 scale for both histogram and realizations plot. If None
+(default), automatically determines scale based on data range:
+- Discrete parameters: always linear
+- Continuous parameters: log if data spans &gt; 2 orders of magnitude, else linear
+Set to True to force log10 scale, or False to force linear scale.
+For continuous parameters, this controls both the histogram bins (log10 values)
+and the color normalization in the realizations plot (LogNorm vs linear).</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Verbosity level for diagnostic output. If &gt; 0, prints data range and
+auto-selected scale choice (default is 0).</p></li>
+<li><p><strong>panels</strong> (<em>str</em><em> or </em><em>sequence</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – Which of the sub-panels to draw, any subset of
+<code class="docutils literal notranslate"><span class="pre">('hist',</span> <span class="pre">'stats',</span> <span class="pre">'reals')</span></code> (left histogram, middle stats-vs-depth,
+right realizations panel). Order is fixed regardless of how it is
+given; a single string is accepted. Panels not available for the
+parameter (e.g. <code class="docutils literal notranslate"><span class="pre">'stats'</span></code> for a scalar) are silently skipped.
+Default is all three.</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plots as PNG files (default True).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays plots but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Creates a 1x3 subplot layout with custom width ratios (fewer if <code class="docutils literal notranslate"><span class="pre">panels</span></code>
+selects a subset).</p>
+<p>For continuous parameters: left panel (width 1) shows a histogram,
+middle panel (width 1.5) shows statistics vs depth (Mean, Median, ±1 Std),
+and right panel (width 2) shows realizations with LogNorm or linear colormap.</p>
+<p>For discrete parameters: left panel (width 1) shows a class distribution
+histogram, middle panel (width 2) shows class probabilities vs depth,
+and right panel (width 3) shows categorical realizations.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">use_log</span></code> parameter controls log10 vs linear scaling for histogram bins
+and colormap normalization. When <code class="docutils literal notranslate"><span class="pre">use_log=None</span></code>, log scale is chosen
+automatically for continuous parameters spanning more than 2 orders of magnitude.</p>
+<p><strong>Automatic Scale Selection (when use_log=None):</strong>
+For continuous parameters, the function automatically chooses between log and
+linear scale based on the data range. Log scale is used if the data spans more
+than 2 orders of magnitude (e.g., 0.1 to 100 or larger), otherwise linear scale
+is used. This ensures appropriate visualization for both wide-range parameters
+(like resistivity) and narrow-range parameters (like thickness in meters).</p>
+<p>Color limits and colormaps are automatically retrieved from file attributes.
+Multi-dimensional parameters show spatial patterns, while single parameters
+show temporal variation.</p>
+<p>The layout uses matplotlib GridSpec with width_ratios=[1, 1.5, 2] for continuous
+and [1, 2, 3] for discrete parameters.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Plot with default (log10 for continuous, linear for discrete)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plot_prior_stats</span><span class="p">(</span><span class="s1">'prior.h5'</span><span class="p">,</span> <span class="n">Mkey</span><span class="o">=</span><span class="s1">'M1'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Force linear scale for continuous parameter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plot_prior_stats</span><span class="p">(</span><span class="s1">'prior.h5'</span><span class="p">,</span> <span class="n">Mkey</span><span class="o">=</span><span class="s1">'M1'</span><span class="p">,</span> <span class="n">use_log</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Force log scale</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plot_prior_stats</span><span class="p">(</span><span class="s1">'prior.h5'</span><span class="p">,</span> <span class="n">Mkey</span><span class="o">=</span><span class="s1">'M1'</span><span class="p">,</span> <span class="n">use_log</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_profile">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ii</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([],</span> <span class="pre">dtype=float64)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xaxis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gap_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">panels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_profile" title="Link to this definition">¶</a></dt>
+<dd><p>Plot 1D profiles from posterior sampling results.</p>
+<p>This function creates vertical profile plots showing the posterior distribution
+of model parameters as a function of depth or model layer. Automatically
+detects model type (discrete or continuous) and calls appropriate plotting function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting index for the data points to plot (1-based indexing, default is 1).</p></li>
+<li><p><strong>i2</strong> (<em>float</em><em>, </em><em>optional</em>) – Ending index for the data points to plot (1-based indexing, default is 1e+9).</p></li>
+<li><p><strong>ii</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – Specific array of indices to plot. If provided, overrides i1 and i2 (default is empty array).</p></li>
+<li><p><strong>im</strong> (<em>int</em><em>, </em><em>optional</em>) – Model identifier to plot. If 0, automatically detects and plots all models (default is 0).</p></li>
+<li><p><strong>xaxis</strong> (<em>str</em><em>, </em><em>optional</em>) – X-axis type for plotting (default is ‘index’).
+Options:
+- ‘index’ : Sequential indices (0, 1, 2, …)
+- ‘id’ : Data point ID from the file
+- ‘x’ : X coordinate (easting)
+- ‘y’ : Y coordinate (northing)</p></li>
+<li><p><strong>gap_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Threshold for making large gaps transparent. If the distance between consecutive data points exceeds this value, the region becomes transparent. If None, no gap transparency is applied (default is None).</p></li>
+<li><p><strong>panels</strong> (<em>list</em><em> of </em><em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – <p>Controls which panels to display. Options depend on model type:</p>
+<p>For continuous models: [‘value’, ‘std’, ‘stats’]
+For discrete models: [‘mode’, ‘entropy’, ‘stats’]</p>
+<p>See plot_profile_continuous() and plot_profile_discrete() for detailed options (default is None, shows all panels).</p>
+</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional plotting arguments passed to discrete/continuous plotting functions.
+Both model types support ‘alpha’ (float, 0.0-1.0) to apply uncertainty-based
+transparency to the main profile panel (median/mean for continuous, mode for discrete).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Creates matplotlib plots.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function automatically computes posterior statistics if not present in the file.
+For discrete models, calls plot_profile_discrete(). For continuous models,
+calls plot_profile_continuous().</p>
+<p class="rubric">Examples</p>
+<p>Plot all models with all panels:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot only median resistivity for model 1:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Plot mode and stats for discrete model 2:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Plot discrete model with full uncertainty transparency on mode:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot continuous model with partial transparency:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot profile with X coordinates on x-axis:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot profile with Y coordinates on x-axis:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'y'</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Plot profile with data IDs on x-axis:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'id'</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_profile_continuous">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_profile_continuous</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ii</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([],</span> <span class="pre">dtype=float64)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xaxis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gap_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">panels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_profile_continuous" title="Link to this definition">¶</a></dt>
+<dd><p>Create vertical profile plots for continuous model parameters.</p>
+<p>Generates a 4-panel plot showing continuous parameter distributions with depth,
+including mean/median values, standard deviation, and temperature/evidence curves.
+Supports transparency based on uncertainty for better visualization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting data point index for profile plotting (1-based indexing, default is 1).</p></li>
+<li><p><strong>i2</strong> (<em>float</em><em>, </em><em>optional</em>) – Ending data point index for profile plotting. If larger than data size,
+uses all available data (default is 1e+9).</p></li>
+<li><p><strong>ii</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – Specific array of indices to plot. If provided, overrides i1 and i2 (default is empty array).</p></li>
+<li><p><strong>im</strong> (<em>int</em><em>, </em><em>optional</em>) – Model index to plot (e.g., 1 for M1, 2 for M2, default is 1).</p></li>
+<li><p><strong>xaxis</strong> (<em>str</em><em>, </em><em>optional</em>) – X-axis type for plotting (default is ‘id’).
+Options:
+- ‘index’ : Sequential indices (0, 1, 2, …)
+- ‘id’ : Data point ID from the file
+- ‘x’ : X coordinate (easting)
+- ‘y’ : Y coordinate (northing)</p></li>
+<li><p><strong>gap_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Threshold for making large gaps transparent. If the distance between consecutive data points exceeds this value, regions after the gaps become completely transparent to indicate missing data. If None, no gap transparency is applied (default is None).</p></li>
+<li><p><strong>panels</strong> (<em>list</em><em> of </em><em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Controls which panels to display. Each panel maintains consistent size regardless of which are shown.
+Options:
+- None (default): Show all panels [‘value’, ‘std’, ‘stats’]
+- [‘value’]: Only median/mean resistivity
+- [‘std’]: Only standard deviation
+- [‘stats’]: Only temperature and log-likelihood
+- Any combination of the above (e.g., [‘value’, ‘stats’])
+Accepted panel names: ‘value’, ‘median’, ‘mean’, ‘harmonicmean’, ‘std’, ‘uncertainty’, ‘stats’, ‘temperature’, ‘t’
+Using a statistic name (<code class="docutils literal notranslate"><span class="pre">'median'</span></code>, <code class="docutils literal notranslate"><span class="pre">'mean'</span></code>, <code class="docutils literal notranslate"><span class="pre">'harmonicmean'</span></code>) as the panel name also
+selects that statistic as the plotted value, overriding the default <code class="docutils literal notranslate"><span class="pre">key</span></code>.</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plot as PNG file (default False).</p></li>
+<li><p><strong>cmap</strong> (<em>str</em><em> or </em><em>colormap</em><em>, </em><em>optional</em>) – Color scheme for plotting (default <code class="docutils literal notranslate"><span class="pre">'jet'</span></code>).</p></li>
+<li><p><strong>key</strong> (<em>str</em><em>, </em><em>optional</em>) – Statistic to plot in the value panel: <code class="docutils literal notranslate"><span class="pre">'Mean'</span></code>, <code class="docutils literal notranslate"><span class="pre">'Median'</span></code>, or <code class="docutils literal notranslate"><span class="pre">'HarmonicMean'</span></code> (default <code class="docutils literal notranslate"><span class="pre">'HarmonicMean'</span></code>).</p></li>
+<li><p><strong>alpha</strong> (<em>float</em><em>, </em><em>optional</em>) – Transparency scaling factor based on normalized standard deviation (0.0=no
+transparency, default; 1.0=full uncertainty-based transparency).</p></li>
+<li><p><strong>txt</strong> (<em>str</em><em>, </em><em>optional</em>) – Additional text for filename.</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Level of debug output (0=none, &gt;0=verbose).</p></li>
+<li><p><strong>clim</strong> (<em>list</em><em>, </em><em>optional</em>) – Color scale limits <code class="docutils literal notranslate"><span class="pre">[min,</span> <span class="pre">max]</span></code>.</p></li>
+<li><p><strong>logstd_min</strong> (<em>float</em><em>, </em><em>optional</em>) – Lower bound for transparency normalization, in the log10(Std) space shown in
+the ‘std’ panel; cells at or below render fully opaque (default <code class="docutils literal notranslate"><span class="pre">0.5</span></code>).</p></li>
+<li><p><strong>logstd_max</strong> (<em>float</em><em>, </em><em>optional</em>) – Upper bound for transparency normalization, in log10(Std) space; cells at or
+above render with maximum transparency (default <code class="docutils literal notranslate"><span class="pre">1.0</span></code>).
+This log10(Std) normalization is the default. Example: <code class="docutils literal notranslate"><span class="pre">logstd_max=2.5</span></code> →
+fully transparent above std=316.</p></li>
+<li><p><strong>std_min</strong> (<em>float</em><em>, </em><em>optional</em>) – If given (with or instead of <code class="docutils literal notranslate"><span class="pre">std_max</span></code>), normalization switches to linear
+<code class="docutils literal notranslate"><span class="pre">Std</span></code> space instead of log10(Std); values below render fully opaque.
+Default in that mode is <code class="docutils literal notranslate"><span class="pre">np.nanmin(Std)</span></code>.</p></li>
+<li><p><strong>std_max</strong> (<em>float</em><em>, </em><em>optional</em>) – Linear-space upper bound; values above render with maximum transparency.
+Default in that mode is <code class="docutils literal notranslate"><span class="pre">0.6</span> <span class="pre">*</span> <span class="pre">np.nanmax(Std)</span></code>.</p></li>
+<li><p><strong>show_n_unique</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, adds a plot of unique realizations in the stats panel (default False).</p></li>
+<li><p><strong>plot_kl</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, plot KL divergence instead of standard deviation in the std panel.
+Falls back to Std if <code class="docutils literal notranslate"><span class="pre">/Mx/KL</span></code> does not exist (default False).</p></li>
+<li><p><strong>fontsize</strong> (<em>int</em><em> or </em><em>float</em><em>, </em><em>optional</em>) – Font size applied to all text elements (titles, axis labels, colorbar labels,
+tick labels). If None, matplotlib’s current default is used (default None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays the plot but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The plot structure uses 3 subplots: ax[0] shows mean or median values
+(or a line plot with confidence bounds for single-parameter models), ax[1]
+shows standard deviation or KL divergence (hidden for single-parameter models),
+and ax[2] shows temperature and evidence curves.</p>
+<p>Transparency can be applied based on uncertainty levels when alpha &gt; 0.
+Depth coordinates are computed relative to surface elevation.</p>
+<p class="rubric">Examples</p>
+<p>Show only median resistivity profile:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_continuous</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Show median with full uncertainty transparency (alpha=1.0):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_continuous</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Show median with partial transparency (alpha=0.5):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_continuous</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Show median and stats (no std):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_continuous</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Show only standard deviation:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_continuous</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'std'</span><span class="p">])</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_profile_discrete">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_profile_discrete</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ii</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([],</span> <span class="pre">dtype=float64)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xaxis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'index'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gap_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">panels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_profile_discrete" title="Link to this definition">¶</a></dt>
+<dd><p>Create vertical profile plots for discrete categorical model parameters.</p>
+<p>Generates a 3-panel plot showing discrete model parameter distributions
+with depth, including mode, entropy, and temperature/evidence curves.
+Designed for geological unit classification results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5</strong> (<em>str</em>) – Path to the HDF5 file containing posterior sampling results.</p></li>
+<li><p><strong>i1</strong> (<em>int</em><em>, </em><em>optional</em>) – Starting data point index for profile plotting (1-based indexing, default is 1).</p></li>
+<li><p><strong>i2</strong> (<em>float</em><em>, </em><em>optional</em>) – Ending data point index for profile plotting. If larger than data size,
+uses all available data (default is 1e+9).</p></li>
+<li><p><strong>ii</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – Specific array of indices to plot. If provided, overrides i1 and i2 (default is empty array).</p></li>
+<li><p><strong>im</strong> (<em>int</em><em>, </em><em>optional</em>) – Model index to plot (e.g., 1 for M1, 2 for M2, default is 1).</p></li>
+<li><p><strong>xaxis</strong> (<em>str</em><em>, </em><em>optional</em>) – X-axis type for plotting (default is ‘index’).
+Options:
+- ‘index’ : Sequential indices (0, 1, 2, …)
+- ‘id’ : Data point ID from the file
+- ‘x’ : X coordinate (easting)
+- ‘y’ : Y coordinate (northing)</p></li>
+<li><p><strong>gap_threshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Threshold for making large gaps transparent. If the distance between consecutive data points exceeds this value, regions after the gaps become completely transparent to indicate missing data. If None, no gap transparency is applied (default is None).</p></li>
+<li><p><strong>panels</strong> (<em>list</em><em> of </em><em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – <p>Controls which panels to display. Each panel maintains consistent size regardless of which are shown.
+Options:
+- None (default): Show all panels [‘mode’, ‘entropy’, ‘stats’]
+- [‘mode’]: Only mode (most probable class)
+- [‘entropy’]: Only entropy (uncertainty)
+- [‘stats’]: Only temperature and log-likelihood
+- Any combination of the above (e.g., [‘mode’, ‘stats’])
+Accepted panel names: ‘mode’, ‘entropy’, ‘stats’, ‘temperature’, ‘t’</p>
+<p>Note: The stats panel optionally shows the number of unique realizations
+when show_n_unique=True is passed in kwargs.</p>
+</p></li>
+<li><p><strong>alpha</strong> (<em>float</em><em>, </em><em>optional</em>) – Transparency scaling factor based on entropy (0.0=no transparency, default;
+1.0=full entropy-based transparency where high-uncertainty regions become transparent).</p></li>
+<li><p><strong>entropy_min</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum entropy for transparency scaling; values below are fully opaque.
+Default is <code class="docutils literal notranslate"><span class="pre">np.nanmin(Entropy)</span></code> from the data.</p></li>
+<li><p><strong>entropy_max</strong> (<em>float</em><em>, </em><em>optional</em>) – Maximum entropy for transparency scaling; values above reach maximum transparency.
+Default is <code class="docutils literal notranslate"><span class="pre">0.6</span> <span class="pre">*</span> <span class="pre">np.nanmax(Entropy)</span></code>.</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em>, </em><em>optional</em>) – Save plot as PNG file (default False).</p></li>
+<li><p><strong>txt</strong> (<em>str</em><em>, </em><em>optional</em>) – Additional text for filename.</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Level of debug output (0=none, &gt;0=verbose).</p></li>
+<li><p><strong>show_n_unique</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, adds a plot of the number of unique realizations in the stats panel,
+sharing the temperature y-axis (default False).</p></li>
+<li><p><strong>clim</strong> (<em>list</em><em>, </em><em>optional</em>) – Color scale limits for discrete classes.</p></li>
+<li><p><strong>plot_kl</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, plot KL divergence instead of entropy in the entropy panel.
+KL is plotted only if the <code class="docutils literal notranslate"><span class="pre">/Mx/KL</span></code> dataset exists; otherwise entropy
+is used as fallback (default False).</p></li>
+<li><p><strong>fontsize</strong> (<em>int</em><em> or </em><em>float</em><em>, </em><em>optional</em>) – Font size applied to all text elements (titles, axis labels, colorbar labels,
+tick labels). If None, matplotlib’s current default is used (default None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Function creates and displays the plot but does not return values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The plot structure uses 3 subplots: ax[0] shows the mode (most probable class,
+optionally with entropy-based transparency), ax[1] shows entropy (0=certain,
+1=maximum uncertainty), and ax[2] shows temperature and evidence curves.</p>
+<p>Class names and colors are automatically retrieved from prior file attributes.
+Depth coordinates are computed relative to surface elevation.</p>
+<p>When alpha &gt; 0, the mode panel shows both classification and uncertainty in one
+view: solid colors indicate high certainty, transparent colors indicate high
+uncertainty.
+The alpha value (0.0 to 1.0) controls the strength of this transparency effect.</p>
+<p class="rubric">Examples</p>
+<p>Show only mode profile:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Show mode with full uncertainty transparency (alpha=1.0):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Show mode with partial transparency (alpha=0.5):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Show mode and stats (no entropy):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Show only entropy:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'entropy'</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Show all panels with transparency on mode:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Show mode with custom entropy range for transparency:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_profile_discrete</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">entropy_min</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">entropy_max</span><span class="o">=</span><span class="mf">0.7</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_voronoi_cells">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_voronoi_cells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">AREA</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hot_r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_edge_affected</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_voronoi_cells" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the Voronoi cells of a region returned by <code class="xref py py-func docutils literal notranslate"><span class="pre">find_coherent_area()</span></code>.</p>
+<p>Every cell in <code class="docutils literal notranslate"><span class="pre">AREA['cells']</span></code> is drawn as a polygon. Cells that failed
+the edge filter (<code class="docutils literal notranslate"><span class="pre">AREA['good']</span> <span class="pre">==</span> <span class="pre">False</span></code>) are hatched grey. If <code class="docutils literal notranslate"><span class="pre">P</span></code>
+(one value per sounding, same length as <code class="docutils literal notranslate"><span class="pre">AREA['cells']</span></code>) is given, the
+kept cells are filled and colour-mapped by <code class="docutils literal notranslate"><span class="pre">P</span></code>; otherwise they are
+drawn unfilled, just the cell boundaries (the Voronoi tessellation).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>AREA</strong> (<em>dict</em>) – Output of <code class="xref py py-func docutils literal notranslate"><span class="pre">find_coherent_area()</span></code> (or any dict with the same
+<code class="docutils literal notranslate"><span class="pre">cells</span></code> / <code class="docutils literal notranslate"><span class="pre">good</span></code> / <code class="docutils literal notranslate"><span class="pre">boundary</span></code> keys).</p></li>
+<li><p><strong>P</strong> (<em>ndarray</em><em> (</em><em>N</em><em>,</em><em>)</em><em>, </em><em>optional</em>) – Per-sounding value to colour the kept cells by (e.g. <code class="docutils literal notranslate"><span class="pre">P_raw</span></code>).</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib Axes</em><em>, </em><em>optional</em>) – Draw into this axes instead of a new figure.</p></li>
+<li><p><strong>cmap</strong> (colour-mapping of <cite>P</cite> (ignored if <cite>P</cite> is None).)</p></li>
+<li><p><strong>vmin</strong> (colour-mapping of <cite>P</cite> (ignored if <cite>P</cite> is None).)</p></li>
+<li><p><strong>vmax</strong> (colour-mapping of <cite>P</cite> (ignored if <cite>P</cite> is None).)</p></li>
+<li><p><strong>show_edge_affected</strong> (<em>bool</em>) – Draw the dropped (edge-affected) cells, hatched grey.</p></li>
+<li><p><strong>show_boundary</strong> (<em>bool</em>) – Draw the concave survey outline (<code class="docutils literal notranslate"><span class="pre">AREA['boundary']</span></code>).</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em> or </em><em>str</em>) – Save the figure as PNG (<code class="docutils literal notranslate"><span class="pre">True</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">'voronoi_cells.png'</span></code>, or a
+given file name).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The figure/axes, and the coloured <cite>PatchCollection</cite> to pass to
+<code class="docutils literal notranslate"><span class="pre">fig.colorbar(mappable,</span> <span class="pre">...)</span></code> (<code class="docutils literal notranslate"><span class="pre">None</span></code> if <cite>P</cite> was not given).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>fig, ax, mappable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.plot_xy">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">plot_xy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">im</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uselog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorbar_label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorbar_ticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorbar_ticklabels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">colorbar_invert</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardcopy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotPoints</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotPoints_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'0.7'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotPoints_marker</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotPoints_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotPoints_alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fontsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.plot_xy" title="Link to this definition">¶</a></dt>
+<dd><p>Core 2D scatter map: plot any array of values at survey (X, Y) locations.</p>
+<p>This is the backbone for all 2D spatial scatter plots in INTEGRATE.
+X and Y are resolved from keyword arguments in priority order:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">X</span></code> / <code class="docutils literal notranslate"><span class="pre">Y</span></code> passed directly.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">f_data_h5</span></code> → <code class="docutils literal notranslate"><span class="pre">get_geometry(f_data_h5)</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">f_post_h5</span></code> → <code class="docutils literal notranslate"><span class="pre">get_geometry(f_post_h5)</span></code> (auto-follows <code class="docutils literal notranslate"><span class="pre">f5_data</span></code> attr).</p></li>
+</ol>
+<p>Colormap and color limits are resolved in priority order:</p>
+<ol class="arabic simple">
+<li><p>Explicit <code class="docutils literal notranslate"><span class="pre">cmap</span></code> / <code class="docutils literal notranslate"><span class="pre">clim</span></code> parameters.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">im</span></code> + <code class="docutils literal notranslate"><span class="pre">f_prior_h5</span></code> → read from <code class="docutils literal notranslate"><span class="pre">/M{im}</span></code> attributes via
+<a class="reference internal" href="#integrate.integrate_plot.h5_get_clim_cmap" title="integrate.integrate_plot.h5_get_clim_cmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">h5_get_clim_cmap()</span></code></a>.</p></li>
+<li><p>Fallback: <a class="reference internal" href="#integrate.integrate_plot.get_colormap_and_limits" title="integrate.integrate_plot.get_colormap_and_limits"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_colormap_and_limits()</span></code></a> <code class="docutils literal notranslate"><span class="pre">('default')</span></code> / matplotlib
+auto-scale.</p></li>
+</ol>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>values</strong> (<em>array-like</em><em>, </em><em>shape</em><em> (</em><em>N</em><em>,</em><em>)</em>) – Per-location colour values.</p></li>
+<li><p><strong>X</strong> (<em>array-like</em><em>, </em><em>optional</em>) – UTM-X coordinates (m). Required unless <code class="docutils literal notranslate"><span class="pre">f_data_h5</span></code> or <code class="docutils literal notranslate"><span class="pre">f_post_h5</span></code>
+is provided.</p></li>
+<li><p><strong>Y</strong> (<em>array-like</em><em>, </em><em>optional</em>) – UTM-Y coordinates (m). Required unless <code class="docutils literal notranslate"><span class="pre">f_data_h5</span></code> or <code class="docutils literal notranslate"><span class="pre">f_post_h5</span></code>
+is provided.</p></li>
+<li><p><strong>f_data_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to DATA.h5; X/Y extracted via <code class="xref py py-func docutils literal notranslate"><span class="pre">get_geometry()</span></code>.</p></li>
+<li><p><strong>f_post_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to POST.h5; X/Y extracted via <code class="xref py py-func docutils literal notranslate"><span class="pre">get_geometry()</span></code> (follows the
+<code class="docutils literal notranslate"><span class="pre">f5_data</span></code> attribute to the source data file).</p></li>
+<li><p><strong>im</strong> (<em>int</em><em>, </em><em>optional</em>) – Model parameter index (e.g. 1 for <code class="docutils literal notranslate"><span class="pre">/M1</span></code>). Used together with
+<code class="docutils literal notranslate"><span class="pre">f_prior_h5</span></code> to read colormap and limits from the prior model.</p></li>
+<li><p><strong>f_prior_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to PRIOR.h5. Used together with <code class="docutils literal notranslate"><span class="pre">im</span></code> to read <code class="docutils literal notranslate"><span class="pre">cmap</span></code>/<code class="docutils literal notranslate"><span class="pre">clim</span></code>.</p></li>
+<li><p><strong>cmap</strong> (<em>colormap</em><em>, </em><em>optional</em>) – Matplotlib colormap. Overrides prior-model lookup.</p></li>
+<li><p><strong>clim</strong> (<em>list</em><em> [</em><em>min</em><em>, </em><em>max</em><em>]</em><em>, </em><em>optional</em>) – Color limits. Overrides prior-model lookup.</p></li>
+<li><p><strong>uselog</strong> (<em>bool</em><em>, </em><em>optional</em>) – Apply <code class="docutils literal notranslate"><span class="pre">LogNorm</span></code> normalisation (default <code class="docutils literal notranslate"><span class="pre">False</span></code>).</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Axes title.</p></li>
+<li><p><strong>colorbar</strong> (<em>bool</em><em>, </em><em>optional</em>) – Add a colorbar (default <code class="docutils literal notranslate"><span class="pre">True</span></code>).</p></li>
+<li><p><strong>colorbar_label</strong> (<em>str</em><em>, </em><em>optional</em>) – Label for the colorbar.</p></li>
+<li><p><strong>colorbar_ticks</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Custom tick positions on the colorbar (useful for discrete data).</p></li>
+<li><p><strong>colorbar_ticklabels</strong> (<em>array-like</em><em>, </em><em>optional</em>) – Custom tick labels matching <code class="docutils literal notranslate"><span class="pre">colorbar_ticks</span></code>.</p></li>
+<li><p><strong>colorbar_invert</strong> (<em>bool</em><em>, </em><em>optional</em>) – Invert the colorbar y-axis (default <code class="docutils literal notranslate"><span class="pre">False</span></code>).</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em><em>, </em><em>optional</em>) – Axes to draw on. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, a new figure is created sized to the
+aspect ratio of the data extent.</p></li>
+<li><p><strong>s</strong> (<em>float</em><em>, </em><em>optional</em>) – Marker size for scatter (default 5).</p></li>
+<li><p><strong>hardcopy</strong> (<em>bool</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, save to an auto-named PNG. If a string, use it as the
+filename (extension added if missing).</p></li>
+<li><p><strong>plotPoints</strong> (<em>bool</em><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, draw all survey locations as small background dots before
+the coloured scatter, making the full coverage visible and showing
+locations with no valid data (NaN) in a neutral colour (default <code class="docutils literal notranslate"><span class="pre">False</span></code>).</p></li>
+<li><p><strong>plotPoints_color</strong> (<em>str</em><em> or </em><em>colour</em><em>, </em><em>optional</em>) – Colour for the background dots when <code class="docutils literal notranslate"><span class="pre">plotPoints=True</span></code> (default <code class="docutils literal notranslate"><span class="pre">'0.7'</span></code>
+— light grey). Using a neutral grey avoids confusion with class colours.</p></li>
+<li><p><strong>plotPoints_marker</strong> (<em>str</em><em>, </em><em>optional</em>) – Marker style for the background dots when <code class="docutils literal notranslate"><span class="pre">plotPoints=True</span></code> (default <code class="docutils literal notranslate"><span class="pre">'.'</span></code>).</p></li>
+<li><p><strong>plotPoints_size</strong> (<em>float</em><em>, </em><em>optional</em>) – Marker size for the background dots when <code class="docutils literal notranslate"><span class="pre">plotPoints=True</span></code>
+(default: <code class="docutils literal notranslate"><span class="pre">max(0.3,</span> <span class="pre">s</span> <span class="pre">*</span> <span class="pre">0.4)</span></code>).</p></li>
+<li><p><strong>plotPoints_alpha</strong> (<em>float</em><em>, </em><em>optional</em>) – Marker alpha for the background dots when <code class="docutils literal notranslate"><span class="pre">plotPoints=True</span></code> (default <code class="docutils literal notranslate"><span class="pre">0.6</span></code>).</p></li>
+<li><p><strong>**kwargs</strong> – Forwarded to <code class="docutils literal notranslate"><span class="pre">ax.scatter()</span></code> for the main (coloured) scatter.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>fig</strong> (<em>matplotlib.figure.Figure</em>)</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em>)</p></li>
+<li><p><strong>sc</strong> (<em>matplotlib.collections.PathCollection</em>) – The scatter collection returned by <code class="docutils literal notranslate"><span class="pre">ax.scatter()</span></code>.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">sc</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">plot_xy</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">f_post_h5</span><span class="o">=</span><span class="s1">'POST.h5'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">sc</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">plot_xy</span><span class="p">(</span><span class="n">rho</span><span class="p">[:,</span> <span class="mi">5</span><span class="p">],</span> <span class="n">f_data_h5</span><span class="o">=</span><span class="s1">'DATA.h5'</span><span class="p">,</span>
+<span class="gp">... </span>                         <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">f_prior_h5</span><span class="o">=</span><span class="s1">'PRIOR.h5'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_plot.setup_matplotlib_backend">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_plot.</span></span><span class="sig-name descname"><span class="pre">setup_matplotlib_backend</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_plot.setup_matplotlib_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Configure matplotlib to use an interactive backend if available.</p>
+<p>This function automatically detects the environment and configures matplotlib
+to use an appropriate backend for displaying plots:</p>
+<ul class="simple">
+<li><p>In Jupyter notebooks: Does nothing (notebooks handle backend automatically)</p></li>
+<li><p>In regular Python scripts: Tries to use TkAgg, Qt5Agg, or GTK3Agg</p></li>
+<li><p>Falls back to Agg if no GUI backend available</p></li>
+</ul>
+<p>Safe to call in both scripts and notebooks. Specifically designed for WSL
+with WSLg support where GUI applications work but matplotlib may default
+to non-interactive backends.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">integrate</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ig</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">setup_matplotlib_backend</span><span class="p">()</span>  <span class="c1"># Call before importing matplotlib.pyplot</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+</pre></div>
+</div>
+<p class="rubric">Notes</p>
+<p>Call this function before importing matplotlib.pyplot to ensure the backend
+is configured correctly. If called in a Jupyter notebook, it will detect this
+and do nothing, allowing the notebook to use its built-in backends.</p>
+<p>If no interactive backend is available (e.g., tkinter not installed), the
+function will print a warning and fall back to the Agg backend (file-only).
+To install tkinter on Ubuntu/Debian: sudo apt-get install python3-tk</p>
+</dd></dl>
+
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="integrate_borehole.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">integrate_borehole</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="integrate_io.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">integrate_io</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023,2024,2025 INTEGRATE WORKING GROUP
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">integrate_plot</a><ul>
+<li><a class="reference internal" href="#integrate.integrate_plot.find_points_along_line_segments"><code class="docutils literal notranslate"><span class="pre">find_points_along_line_segments()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.get_colormap_and_limits"><code class="docutils literal notranslate"><span class="pre">get_colormap_and_limits()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.h5_get_clim_cmap"><code class="docutils literal notranslate"><span class="pre">h5_get_clim_cmap()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_T_EV"><code class="docutils literal notranslate"><span class="pre">plot_T_EV()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_boreholes"><code class="docutils literal notranslate"><span class="pre">plot_boreholes()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_cumulative_probability_profile"><code class="docutils literal notranslate"><span class="pre">plot_cumulative_probability_profile()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_data"><code class="docutils literal notranslate"><span class="pre">plot_data()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_data_prior"><code class="docutils literal notranslate"><span class="pre">plot_data_prior()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_data_prior_post"><code class="docutils literal notranslate"><span class="pre">plot_data_prior_post()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_data_xy"><code class="docutils literal notranslate"><span class="pre">plot_data_xy()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_discrete_data_entropy"><code class="docutils literal notranslate"><span class="pre">plot_discrete_data_entropy()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_feature_2d"><code class="docutils literal notranslate"><span class="pre">plot_feature_2d()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_geometry"><code class="docutils literal notranslate"><span class="pre">plot_geometry()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_post_stats"><code class="docutils literal notranslate"><span class="pre">plot_post_stats()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_posterior_cumulative_thickness"><code class="docutils literal notranslate"><span class="pre">plot_posterior_cumulative_thickness()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_prior_stats"><code class="docutils literal notranslate"><span class="pre">plot_prior_stats()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_profile"><code class="docutils literal notranslate"><span class="pre">plot_profile()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_profile_continuous"><code class="docutils literal notranslate"><span class="pre">plot_profile_continuous()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_profile_discrete"><code class="docutils literal notranslate"><span class="pre">plot_profile_discrete()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_voronoi_cells"><code class="docutils literal notranslate"><span class="pre">plot_voronoi_cells()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.plot_xy"><code class="docutils literal notranslate"><span class="pre">plot_xy()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_plot.setup_matplotlib_backend"><code class="docutils literal notranslate"><span class="pre">setup_matplotlib_backend()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=f4d81ccd"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    </body>
+</html>

@@ -1,0 +1,1021 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Getting started with INTEGRATE - with no forward code" href="integrate_getting_started_no_forward.html"><link rel="prev" title="Getting Started" href="index.html">
+        <link rel="canonical" href="https://cultpenguin.github.io/integrate_module/auto_examples/10_getting_started/integrate_getting_started.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>Getting started with INTEGRATE - INTEGRATE 0.99.8 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">INTEGRATE 0.99.8 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">INTEGRATE 0.99.8 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../gettingstarted.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../format.html">Data format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../format_wells.html">Borehole Data Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../format_query.html">Query Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../prior_data.html">Prior Data Generation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rejection.html">Rejection Sampling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../workflow.html">Workflows</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Example Gallery</a><input aria-label="Toggle navigation of Example Gallery" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Getting started with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="integrate_getting_started_no_forward.html">Getting started with INTEGRATE - with no forward code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="integrate_getting_started_posterior_only.html">Getting started with INTEGRATE - posterior analysis only</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../20_workflow/index.html">The Complete Workflow</a><input aria-label="Toggle navigation of The Complete Workflow" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../20_workflow/integrate_workflow.html">The complete INTEGRATE workflow: from data to posterior</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../30_data/index.html">Data</a><input aria-label="Toggle navigation of Data" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../30_data/integrate_boreholes.html">Borehole data in INTEGRATE – representation and integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../30_data/integrate_dual_data.html">Dual data types (low and high moment seperately)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../40_noise/index.html">Noise</a><input aria-label="Toggle navigation of Noise" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../40_noise/integrate_gaussian_noise.html">Synthetic Case Study example with different noise models (uncorrelated/correlated)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../50_hypothesis/index.html">Hypothesis Testing</a><input aria-label="Toggle navigation of Hypothesis Testing" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../50_hypothesis/integrate_daugaard_multi_prior.html">Daugaard Case Study with three lithology-resistivity prior models.</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../50_hypothesis/integrate_daugaard_multi_prior_multi_data.html">Daugaard Case Study with geology-resistivity-category prior models.</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../60_query/index.html">Querying the Posterior</a><input aria-label="Toggle navigation of Querying the Posterior" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../60_query/integrate_query.html">query: Posterior Query Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../70_synthetic/index.html">Synthetic Case</a><input aria-label="Toggle navigation of Synthetic Case" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../70_synthetic/integrate_synthetic_case.html">INTEGRATE Synthetic Case Study example</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../80_plotting/index.html">Plotting</a><input aria-label="Toggle navigation of Plotting" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../80_plotting/integrate_profiles.html">Profile Visualization in INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../85_rawmaterial/index.html">Raw Material Assessment</a><input aria-label="Toggle navigation of Raw Material Assessment" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../85_rawmaterial/integrate_rawmaterial_daugaard.html">Daugaard: probabilistic raw-material assessment with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../85_rawmaterial/integrate_rawmaterial_sdrfelding.html">Sdr. Felding: probabilistic raw-material assessment with INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../90_other/index.html">Other Examples</a><input aria-label="Toggle navigation of Other Examples" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_esbjerg.html">INTEGRATE on ESBJERG data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_linear_logspace.html">Data, and noise, in linear or log space</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_merge_data.html">Merging multiple data files from the same survey (ESBJERG)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_merge_prior.html">INTEGRATE - Demonstration of merge_prior() function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_priors.html">INTEGRATE -Generic Prior Model Generation Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_timing_example.html">INTEGRATE Timing Analysis Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../contributions.html">Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../modules.html">Modules (documentation)</a><input aria-label="Toggle navigation of Modules (documentation)" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate.html">integrate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_rejection.html">integrate_rejection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_io.html">integrate_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_plot.html">integrate_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_borehole.html">integrate_borehole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_query.html">integrate_query</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          
+
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-auto-examples-10-getting-started-integrate-getting-started-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="getting-started-with-integrate">
+<span id="sphx-glr-auto-examples-10-getting-started-integrate-getting-started-py"></span><h1>Getting started with INTEGRATE<a class="headerlink" href="#getting-started-with-integrate" title="Link to this heading">¶</a></h1>
+<p>This notebook contains a simple example for getting started with INTEGRATE.</p>
+<p>The workflow follows these main steps:</p>
+<p>0. Load electromagnetic data (DAUGAARD.h5)
+1a. Set up a prior model, creating the file PRIOR.h5
+1b. Update the prior model with forward-modeled data in PRIOR.h5
+2. Perform probabilistic inversion using integrate_rejection, creating POST.h5
+3. Plot and analyze the results</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="kn">import</span><span class="w"> </span><span class="nn">integrate</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ig</span><span class="w">
+</span><span class="n">hardcopy</span> <span class="o">=</span> <span class="kc">True</span><span class="w">
+</span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="nn">.</span><span class="nn">pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span><span class="w">
+</span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="w">
+</span></pre></div></div>
+<section id="get-ttem-data">
+<h2>0. Get TTEM data<a class="headerlink" href="#get-ttem-data" title="Link to this heading">¶</a></h2>
+<p>Several test cases are available in the INTEGRATE package.
+To see which cases are available, check the <code class="docutils literal notranslate"><span class="pre">get_case_data</span></code> function.</p>
+<p>The code below downloads the file DAUGAARD_AVG.h5 that contains
+TTEM (time-domain electromagnetic) soundings from Daugaard, Denmark.
+It also downloads the corresponding GEX file, TX07_20231016_2x4_RC20-33.gex,
+which contains information about the TTEM system configuration and parameters.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">case</span> <span class="o">=</span> <span class="s1">'</span><span class="s1">DAUGAARD</span><span class="s1">'</span><span class="w">
+</span><span class="n">files</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">get_case_data</span><span class="p">(</span><span class="n">case</span><span class="o">=</span><span class="n">case</span><span class="p">,</span> <span class="n">showInfo</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="w">
+</span><span class="n">f_data_h5</span> <span class="o">=</span> <span class="n">files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w">
+</span><span class="n">file_gex</span><span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">get_gex_file_from_data</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">)</span><span class="w">
+</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="s2">Using data file: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">f_data_h5</span><span class="p">)</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="s2">Using GEX file: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">file_gex</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting data for case: DAUGAARD
+
+Downloading DAUGAARD:   0%|          | 0/4 [00:00&lt;?, ?it/s]File DAUGAARD_AVG.h5 already exists. Skipping download.
+File TX07_20231016_2x4_RC20-33.gex already exists. Skipping download.
+File daugaard_12boreholes.json already exists. Skipping download.
+File README_DAUGAARD already exists. Skipping download.
+
+Downloading DAUGAARD: 100%|██████████| 4/4 [00:00&lt;00:00, 41943.04it/s]
+--&gt; Got data for case: DAUGAARD
+Using data file: DAUGAARD_AVG.h5
+Using GEX file: TX07_20231016_2x4_RC20-33.gex
+</pre></div>
+</div>
+<section id="plot-the-geometry-and-data">
+<h3>Plot the geometry and data<a class="headerlink" href="#plot-the-geometry-and-data" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ig.plot_geometry</span></code> plots the spatial geometry of the data (i.e., the locations of the soundings).
+<code class="docutils literal notranslate"><span class="pre">ig.plot_data</span></code> plots the measured electromagnetic data for each sounding.</p>
+<p>The commented line below would plot LINE, ELEVATION and data id as three scatter plots:
+ig.plot_geometry(f_data_h5)
+Each plot can be generated separately by specifying the ‘pl’ argument:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">LINE</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">ELEVATION</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">id</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_001.png" srcset="../../_images/sphx_glr_integrate_getting_started_001.png" alt="LINE" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_002.png" srcset="../../_images/sphx_glr_integrate_getting_started_002.png" alt="ELEVATION" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_003.png" srcset="../../_images/sphx_glr_integrate_getting_started_003.png" alt="id" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>f_data_h5=DAUGAARD_AVG.h5
+f_data_h5=DAUGAARD_AVG.h5
+f_data_h5=DAUGAARD_AVG.h5
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">useSubset</span> <span class="o">=</span> <span class="kc">False</span><span class="w">
+</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">LINE</span><span class="p">,</span> <span class="n">ELEVATION</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">get_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Find points within buffer distance</span><span class="w">
+</span><span class="n">Xl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="p">[</span><span class="mi">544000</span><span class="p">,</span> <span class="mi">543550</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="n">Yl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="p">[</span><span class="mi">6174500</span><span class="p">,</span> <span class="mi">6176500</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="c1">#Xl = np.array([544000, 543550, 543000])</span><span class="w">
+</span><span class="c1">#Yl = np.array([6174500, 6176500, 6176400])</span><span class="w">
+</span><span class="n">buffer</span> <span class="o">=</span> <span class="mf">10.0</span><span class="w">
+</span><span class="n">indices</span><span class="p">,</span> <span class="n">distances</span><span class="p">,</span> <span class="n">segment_ids</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">find_points_along_line_segments</span><span class="p">(</span><span class="w">
+</span>    <span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Xl</span><span class="p">,</span> <span class="n">Yl</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">buffer</span><span class="w">
+</span><span class="p">)</span><span class="w">
+</span><span class="n">i_line</span> <span class="o">=</span> <span class="n">indices</span><span class="w">
+</span><span class="k">if</span> <span class="n">useSubset</span><span class="p">:</span><span class="w">
+</span>    <span class="n">i_use</span> <span class="o">=</span> <span class="n">i_line</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">ELEVATION</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Xl</span><span class="p">,</span> <span class="n">Yl</span><span class="p">,</span><span class="s1">'</span><span class="s1">ko</span><span class="s1">'</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">i_use</span><span class="p">]</span><span class="p">,</span> <span class="n">Y</span><span class="p">[</span><span class="n">i_use</span><span class="p">]</span><span class="p">,</span> <span class="s1">'</span><span class="s1">ko</span><span class="s1">'</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">'</span><span class="s1">Profile line</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="w">
+</span><span class="k">else</span><span class="p">:</span><span class="w">
+</span><span class="c1"># Use all data 1:len(X)</span><span class="w">
+</span>    <span class="n">i_use</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<p>The electromagnetic data (d_obs and d_std) can be plotted using ig.plot_data:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_data</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Plot data channel 15 in an XY grid</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_data_xy</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">data_channel</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">)</span><span class="p">;</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_004.png" srcset="../../_images/sphx_glr_integrate_getting_started_004.png" alt="Dataset D1, d_obs: observed data, d_std: standard deviation, Relative noise, % (d_std / d_obs × 100)" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_005.png" srcset="../../_images/sphx_glr_integrate_getting_started_005.png" alt="Data set D1 - d_obs (channel 15)" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;Figure size 1200x930.341 with 2 Axes&gt;
+</pre></div>
+</div>
+</section>
+</section>
+<section id="set-up-the-prior-model-rho-mathbf-m-mathbf-d">
+<h2>1. Set up the prior model ($rho(mathbf{m},mathbf{d})$)<a class="headerlink" href="#set-up-the-prior-model-rho-mathbf-m-mathbf-d" title="Link to this heading">¶</a></h2>
+<p>In this example, a simple layered prior model will be considered.
+The prior represents our initial beliefs about subsurface resistivity structure.
+%%
+1a. Generate prior model parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</p>
+<p>First, we generate a sample of the prior model parameters, $rho(mathbf{m})$.</p>
+<p>As an example, we choose a simple layered Earth model.
+The number of layers follows a chi-squared distribution with 4 degrees of freedom,
+and the resistivity in each layer is log-uniformly distributed between [1,3000] Ωm.</p>
+<p>This creates N realizations of 3 types of model parameters:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span class="n">PRIOR</span><span class="p">:</span><span class="o">/</span><span class="n">M1</span><span class="p">:</span> <span class="mi">1</span><span class="n">D</span> <span class="n">resistivity</span> <span class="n">values</span> <span class="ow">in</span> <span class="mi">1</span><span class="n">m</span> <span class="n">thick</span> <span class="n">layers</span> <span class="n">down</span> <span class="n">to</span> <span class="mi">90</span><span class="n">m</span> <span class="n">depth</span><span class="w">
+</span><span class="n">PRIOR</span><span class="p">:</span><span class="o">/</span><span class="n">M2</span><span class="p">:</span> <span class="mi">1</span><span class="n">D</span> <span class="n">resistivity</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">discrete</span> <span class="n">parameter</span> <span class="n">sets</span> <span class="n">where</span> <span class="n">the</span> <span class="n">first</span><span class="w">
+</span>           <span class="n">Nlayer</span> <span class="n">parameters</span> <span class="n">are</span> <span class="n">resistivities</span><span class="p">,</span> <span class="ow">and</span> <span class="n">the</span> <span class="n">last</span> <span class="n">Nlayer</span><span class="o">-</span><span class="mi">1</span><span class="w">
+</span>           <span class="n">parameters</span> <span class="n">are</span> <span class="n">depths</span> <span class="n">to</span> <span class="n">the</span> <span class="n">base</span> <span class="n">of</span> <span class="n">each</span> <span class="n">layer</span><span class="w">
+</span><span class="n">PRIOR</span><span class="p">:</span><span class="o">/</span><span class="n">M3</span><span class="p">:</span> <span class="n">The</span> <span class="n">number</span> <span class="n">of</span> <span class="n">layers</span> <span class="ow">in</span> <span class="n">each</span> <span class="n">model</span> <span class="n">realization</span><span class="w">
+</span></pre></div></div>
+<p>Select how many prior model realizations (N) should be generated</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">N</span><span class="o">=</span><span class="mi">2000000</span><span class="w">
+</span><span class="n">N</span><span class="o">=</span><span class="mi">10000</span><span class="w">
+</span><span class="w">
+</span><span class="n">f_prior_h5</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">prior_model_layered</span><span class="p">(</span><span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span><span class="n">lay_dist</span><span class="o">=</span><span class="s1">'</span><span class="s1">chi2</span><span class="s1">'</span><span class="p">,</span> <span class="n">NLAY_deg</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">RHO_min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">RHO_max</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span> <span class="n">f_prior_h5</span><span class="o">=</span><span class="s1">'</span><span class="s1">PRIOR_N</span><span class="si">%d</span><span class="s1">.h5</span><span class="s1">'</span> <span class="o">%</span> <span class="n">N</span><span class="p">,</span><span class="w">
+</span>                                    <span class="n">showInfo</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="w">
+</span><span class="c1">#print('%s is used to hold prior realizations' % (f_prior_h5))</span><span class="w">
+</span></pre></div></div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>prior_layered:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+
+prior_model_layered: Saving prior model to PRIOR_N10000.h5
+</pre></div>
+</div>
+<p>Plot summary statistics of the prior model for quality control of the prior choice</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_prior_stats</span><span class="p">(</span><span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_006.png" srcset="../../_images/sphx_glr_integrate_getting_started_006.png" alt="PRIOR_N10000 - resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_007.png" srcset="../../_images/sphx_glr_integrate_getting_started_007.png" alt="PRIOR_N10000 - sparse - depth-resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_008.png" srcset="../../_images/sphx_glr_integrate_getting_started_008.png" alt="PRIOR_N10000 - Number of layers" class = "sphx-glr-multi-img"/></li>
+</ul>
+<section id="b-generate-corresponding-prior-data">
+<h3>1b. Generate corresponding prior data<a class="headerlink" href="#b-generate-corresponding-prior-data" title="Link to this heading">¶</a></h3>
+<p>Next, we generate a corresponding sample of $rho(mathbf{d})$ (prior data distribution).</p>
+<p>The prior data, corresponding to the prior model parameters, are computed using
+the GA-AEM electromagnetic forward modeling code and the GEX system configuration file.</p>
+<p>Option 1: Update the existing PRIOR.h5 file with forward-modeled data</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="c1"># set the default hdf file to be the f_prior_data_h5 (without extension) + file_gex (without extension) + .h5</span><span class="w">
+</span><span class="n">f_prior_data_h5</span> <span class="o">=</span> <span class="s1">'</span><span class="si">%s</span><span class="s1">_</span><span class="si">%s</span><span class="s1">_Nh280_Nf12.h5</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="n">f_prior_h5</span><span class="p">[</span><span class="p">:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span><span class="p">,</span> <span class="n">file_gex</span><span class="p">[</span><span class="p">:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span><span class="n">useExistingData</span> <span class="o">=</span> <span class="kc">True</span><span class="w">
+</span><span class="k">if</span> <span class="n">useExistingData</span><span class="p">:</span><span class="w">
+</span>    <span class="c1"># if exist f_post_data_h5 then used it, otherwise create it</span><span class="w">
+</span>    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span><span class="w">
+</span>    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">f_prior_data_h5</span><span class="p">)</span><span class="p">:</span><span class="w">
+</span>        <span class="n">f_prior_data_h5</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">prior_data_em</span><span class="p">(</span><span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">file_gex</span><span class="p">,</span> <span class="n">doMakePriorCopy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">f_prior_data_h5</span><span class="o">=</span><span class="n">f_prior_data_h5</span><span class="p">)</span><span class="w">
+</span>    <span class="k">else</span><span class="p">:</span><span class="w">
+</span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'</span><span class="s1">Using existing prior data file: </span><span class="si">%s</span><span class="s1">'</span> <span class="o">%</span> <span class="n">f_prior_data_h5</span><span class="p">)</span><span class="w">
+</span><span class="w">
+</span><span class="c1">#f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)</span><span class="w">
+</span><span class="w">
+</span><span class="nb">print</span><span class="p">(</span><span class="s1">'</span><span class="s1">Updated </span><span class="si">%s</span><span class="s1"> to hold prior data (forward-modeled responses)</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="n">f_prior_data_h5</span><span class="p">)</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Using existing prior data file: PRIOR_N10000_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5
+Updated PRIOR_N10000_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5 to hold prior data (forward-modeled responses)
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">D</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">load_prior_data</span><span class="p">(</span><span class="n">f_prior_data_h5</span><span class="p">)</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w">
+</span></pre></div></div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Loading prior data from PRIOR_N10000_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5. Using prior data ids: []
+  - /D1:  N,nd = 10000/40
+</pre></div>
+</div>
+<p>It is useful to compare the prior data to the observed data before inversion.
+If there is little to no overlap between observed and prior data, the inversion
+is unlikely to succeed, indicating inconsistency between the prior model and observations.
+In the figure below, you can see that the observed data (red) falls clearly within
+the range of the prior data distribution.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_data_prior</span><span class="p">(</span><span class="n">f_prior_data_h5</span><span class="p">,</span><span class="n">f_data_h5</span><span class="p">,</span><span class="n">nr</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<img src="../../_images/sphx_glr_integrate_getting_started_009.png" srcset="../../_images/sphx_glr_integrate_getting_started_009.png" alt="D1: Prior (black) vs Observed (red)" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>True
+</pre></div>
+</div>
+</section>
+</section>
+<section id="sample-the-posterior-distribution-sigma-mathbf-m">
+<h2>2. Sample the posterior distribution $sigma(mathbf{m})$<a class="headerlink" href="#sample-the-posterior-distribution-sigma-mathbf-m" title="Link to this heading">¶</a></h2>
+<p>The posterior distribution is sampled using the extended rejection sampler.</p>
+<p>Rejection sampling of the posterior can be done with default settings using:
+f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5)</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="c1"># However, you can control several important options.</span><span class="w">
+</span><span class="c1"># You can choose to use only a subset of the prior data. Decreasing the sample</span><span class="w">
+</span><span class="c1"># size makes the inversion faster but increasingly approximate.</span><span class="w">
+</span><span class="n">N_use</span> <span class="o">=</span> <span class="n">N</span>   <span class="c1"># Number of prior samples to use (use all available)</span><span class="w">
+</span><span class="n">T_base</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># Base annealing temperature for rejection sampling</span><span class="w">
+</span><span class="n">autoT</span> <span class="o">=</span> <span class="mi">1</span>   <span class="c1"># Automatically estimate optimal annealing temperature</span><span class="w">
+</span><span class="n">f_post_h5</span> <span class="o">=</span> <a class="sphx-glr-backref-module-integrate sphx-glr-backref-type-py-module reference internal" href="../../modules/integrate_rejection.html#module-integrate.integrate_rejection" title="integrate.integrate_rejection"><span class="n">ig</span><span class="o">.</span><span class="n">integrate_rejection</span></a><span class="p">(</span><span class="n">f_prior_data_h5</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">f_data_h5</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">f_post_h5</span> <span class="o">=</span> <span class="s1">'</span><span class="s1">POST.h5</span><span class="s1">'</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">N_use</span> <span class="o">=</span> <span class="n">N_use</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">autoT</span> <span class="o">=</span> <span class="n">autoT</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">T_base</span> <span class="o">=</span> <span class="n">T_base</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">showInfo</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span>                                   <span class="n">ip_range</span><span class="o">=</span><span class="n">i_use</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Rejection Sampling (JAX):   0%|          | 0/183 [00:00&lt;?, ?it/s]
+Rejection Sampling (JAX):   1%|          | 1/183 [00:00&lt;00:32,  5.53it/s]
+Rejection Sampling (JAX):   2%|▏         | 4/183 [00:00&lt;00:13, 13.69it/s]
+Rejection Sampling (JAX):   4%|▍         | 7/183 [00:00&lt;00:10, 17.20it/s]
+Rejection Sampling (JAX):   5%|▌         | 10/183 [00:00&lt;00:09, 18.55it/s]
+Rejection Sampling (JAX):   7%|▋         | 13/183 [00:00&lt;00:08, 19.40it/s]
+Rejection Sampling (JAX):   9%|▊         | 16/183 [00:00&lt;00:08, 20.22it/s]
+Rejection Sampling (JAX):  10%|█         | 19/183 [00:01&lt;00:07, 20.95it/s]
+Rejection Sampling (JAX):  12%|█▏        | 22/183 [00:01&lt;00:07, 21.50it/s]
+Rejection Sampling (JAX):  14%|█▎        | 25/183 [00:01&lt;00:07, 21.75it/s]
+Rejection Sampling (JAX):  15%|█▌        | 28/183 [00:01&lt;00:07, 21.81it/s]
+Rejection Sampling (JAX):  17%|█▋        | 31/183 [00:01&lt;00:06, 22.03it/s]
+Rejection Sampling (JAX):  19%|█▊        | 34/183 [00:01&lt;00:06, 21.90it/s]
+Rejection Sampling (JAX):  20%|██        | 37/183 [00:01&lt;00:06, 21.96it/s]
+Rejection Sampling (JAX):  22%|██▏       | 40/183 [00:01&lt;00:06, 22.14it/s]
+Rejection Sampling (JAX):  23%|██▎       | 43/183 [00:02&lt;00:06, 21.98it/s]
+Rejection Sampling (JAX):  25%|██▌       | 46/183 [00:02&lt;00:06, 21.80it/s]
+Rejection Sampling (JAX):  27%|██▋       | 49/183 [00:02&lt;00:06, 21.68it/s]
+Rejection Sampling (JAX):  28%|██▊       | 52/183 [00:02&lt;00:06, 21.61it/s]
+Rejection Sampling (JAX):  30%|███       | 55/183 [00:02&lt;00:05, 21.41it/s]
+Rejection Sampling (JAX):  32%|███▏      | 58/183 [00:02&lt;00:05, 21.41it/s]
+Rejection Sampling (JAX):  33%|███▎      | 61/183 [00:02&lt;00:05, 21.58it/s]
+Rejection Sampling (JAX):  35%|███▍      | 64/183 [00:03&lt;00:05, 21.63it/s]
+Rejection Sampling (JAX):  37%|███▋      | 67/183 [00:03&lt;00:05, 21.72it/s]
+Rejection Sampling (JAX):  38%|███▊      | 70/183 [00:03&lt;00:05, 21.87it/s]
+Rejection Sampling (JAX):  40%|███▉      | 73/183 [00:03&lt;00:04, 22.03it/s]
+Rejection Sampling (JAX):  42%|████▏     | 76/183 [00:03&lt;00:04, 22.21it/s]
+Rejection Sampling (JAX):  43%|████▎     | 79/183 [00:03&lt;00:04, 22.04it/s]
+Rejection Sampling (JAX):  45%|████▍     | 82/183 [00:03&lt;00:04, 22.17it/s]
+Rejection Sampling (JAX):  46%|████▋     | 85/183 [00:04&lt;00:04, 22.32it/s]
+Rejection Sampling (JAX):  48%|████▊     | 88/183 [00:04&lt;00:04, 22.32it/s]
+Rejection Sampling (JAX):  50%|████▉     | 91/183 [00:04&lt;00:04, 22.23it/s]
+Rejection Sampling (JAX):  51%|█████▏    | 94/183 [00:04&lt;00:03, 22.31it/s]
+Rejection Sampling (JAX):  53%|█████▎    | 97/183 [00:04&lt;00:03, 22.09it/s]
+Rejection Sampling (JAX):  55%|█████▍    | 100/183 [00:04&lt;00:03, 21.92it/s]
+Rejection Sampling (JAX):  56%|█████▋    | 103/183 [00:04&lt;00:03, 22.00it/s]
+Rejection Sampling (JAX):  58%|█████▊    | 106/183 [00:04&lt;00:03, 22.20it/s]
+Rejection Sampling (JAX):  60%|█████▉    | 109/183 [00:05&lt;00:03, 22.20it/s]
+Rejection Sampling (JAX):  61%|██████    | 112/183 [00:05&lt;00:03, 22.29it/s]
+Rejection Sampling (JAX):  63%|██████▎   | 115/183 [00:05&lt;00:03, 22.34it/s]
+Rejection Sampling (JAX):  64%|██████▍   | 118/183 [00:05&lt;00:02, 22.31it/s]
+Rejection Sampling (JAX):  66%|██████▌   | 121/183 [00:05&lt;00:02, 22.14it/s]
+Rejection Sampling (JAX):  68%|██████▊   | 124/183 [00:05&lt;00:02, 22.05it/s]
+Rejection Sampling (JAX):  69%|██████▉   | 127/183 [00:05&lt;00:02, 21.98it/s]
+Rejection Sampling (JAX):  71%|███████   | 130/183 [00:06&lt;00:02, 22.20it/s]
+Rejection Sampling (JAX):  73%|███████▎  | 133/183 [00:06&lt;00:02, 22.38it/s]
+Rejection Sampling (JAX):  74%|███████▍  | 136/183 [00:06&lt;00:02, 22.39it/s]
+Rejection Sampling (JAX):  76%|███████▌  | 139/183 [00:06&lt;00:01, 22.29it/s]
+Rejection Sampling (JAX):  78%|███████▊  | 142/183 [00:06&lt;00:01, 22.27it/s]
+Rejection Sampling (JAX):  79%|███████▉  | 145/183 [00:06&lt;00:01, 22.16it/s]
+Rejection Sampling (JAX):  81%|████████  | 148/183 [00:06&lt;00:01, 22.17it/s]
+Rejection Sampling (JAX):  83%|████████▎ | 151/183 [00:06&lt;00:01, 22.27it/s]
+Rejection Sampling (JAX):  84%|████████▍ | 154/183 [00:07&lt;00:01, 22.53it/s]
+Rejection Sampling (JAX):  86%|████████▌ | 157/183 [00:07&lt;00:01, 22.59it/s]
+Rejection Sampling (JAX):  87%|████████▋ | 160/183 [00:07&lt;00:01, 22.66it/s]
+Rejection Sampling (JAX):  89%|████████▉ | 163/183 [00:07&lt;00:00, 22.43it/s]
+Rejection Sampling (JAX):  91%|█████████ | 166/183 [00:07&lt;00:00, 22.23it/s]
+Rejection Sampling (JAX):  92%|█████████▏| 169/183 [00:07&lt;00:00, 22.21it/s]
+Rejection Sampling (JAX):  94%|█████████▍| 172/183 [00:07&lt;00:00, 22.34it/s]
+Rejection Sampling (JAX):  96%|█████████▌| 175/183 [00:08&lt;00:00, 22.43it/s]
+Rejection Sampling (JAX):  97%|█████████▋| 178/183 [00:08&lt;00:00, 22.15it/s]
+Rejection Sampling (JAX):  99%|█████████▉| 181/183 [00:08&lt;00:00, 21.97it/s]
+
+integrate_rejection: Time=  8.9s/11693 soundings,  0.8ms/sounding, 1318.0it/s. T_av=108.8, EV_av=-106.5
+
+N_UNIQUE:   0%|          | 0/11693 [00:00&lt;?, ?it/s]
+
+
+M1-continuous:   0%|          | 0/11693 [00:00&lt;?, ?it/s]
+M1-continuous:   5%|▍         | 533/11693 [00:01&lt;00:20, 532.41it/s]
+M1-continuous:   9%|▉         | 1069/11693 [00:02&lt;00:19, 534.05it/s]
+M1-continuous:  14%|█▍        | 1614/11693 [00:03&lt;00:18, 539.04it/s]
+M1-continuous:  19%|█▊        | 2173/11693 [00:04&lt;00:17, 546.53it/s]
+M1-continuous:  23%|██▎       | 2720/11693 [00:05&lt;00:16, 545.02it/s]
+M1-continuous:  28%|██▊       | 3272/11693 [00:06&lt;00:15, 547.07it/s]
+M1-continuous:  33%|███▎      | 3820/11693 [00:07&lt;00:14, 546.46it/s]
+M1-continuous:  37%|███▋      | 4367/11693 [00:08&lt;00:13, 543.29it/s]
+M1-continuous:  42%|████▏     | 4920/11693 [00:09&lt;00:12, 546.15it/s]
+M1-continuous:  47%|████▋     | 5467/11693 [00:10&lt;00:11, 540.38it/s]
+M1-continuous:  51%|█████▏    | 6008/11693 [00:11&lt;00:10, 533.59it/s]
+M1-continuous:  56%|█████▌    | 6553/11693 [00:12&lt;00:09, 536.77it/s]
+M1-continuous:  61%|██████    | 7095/11693 [00:13&lt;00:08, 538.19it/s]
+M1-continuous:  65%|██████▌   | 7634/11693 [00:14&lt;00:07, 537.10it/s]
+M1-continuous:  70%|██████▉   | 8177/11693 [00:15&lt;00:06, 538.71it/s]
+M1-continuous:  75%|███████▍  | 8730/11693 [00:16&lt;00:05, 542.83it/s]
+M1-continuous:  79%|███████▉  | 9273/11693 [00:17&lt;00:04, 539.84it/s]
+M1-continuous:  84%|████████▍ | 9813/11693 [00:18&lt;00:03, 535.63it/s]
+M1-continuous:  89%|████████▊ | 10353/11693 [00:19&lt;00:02, 536.84it/s]
+M1-continuous:  93%|█████████▎| 10902/11693 [00:20&lt;00:01, 540.18it/s]
+M1-continuous:  98%|█████████▊| 11454/11693 [00:21&lt;00:00, 543.50it/s]
+
+/home/tmeha/PROGRAMMING/TEST/integrate_module/integrate/integrate.py:716: H5pyDeprecationWarning: Creating a dataset without passing data or dtype is deprecated. Pass an explicit dtype. Using dtype='f4' will keep the current default behaviour.
+  f_post.create_dataset(dset, (nsounding,nm))
+
+M2-continuous:   0%|          | 0/11693 [00:00&lt;?, ?it/s]
+M2-continuous:  11%|█         | 1248/11693 [00:01&lt;00:08, 1247.75it/s]
+M2-continuous:  21%|██▏       | 2498/11693 [00:02&lt;00:07, 1248.80it/s]
+M2-continuous:  32%|███▏      | 3769/11693 [00:03&lt;00:06, 1258.76it/s]
+M2-continuous:  43%|████▎     | 5028/11693 [00:04&lt;00:05, 1251.63it/s]
+M2-continuous:  54%|█████▎    | 6280/11693 [00:05&lt;00:04, 1240.43it/s]
+M2-continuous:  64%|██████▍   | 7528/11693 [00:06&lt;00:03, 1242.91it/s]
+M2-continuous:  75%|███████▌  | 8779/11693 [00:07&lt;00:02, 1245.38it/s]
+M2-continuous:  86%|████████▌ | 10025/11693 [00:08&lt;00:01, 1241.13it/s]
+M2-continuous:  96%|█████████▋| 11274/11693 [00:09&lt;00:00, 1243.46it/s]
+
+
+M3-continuous:   0%|          | 0/11693 [00:00&lt;?, ?it/s]
+M3-continuous:  91%|█████████ | 10622/11693 [00:01&lt;00:00, 10621.12it/s]
+</pre></div>
+</div>
+<p>Posterior statistics computation (typically done after inversion)
+This computes summary statistics like mean, median, standard deviation
+ig.integrate_posterior_stats(f_post_h5)
+ig.integrate_posterior_stats(f_post_h5, ip_range = i_use)</p>
+</section>
+<section id="plot-statistics-from-the-posterior-sigma-mathbf-m">
+<h2>3. Plot statistics from the posterior $sigma(mathbf{m})$<a class="headerlink" href="#plot-statistics-from-the-posterior-sigma-mathbf-m" title="Link to this heading">¶</a></h2>
+<section id="compare-prior-and-posterior-data">
+<h3>Compare prior and posterior data<a class="headerlink" href="#compare-prior-and-posterior-data" title="Link to this heading">¶</a></h3>
+<p>First, compare prior (beige) to posterior (black) data, along with observed data (red),
+for specific measurement locations (data IDs).</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_data_prior_post</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">i_plot</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_data_prior_post</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">i_plot</span><span class="o">=</span><span class="n">i_use</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_data_prior_post</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">i_plot</span><span class="o">=</span><span class="n">i_use</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_010.png" srcset="../../_images/sphx_glr_integrate_getting_started_010.png" alt="Data set D1, Observation # 101" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_011.png" srcset="../../_images/sphx_glr_integrate_getting_started_011.png" alt="Data set D1, Observation # 1" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_012.png" srcset="../../_images/sphx_glr_integrate_getting_started_012.png" alt="Data set D1, Observation # 11693" class = "sphx-glr-multi-img"/></li>
+</ul>
+</section>
+<section id="evidence-and-annealing-temperature">
+<h3>Evidence and annealing temperature<a class="headerlink" href="#evidence-and-annealing-temperature" title="Link to this heading">¶</a></h3>
+<p>The evidence quantifies how well the data fits the model,
+while temperature controls the acceptance rate in rejection sampling.</p>
+<p>Plot the annealing temperature used for inversion</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_T_EV</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">T</span><span class="s1">'</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Plot the evidence (log-likelihood) estimated during inversion</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_T_EV</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">EV</span><span class="s1">'</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Plot the chi-squared data fit (normalized mean-loglikelihood)</span><span class="w">
+</span><span class="c1"># Values less than one suggest overfitting</span><span class="w">
+</span><span class="c1"># Values above one suggest underfitting</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_T_EV</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'</span><span class="s1">CHI2</span><span class="s1">'</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_013.png" srcset="../../_images/sphx_glr_integrate_getting_started_013.png" alt="Temperature" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_014.png" srcset="../../_images/sphx_glr_integrate_getting_started_014.png" alt="log(EV)" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_015.png" srcset="../../_images/sphx_glr_integrate_getting_started_015.png" alt="Reduced Chi-Squared (Goodness of Fit)" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Figure saved to POST_1_11693_T.png
+Figure saved to POST_1_11693_EV.png
+Figure saved to POST_1_11693_CHI2.png
+</pre></div>
+</div>
+</section>
+<section id="resistivity-profiles">
+<h3>Resistivity profiles<a class="headerlink" href="#resistivity-profiles" title="Link to this heading">¶</a></h3>
+<p>Plot a profile showing posterior statistics of model parameter M1 (resistivity)
+along a section of the survey line.</p>
+<p>Plot resistivity profile for model M1</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">HarmonicMean</span><span class="s1">'</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Plot resistivity 'Median' profile for model M1 from data point i1 to i2</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">i1</span><span class="o">=</span><span class="mi">1401</span><span class="p">,</span> <span class="n">i2</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Plot resistivity 'HarmonicMean' profile for model M1 from data point i1 to i2</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">i1</span><span class="o">=</span><span class="mi">1401</span><span class="p">,</span> <span class="n">i2</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">HarmonicMean</span><span class="s1">'</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="c1"># Plot resistivity 'Mean' profile for model M1 from data point i1 to i2</span><span class="w">
+</span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">i1</span><span class="o">=</span><span class="mi">1401</span><span class="p">,</span> <span class="n">i2</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Mean</span><span class="s1">'</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span><span class="w">
+</span><span class="k">if</span> <span class="n">useSubset</span><span class="p">:</span><span class="w">
+</span>    <span class="c1"># Plot resistivity profile for model M1 for specific data points, along 'x', 'y' and 'index' axes</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">i_use</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'</span><span class="s1">x</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">i_use</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'</span><span class="s1">y</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">i_use</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'</span><span class="s1">index</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span>    <span class="c1">#</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">i_use</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'</span><span class="s1">index</span><span class="s1">'</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_016.png" srcset="../../_images/sphx_glr_integrate_getting_started_016.png" alt="HarmonicMean resistivity, LogStd resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_017.png" srcset="../../_images/sphx_glr_integrate_getting_started_017.png" alt="Median resistivity, LogStd resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_018.png" srcset="../../_images/sphx_glr_integrate_getting_started_018.png" alt="HarmonicMean resistivity, LogStd resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_019.png" srcset="../../_images/sphx_glr_integrate_getting_started_019.png" alt="Mean resistivity, LogStd resistivity" class = "sphx-glr-multi-img"/></li>
+</ul>
+</section>
+<section id="plot-2d-spatial-features">
+<h3>Plot 2D spatial features<a class="headerlink" href="#plot-2d-spatial-features" title="Link to this heading">¶</a></h3>
+<p>Plot the median resistivity at specific depths (layers 5, 30, and 50)
+to show lateral variations in subsurface structure.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="c1"># Plot 2D features: Resistivity at different depths</span><span class="w">
+</span><span class="k">try</span><span class="p">:</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">iz</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">iz</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Mean</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">iz</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">HarmonicMean</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="k">except</span><span class="p">:</span><span class="w">
+</span>    <span class="k">pass</span><span class="w">
+</span><span class="w">
+</span><span class="k">try</span><span class="p">:</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">iz</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="k">except</span><span class="p">:</span><span class="w">
+</span>    <span class="k">pass</span><span class="w">
+</span><span class="w">
+</span><span class="k">try</span><span class="p">:</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">iz</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="k">except</span><span class="p">:</span><span class="w">
+</span>    <span class="k">pass</span><span class="w">
+</span><span class="w">
+</span><span class="k">try</span><span class="p">:</span><span class="w">
+</span>    <span class="c1"># Plot number of layers</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="k">except</span><span class="p">:</span><span class="w">
+</span>    <span class="k">pass</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_020.png" srcset="../../_images/sphx_glr_integrate_getting_started_020.png" alt="/M1/Median[5,:] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_021.png" srcset="../../_images/sphx_glr_integrate_getting_started_021.png" alt="/M1/Mean[5,:] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_022.png" srcset="../../_images/sphx_glr_integrate_getting_started_022.png" alt="/M1/HarmonicMean[5,:] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_023.png" srcset="../../_images/sphx_glr_integrate_getting_started_023.png" alt="/M1/Median[30,:] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_024.png" srcset="../../_images/sphx_glr_integrate_getting_started_024.png" alt="/M1/Median[50,:] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_025.png" srcset="../../_images/sphx_glr_integrate_getting_started_025.png" alt="/M3/Median[0,:] Number of layers" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>/M1/Median[5,:] resistivity
+/M1/Mean[5,:] resistivity
+/M1/HarmonicMean[5,:] resistivity
+/M1/Median[30,:] resistivity
+/M1/Median[50,:] resistivity
+/M3/Median[0,:] Number of layers
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="c1"># Plot 2D features: Resistivity at different elevations</span><span class="w">
+</span><span class="k">try</span><span class="p">:</span><span class="w">
+</span>    <span class="k">for</span> <span class="n">ele</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">60</span><span class="p">,</span><span class="o">-</span><span class="mi">51</span><span class="p">,</span><span class="o">-</span><span class="mi">20</span><span class="p">)</span><span class="p">:</span><span class="w">
+</span>        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span>        <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">elevation</span><span class="o">=</span><span class="n">ele</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2000</span><span class="p">]</span><span class="p">,</span><span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="k">except</span><span class="p">:</span><span class="w">
+</span>    <span class="k">pass</span><span class="w">
+</span></pre></div></div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_getting_started_026.png" srcset="../../_images/sphx_glr_integrate_getting_started_026.png" alt="integrate getting started" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_027.png" srcset="../../_images/sphx_glr_integrate_getting_started_027.png" alt="/M1/Median[elev=60.0m] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_028.png" srcset="../../_images/sphx_glr_integrate_getting_started_028.png" alt="integrate getting started" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_029.png" srcset="../../_images/sphx_glr_integrate_getting_started_029.png" alt="/M1/Median[elev=40.0m] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_030.png" srcset="../../_images/sphx_glr_integrate_getting_started_030.png" alt="integrate getting started" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_031.png" srcset="../../_images/sphx_glr_integrate_getting_started_031.png" alt="/M1/Median[elev=20.0m] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_032.png" srcset="../../_images/sphx_glr_integrate_getting_started_032.png" alt="integrate getting started" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_033.png" srcset="../../_images/sphx_glr_integrate_getting_started_033.png" alt="/M1/Median[elev=0.0m] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_034.png" srcset="../../_images/sphx_glr_integrate_getting_started_034.png" alt="integrate getting started" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_035.png" srcset="../../_images/sphx_glr_integrate_getting_started_035.png" alt="/M1/Median[elev=-20.0m] resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_036.png" srcset="../../_images/sphx_glr_integrate_getting_started_036.png" alt="integrate getting started" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_getting_started_037.png" srcset="../../_images/sphx_glr_integrate_getting_started_037.png" alt="/M1/Median[elev=-40.0m] resistivity" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>/M1/Median[elev=60.0m] resistivity
+/M1/Median[elev=40.0m] resistivity
+/M1/Median[elev=20.0m] resistivity
+/M1/Median[elev=0.0m] resistivity
+/M1/Median[elev=-20.0m] resistivity
+/M1/Median[elev=-40.0m] resistivity
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="k">try</span><span class="p">:</span><span class="w">
+</span>    <span class="c1"># Plot a 2D feature: The estimated number of layers</span><span class="w">
+</span>    <span class="n">ig</span><span class="o">.</span><span class="n">plot_feature_2d</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span><span class="n">im</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">iz</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">,</span> <span class="n">uselog</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">jet</span><span class="s1">'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span><span class="w">
+</span>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span><span class="k">except</span><span class="p">:</span><span class="w">
+</span>    <span class="k">pass</span><span class="w">
+</span></pre></div></div>
+<img src="../../_images/sphx_glr_integrate_getting_started_038.png" srcset="../../_images/sphx_glr_integrate_getting_started_038.png" alt="/M3/Median[0,:] Number of layers" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>/M3/Median[0,:] Number of layers
+</pre></div>
+</div>
+</section>
+</section>
+<section id="export-results-to-csv-format">
+<h2>Export results to CSV format<a class="headerlink" href="#export-results-to-csv-format" title="Link to this heading">¶</a></h2>
+<p>Export the posterior results to CSV files for use in GIS software or further analysis.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">f_csv</span><span class="p">,</span> <span class="n">f_point_csv</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">post_to_csv</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Writing to POST_M1.csv
+----------------------------------------------------
+Creating point data set: Median
+Creating point data set: Mean
+Creating point data set: Std
+- saving to : POST_M1_point.csv
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="c1"># Read the exported CSV file for inspection</span><span class="w">
+</span><span class="c1"># Example filename (actual filename will be generated automatically):</span><span class="w">
+</span><span class="c1">#f_point_csv = 'POST_DAUGAARD_AVG_PRIOR_CHI2_NF_3_log-uniform_N100000_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu100000_aT1_M1_point.csv'</span><span class="w">
+</span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span><span class="w">
+</span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">f_point_csv</span><span class="p">)</span><span class="w">
+</span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<div class="output_subarea output_html rendered_html output_result">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>X</th>
+      <th>Y</th>
+      <th>Z</th>
+      <th>LINE</th>
+      <th>Median</th>
+      <th>Mean</th>
+      <th>Std</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>543822.9</td>
+      <td>6176069.6</td>
+      <td>58.82</td>
+      <td>140.0</td>
+      <td>25.563763</td>
+      <td>181.804855</td>
+      <td>416.123077</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>543822.9</td>
+      <td>6176069.6</td>
+      <td>57.82</td>
+      <td>140.0</td>
+      <td>25.563763</td>
+      <td>181.905548</td>
+      <td>416.815338</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>543822.9</td>
+      <td>6176069.6</td>
+      <td>56.82</td>
+      <td>140.0</td>
+      <td>25.778664</td>
+      <td>113.035889</td>
+      <td>281.464142</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>543822.9</td>
+      <td>6176069.6</td>
+      <td>55.82</td>
+      <td>140.0</td>
+      <td>25.563763</td>
+      <td>112.083229</td>
+      <td>280.523743</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>543822.9</td>
+      <td>6176069.6</td>
+      <td>54.82</td>
+      <td>140.0</td>
+      <td>25.662443</td>
+      <td>90.502724</td>
+      <td>204.919830</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+<br />
+<br /><p>Optional: Use PyVista for 3D visualization of X,Y,Z coordinates with median resistivity</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span class="n">plPyVista</span> <span class="o">=</span> <span class="kc">False</span><span class="w">
+</span><span class="k">if</span> <span class="n">plPyVista</span><span class="p">:</span><span class="w">
+</span>    <span class="kn">import</span><span class="w"> </span><span class="nn">pyvista</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pv</span><span class="w">
+</span>    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="w">
+</span>    <span class="kn">from</span><span class="w"> </span><span class="nn">pyvista</span><span class="w"> </span><span class="kn">import</span> <span class="n">examples</span><span class="w">
+</span>    <span class="c1">#pv.set_jupyter_backend('client')</span><span class="w">
+</span>    <span class="n">pv</span><span class="o">.</span><span class="n">set_plot_theme</span><span class="p">(</span><span class="s2">&quot;</span><span class="s2">document</span><span class="s2">&quot;</span><span class="p">)</span><span class="w">
+</span>    <span class="n">p</span> <span class="o">=</span> <span class="n">pv</span><span class="o">.</span><span class="n">Plotter</span><span class="p">(</span><span class="n">notebook</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="w">
+</span>    <span class="n">p</span> <span class="o">=</span> <span class="n">pv</span><span class="o">.</span><span class="n">Plotter</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span>    <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">50</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">200</span><span class="p">)</span><span class="p">]</span><span class="w">
+</span>    <span class="c1">#filtered_df = df[(df['LINE'] &gt; 1000) &amp; (df['LINE'] &lt; 1400) ]</span><span class="w">
+</span>    <span class="n">points</span> <span class="o">=</span> <span class="n">filtered_df</span><span class="p">[</span><span class="p">[</span><span class="s1">'</span><span class="s1">X</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">Y</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">Z</span><span class="s1">'</span><span class="p">]</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="p">:</span><span class="p">]</span><span class="w">
+</span>    <span class="n">median</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">filtered_df</span><span class="p">[</span><span class="s1">'</span><span class="s1">Mean</span><span class="s1">'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="p">:</span><span class="p">]</span><span class="p">)</span><span class="w">
+</span>    <span class="n">opacity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">filtered_df</span><span class="p">[</span><span class="s1">'</span><span class="s1">Median</span><span class="s1">'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="p">:</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">100</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span><span class="w">
+</span>    <span class="c1">#p.add_points(points, render_points_as_spheres=True, point_size=3, scalars=median, cmap='jet', opacity=opacity)</span><span class="w">
+</span>    <span class="n">p</span><span class="o">.</span><span class="n">add_points</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">render_points_as_spheres</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">point_size</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">scalars</span><span class="o">=</span><span class="n">median</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'</span><span class="s1">hot</span><span class="s1">'</span><span class="p">)</span><span class="w">
+</span>    <span class="n">p</span><span class="o">.</span><span class="n">show_grid</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span>    <span class="n">p</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="p">)</span><span class="w">
+</span></pre></div></div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (1 minutes 21.111 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-auto-examples-10-getting-started-integrate-getting-started-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/137459736a2e0236345977ed5f17a487/integrate_getting_started.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">integrate_getting_started.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/7b0546fca6ceff59b99040133e869196/integrate_getting_started.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">integrate_getting_started.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/182b54859e8c51bc01c52d46adec617b/integrate_getting_started.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">integrate_getting_started.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="integrate_getting_started_no_forward.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Getting started with INTEGRATE - with no forward code</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Getting Started</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023,2024,2025 INTEGRATE WORKING GROUP
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Getting started with INTEGRATE</a><ul>
+<li><a class="reference internal" href="#get-ttem-data">0. Get TTEM data</a><ul>
+<li><a class="reference internal" href="#plot-the-geometry-and-data">Plot the geometry and data</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#set-up-the-prior-model-rho-mathbf-m-mathbf-d">1. Set up the prior model ($rho(mathbf{m},mathbf{d})$)</a><ul>
+<li><a class="reference internal" href="#b-generate-corresponding-prior-data">1b. Generate corresponding prior data</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sample-the-posterior-distribution-sigma-mathbf-m">2. Sample the posterior distribution $sigma(mathbf{m})$</a></li>
+<li><a class="reference internal" href="#plot-statistics-from-the-posterior-sigma-mathbf-m">3. Plot statistics from the posterior $sigma(mathbf{m})$</a><ul>
+<li><a class="reference internal" href="#compare-prior-and-posterior-data">Compare prior and posterior data</a></li>
+<li><a class="reference internal" href="#evidence-and-annealing-temperature">Evidence and annealing temperature</a></li>
+<li><a class="reference internal" href="#resistivity-profiles">Resistivity profiles</a></li>
+<li><a class="reference internal" href="#plot-2d-spatial-features">Plot 2D spatial features</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#export-results-to-csv-format">Export results to CSV format</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=f4d81ccd"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/sg-tags.js?v=d80f6fa4"></script>
+    </body>
+</html>

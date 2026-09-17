@@ -1,0 +1,1050 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="integrate_io" href="integrate_io.html"><link rel="prev" title="integrate" href="integrate.html">
+        <link rel="canonical" href="https://cultpenguin.github.io/integrate_module/modules/integrate_rejection.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>integrate_rejection - INTEGRATE 0.99.8 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=c83e6b79" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">INTEGRATE 0.99.8 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">INTEGRATE 0.99.8 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gettingstarted.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format.html">Data format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format_wells.html">Borehole Data Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../format_query.html">Query Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prior_data.html">Prior Data Generation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rejection.html">Rejection Sampling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflows</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../auto_examples/index.html">Example Gallery</a><input aria-label="Toggle navigation of Example Gallery" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/10_getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started.html">Getting started with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started_no_forward.html">Getting started with INTEGRATE - with no forward code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/10_getting_started/integrate_getting_started_posterior_only.html">Getting started with INTEGRATE - posterior analysis only</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/20_workflow/index.html">The Complete Workflow</a><input aria-label="Toggle navigation of The Complete Workflow" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/20_workflow/integrate_workflow.html">The complete INTEGRATE workflow: from data to posterior</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/30_data/index.html">Data</a><input aria-label="Toggle navigation of Data" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/30_data/integrate_boreholes.html">Borehole data in INTEGRATE – representation and integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/30_data/integrate_dual_data.html">Dual data types (low and high moment seperately)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/40_noise/index.html">Noise</a><input aria-label="Toggle navigation of Noise" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/40_noise/integrate_gaussian_noise.html">Synthetic Case Study example with different noise models (uncorrelated/correlated)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/50_hypothesis/index.html">Hypothesis Testing</a><input aria-label="Toggle navigation of Hypothesis Testing" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/50_hypothesis/integrate_daugaard_multi_prior.html">Daugaard Case Study with three lithology-resistivity prior models.</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/50_hypothesis/integrate_daugaard_multi_prior_multi_data.html">Daugaard Case Study with geology-resistivity-category prior models.</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/60_query/index.html">Querying the Posterior</a><input aria-label="Toggle navigation of Querying the Posterior" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/60_query/integrate_query.html">query: Posterior Query Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/70_synthetic/index.html">Synthetic Case</a><input aria-label="Toggle navigation of Synthetic Case" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/70_synthetic/integrate_synthetic_case.html">INTEGRATE Synthetic Case Study example</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/80_plotting/index.html">Plotting</a><input aria-label="Toggle navigation of Plotting" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/80_plotting/integrate_profiles.html">Profile Visualization in INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/85_rawmaterial/index.html">Raw Material Assessment</a><input aria-label="Toggle navigation of Raw Material Assessment" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/85_rawmaterial/integrate_rawmaterial_daugaard.html">Daugaard: probabilistic raw-material assessment with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/85_rawmaterial/integrate_rawmaterial_sdrfelding.html">Sdr. Felding: probabilistic raw-material assessment with INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../auto_examples/90_other/index.html">Other Examples</a><input aria-label="Toggle navigation of Other Examples" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_esbjerg.html">INTEGRATE on ESBJERG data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_linear_logspace.html">Data, and noise, in linear or log space</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_merge_data.html">Merging multiple data files from the same survey (ESBJERG)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_merge_prior.html">INTEGRATE - Demonstration of merge_prior() function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_priors.html">INTEGRATE -Generic Prior Model Generation Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auto_examples/90_other/integrate_timing_example.html">INTEGRATE Timing Analysis Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../contributions.html">Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../modules.html">Modules (documentation)</a><input aria-label="Toggle navigation of Modules (documentation)" checked="" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="integrate.html">integrate</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">integrate_rejection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_io.html">integrate_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_plot.html">integrate_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_borehole.html">integrate_borehole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrate_query.html">integrate_query</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          
+
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="integrate-rejection">
+<h1>integrate_rejection<a class="headerlink" href="#integrate-rejection" title="Link to this heading">¶</a></h1>
+<p>Functions for rejection sampling and Bayesian inversion in the INTEGRATE module.</p>
+<p id="module-integrate.integrate_rejection">Rejection Sampling Module for INTEGRATE</p>
+<p>This module contains functions for Bayesian inversion using rejection sampling methodology.
+It includes the main rejection sampling algorithm, likelihood calculations, and parallel
+processing support for efficient posterior sampling.</p>
+<p>Key Functions:
+- integrate_rejection(): Main rejection sampling function
+- integrate_rejection_range(): Core rejection sampling for data point ranges
+- likelihood_*(): Various likelihood calculation functions
+- Shared memory functions for parallel processing</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.cleanup_shared_memory">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">cleanup_shared_memory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shm_objects</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.cleanup_shared_memory" title="Link to this definition">¶</a></dt>
+<dd><p>Clean up shared memory segments.</p>
+<p>This function properly closes and unlinks shared memory objects created during
+parallel processing to prevent memory leaks and system resource exhaustion.
+It handles cleanup gracefully by catching and ignoring errors for objects
+that may have already been cleaned up.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>shm_objects</strong> (<em>list</em>) – List of shared memory objects to clean up.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function should always be called in a finally block or similar
+error-safe context to ensure cleanup occurs even if exceptions are raised.</p>
+<p>Each shared memory object is both closed (to release the local reference)
+and unlinked (to remove it from the system). Errors during cleanup are
+silently ignored to prevent cascading failures.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shared_memories</span><span class="p">,</span> <span class="n">shm_objects</span> <span class="o">=</span> <span class="n">create_shared_memory</span><span class="p">(</span><span class="n">arrays</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">try</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="c1"># Use shared memory</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">... </span><span class="k">finally</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">cleanup_shared_memory</span><span class="p">(</span><span class="n">shm_objects</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.compute_hypothesis_probability">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">compute_hypothesis_probability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_post_h5_list</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.compute_hypothesis_probability" title="Link to this definition">¶</a></dt>
+<dd><p>Compute hypothesis probabilities from evidence values in posterior files.</p>
+<p>This function reads evidence (EV) values from multiple posterior HDF5 files,
+each representing a different hypothesis/prior model, and computes the
+probability of each hypothesis at each data point using Bayesian model averaging.</p>
+<p>The probability is computed using Bayes’ theorem for model selection with the
+assumption of equal prior probabilities for all hypotheses.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_post_h5_list</strong> (<em>list</em><em> of </em><em>str</em>) – List of paths to posterior HDF5 files, one for each hypothesis.
+Each file must contain an ‘/EV’ dataset with log-evidence values (natural log).</p></li>
+<li><p><strong>showInfo</strong> (<em>int</em><em>, </em><em>optional</em>) – Level of verbosity for output. Default is 0.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>P</strong> (<em>ndarray, shape (n_data_points, n_hypotheses)</em>) – Probability of each hypothesis at each data point.
+P[i, j] is the probability of hypothesis j at data point i.
+Each row sums to 1.0 (within numerical precision).</p></li>
+<li><p><strong>mode</strong> (<em>ndarray, shape (n_data_points,)</em>) – Index of the most probable hypothesis for each data point.
+Values are 0-based indices in range [0, n_hypotheses-1].</p></li>
+<li><p><strong>entropy_values</strong> (<em>ndarray, shape (n_data_points,)</em>) – Entropy (uncertainty measure) for each data point.
+Values are in range [0, log_base(n_hypotheses)], where base=n_hypotheses.
+0 = certain (one hypothesis has probability 1), higher values = more uncertain.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The probability is computed using Bayes’ theorem for model selection:</p>
+<blockquote>
+<div><p>P(hypothesis_i | data) = P(data | hypothesis_i) * P(hypothesis_i) / P(data)</p>
+</div></blockquote>
+<p>Where P(data | hypothesis_i) is the marginal likelihood (evidence), stored
+as log-evidence (EV, natural log) in the HDF5 files. Assuming equal prior
+probabilities for all hypotheses:</p>
+<blockquote>
+<div><p>P(hypothesis_i | data) = exp(EV_i) / sum_j(exp(EV_j))</p>
+</div></blockquote>
+<p>For numerical stability, the log-sum-exp trick is used:</p>
+<blockquote>
+<div><p>P(hypothesis_i | data) = exp(EV_i - log_sum_exp(all EVs))</p>
+</div></blockquote>
+<p>where log_sum_exp is computed using np.logaddexp.reduce() for arbitrary
+number of hypotheses.</p>
+<p>The evidence (EV) values are stored as natural logarithms (ln, not log10)
+as computed by integrate_rejection_range().</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">integrate</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ig</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create three posterior files from different prior models</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f_post_list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'post_valley.h5'</span><span class="p">,</span> <span class="s1">'post_standard.h5'</span><span class="p">,</span> <span class="s1">'post_merged.h5'</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">entropy</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">compute_hypothesis_probability</span><span class="p">(</span><span class="n">f_post_list</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># (n_data_points, 3)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># Probabilities for first data point: [0.3, 0.5, 0.2]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">P</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>  <span class="c1"># Should be 1.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mode</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># Most probable hypothesis index: 1 (0-based)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">entropy</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># Uncertainty measure: ~0.96</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># For two hypotheses (e.g., valley vs standard lithology)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f_post_list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'post_valley.h5'</span><span class="p">,</span> <span class="s1">'post_standard.h5'</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">entropy</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">compute_hypothesis_probability</span><span class="p">(</span><span class="n">f_post_list</span><span class="p">,</span> <span class="n">showInfo</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_valley</span> <span class="o">=</span> <span class="n">P</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>  <span class="c1"># Probability of valley hypothesis</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_standard</span> <span class="o">=</span> <span class="n">P</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c1"># Probability of standard hypothesis</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">most_probable_hypothesis</span> <span class="o">=</span> <span class="n">mode</span>  <span class="c1"># Index of most probable hypothesis per data point</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">uncertainty</span> <span class="o">=</span> <span class="n">entropy</span>  <span class="c1"># Entropy values indicating uncertainty</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#integrate.integrate_rejection.integrate_rejection" title="integrate.integrate_rejection.integrate_rejection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">integrate_rejection</span></code></a></dt><dd><p>Main rejection sampling function that creates posterior files</p>
+</dd>
+<dt><a class="reference internal" href="#integrate.integrate_rejection.integrate_rejection_range" title="integrate.integrate_rejection.integrate_rejection_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">integrate_rejection_range</span></code></a></dt><dd><p>Core rejection sampling that computes EV values</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.create_shared_memory">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">create_shared_memory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arrays</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.create_shared_memory" title="Link to this definition">¶</a></dt>
+<dd><p>Create shared memory segments for arrays.</p>
+<p>This function creates shared memory segments for a list of numpy arrays,
+allowing them to be accessed efficiently across multiple processes without
+copying data. Returns both memory references and objects for cleanup.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>arrays</strong> (<em>list</em>) – List of numpy arrays to place in shared memory.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>shared_memories</strong> (<em>list</em>) – List of <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">shape,</span> <span class="pre">dtype)</span></code> tuples identifying shared memory segments.</p></li>
+<li><p><strong>shm_objects</strong> (<em>list</em>) – List of SharedMemory objects for cleanup.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The returned shm_objects must be cleaned up using cleanup_shared_memory()
+to prevent memory leaks. This should be done in a finally block.</p>
+<p>If an error occurs during creation, any successfully created memory segments
+are automatically cleaned up before raising the exception.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.integrate_posterior_chunk">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">integrate_posterior_chunk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.integrate_posterior_chunk" title="Link to this definition">¶</a></dt>
+<dd><p>Process a single chunk of data points for parallel rejection sampling.</p>
+<p>This function is called by each worker process in the parallel processing pool.
+It reconstructs shared data arrays, processes the assigned chunk of data points
+using rejection sampling, and returns results for aggregation by the main process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>args</strong> (<em>tuple</em>) – Packed arguments: (i_chunk, ip_chunks, DATA, idx, N_use, id_use,
+shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level,
+normalize_likelihood). See <code class="docutils literal notranslate"><span class="pre">integrate_rejection_range</span></code> for descriptions
+of individual fields.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>i_use</strong> (<em>ndarray, shape (nump, nr)</em>) – Indices of accepted posterior samples for the chunk.</p></li>
+<li><p><strong>T</strong> (<em>ndarray, shape (nump,)</em>) – Temperature values used for the chunk.</p></li>
+<li><p><strong>EV</strong> (<em>ndarray, shape (nump,)</em>) – Evidence values for the chunk.</p></li>
+<li><p><strong>EV_post</strong> (<em>ndarray, shape (nump,)</em>) – Posterior evidence values for the chunk.</p></li>
+<li><p><strong>N_UNIQUE</strong> (<em>ndarray, shape (nump,)</em>) – Number of unique samples for the chunk.</p></li>
+<li><p><strong>ip_range</strong> (<em>ndarray</em>) – Range of data point indices that were processed.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function runs in a separate process and communicates with the main process
+through shared memory for data arrays and return values through the process pool.</p>
+<p>The function first reconstructs the shared data arrays from memory references,
+then calls integrate_rejection_range to perform the actual rejection sampling
+on the assigned chunk of data points.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.integrate_posterior_main">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">integrate_posterior_main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip_chunks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DATA</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_use</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_use</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoT</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_base</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ncpu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_N_best</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_N_above</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_P_acc_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize_likelihood</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.integrate_posterior_main" title="Link to this definition">¶</a></dt>
+<dd><p>Coordinate parallel processing of posterior sampling across multiple chunks.</p>
+<p>This function manages the parallel execution of rejection sampling by distributing
+data point chunks across multiple CPU cores. It handles shared memory management
+for efficient data transfer between processes and aggregates results from all chunks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ip_chunks</strong> (<em>list</em>) – List of data point index chunks for parallel processing.</p></li>
+<li><p><strong>D</strong> (<em>list</em>) – List of forward modeled data arrays shared across processes.</p></li>
+<li><p><strong>DATA</strong> (<em>dict</em>) – Dictionary containing observed data structures.</p></li>
+<li><p><strong>idx</strong> (<em>list</em>) – Indices of prior samples to use for inversion.</p></li>
+<li><p><strong>N_use</strong> (<em>int</em>) – Maximum number of prior samples per chunk.</p></li>
+<li><p><strong>id_use</strong> (<em>list</em>) – List of data identifiers for likelihood calculation.</p></li>
+<li><p><strong>autoT</strong> (<em>int</em>) – Automatic temperature estimation flag.</p></li>
+<li><p><strong>T_base</strong> (<em>float</em>) – Base temperature for rejection sampling.</p></li>
+<li><p><strong>nr</strong> (<em>int</em>) – Number of posterior samples to retain per data point.</p></li>
+<li><p><strong>Ncpu</strong> (<em>int</em>) – Number of CPU cores to use for parallel processing.</p></li>
+<li><p><strong>use_N_best</strong> (<em>int</em>) – Flag to use only the N best-fitting samples.</p></li>
+<li><p><strong>T_N_above</strong> (<em>int</em><em>, </em><em>optional</em>) – Passed through to <code class="docutils literal notranslate"><span class="pre">integrate_rejection_range</span></code> / <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code>. Default is 10.</p></li>
+<li><p><strong>T_P_acc_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Passed through to <code class="docutils literal notranslate"><span class="pre">integrate_rejection_range</span></code> / <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code>. Default is 0.2.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>i_use_all</strong> (<em>ndarray, shape (Ndp, nr)</em>) – Indices of accepted posterior samples for all data points.</p></li>
+<li><p><strong>T_all</strong> (<em>ndarray, shape (Ndp,)</em>) – Temperature values used for all data points.</p></li>
+<li><p><strong>EV_all</strong> (<em>ndarray, shape (Ndp,)</em>) – Evidence values for all data points.</p></li>
+<li><p><strong>EV_post_all</strong> (<em>ndarray, shape (Ndp,)</em>) – Posterior evidence values for all data points.</p></li>
+<li><p><strong>N_UNIQUE_all</strong> (<em>ndarray, shape (Ndp,)</em>) – Number of unique samples for all data points.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function uses shared memory to minimize data copying overhead during parallel processing.
+Shared memory is automatically cleaned up after processing completion.</p>
+<p>The function creates a process pool with the specified number of CPUs and distributes
+the work chunks across them. Each worker process operates on a subset of data points
+and returns its results, which are then aggregated by the main process.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.integrate_rejection">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">integrate_rejection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f_prior_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'prior.h5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_data_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'DAUGAAD_AVG_inout.h5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_post_h5</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_use</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_use</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ip_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoT</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Nchunks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ncpu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_N_best</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_N_above</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_P_acc_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">console_progress</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.integrate_rejection" title="Link to this definition">¶</a></dt>
+<dd><p>Perform probabilistic inversion using rejection sampling.</p>
+<p>This is the main function for Bayesian inversion using rejection sampling methodology.
+It samples the posterior distribution by rejecting prior samples that are inconsistent
+with observed data within a temperature-controlled tolerance. Supports parallel processing
+and automatic temperature estimation for efficient sampling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f_prior_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to HDF5 file containing prior model and data samples.
+Default is ‘prior.h5’.</p></li>
+<li><p><strong>f_data_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to HDF5 file containing observed data for inversion.
+Default is ‘DAUGAAD_AVG_inout.h5’.</p></li>
+<li><p><strong>f_post_h5</strong> (<em>str</em><em>, </em><em>optional</em>) – Output path for posterior samples. If empty, auto-generated from prior filename.
+Default is empty string.</p></li>
+<li><p><strong>N_use</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of prior samples to use for inversion.
+Default is 100000000000.</p></li>
+<li><p><strong>id_use</strong> (<em>list</em><em>, </em><em>optional</em>) – List of data identifiers to use for inversion. If empty, uses all available data.
+Default is empty list.</p></li>
+<li><p><strong>id_prior</strong> (<em>int</em><em>, </em><em>dict</em><em>, or </em><em>None</em><em>, </em><em>optional</em>) – Override which prior dataset(s) each observed dataset in <code class="docutils literal notranslate"><span class="pre">id_use</span></code> is
+compared against, without needing to change <code class="docutils literal notranslate"><span class="pre">/D{id}/id_prior</span></code> in
+<code class="docutils literal notranslate"><span class="pre">f_data_h5</span></code>. Default is None (no override – use whatever
+<code class="docutils literal notranslate"><span class="pre">load_data</span></code> resolves from the data file, i.e. <code class="docutils literal notranslate"><span class="pre">/D{id}/id_prior</span></code> if
+present, else <code class="docutils literal notranslate"><span class="pre">id</span></code> itself; identical to the pre-existing behaviour).
+If an int, that prior id is used for every id in <code class="docutils literal notranslate"><span class="pre">id_use</span></code> (e.g.
+<code class="docutils literal notranslate"><span class="pre">id_use=[1],</span> <span class="pre">id_prior=2</span></code> compares observed <code class="docutils literal notranslate"><span class="pre">/D1</span></code> against prior
+<code class="docutils literal notranslate"><span class="pre">/D2</span></code>). If a dict, it maps <code class="docutils literal notranslate"><span class="pre">{data_id:</span> <span class="pre">prior_id}</span></code> and only
+overrides the listed data ids; any id in <code class="docutils literal notranslate"><span class="pre">id_use</span></code> not present as a
+dict key keeps its normally-resolved prior id. Any other type raises
+<code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
+<li><p><strong>ip_range</strong> (<em>list</em><em>, </em><em>optional</em>) – List of data point indices to invert. If empty, inverts all data points.
+Default is empty list.</p></li>
+<li><p><strong>nr</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of posterior samples to retain per data point.
+Default is 1000.</p></li>
+<li><p><strong>autoT</strong> (<em>int</em><em>, </em><em>optional</em>) – Automatic temperature estimation method (1=enabled, 0=disabled).
+Default is 1.</p></li>
+<li><p><strong>T_base</strong> (<em>float</em><em>, </em><em>optional</em>) – Base temperature for rejection sampling when autoT=0.
+Default is 1.</p></li>
+<li><p><strong>Nchunks</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of chunks for parallel processing. If 0, auto-determined.
+Default is 0.</p></li>
+<li><p><strong>Ncpu</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of CPU cores to use. If 0, auto-determined from system.
+Default is 0.</p></li>
+<li><p><strong>parallel</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enable parallel processing if environment supports it.
+Default is True.</p></li>
+<li><p><strong>use_N_best</strong> (<em>int</em><em>, </em><em>optional</em>) – Use only the N best-fitting samples (0=disabled).
+Default is 0.</p></li>
+<li><p><strong>T_N_above</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of top samples used by <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code> to estimate the annealing
+temperature. Passed as <code class="docutils literal notranslate"><span class="pre">N_above</span></code> to <code class="xref py py-func docutils literal notranslate"><span class="pre">logl_T_est()</span></code>.
+Default is None (uses <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code> default of 10).</p></li>
+<li><p><strong>T_P_acc_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Target acceptance probability level used by <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code> to estimate
+the annealing temperature. Passed as <code class="docutils literal notranslate"><span class="pre">P_acc_lev</span></code> to <code class="xref py py-func docutils literal notranslate"><span class="pre">logl_T_est()</span></code>.
+Default is None (uses <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code> default of 0.2).</p></li>
+<li><p><strong>progress_callback</strong> (<em>callable</em><em>, </em><em>optional</em>) – Callback function for progress updates. Called as progress_callback(current, total, info_dict).
+Default is None (no callback).</p></li>
+<li><p><strong>console_progress</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to show console TQDM progress bar. If None, auto-detects based on progress_callback.
+Default is None.</p></li>
+<li><p><strong>backend</strong> (<em>str</em><em> or </em><em>None</em><em>, </em><em>optional</em>) – Computation backend to use.  <code class="docutils literal notranslate"><span class="pre">'numpy'</span></code> uses the original
+NumPy/multiprocessing implementation.  <code class="docutils literal notranslate"><span class="pre">'jax'</span></code> uses a JIT-compiled,
+vmapped JAX implementation that processes data points in batches; pass
+<code class="docutils literal notranslate"><span class="pre">Nbatch=&lt;int&gt;</span></code> (via <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code>, default 64) to tune the batch size.
+JAX must be installed separately: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">jax</span></code>.
+Default is None, in which case the backend is taken from the
+<code class="docutils literal notranslate"><span class="pre">REJECTION_BACKEND</span></code> environment variable if set (e.g.
+<code class="docutils literal notranslate"><span class="pre">os.environ['REJECTION_BACKEND']</span> <span class="pre">=</span> <span class="pre">'jax'</span></code>), else <code class="docutils literal notranslate"><span class="pre">'numpy'</span></code>.
+Passing <code class="docutils literal notranslate"><span class="pre">backend</span></code> explicitly always overrides the environment
+variable.</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments including showInfo, updatePostStat, post_dir,
+Nbatch (batch size for backend=’jax’), and normalize_likelihood (bool,
+default False; if True, Gaussian likelihoods include the full
+normalization constant, giving a properly comparable EV/entropy across
+data points and hypotheses, without changing P_acc/T/CHI2).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Path to the output HDF5 file containing posterior samples and statistics.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function automatically determines optimal processing parameters based on data size
+and system capabilities. Temperature annealing is used to improve sampling efficiency.</p>
+<p>Large datasets may require significant memory and processing time. Monitor system
+resources during execution.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">integrate</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ig</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">f_post</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">integrate_rejection</span><span class="p">(</span><span class="s1">'prior.h5'</span><span class="p">,</span> <span class="s1">'data.h5'</span><span class="p">,</span> <span class="n">N_use</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Results saved to: </span><span class="si">{</span><span class="n">f_post</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># compare the same observed D1 against a different prior id, no DATA.h5 edits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">integrate_rejection</span><span class="p">(</span><span class="s1">'prior1.h5'</span><span class="p">,</span> <span class="s1">'data.h5'</span><span class="p">,</span> <span class="n">id_use</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ig</span><span class="o">.</span><span class="n">integrate_rejection</span><span class="p">(</span><span class="s1">'prior2.h5'</span><span class="p">,</span> <span class="s1">'data.h5'</span><span class="p">,</span> <span class="n">id_use</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">id_prior</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.integrate_rejection_range">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">integrate_rejection_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DATA</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_use</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id_use</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ip_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoT</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_N_above</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_P_acc_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.integrate_rejection_range" title="Link to this definition">¶</a></dt>
+<dd><p>Perform rejection sampling for a specific range of data points.</p>
+<p>This function implements the core rejection sampling algorithm for a subset of data points.
+It evaluates likelihood for each data point in the range and accepts/rejects prior samples
+based on temperature-controlled criteria. Used internally by integrate_rejection for
+both serial and parallel processing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>D</strong> (<em>list</em>) – List of forward modeled data arrays for each data type.</p></li>
+<li><p><strong>DATA</strong> (<em>dict</em>) – Dictionary containing observed data including ‘d_obs’, ‘d_std’, and other data arrays.</p></li>
+<li><p><strong>idx</strong> (<em>list</em><em>, </em><em>optional</em>) – Indices of prior samples to use. If empty, uses sequential indexing.
+Default is empty list.</p></li>
+<li><p><strong>N_use</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of prior samples to evaluate.
+Default is 1000.</p></li>
+<li><p><strong>id_use</strong> (<em>list</em><em>, </em><em>optional</em>) – List of data identifiers to use for likelihood calculation.
+Default is [] which use all data types available.</p></li>
+<li><p><strong>ip_range</strong> (<em>list</em><em>, </em><em>optional</em>) – Range of data point indices to process. If empty, processes all data points.
+Default is empty list.</p></li>
+<li><p><strong>nr</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of posterior samples to retain per data point.
+Default is 1000.</p></li>
+<li><p><strong>autoT</strong> (<em>int</em><em>, </em><em>optional</em>) – Automatic temperature estimation method (1=enabled, 0=disabled).
+Default is 1.</p></li>
+<li><p><strong>T_base</strong> (<em>float</em><em>, </em><em>optional</em>) – Base temperature for rejection sampling when autoT=0.
+Default is 1.</p></li>
+<li><p><strong>T_N_above</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of top samples used by <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code> to estimate the annealing
+temperature. Passed as <code class="docutils literal notranslate"><span class="pre">N_above</span></code> to <code class="xref py py-func docutils literal notranslate"><span class="pre">logl_T_est()</span></code>.
+Default is 10.</p></li>
+<li><p><strong>T_P_acc_level</strong> (<em>float</em><em>, </em><em>optional</em>) – Target acceptance probability level used by <code class="docutils literal notranslate"><span class="pre">logl_T_est</span></code> to estimate
+the annealing temperature. Passed as <code class="docutils literal notranslate"><span class="pre">P_acc_lev</span></code> to <code class="xref py py-func docutils literal notranslate"><span class="pre">logl_T_est()</span></code>.
+Default is 0.2.</p></li>
+<li><p><strong>progress_callback</strong> (<em>callable</em><em>, </em><em>optional</em>) – Optional callback function for progress updates. Called with (current, total).
+Default is None (no callbacks).</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional arguments including useRandomData, showInfo, use_N_best, and
+normalize_likelihood (bool, default False; use the full normalized
+Gaussian log-pdf. Inert for P_acc/T; CHI2 is de-normalized back out;
+EV becomes a properly comparable evidence across data points/hypotheses).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>i_use_all</strong> (<em>ndarray, shape (nump, nr)</em>) – Indices of accepted posterior samples for each data point.</p></li>
+<li><p><strong>T_all</strong> (<em>ndarray, shape (nump,)</em>) – Temperature values used for each data point.</p></li>
+<li><p><strong>EV_all</strong> (<em>ndarray, shape (nump,)</em>) – Evidence values for each data point.</p></li>
+<li><p><strong>EV_post_all</strong> (<em>ndarray, shape (nump,)</em>) – Posterior evidence values for each data point.</p></li>
+<li><p><strong>N_UNIQUE_all</strong> (<em>ndarray, shape (nump,)</em>) – Number of unique samples for each data point.</p></li>
+<li><p><strong>ip_range</strong> (<em>ndarray</em>) – Range of data point indices that were processed.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function is the computational core of the rejection sampling algorithm.
+It handles temperature annealing and likelihood evaluation for efficient sampling.</p>
+<p>The algorithm evaluates the likelihood of observed data given forward modeled data
+for each prior sample, then uses temperature-controlled acceptance criteria to
+select posterior samples that are consistent with observations.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.likelihood_gaussian_diagonal">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">likelihood_gaussian_diagonal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_std</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_norm_const</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_norm_const</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.likelihood_gaussian_diagonal" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the Gaussian likelihood for a diagonal covariance matrix.</p>
+<p>This function calculates the likelihood of observed data given a set of predicted data
+and standard deviations, assuming a Gaussian distribution with a diagonal covariance matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>D</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_samples</em><em>, </em><em>n_features</em><em>)</em>) – Predicted data array containing forward model predictions.</p></li>
+<li><p><strong>d_obs</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_features</em><em>,</em><em>)</em>) – Observed data array containing measured values.</p></li>
+<li><p><strong>d_std</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_features</em><em>)</em>) – Standard deviation array containing measurement uncertainties.</p></li>
+<li><p><strong>N_app</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of data points to use for approximation. If 0, uses all data.
+Default is 0.</p></li>
+<li><p><strong>normalize</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, include the Gaussian normalization constant
+-0.5*sum(log(2*pi*d_std**2)) in the returned log-likelihood, giving
+the full (normalized) Gaussian log-pdf instead of just the quadratic
+form. Default is False (preserves prior behavior).</p></li>
+<li><p><strong>log_norm_const</strong> (<em>float</em><em>, </em><em>optional</em>) – Precomputed normalization constant to use instead of recomputing it
+from d_std. Only used when normalize=True. Default is None.</p></li>
+<li><p><strong>return_norm_const</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, return (L, log_norm_const) instead of just L. Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Log-likelihood values for each sample, computed as:
+L[i] = -0.5 * sum((D[i] - d_obs)**2 / d_std**2)
+plus the normalization constant when normalize=True.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray, shape (n_samples,)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function assumes independent Gaussian errors with diagonal covariance matrix.
+The log-likelihood is computed using vectorized operations for efficiency.</p>
+<p>When N_app &gt; 0, only the N_app samples with smallest residuals are evaluated,
+and the remaining samples are assigned a very low likelihood (-1e15).</p>
+<p>This implementation is already well-optimized. Micro-optimizations like pre-computing
+inverse variance do not improve performance with modern NumPy.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.likelihood_gaussian_diagonal_old">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">likelihood_gaussian_diagonal_old</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_std</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.likelihood_gaussian_diagonal_old" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the Gaussian likelihood for a diagonal covariance matrix (original version).</p>
+<p>This is the original implementation kept for reference and backwards compatibility.
+For better performance, use likelihood_gaussian_diagonal() instead.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>D</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_samples</em><em>, </em><em>n_features</em><em>)</em>) – Predicted data array containing forward model predictions.</p></li>
+<li><p><strong>d_obs</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_features</em><em>,</em><em>)</em>) – Observed data array containing measured values.</p></li>
+<li><p><strong>d_std</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_features</em><em>,</em><em>)</em>) – Standard deviation array containing measurement uncertainties.</p></li>
+<li><p><strong>N_app</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of data points to use for approximation. If 0, uses all data.
+Default is 0.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Log-likelihood values for each sample, computed as:
+L[i] = -0.5 * sum((D[i] - d_obs)**2 / d_std**2)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray, shape (n_samples,)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This is the original implementation. It has been replaced by an optimized
+version that is ~15-25% faster. This function is kept for reference and validation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.likelihood_gaussian_full">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">likelihood_gaussian_full</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Cd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkNaN</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">useVectorized</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_det_Cd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_norm_const</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.likelihood_gaussian_full" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the Gaussian likelihood with full covariance matrix.</p>
+<p>This function computes likelihood values for model predictions given observed data
+and a full covariance matrix, handling NaN values appropriately.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>D</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_samples</em><em>, </em><em>n_features</em><em>)</em>) – Model predictions containing forward model results.</p></li>
+<li><p><strong>d_obs</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_features</em><em>,</em><em>)</em>) – Observed data containing measured values.</p></li>
+<li><p><strong>Cd</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_features</em><em>, </em><em>n_features</em><em>)</em>) – Full covariance matrix of observed data uncertainties.</p></li>
+<li><p><strong>N_app</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of data points to use for approximation. If 0, uses all data.
+Default is 0.</p></li>
+<li><p><strong>checkNaN</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, handles NaN values in d_obs by ignoring them in calculations.
+Default is True.</p></li>
+<li><p><strong>useVectorized</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, uses vectorized computation for better performance.
+Default is False.</p></li>
+<li><p><strong>normalize</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, include the Gaussian normalization constant
+-0.5*(n*log(2*pi) + log|Cd|) in the returned log-likelihood, giving
+the full (normalized) Gaussian log-pdf instead of just the quadratic
+form. The log-determinant is memoized (see _cached_slogdet) so it is
+only recomputed when the covariance (or the valid-channel subset)
+actually changes. Default is False (preserves prior behavior).</p></li>
+<li><p><strong>log_det_Cd</strong> (<em>float</em><em>, </em><em>optional</em>) – Precomputed log|Cd| (of the same valid-channel subset used internally)
+to use instead of recomputing/looking it up. Only used when
+normalize=True. Default is None.</p></li>
+<li><p><strong>return_norm_const</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, return (L, log_norm_const) instead of just L. Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Log-likelihood values for each sample, computed as:
+L[i] = -0.5 * (D[i] - d_obs)^T * Cd^(-1) * (D[i] - d_obs)
+plus the normalization constant when normalize=True.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray, shape (n_samples,)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function handles full covariance matrices accounting for correlated errors.
+When checkNaN=True, only non-NaN data points are used in the likelihood calculation.</p>
+<p>The vectorized implementation uses einsum for efficient matrix operations.
+When N_app &gt; 0, only the N_app samples with smallest residuals are evaluated.</p>
+<p>TODO: Check that this works when D has NaN values and determine why they occur.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.likelihood_multinomial">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">likelihood_multinomial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_is_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entropyFilter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entropyThreshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.99</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.likelihood_multinomial" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate log-likelihood of multinomial distribution for discrete data.</p>
+<p>This function computes the log-likelihood of multinomial distribution for discrete data
+using fully vectorized array operations for efficient computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>D</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>N</em><em>, </em><em>n_features</em><em>)</em>) – Matrix of observed discrete data, where each element represents a class ID.</p></li>
+<li><p><strong>P_obs</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_classes</em><em>, </em><em>n_features</em><em>)</em>) – Matrix of probabilities, where each column represents probability distribution over classes.</p></li>
+<li><p><strong>class_id</strong> (<em>ndarray</em><em>, </em><em>optional</em>) – Array of unique class IDs corresponding to rows in P_obs.
+If None, extracted from unique values in D.
+Default is None.</p></li>
+<li><p><strong>class_is_idx</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, class_id is already an index. If False, computes index from class_id array.
+Default is False.</p></li>
+<li><p><strong>entropyFilter</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, applies entropy filtering to select features.
+Default is False.</p></li>
+<li><p><strong>entropyThreshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Threshold for entropy filtering. Features with entropy below this value are selected.
+Default is 0.99.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Log-likelihood values for each sample, computed using natural logarithm.
+For each sample i: logL[i] = sum(log(p[i,j])) over all features j.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray, shape (N,)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This vectorized implementation eliminates Python loops for significant performance gains.
+The log-likelihood is calculated as the sum of natural logarithms of probabilities:
+logL[i] = sum(log(p[i,j])) for all features j</p>
+<p>This means exp(logL[i]) equals the product of probabilities across features.
+For single-feature cases, exp(logL) directly equals the observed probability.</p>
+<p>When entropyFilter is True, only features with entropy below the threshold
+are used in the likelihood calculation, which can improve computational efficiency
+for datasets with many uninformative features.</p>
+<p>Performance: This vectorized version is approximately 5-10x faster than the loop-based
+implementation for large datasets (N &gt; 10,000).</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">D</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>  <span class="c1"># Sample data with class IDs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]])</span>  <span class="c1"># Class probabilities</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">logL</span> <span class="o">=</span> <span class="n">likelihood_multinomial</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">P_obs</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.likelihood_multinomial_old">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">likelihood_multinomial_old</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_is_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entropyFilter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entropyThreshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.99</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.likelihood_multinomial_old" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate log-likelihood of multinomial distribution for discrete data (old loop-based version).</p>
+<p>This is the original loop-based implementation kept for reference and backwards compatibility.
+For better performance, use likelihood_multinomial() instead.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>D</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>N</em><em>, </em><em>n_features</em><em>)</em>) – Matrix of observed discrete data, where each element represents a class ID.</p></li>
+<li><p><strong>P_obs</strong> (<em>ndarray</em><em>, </em><em>shape</em><em> (</em><em>n_classes</em><em>, </em><em>n_features</em><em>)</em>) – Matrix of probabilities, where each column represents probability distribution over classes.</p></li>
+<li><p><strong>class_id</strong> (<em>ndarray</em><em>, </em><em>optional</em>) – Array of unique class IDs corresponding to rows in P_obs.
+If None, extracted from unique values in D.
+Default is None.</p></li>
+<li><p><strong>class_is_idx</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, class_id is already an index. If False, computes index from class_id array.
+Default is False.</p></li>
+<li><p><strong>entropyFilter</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, applies entropy filtering to select features.
+Default is False.</p></li>
+<li><p><strong>entropyThreshold</strong> (<em>float</em><em>, </em><em>optional</em>) – Threshold for entropy filtering. Features with entropy below this value are selected.
+Default is 0.99.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Log-likelihood values for each sample, computed using natural logarithm.
+For each sample i: logL[i] = sum(log(p[i,j])) over all features j.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray, shape (N,)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This is the original loop-based implementation. It has been replaced by a vectorized
+version that is 5-10x faster. This function is kept for reference and validation.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">D</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>  <span class="c1"># Sample data with class IDs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_obs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]])</span>  <span class="c1"># Class probabilities</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">logL</span> <span class="o">=</span> <span class="n">likelihood_multinomial_old</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">P_obs</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.reconstruct_shared_arrays">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">reconstruct_shared_arrays</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shared_memory_refs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.reconstruct_shared_arrays" title="Link to this definition">¶</a></dt>
+<dd><p>Reconstruct arrays from shared memory references.</p>
+<p>This function takes shared memory references (created by create_shared_memory)
+and reconstructs the original numpy arrays by accessing the shared memory
+segments. Used by worker processes to access shared data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>shared_memory_refs</strong> (<em>list</em>) – List of (name, shape, dtype) tuples identifying shared memory segments.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>reconstructed_arrays</strong> (<em>list</em>) – List of numpy arrays reconstructed from shared memory.</p></li>
+<li><p><strong>shm_objects</strong> (<em>list</em>) – List of shared memory objects that must be closed after use.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The reconstructed arrays are views into shared memory. Modifications
+will affect the shared data across all processes. Do NOT modify these arrays.
+The shared memory objects must be closed after use to prevent leaks.</p>
+</div>
+<p class="rubric">Notes</p>
+<p>If an error occurs during reconstruction, any successfully opened shared memory
+objects are automatically closed before raising the exception.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="integrate.integrate_rejection.select_subset_for_inversion">
+<span class="sig-prename descclassname"><span class="pre">integrate.integrate_rejection.</span></span><span class="sig-name descname"><span class="pre">select_subset_for_inversion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_app</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#integrate.integrate_rejection.select_subset_for_inversion" title="Link to this definition">¶</a></dt>
+<dd><p>Select a subset of indices for inversion based on the sum of squared residuals.</p>
+<p>This function calculates the sum of squared values along the specified axis
+for each row in the input array <cite>dd</cite>. It then selects the indices of the
+<cite>N_app</cite> smallest sums for fastest performance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dd</strong> (<em>numpy.ndarray</em>) – A 2D array of data from which to select the subset.</p></li>
+<li><p><strong>N_app</strong> (<em>int</em>) – The number of indices to select based on the smallest sums.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>idx</strong> – An array of indices corresponding to the <cite>N_app</cite> smallest L2 norms.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function uses squared residuals (L2 norm) for optimal performance,
+avoiding expensive absolute value operations. Uses <cite>np.argpartition</cite>
+for efficient selection of the smallest sums.</p>
+</dd></dl>
+
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="integrate_io.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">integrate_io</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="integrate.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">integrate</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023,2024,2025 INTEGRATE WORKING GROUP
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">integrate_rejection</a><ul>
+<li><a class="reference internal" href="#integrate.integrate_rejection.cleanup_shared_memory"><code class="docutils literal notranslate"><span class="pre">cleanup_shared_memory()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.compute_hypothesis_probability"><code class="docutils literal notranslate"><span class="pre">compute_hypothesis_probability()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.create_shared_memory"><code class="docutils literal notranslate"><span class="pre">create_shared_memory()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.integrate_posterior_chunk"><code class="docutils literal notranslate"><span class="pre">integrate_posterior_chunk()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.integrate_posterior_main"><code class="docutils literal notranslate"><span class="pre">integrate_posterior_main()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.integrate_rejection"><code class="docutils literal notranslate"><span class="pre">integrate_rejection()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.integrate_rejection_range"><code class="docutils literal notranslate"><span class="pre">integrate_rejection_range()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.likelihood_gaussian_diagonal"><code class="docutils literal notranslate"><span class="pre">likelihood_gaussian_diagonal()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.likelihood_gaussian_diagonal_old"><code class="docutils literal notranslate"><span class="pre">likelihood_gaussian_diagonal_old()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.likelihood_gaussian_full"><code class="docutils literal notranslate"><span class="pre">likelihood_gaussian_full()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.likelihood_multinomial"><code class="docutils literal notranslate"><span class="pre">likelihood_multinomial()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.likelihood_multinomial_old"><code class="docutils literal notranslate"><span class="pre">likelihood_multinomial_old()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.reconstruct_shared_arrays"><code class="docutils literal notranslate"><span class="pre">reconstruct_shared_arrays()</span></code></a></li>
+<li><a class="reference internal" href="#integrate.integrate_rejection.select_subset_for_inversion"><code class="docutils literal notranslate"><span class="pre">select_subset_for_inversion()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=f4d81ccd"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    </body>
+</html>
