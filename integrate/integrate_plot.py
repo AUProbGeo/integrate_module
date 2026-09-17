@@ -114,6 +114,8 @@ import h5py
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Polygon as MplPolygon
 from integrate.integrate import integrate_posterior_stats
 from integrate.integrate_io import get_geometry, get_number_of_data
 from integrate.integrate import posterior_cumulative_thickness
@@ -131,6 +133,7 @@ def get_colormap_and_limits(cmap_type='default', custom_clim=None):
     ----------
     cmap_type : str, optional
         Type of colormap to return (default is 'default'):
+
         - 'default': Red-white-blue-black colormap for general use
         - 'resistivity': Log-scale colormap optimized for resistivity data
         - 'entropy': Grayscale colormap for uncertainty visualization
@@ -260,7 +263,8 @@ def plot_xy(values, X=None, Y=None,
             cmap=None, clim=None, norm=None, uselog=False,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
-            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.', fontsize=None, **kwargs):
+            ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.',
+            plotPoints_size=None, plotPoints_alpha=0.6, fontsize=None, **kwargs):
     """
     Core 2D scatter map: plot any array of values at survey (X, Y) locations.
 
@@ -332,8 +336,15 @@ def plot_xy(values, X=None, Y=None,
     plotPoints_color : str or colour, optional
         Colour for the background dots when ``plotPoints=True`` (default ``'0.7'``
         — light grey). Using a neutral grey avoids confusion with class colours.
+    plotPoints_marker : str, optional
+        Marker style for the background dots when ``plotPoints=True`` (default ``'.'``).
+    plotPoints_size : float, optional
+        Marker size for the background dots when ``plotPoints=True``
+        (default: ``max(0.3, s * 0.4)``).
+    plotPoints_alpha : float, optional
+        Marker alpha for the background dots when ``plotPoints=True`` (default ``0.6``).
     **kwargs
-        Forwarded to ``ax.scatter()``.
+        Forwarded to ``ax.scatter()`` for the main (coloured) scatter.
 
     Returns
     -------
@@ -390,7 +401,8 @@ def plot_xy(values, X=None, Y=None,
 
     # --- Background points ---
     if plotPoints:
-        ax.scatter(X, Y, color=plotPoints_color, s=max(0.3, s * 0.4), marker=plotPoints_marker, alpha=0.6, zorder=1)
+        _plotPoints_size = plotPoints_size if plotPoints_size is not None else max(0.3, s * 0.4)
+        ax.scatter(X, Y, color=plotPoints_color, s=_plotPoints_size, marker=plotPoints_marker, alpha=plotPoints_alpha, zorder=1)
 
     # --- Scatter ---
     vmin = clim[0] if clim is not None else None
@@ -432,6 +444,9 @@ def plot_xy(values, X=None, Y=None,
         if fontsize is not None:
             cbar.set_label(colorbar_label or '', fontsize=fontsize)
             cbar.ax.tick_params(labelsize=fontsize - 2)
+        # append_axes() made the colorbar the current axes; restore the map
+        # axes so callers can keep using plt.plot()/plt.title() afterwards.
+        plt.sca(ax)
 
     # --- Decoration ---
     if fontsize is not None:
@@ -485,6 +500,7 @@ def plot_posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], property='med
         Whether to use prior data instead of posterior data (default is False).
     **kwargs : dict
         Additional keyword arguments:
+
         - hardcopy : bool, save plot as PNG file (default False)
         - s : float, scatter point size (default 10)
 
@@ -986,8 +1002,11 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         Save plots as PNG files with descriptive names (default is False).
     **kwargs : dict
         Additional keyword arguments:
+
         - s : int, marker size (default is 1)
-        - plot_data_locations : bool, plot black background dots at all data locations (default is False)
+        - plotPoints : bool, plot grey background dots at all data locations
+          (default is False). ``plot_data_locations`` is accepted as a
+          deprecated alias.
         - CHI2_min : float, minimum CHI2 color scale value (default is 0)
         - CHI2_max : float, maximum CHI2 color scale value (default is 5)
         - N_UNIQUE_min : float, minimum N_UNIQUE color scale value (default is auto)
@@ -1014,7 +1033,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     """
 
     s = kwargs.pop('s', 1)
-    plot_data_locations = kwargs.pop('plot_data_locations', False)
+    plotPoints = kwargs.pop('plotPoints', False)
+    if 'plot_data_locations' in kwargs:
+        import warnings
+        warnings.warn(
+            "plot_T_EV: 'plot_data_locations' is deprecated, use 'plotPoints'",
+            DeprecationWarning, stacklevel=2)
+        plotPoints = kwargs.pop('plot_data_locations')
     CHI2_min = kwargs.pop('CHI2_min', 0)
     CHI2_max = kwargs.pop('CHI2_max', 5)
     N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
@@ -1067,7 +1092,7 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
     
     base = os.path.splitext(f_post_h5)[0]
     shared = dict(X=X[i1:i2], Y=Y[i1:i2], s=s, fontsize=fontsize,
-                  plotPoints=plot_data_locations, **kwargs)
+                  plotPoints=plotPoints, **kwargs)
 
     if (pl=='all') or (pl=='T'):
         f_png = '%s_%d_%d_T.png' % (base, i1, i2) if hardcopy else False
@@ -2122,21 +2147,21 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         Level of debug output (0=none, >0=verbose).
     clim : list, optional
         Color scale limits ``[min, max]``.
-    std_min : float, optional
-        Minimum std for transparency normalization; values below render as fully opaque.
-        Default is ``np.nanmin(Std)``.
-    std_max : float, optional
-        Maximum std for transparency normalization; values above render with maximum
-        transparency. Default is ``0.6 * np.nanmax(Std)``.
     logstd_min : float, optional
-        Like ``std_min`` but in log10(Std) space. When provided (together with or
-        instead of ``logstd_max``), the normalisation is performed on ``log10(Std)``
-        rather than raw ``Std``. Useful for log-scale data such as resistivity where
-        the std spans several orders of magnitude.
-        Example: ``logstd_min=1.0`` → opaque below std=10.
+        Lower bound for transparency normalization, in the log10(Std) space shown in
+        the 'std' panel; cells at or below render fully opaque (default ``0.5``).
     logstd_max : float, optional
-        Like ``std_max`` but in log10(Std) space.
-        Example: ``logstd_max=2.5`` → fully transparent above std=316.
+        Upper bound for transparency normalization, in log10(Std) space; cells at or
+        above render with maximum transparency (default ``1.0``).
+        This log10(Std) normalization is the default. Example: ``logstd_max=2.5`` →
+        fully transparent above std=316.
+    std_min : float, optional
+        If given (with or instead of ``std_max``), normalization switches to linear
+        ``Std`` space instead of log10(Std); values below render fully opaque.
+        Default in that mode is ``np.nanmin(Std)``.
+    std_max : float, optional
+        Linear-space upper bound; values above render with maximum transparency.
+        Default in that mode is ``0.6 * np.nanmax(Std)``.
     show_n_unique : bool, optional
         If True, adds a plot of unique realizations in the stats panel (default False).
     plot_kl : bool, optional
@@ -2319,28 +2344,26 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     # Then apply alpha scaling: alpha * normalized_Std
     A = np.ones(Std.shape)  # Start with fully opaque (alpha=1)
     if alpha > 0:
-        logstd_min = kwargs.get('logstd_min', None)
-        logstd_max = kwargs.get('logstd_max', None)
+        std_min = kwargs.get('std_min', None)
+        std_max = kwargs.get('std_max', None)
 
-        if logstd_min is not None or logstd_max is not None:
-            # Normalise using the LogStd already stored in the posterior file
-            # (same values shown in the second subplot) — values are typically 0–1
-            _log_std = LogStd if LogStd is not None else np.log10(np.where(Std > 0, Std, np.nan))
-            lo = logstd_min if logstd_min is not None else np.nanmin(_log_std)
-            hi = logstd_max if logstd_max is not None else np.nanmax(_log_std)
-            Std_normalized = (_log_std - lo) / (hi - lo) if hi > lo else np.zeros_like(_log_std)
+        if std_min is not None or std_max is not None:
+            # Normalise in linear Std space (only when std_min/std_max given explicitly)
+            lo = std_min if std_min is not None else np.nanmin(Std)
+            hi = std_max if std_max is not None else 0.6 * np.nanmax(Std)
+            Std_normalized = (Std - lo) / (hi - lo) if hi > lo else np.zeros_like(Std)
         else:
-            # Normalise in linear Std space (default)
-            std_min = kwargs.get('std_min', np.nanmin(Std))
-            std_max = kwargs.get('std_max', 0.6 * np.nanmax(Std))
-            Std_normalized = (Std - std_min) / (std_max - std_min) if std_max > std_min else np.zeros_like(Std)
+            # Default: normalise in the same log10(std) space shown in the 'std' panel
+            _log_std = LogStd if LogStd is not None else np.log10(np.where(Std > 0, Std, np.nan))
+            lo = kwargs.get('logstd_min', 0.5)
+            hi = kwargs.get('logstd_max', 1.0)
+            Std_normalized = (_log_std - lo) / (hi - lo) if hi > lo else np.zeros_like(_log_std)
 
         Std_normalized = np.clip(Std_normalized, 0, 1)
 
         # Apply alpha scaling: higher uncertainty = more transparent
         A = 1 - alpha * Std_normalized
-        print(np.nanmax(A))
-    
+
     nm = Mean.shape[0]
     if nm<=1:
         pass
@@ -2854,7 +2877,7 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
     return fig
 
 
-def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs):
+def plot_discrete_data_entropy(f_data_h5, id_list=None, depth_reduce='min', **kwargs):
     """
     Plot the pointwise entropy of one or more multinomial discrete data
     entries in a DATA HDF5 file, as a 2D map via :func:`plot_xy`.
@@ -2870,9 +2893,11 @@ def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs)
     ----------
     f_data_h5 : str
         Path to the DATA HDF5 file.
-    id_list : int or list of int
+    id_list : int or list of int, optional
         One or more dataset ids referencing multinomial /D{id} groups
         (e.g. from ``save_borehole_data()``'s ``id_out`` / ``id_borehole_list``).
+        If ``None`` (default), every /D{id} group in the file with
+        ``noise_model == 'multinomial'`` is used.
     depth_reduce : {'min', 'mean'}, optional
         See :func:`discrete_data_entropy`. Default ``'min'``.
     **kwargs
@@ -2887,7 +2912,21 @@ def plot_discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', **kwargs)
     --------
     >>> fig, ax, sc = ig.plot_discrete_data_entropy(f_data_h5, id_borehole_list)
     """
+    import re
+    import h5py
     import integrate as ig
+
+    if id_list is None:
+        with h5py.File(f_data_h5, 'r') as f_data:
+            id_list = sorted(
+                int(re.search(r'D(\d+)', key).group(1))
+                for key in f_data.keys()
+                if re.match(r'D\d+$', key)
+                and f_data[f'/{key}'].attrs.get('noise_model', 'none') == 'multinomial'
+            )
+        if len(id_list) == 0:
+            raise ValueError(
+                "No multinomial /D{id} datasets found in %s" % f_data_h5)
 
     H = ig.discrete_data_entropy(f_data_h5, id_list, depth_reduce=depth_reduce,
                                   showInfo=kwargs.pop('showInfo', 1))
@@ -3111,13 +3150,14 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
 
 
 def plot_data_prior(f_prior_data_h5,
-                    f_data_h5, 
+                    f_data_h5,
                     nr=1000,
                     id=1,
                     id_data = None,
-                    d_str='d_obs', 
+                    d_str='d_obs',
                     alpha=0.5,
-                    ylim=None, 
+                    ylim=None,
+                    plot_type=['prior', 'data'],
                     **kwargs):
     """
     Compare observed data with prior model predictions.
@@ -3144,6 +3184,11 @@ def plot_data_prior(f_prior_data_h5,
         Transparency level for prior realization lines, range 0-1 (default is 0.5).
     ylim : tuple or list, optional
         Y-axis limits as (ymin, ymax). If None, uses automatic scaling (default is None).
+    plot_type : str or list of str, optional
+        Which data to show: 'prior' (prior realizations only), 'data' (observed
+        data only), or both. Accepts a single string or a list, e.g.
+        plot_type='prior' or plot_type=['prior', 'data'] (default is
+        ['prior', 'data'], i.e. show both).
     **kwargs : dict
         Additional keyword arguments:
         - hardcopy : bool, save plot as PNG file (default True)
@@ -3169,6 +3214,15 @@ def plot_data_prior(f_prior_data_h5,
     
     cols=['wheat','black','red']
 
+    # Normalize plot_type to a list and decide what to show
+    if isinstance(plot_type, str):
+        plot_type = [plot_type]
+    plot_type = [str(p).lower() for p in plot_type]
+    do_prior = 'prior' in plot_type
+    do_data = 'data' in plot_type
+    if not (do_prior or do_data):
+        raise ValueError("plot_type must contain 'prior' and/or 'data', got %s" % plot_type)
+
     with h5py.File(f_data_h5,'r') as f_data, h5py.File(f_prior_data_h5,'r') as f_prior_data:
 
         # Get data dimensions to determine plot type
@@ -3183,37 +3237,39 @@ def plot_data_prior(f_prior_data_h5,
             name_attr = name_attr.decode('utf-8')
 
         # Load prior data
-        dh5_str_prior = 'D%d' % (id)
-        if dh5_str_prior in f_prior_data:
-            npr = f_prior_data[dh5_str_prior].shape[0]
-            nr_prior = np.min([nr, npr])
-            i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
-            prior_data = f_prior_data[dh5_str_prior][i_use]
+        if do_prior:
+            dh5_str_prior = 'D%d' % (id)
+            if dh5_str_prior in f_prior_data:
+                npr = f_prior_data[dh5_str_prior].shape[0]
+                nr_prior = np.min([nr, npr])
+                i_use = np.sort(np.random.choice(npr, nr_prior, replace=False))
+                prior_data = f_prior_data[dh5_str_prior][i_use]
 
-            # Check if data is 1D (only one column)
-            if prior_data.shape[1] == 1:
-                is_1d = True
-                prior_data = prior_data.flatten()
-        else:
-            print('%s not in f_prior_data' % dh5_str_prior)
+                # Check if data is 1D (only one column)
+                if prior_data.shape[1] == 1:
+                    is_1d = True
+                    prior_data = prior_data.flatten()
+            else:
+                print('%s not in f_prior_data' % dh5_str_prior)
 
         # Load observed data
-        dh5_str_obs = 'D%d/%s' % (id_data, d_str)
-        if dh5_str_obs in f_data:
-            d_obs_full = f_data[dh5_str_obs][:]
-            if len(d_obs_full.shape) == 1:
-                d_obs_full = d_obs_full.reshape(-1, 1)
-            ns, nd = d_obs_full.shape
-            nr_obs = np.min([nr, ns])
-            i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
-            obs_data = d_obs_full[i_use_d, :]
+        if do_data:
+            dh5_str_obs = 'D%d/%s' % (id_data, d_str)
+            if dh5_str_obs in f_data:
+                d_obs_full = f_data[dh5_str_obs][:]
+                if len(d_obs_full.shape) == 1:
+                    d_obs_full = d_obs_full.reshape(-1, 1)
+                ns, nd = d_obs_full.shape
+                nr_obs = np.min([nr, ns])
+                i_use_d = np.sort(np.random.choice(ns, nr_obs, replace=False))
+                obs_data = d_obs_full[i_use_d, :]
 
-            # Check if observed data is also 1D
-            if obs_data.shape[1] == 1:
-                is_1d = True
-                obs_data = obs_data.flatten()
-        else:
-            print('%s not in f_data' % dh5_str_obs)
+                # Check if observed data is also 1D
+                if obs_data.shape[1] == 1:
+                    is_1d = True
+                    obs_data = obs_data.flatten()
+            else:
+                print('%s not in f_data' % dh5_str_obs)
 
     plt.figure(figsize=(7,6))
 
@@ -3233,7 +3289,10 @@ def plot_data_prior(f_prior_data_h5,
         plt.ylabel('Probability Density')
         plt.legend()
         name_suffix = ': %s' % name_attr if name_attr else ''
-        plt.title('D%d%s: Prior vs Observed (1D Histogram)' % (id_data, name_suffix))
+        shown = ' vs '.join([s for s, ok in
+                             (('Prior', prior_data is not None),
+                              ('Observed', obs_data is not None)) if ok])
+        plt.title('D%d%s: %s (1D Histogram)' % (id_data, name_suffix, shown))
     else:
         # Original 2D line plot
         if prior_data is not None:
@@ -3247,7 +3306,10 @@ def plot_data_prior(f_prior_data_h5,
         plt.xlabel('Data #')
         plt.ylabel('Data Value')
         name_suffix = ': %s' % name_attr if name_attr else ''
-        plt.title('D%d%s: Prior (black) vs Observed (red)' % (id_data, name_suffix))
+        shown = ' vs '.join([s for s, ok in
+                             (('Prior (black)', prior_data is not None),
+                              ('Observed (red)', obs_data is not None)) if ok])
+        plt.title('D%d%s: %s' % (id_data, name_suffix, shown))
 
     if ylim is not None:
         if is_1d:
@@ -3263,7 +3325,8 @@ def plot_data_prior(f_prior_data_h5,
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:
         # strip the filename from f_data_h5
-        plt.savefig('%s_%s_id%d_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str), bbox_inches='tight')
+        pt_tag = '_'.join(plot_type)
+        plt.savefig('%s_%s_id%d_%s_%s.png' % (os.path.splitext(f_data_h5)[0],os.path.splitext(f_prior_data_h5)[0],id,d_str,pt_tag), bbox_inches='tight')
     plt.show()
     
     return True
@@ -3657,7 +3720,8 @@ def find_points_along_line_segments(X, Y, Xl, Yl, ID=None, tolerance=None, metho
             closest_segments[selected_indices])
 
 
-def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=None, **kwargs):
+def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=None,
+                     panels=('hist', 'stats', 'reals'), **kwargs):
     """
     Visualize prior model parameter distributions and sample realizations.
 
@@ -3686,6 +3750,13 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
     showInfo : int, optional
         Verbosity level for diagnostic output. If > 0, prints data range and
         auto-selected scale choice (default is 0).
+    panels : str or sequence of str, optional
+        Which of the sub-panels to draw, any subset of
+        ``('hist', 'stats', 'reals')`` (left histogram, middle stats-vs-depth,
+        right realizations panel). Order is fixed regardless of how it is
+        given; a single string is accepted. Panels not available for the
+        parameter (e.g. ``'stats'`` for a scalar) are silently skipped.
+        Default is all three.
     hardcopy : bool, optional
         Save plots as PNG files (default True).
 
@@ -3696,7 +3767,8 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
 
     Notes
     -----
-    Creates a 1x3 subplot layout with custom width ratios.
+    Creates a 1x3 subplot layout with custom width ratios (fewer if ``panels``
+    selects a subset).
 
     For continuous parameters: left panel (width 1) shows a histogram,
     middle panel (width 1.5) shows statistics vs depth (Mean, Median, ±1 Std),
@@ -3748,7 +3820,8 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         if len(Mkey)==0:
             for key in f_prior.keys():
                 if (key[0]=='M'):
-                    plot_prior_stats(f_prior_h5, Mkey=key, nr=nr, use_log=use_log, showInfo=showInfo, **kwargs)
+                    plot_prior_stats(f_prior_h5, Mkey=key, nr=nr, use_log=use_log,
+                                     showInfo=showInfo, panels=panels, **kwargs)
             return
 
         if Mkey[0]!='/':
@@ -3835,54 +3908,68 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
     title_fs_kw = {'fontsize': fontsize + 2} if fontsize is not None else {}
     legend_fs = fontsize if fontsize is not None else 8
 
+    # --- resolve which sub-panels to draw --------------------------------
+    _PANEL_ORDER = ('hist', 'stats', 'reals')
+    _req = (panels,) if isinstance(panels, str) else tuple(panels)
+    _want = [p for p in _PANEL_ORDER if p in _req] or list(_PANEL_ORDER)
+
+    def _panel_grid(avail, width_ratios):
+        """1xN GridSpec over the requested + available panels.
+
+        ``avail`` maps panel name -> bool, ``width_ratios`` panel name ->
+        float. Returns ``(fig, {panel: axes})`` with axes only for the
+        panels actually drawn (always at least ``'reals'``).
+        """
+        import matplotlib.gridspec as _gs
+        cols = [p for p in _want if avail.get(p, False)] or ['reals']
+        ratios = [width_ratios[p] for p in cols]
+        fig_w = {1: 7, 2: 12, 3: 18}.get(len(cols), 6 * len(cols))
+        _fig = plt.figure(figsize=(fig_w, 6))
+        _grid = _gs.GridSpec(1, len(cols), width_ratios=ratios, figure=_fig)
+        return _fig, {p: _fig.add_subplot(_grid[i]) for i, p in enumerate(cols)}
+
     if not is_discrete:
         # CONTINUOUS
 
-        import matplotlib.gridspec as gridspec
         show_stats = (Nm > 1)
 
-        if show_stats:
-            fig = plt.figure(figsize=(18, 6))
-            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1.5, 2], figure=fig)
-            idx_right = 2
-        else:
-            fig = plt.figure(figsize=(12, 6))
-            gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2], figure=fig)
-            idx_right = 1
+        fig, _ax = _panel_grid(
+            {'hist': True, 'stats': show_stats, 'reals': True},
+            {'hist': 1.0, 'stats': 1.5, 'reals': 2.0},
+        )
+        ax_left, ax_middle, ax_right = _ax.get('hist'), _ax.get('stats'), _ax.get('reals')
 
-        ax_left = fig.add_subplot(gs[0])
-
-        if show_stats:
-            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+        if ax_left is not None and show_stats:
+            # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M.flatten()
                 M_hist = M_hist[M_hist > 0]
                 if len(M_hist) > 0:
-                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                    m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
-                    m1 = ax_left.hist([], 101, orientation='horizontal')
-                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
-                ticks = ax_left.get_yticks()
-                ax_left.set_yticks(ticks)
-                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                    m1 = ax_left.hist([], 101)
+                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_xticks()
+                ax_left.set_xticks(ticks)
+                ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
             else:
                 M_hist = M.flatten()
-                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-                ax_left.set_ylabel(name, **fs_kw)
-            ax_left.set_xlabel('Counts', **fs_kw)
-        else:
+                m1 = ax_left.hist(M_hist, 101)
+                ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_ylabel('Counts', **fs_kw)
+        elif ax_left is not None:
             # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M.flatten()
             m1 = ax_left.hist(M_hist, 101)
             ax_left.set_xlabel(name, **fs_kw)
             ax_left.set_ylabel('Counts', **fs_kw)
 
-        if fontsize is not None:
-            ax_left.tick_params(labelsize=fontsize)
-        ax_left.grid()
+        if ax_left is not None:
+            if fontsize is not None:
+                ax_left.tick_params(labelsize=fontsize)
+            ax_left.grid()
 
-        if show_stats:
-            ax_middle = fig.add_subplot(gs[1])
+        if ax_middle is not None:
 
             M_mean = np.mean(M, axis=0)
             M_median = np.median(M, axis=0)
@@ -3915,34 +4002,33 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             if fontsize is not None:
                 ax_middle.tick_params(labelsize=fontsize)
 
-        ax_right = fig.add_subplot(gs[idx_right])
-
-        X,Y = np.meshgrid(np.arange(1,nr+1),z)
-        ax_right.invert_yaxis()
-        if Nm>1:
-            if use_log_scale:
-                m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
-                                cmap=cmap,
-                                shading='auto',
-                                norm=LogNorm())
+        if ax_right is not None:
+            X,Y = np.meshgrid(np.arange(1,nr+1),z)
+            ax_right.invert_yaxis()
+            if Nm>1:
+                if use_log_scale:
+                    m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
+                                    cmap=cmap,
+                                    shading='auto',
+                                    norm=LogNorm())
+                else:
+                    m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
+                                    cmap=cmap,
+                                    shading='auto')
+                m2.set_clim(clim[0],clim[1])
+                cbar_label = '%s: %s' % (Mkey[1::], name)
+                cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
+                if fontsize is not None:
+                    cbar.set_label(cbar_label, **fs_kw)
+                    cbar.ax.tick_params(labelsize=fontsize)
             else:
-                m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
-                                cmap=cmap,
-                                shading='auto')
-            m2.set_clim(clim[0],clim[1])
-            cbar_label = '%s: %s' % (Mkey[1::], name)
-            cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
-            if fontsize is not None:
-                cbar.set_label(cbar_label, **fs_kw)
-                cbar.ax.tick_params(labelsize=fontsize)
-        else:
-            m2 = ax_right.plot(np.arange(1,nr+1),M[0:nr,:].flatten())
-            ax_right.set_xlim(1,nr)
+                m2 = ax_right.plot(np.arange(1,nr+1),M[0:nr,:].flatten())
+                ax_right.set_xlim(1,nr)
 
-        ax_right.set_xlabel('Realization #', **fs_kw)
-        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
-        if fontsize is not None:
-            ax_right.tick_params(labelsize=fontsize)
+            ax_right.set_xlabel('Realization #', **fs_kw)
+            ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+            if fontsize is not None:
+                ax_right.tick_params(labelsize=fontsize)
 
         tit = kwargs.get('title', None)
         if tit is None:
@@ -3959,21 +4045,15 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
         class_name = _class_name
         n_class = len(class_name)
 
-        import matplotlib.gridspec as gridspec
         show_histogram = (Nm > 1)
 
-        if show_histogram:
-            fig = plt.figure(figsize=(18, 6))
-            gs = gridspec.GridSpec(1, 3, width_ratios=[1, 2, 3], figure=fig)
-            ax_left = fig.add_subplot(gs[0])
-            idx_middle, idx_right = 1, 2
-        else:
-            fig = plt.figure(figsize=(12, 6))
-            gs = gridspec.GridSpec(1, 2, width_ratios=[2, 3], figure=fig)
-            ax_left = None
-            idx_middle, idx_right = 0, 1
+        fig, _ax = _panel_grid(
+            {'hist': show_histogram, 'stats': True, 'reals': True},
+            {'hist': 1.0, 'stats': 2.0, 'reals': 3.0},
+        )
+        ax_left, ax_middle, ax_right = _ax.get('hist'), _ax.get('stats'), _ax.get('reals')
 
-        if show_histogram:
+        if ax_left is not None:
             m1 = ax_left.hist(M.flatten(), bins=np.arange(0.5, n_class+1.5, 1), orientation='horizontal')
             ax_left.set_ylabel(name, **fs_kw)
             ax_left.set_xlabel('Counts', **fs_kw)
@@ -3983,9 +4063,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                 ax_left.tick_params(labelsize=fontsize)
             ax_left.grid()
 
-        ax_middle = fig.add_subplot(gs[idx_middle])
-
-        if Nm > 1:
+        if ax_middle is not None and Nm > 1:
             from scipy import stats
             import matplotlib.cm as cm
 
@@ -4013,8 +4091,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             ax_middle.set_xlabel('Probability', **fs_kw)
             ax_middle.set_ylabel('Depth (m)', **fs_kw)
             ax_middle.grid(True, alpha=0.3)
-        else:
-            import matplotlib.cm as cm
+        elif ax_middle is not None:
 
             class_counts = np.zeros(n_class)
             for c in range(n_class):
@@ -4031,38 +4108,37 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             ax_middle.set_xlim([0, 1])
             ax_middle.grid(True, alpha=0.3)
 
-        if fontsize is not None:
+        if ax_middle is not None and fontsize is not None:
             ax_middle.tick_params(labelsize=fontsize)
 
-        ax_right = fig.add_subplot(gs[idx_right])
+        if ax_right is not None:
+            X,Y = np.meshgrid(np.arange(1,nr+1),z)
+            ax_right.invert_yaxis()
+            if Nm>1:
+                m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
+                                cmap=cmap,
+                                shading='auto')
+                m2.set_clim(clim[0]-.5,clim[1]+.5)
+                cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],name))
+                cbar1.set_ticks(np.arange(n_class)+1)
+                cbar1.set_ticklabels(class_name)
+                cbar1.ax.invert_yaxis()
+                if fontsize is not None:
+                    cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
+                    cbar1.ax.tick_params(labelsize=fontsize)
+            else:
+                m2 = ax_right.plot(np.arange(1,nr+1), M[0:nr,:].flatten(), '.', markersize=4)
+                ax_right.set_xlim(1,nr)
+                if class_id is not None and class_name is not None:
+                    ax_right.set_yticks(class_id)
+                    ax_right.set_yticklabels(class_name)
+                ax_right.yaxis.tick_right()
+                ax_right.yaxis.set_label_position('right')
 
-        X,Y = np.meshgrid(np.arange(1,nr+1),z)
-        ax_right.invert_yaxis()
-        if Nm>1:
-            m2 = ax_right.pcolor(X,Y,M[0:nr,:].T,
-                            cmap=cmap,
-                            shading='auto')
-            m2.set_clim(clim[0]-.5,clim[1]+.5)
-            cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],name))
-            cbar1.set_ticks(np.arange(n_class)+1)
-            cbar1.set_ticklabels(class_name)
-            cbar1.ax.invert_yaxis()
+            ax_right.set_xlabel('Realization #', **fs_kw)
+            ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
             if fontsize is not None:
-                cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
-                cbar1.ax.tick_params(labelsize=fontsize)
-        else:
-            m2 = ax_right.plot(np.arange(1,nr+1), M[0:nr,:].flatten(), '.', markersize=4)
-            ax_right.set_xlim(1,nr)
-            if class_id is not None and class_name is not None:
-                ax_right.set_yticks(class_id)
-                ax_right.set_yticklabels(class_name)
-            ax_right.yaxis.tick_right()
-            ax_right.yaxis.set_label_position('right')
-
-        ax_right.set_xlabel('Realization #', **fs_kw)
-        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
-        if fontsize is not None:
-            ax_right.tick_params(labelsize=fontsize)
+                ax_right.tick_params(labelsize=fontsize)
 
         tit = kwargs.get('title', None)
         if tit is None:
@@ -4329,35 +4405,35 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
         ax_left = fig.add_subplot(gs[0])
 
         if show_stats:
-            # Multi-layer: horizontal histogram (parameter on y-axis, Counts on x-axis)
+            # Multi-layer: vertical histogram (parameter on x-axis, Counts on y-axis)
             if use_log_scale:
                 M_hist = M_all.flatten()
                 M_hist = M_hist[M_hist > 0]
                 if len(M_hist) > 0:
-                    m1 = ax_left.hist(np.log10(M_hist), 101, orientation='horizontal')
+                    m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
-                    m1 = ax_left.hist([], 101, orientation='horizontal')
-                ax_left.set_ylabel('log10(%s)' % name, **fs_kw)
-                ticks = ax_left.get_yticks()
-                ax_left.set_yticks(ticks)
-                ax_left.set_yticklabels(['$10^{%3.1f}$' % i for i in ticks])
+                    m1 = ax_left.hist([], 101)
+                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ticks = ax_left.get_xticks()
+                ax_left.set_xticks(ticks)
+                ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
                 if stat_mean is not None:
                     mean_pos = stat_mean[stat_mean > 0]
                     if len(mean_pos) > 0:
-                        ax_left.axhline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
+                        ax_left.axvline(np.log10(np.mean(mean_pos)), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
                     median_pos = stat_median[stat_median > 0]
                     if len(median_pos) > 0:
-                        ax_left.axhline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
+                        ax_left.axvline(np.log10(np.median(median_pos)), color='blue', linestyle='--', linewidth=2, label='Median')
             else:
                 M_hist = M_all.flatten()
-                m1 = ax_left.hist(M_hist, 101, orientation='horizontal')
-                ax_left.set_ylabel(name, **fs_kw)
+                m1 = ax_left.hist(M_hist, 101)
+                ax_left.set_xlabel(name, **fs_kw)
                 if stat_mean is not None:
-                    ax_left.axhline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
+                    ax_left.axvline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
-                    ax_left.axhline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
-            ax_left.set_xlabel('Counts', **fs_kw)
+                    ax_left.axvline(np.median(stat_median), color='blue', linestyle='--', linewidth=2, label='Median')
+            ax_left.set_ylabel('Counts', **fs_kw)
             if stat_mean is not None or stat_median is not None:
                 ax_left.legend(loc='best', fontsize=legend_fs)
         else:
@@ -4759,6 +4835,11 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             ``depth_bottom`` value across all boreholes.
         title : str, optional
             Overall figure title.
+        fontsize : int or float, optional
+            Font size applied to all text elements (per-well headers, axis
+            label, tick labels, legend); the overall ``title`` is drawn two
+            points larger. If None, the module's default sizes are used
+            (default None).
 
     Returns
     -------
@@ -4781,6 +4862,16 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     _fname_kw = kwargs.get('name', None)
     depth_max = kwargs.get('depth_max', None)
     title     = kwargs.get('title', None)
+
+    # Font sizes: a single ``fontsize`` kwarg overrides every text element,
+    # matching the convention used by the other plot_* functions in this
+    # module.  When None, the previous hard-coded sizes are kept.
+    fontsize   = kwargs.get('fontsize', None)
+    fs_sub     = fontsize if fontsize is not None else 8    # per-well header
+    fs_tick    = fontsize if fontsize is not None else 7    # y tick labels
+    fs_legend  = fontsize if fontsize is not None else 8    # class legend
+    fs_ylabel  = {'fontsize': fontsize} if fontsize is not None else {}
+    fs_suptitle = (fontsize + 2) if fontsize is not None else 10
 
     # --- normalise input to a list of dicts ---
     if isinstance(W, str):
@@ -4955,7 +5046,7 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
                 subtitle = f'X={x_coord:.0f}\nY={y_coord:.0f}'
         else:
             subtitle = ''
-        ax.set_title(f'{bh_name}\n{subtitle}', fontsize=8)
+        ax.set_title(f'{bh_name}\n{subtitle}', fontsize=fs_sub)
         ax.set_xlim(-0.05, 1.05)
         if use_elevation:
             ax.set_ylim(y_min_global, y_max_global)   # high elevation at top
@@ -4963,9 +5054,10 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             ax.set_ylim(y_max_global, y_min_global)   # depth increases downward
         ax.set_xticks([])
         ax.set_xlabel('')
-        ax.tick_params(axis='y', labelsize=7)
+        ax.tick_params(axis='y', labelsize=fs_tick)
 
-    axes[0].set_ylabel('Elevation (m a.s.l.)' if use_elevation else 'Depth (m)')
+    axes[0].set_ylabel('Elevation (m a.s.l.)' if use_elevation else 'Depth (m)',
+                       **fs_ylabel)
 
     # --- shared legend ---
     patches = [
@@ -4975,16 +5067,16 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     ]
     if n_wells == 1:
         fig.legend(handles=patches, loc='center left',
-                   fontsize=8, frameon=True,
+                   fontsize=fs_legend, frameon=True,
                    bbox_to_anchor=(1.0, 0.5))
     else:
         fig.legend(handles=patches, loc='lower center',
                    ncol=min(len(patches), 6),
-                   fontsize=8, frameon=True,
+                   fontsize=fs_legend, frameon=True,
                    bbox_to_anchor=(0.5, 0.0))
 
     if title:
-        fig.suptitle(title, fontsize=10, y=1.01)
+        fig.suptitle(title, fontsize=fs_suptitle, y=1.01)
 
     plt.tight_layout(rect=[0, 0.06, 1, 1])
 
@@ -4995,4 +5087,89 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             print(f'plot_boreholes: saved {out}')
 
     return fig
+
+
+def plot_voronoi_cells(AREA, P=None, ax=None, cmap='hot_r', vmin=None, vmax=None,
+                       show_edge_affected=True, show_boundary=True, hardcopy=False):
+    """Plot the Voronoi cells of a region returned by :func:`find_coherent_area`.
+
+    Every cell in ``AREA['cells']`` is drawn as a polygon. Cells that failed
+    the edge filter (``AREA['good'] == False``) are hatched grey. If ``P``
+    (one value per sounding, same length as ``AREA['cells']``) is given, the
+    kept cells are filled and colour-mapped by ``P``; otherwise they are
+    drawn unfilled, just the cell boundaries (the Voronoi tessellation).
+
+    Parameters
+    ----------
+    AREA : dict
+        Output of :func:`find_coherent_area` (or any dict with the same
+        ``cells`` / ``good`` / ``boundary`` keys).
+    P : ndarray (N,), optional
+        Per-sounding value to colour the kept cells by (e.g. ``P_raw``).
+    ax : matplotlib Axes, optional
+        Draw into this axes instead of a new figure.
+    cmap, vmin, vmax : colour-mapping of `P` (ignored if `P` is None).
+    show_edge_affected : bool
+        Draw the dropped (edge-affected) cells, hatched grey.
+    show_boundary : bool
+        Draw the concave survey outline (``AREA['boundary']``).
+    hardcopy : bool or str
+        Save the figure as PNG (``True`` -> ``'voronoi_cells.png'``, or a
+        given file name).
+
+    Returns
+    -------
+    fig, ax, mappable
+        The figure/axes, and the coloured `PatchCollection` to pass to
+        ``fig.colorbar(mappable, ...)`` (``None`` if `P` was not given).
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 8))
+    else:
+        fig = ax.figure
+
+    def _patches(idx):
+        patches, keep = [], []
+        for i in idx:
+            c = AREA['cells'][i]
+            if c is None or c.is_empty:
+                continue
+            parts = c.geoms if c.geom_type == "MultiPolygon" else [c]
+            for part in parts:
+                if part.geom_type == "Polygon" and not part.is_empty:
+                    patches.append(MplPolygon(np.asarray(part.exterior.coords)))
+                    keep.append(i)
+        return patches, np.asarray(keep, dtype=int)
+
+    good = AREA['good']
+    patches_good, keep_good = _patches(np.where(good)[0])
+    mappable = None
+    if P is not None:
+        P = np.asarray(P)
+        pc_good = PatchCollection(patches_good, edgecolor='0.75', linewidths=0.15)
+        pc_good.set_cmap(cmap)
+        pc_good.set_array(P[keep_good])
+        pc_good.set_clim(vmin, vmax)
+        mappable = pc_good
+    else:
+        pc_good = PatchCollection(patches_good, facecolor='none', edgecolor='0.3', linewidths=0.5)
+    ax.add_collection(pc_good, autolim=True)
+
+    if show_edge_affected:
+        patches_edge, _ = _patches(np.where(~good)[0])
+        pc_edge = PatchCollection(patches_edge, facecolor='0.85', edgecolor='0.6',
+                                  linewidths=0.15, hatch='//')
+        ax.add_collection(pc_edge, autolim=True)
+
+    if show_boundary:
+        ax.plot(*AREA['boundary'].exterior.xy, color='0.5', lw=0.8, ls=':')
+
+    ax.set_aspect('equal')
+    ax.autoscale_view()
+
+    if hardcopy:
+        fname = hardcopy if isinstance(hardcopy, str) else 'voronoi_cells.png'
+        fig.savefig(fname, dpi=200, bbox_inches='tight')
+
+    return fig, ax, mappable
 

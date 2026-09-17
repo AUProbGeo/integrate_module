@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "integrate_module"
-version = "0.99.6"
+version = "0.99.8"
 description = "Localized probabilistic data integration"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
@@ -23,6 +23,7 @@ dependencies = [
     "tqdm",
     "requests",
     "geoprior1d>=0.9",
+    "shapely",
     "ga-aem-forward-win; platform_system == 'Windows'",
     "jupyter>=1.0.0",
     "jupytext",
@@ -33,6 +34,11 @@ dependencies = [
     "streamlit",
     "libaarhusxyz",
     "jax",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-fasthtml",
+    "openpyxl",
+    "httpx",
 ]
 
 [project.optional-dependencies]
@@ -51,17 +57,26 @@ examples = [
 ]
 docs = [
     "sphinx",
-    "nbsphinx",
     "sphinx-gallery",
     "pandoc",
     "myst-parser",
     "sphinx-rtd-theme",
     "furo",
+    "ghp-import",
     "tomli; python_version < '3.11'",
 ]
 jax-cuda = [
-    "jax[cuda12]",
+    "jax[cuda13]",
 ]
+#anemone = [
+#    "torch",
+#    # local path until anemone is published
+#    "anemone @ file:///home/tmeha/PROGRAMMING/anemone",
+#]
+#simpeg = [
+#    # local checkout until pinned to a release (needs simpeg >= 0.22)
+#    "simpeg @ file:///home/tmeha/PROGRAMMING/simpeg",
+#]
 
 
 [project.urls]
@@ -71,10 +86,26 @@ Repository = "https://github.com/AUProbGeo/integrate_module"
 Issues = "https://github.com/AUProbGeo/integrate_module/issues"
 
 [project.scripts]
-integrate = "integrate.integrate_www_cli:main"
+integrate = "frontend.app:main"
+integrate_www = "integrate.integrate_www_cli:main"
 integrate_timing = "integrate.integrate_timing_cli:main"
 integrate_rejection = "integrate.integrate_rejection_cli:main"
 hdf5_info = "integrate.integrate_hdf5_info_cli:main"
+integrate_ui = "ui.backend.main:main"
 
 [tool.setuptools]
-packages = ["integrate"]
+packages = [
+    "integrate", "ui", "ui.backend", "ui.backend.routers",
+    "frontend", "frontend.pages", "frontend.services",
+]
+
+[tool.setuptools.package-data]
+# Ship the built frontend (run ui/dev.sh build before packaging).
+ui = ["frontend/dist/**/*"]
+# Ship the FastHTML frontend's static assets (CSS, JS, fonts).
+frontend = ["static/**/*"]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+]

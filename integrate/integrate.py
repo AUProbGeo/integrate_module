@@ -17,7 +17,8 @@ Key Features:
 Main Functions:
     - integrate_rejection(): Main rejection sampling workflow (now in integrate_rejection module)
     - prior_data(): Integration of forward modeling with prior structure
-    - forward_gaaem(): Electromagnetic forward modeling interface
+    - forward_em()/prior_data_em(): EM forward modeling dispatch (backends in
+      gaaem_forward, anemone_forward and simpeg_forward modules)
     - likelihood_*(): Various likelihood calculation functions (now in integrate_rejection module)
     - posterior_*(): Posterior analysis and statistics
 
@@ -961,672 +962,168 @@ def prior_data(f_prior_in_h5, f_forward_h5, id=1, im=1, doMakePriorCopy=0, paral
     return f_prior_h5
 
 
-'''
-Forward simulation
-'''
+_EM_METHODS = {'ga-aem': 'ga-aem', 'gaaem': 'ga-aem', 'anemone': 'anemone',
+               'simpeg': 'simpeg'}
 
-def forward_gaaem(C=np.array(()), 
-                    thickness=np.array(()), 
-                    stmfiles=None, 
-                    tx_height=np.array(()), 
-                    txrx_dx = -13, 
-                    txrx_dy = 0,
-                    txrx_dz     = .1,
-                    GEX={}, 
-                    file_gex=None, 
-                    showtime=False, 
-                    **kwargs):
+
+_EM_METHOD_ENV = 'EM_FORWARD_METHOD'
+_EM_METHOD_DEFAULT = 'ga-aem'
+
+
+def _em_method(method=None):
     """
-    Perform forward modeling using the GA-AEM method.
+    Normalise/validate a method string for forward_em / prior_data_em.
 
-    Parameters
-    ----------
-    C : numpy.ndarray, optional
-        Conductivity array. Default is np.array(()).
-    thickness : numpy.ndarray, optional
-        Thickness array. Default is np.array(()).
-    stmfiles : list, optional
-        List of STM files. Default is None.
-    tx_height : numpy.ndarray, optional
-        Transmitter height array. Default is np.array(()).
-    txrx_dx : float, optional
-        X-distance between transmitter and receiver. Default is -13.
-    txrx_dy : float, optional
-        Y-distance between transmitter and receiver. Default is 0.
-    txrx_dz : float, optional
-        Z-distance between transmitter and receiver. Default is 0.1.
-    GEX : dict, optional
-        GEX dictionary. Default is {}.
-    file_gex : str, optional
-        Path to GEX file. Default is None.
-    showtime : bool, optional
-        Flag to display execution time. Default is False.
-    showInfo : int, optional
-        Level of verbosity for output.
-    doCompress : bool, optional
-        Flag to enable layer compression. Default is True.
-
-    Returns
-    -------
-    numpy.ndarray
-        Forward modeled data array.
+    If ``method`` is None, the environment variable ``EM_FORWARD_METHOD`` is
+    used (e.g. ``EM_FORWARD_METHOD=anemone``); if that is unset or empty,
+    ``'ga-aem'`` is used.
     """
-    from gatdaem1d import Earth;
-    from gatdaem1d import Geometry;
-    # Next should probably only be loaded if the DLL is not allready loaded!!!
-    from gatdaem1d import TDAEMSystem; # loads the DLL!!
-    import integrate as ig
-    import time 
-    from tqdm import tqdm
-
-    showInfo = kwargs.get('showInfo', 0)
-    progress_callback = kwargs.get('progress_callback', None)
-    if (showInfo<0):
-        disableTqdm=True
-    else:
-        disableTqdm=False
-
-    doCompress = kwargs.get('doCompress', True)
-
-    # Handle None defaults
-    if stmfiles is None:
-        stmfiles = []
-    if file_gex is None:
-        file_gex = ''
-
-    #print(stmfiles)
-    #print(file_gex)
-
-    if (len(stmfiles)>0) and (file_gex != '') and (len(GEX)==0):
-        # GEX FILE and STM FILES
-        if (showInfo)>1:
-            print('Using submitted GEX file (%s)' % (file_gex))
-        # Try legacy read_gex first, fallback to read_gex_workbench if needed
-        try:
-            GEX = ig.read_gex(file_gex)
-        except (ValueError, KeyError) as e:
-            if showInfo > 0:
-                print(f"Legacy read_gex() failed ({type(e).__name__}), trying read_gex_workbench()...")
-            GEX = ig.read_gex_workbench(file_gex, showInfo=showInfo)
-    elif (len(stmfiles)>0):
-        # USING STM FILES
-        if (showInfo)>1:
-            print('Using submitted STM files (%s)' % (stmfiles))
-
-    elif (len(stmfiles)==0) and (file_gex != '') and (len(GEX)==0):
-        # ONLY GEX FILE
-        stmfiles, GEX = ig.gex_to_stm(file_gex, **kwargs)
-    elif (len(stmfiles)>0) and (file_gex == '') and (len(GEX)>0):
-        # Using GEX dict and STM FILES
-        a = 1
-    elif (len(GEX)>0) and (len(stmfiles)>1):
-        # using the GEX file in stmfiles
-        print('Using submitted GEX and STM files')
-    elif (len(GEX)>0) and (len(stmfiles)==0):
-        # using GEX file and writing STM files
-        print('Using submitted GEX and writing STM files')
-        stmfiles = ig.write_stm_files(GEX, **kwargs)
-    elif (len(GEX)==0) and (len(stmfiles)>1):
-        if (file_gex == ''):
-            if (showInfo>-1):
-                print('Using STM files without GEX file')
-            #return -1
-        else:
-            print('Converting STM files to GEX')
-            # Try legacy read_gex first, fallback to read_gex_workbench if needed
-            try:
-                GEX = ig.read_gex(file_gex)
-            except (ValueError, KeyError) as e:
-                if showInfo > 0:
-                    print(f"Legacy read_gex() failed ({type(e).__name__}), trying read_gex_workbench()...")
-                GEX = ig.read_gex_workbench(file_gex, showInfo=showInfo)
-    elif (len(GEX)>0) and (len(stmfiles)==0):
-        stmfiles, GEX = ig.gex_to_stm(file_gex, **kwargs)
-    elif (file_gex != ''):
-        a=1
-        #stmfiles, GEX = ig.gex_to_stm(file_gex, **kwargs)
-    else:   
-        print('Error: No GEX or STM files provided')
-        return -1
-
-    if (showInfo>0):
-        print('Using STM files : ')
-        print(stmfiles)
-
-    if (showInfo>1):        
-        if 'filename' in GEX:
-            print('Using GEX file: ', GEX['filename'])
-
-    nstm=len(stmfiles)
-    if (showInfo>0):
-        for i in range(len(stmfiles)):
-            print('Using MOMENT:', stmfiles[i])
-
-    if C.ndim==1:
-        nd=1
-        nl=C.shape[0]
-    else:
-        nd,nl=C.shape
-
-    nt = thickness.shape[0]
-    if nt != (nl-1):
-        raise ValueError('Error: thickness array (nt=%d) does not match the number of layers minus 1(nl=%d)' % (nt,nl))
-
-    if (showInfo>0):
-        print('nd=%s, nl=%d,  nstm=%d' %(nd,nl,nstm))
-
-    # SETTING UP t1=time.time()
-    t1=time.time()
-    
-    S_LM = TDAEMSystem(stmfiles[0])
-    if nstm>1:
-        S_HM = TDAEMSystem(stmfiles[1])
-        S=[S_LM, S_HM]
-    else:
-        S=[S_LM]
-    t2=time.time()
-    t_system = 1000*(t2-t1)
-    if showtime:
-        print("Time, Setting up systems = %4.1fms" % t_system)
-
-    # Setting up geometry
-    if len(GEX)>0:
-        # Try legacy read_gex first, fallback to read_gex_workbench if needed
-        try:
-            GEX = ig.read_gex(file_gex)
-        except (ValueError, KeyError) as e:
-            if showInfo > 0:
-                print(f"Legacy read_gex() failed ({type(e).__name__}), trying read_gex_workbench()...")
-            GEX = ig.read_gex_workbench(file_gex, showInfo=showInfo)
-        if 'TxCoilPosition1' in GEX['General']:
-            # Typical for tTEM system
-            txrx_dx = float(GEX['General']['RxCoilPosition1'][0])-float(GEX['General']['TxCoilPosition1'][0])
-            txrx_dy = float(GEX['General']['RxCoilPosition1'][1])-float(GEX['General']['TxCoilPosition1'][1])
-            txrx_dz = float(GEX['General']['RxCoilPosition1'][2])-float(GEX['General']['TxCoilPosition1'][2])
-            if len(tx_height)==0:
-                tx_height = -float(GEX['General']['TxCoilPosition1'][2])
-                tx_height=np.array([tx_height])
-
-        else:
-            # Typical for SkyTEM system
-            txrx_dx = float(GEX['General']['RxCoilPosition1'][0])
-            txrx_dy = float(GEX['General']['RxCoilPosition1'][1])
-            txrx_dz = float(GEX['General']['RxCoilPosition1'][2])
-            if len(tx_height)==0:
-                tx_height=np.array([40])
-    
-
-        # Set geometry once, if tx_height has one value
-        if len(tx_height)==1:
-            if (showInfo>1):
-                print('Using tx_height=%f' % tx_height[0])
-            G = Geometry(tx_height=float(tx_height[0]), txrx_dx = txrx_dx, txrx_dy = txrx_dy, txrx_dz = txrx_dz)
-        if (showInfo>1):
-            print('tx_height=%f, txrx_dx=%f, txrx_dy=%f, txrx_dz=%f' % (tx_height[0], txrx_dx, txrx_dy, txrx_dz))
-        
-        # Handle both scalar and array values for NumPy 2.x compatibility
-        no_gates_ch1 = np.atleast_1d(GEX['Channel1']['NoGates'])[0]
-        remove_gates_ch1 = np.atleast_1d(GEX['Channel1']['RemoveInitialGates'])[0]
-        ng0 = no_gates_ch1 - remove_gates_ch1
-        if nstm>1:
-            no_gates_ch2 = np.atleast_1d(GEX['Channel2']['NoGates'])[0]
-            remove_gates_ch2 = np.atleast_1d(GEX['Channel2']['RemoveInitialGates'])[0]
-            ng1 = no_gates_ch2 - remove_gates_ch2
-        else:
-            ng1 = 0
-        ng = int(ng0+ng1)
-    
-    else:
-        if len(tx_height)==0:
-            tx_height=np.array([0])
-        G = Geometry(tx_height=float(tx_height[0]), txrx_dx = txrx_dx, txrx_dy = txrx_dy, txrx_dz = txrx_dz)
-        # Here we should read the number of gates from the lines in STMFILES that conatin 'NumberOfWindows = 41'
-        ng = 41
-
-    # pinrt txrx_dx, txrx_dy, txrx_dz
-    if (showInfo>0):
-        print('txrx_dx=%f, txrx_dy=%f, txrx_dz=%f' % (txrx_dx, txrx_dy, txrx_dz))
-        print('ng=%d' % ng)
-        
-
-    D = np.zeros((nd,ng))
-
-    # Compute forward data
-    t1=time.time()
-    # Throttle callback to ~100 updates so it does not dominate runtime
-    progress_step = max(1, nd // 100)
-
-    for i in tqdm(range(nd), mininterval=1, disable=disableTqdm, desc='gatdaem1d', leave=False):
-        if progress_callback and ((i + 1) % progress_step == 0 or i + 1 == nd):
-            _report_progress(progress_callback, i + 1, nd,
-                             'computing', 'Forward modeling (%d/%d soundings)' % (i + 1, nd))
-        if C.ndim==1:
-            # Only one model
-            conductivity = C
-        else:
-            conductivity = C[i]
-
-        # Update geometry, tx_height is changing!
-        if len(tx_height)>1:
-            if (showInfo>1):
-                print('Using tx_height=%f' % tx_height[i])
-            G = Geometry(tx_height=float(tx_height[i]), txrx_dx = txrx_dx, txrx_dy = txrx_dy, txrx_dz = txrx_dz)
-    
-        #doCompress=True
-        if doCompress:
-            i_change=np.where(np.diff(conductivity) != 0 )[0]+1
-            n_change = len(i_change)
-            conductivity_compress = np.zeros(n_change+1)+conductivity[0]
-            thickness_compress = np.zeros(n_change)
-            for il in range(n_change):
-                conductivity_compress[il+1] = conductivity[i_change[il]]
-                if il==0:
-                    thickness_compress[il]=np.sum(thickness[0:i_change[il]])
-                else:   
-                    i1=i_change[il-1]
-                    i2=i_change[il]
-                    #print("i1: %d, i2: %d" % (i1, i2))
-                    thickness_compress[il]=np.sum(thickness[i1:i2]) 
-            E = Earth(conductivity_compress,thickness_compress)
-        else:   
-            E = Earth(conductivity,thickness)
-
-        fm0 = S[0].forwardmodel(G,E)
-        d = -fm0.SZ
-        if nstm>1:
-            fm1 = S[1].forwardmodel(G,E)
-            d1 = -fm1.SZ
-            d = np.concatenate((d,d1))    
-
-        D[i] = d    
-
-        '''
-        fm_lm = S_LM.forwardmodel(G,E)
-        fm_hm = S_HM.forwardmodel(G,E)
-        # combine -fm_lm.SZ and -fm_hm.SZ
-        d = np.concatenate((-fm_lm.SZ,-fm_hm.SZ))
-        d_ref = D[i]
-        '''
-        
-    t2=time.time()
-    if showtime:
-        print("Time = %4.1fms per model and %d model tests" % (1000*(t2-t1)/nd, nd))
-
-    return D
-
-def forward_gaaem_chunk(C_chunk, tx_height_chunk, thickness, stmfiles, file_gex, Nhank, Nfreq, **kwargs):
-    """
-    Perform forward modeling using the GA-AEM method on a chunk of data.
-
-    Parameters
-    ----------
-    C_chunk : numpy.ndarray
-        The chunk of data to be processed.
-    tx_height_chunk : numpy.ndarray
-        The transmitter heights for this chunk.
-    thickness : float
-        The thickness of the model.
-    stmfiles : list
-        A list of STM files.
-    file_gex : str
-        The path to the GEX file.
-    Nhank : int
-        The number of Hankel functions.
-    Nfreq : int
-        The number of frequencies.
-    **kwargs : dict
-        Additional keyword arguments.
-
-    Returns
-    -------
-    numpy.ndarray
-        The result of the forward modeling.
-    """
-    return forward_gaaem(C=C_chunk, 
-                        thickness=thickness, 
-                        tx_height=tx_height_chunk,
-                        stmfiles=stmfiles, 
-                        file_gex=file_gex, 
-                        Nhank=Nhank, 
-                        Nfreq=Nfreq, 
-                        parallel=False, 
-                        **kwargs)
-
-# %% PRIOR DATA GENERATORS
-
-# Add this function to check current handle count (Windows only)
-def get_process_handle_count():
-    """
-    Return the number of handles used by the current process (Windows only).
-    
-    Returns
-    -------
-    int
-        The number of handles used by the current process.
-    """
-    import psutil
     import os
-    return psutil.Process(os.getpid()).num_handles()
+    source = 'method'
+    if method is None:
+        method = os.environ.get(_EM_METHOD_ENV, '').strip() or None
+        source = _EM_METHOD_ENV
+    if method is None:
+        return _EM_METHOD_DEFAULT
+    key = str(method).lower()
+    if key not in _EM_METHODS:
+        raise ValueError(
+            "unknown EM forward method %r (from %s); use 'ga-aem', 'anemone' or 'simpeg'"
+            % (method, source))
+    return _EM_METHODS[key]
 
-def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorCopy=True, im=1, id=1, im_height=0, Nhank=280, Nfreq=12, is_log=False, parallel=True, force_replace=False, **kwargs):
+
+_EM_DEVICE_ENV = 'EM_FORWARD_DEVICE'
+_EM_DEVICE_DEFAULT = 'cpu'
+
+
+def _em_device(device=None):
     """
-    Generate prior data for the GA-AEM method.
+    Resolve the ``device`` kwarg used by the anemone EM forward backend.
+
+    If ``device`` is None, the environment variable ``EM_FORWARD_DEVICE`` is
+    used (e.g. ``EM_FORWARD_DEVICE=cuda``); if that is unset or empty,
+    ``'cpu'`` is used.
+    """
+    import os
+    if device is None:
+        device = os.environ.get(_EM_DEVICE_ENV, '').strip() or None
+    if device is None:
+        return _EM_DEVICE_DEFAULT
+    return device
+
+
+def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
+    """
+    Forward EM response, dispatching to GA-AEM or anemone.
+
+    A thin wrapper around :func:`integrate.gaaem_forward.forward_gaaem` and
+    :func:`integrate.anemone_forward.forward_anemone` that lets the two
+    backends be called identically: both take **resistivity** ``M`` here
+    (``forward_gaaem`` itself takes conductivity ``C = 1/M``; this wrapper
+    does that conversion so the caller never has to).
+
+    Parameters
+    ----------
+    M : array_like
+        Resistivity, shape ``(nl,)`` or ``(nd, nl)`` [ohm.m].
+    thickness : array_like
+        Layer thickness, shape ``(nl-1,)`` [m].
+    file_gex : str, optional
+        Path to the GEX system file.
+    method : str, optional
+        ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
+        environment variable ``EM_FORWARD_METHOD`` is used, falling back to
+        ``'ga-aem'``. Raises ``ValueError`` for anything else.
+    **kwargs
+        Passed through to the selected backend.
+
+    Returns
+    -------
+    numpy.ndarray
+        Forward-modelled data, same shape/units/gate-layout for both methods.
+
+    Raises
+    ------
+    ImportError
+        If ``method='anemone'`` (``anemone``/``torch``) or ``method='simpeg'``
+        (``simpeg``) is requested but the package is not installed (the error
+        names the pip install command).
+    """
+    import numpy as np
+    method = _em_method(method)
+    if method == 'ga-aem':
+        from integrate.gaaem_forward import forward_gaaem
+        C = 1.0 / np.asarray(M, dtype=float)
+        return forward_gaaem(C=C, thickness=thickness, file_gex=file_gex, **kwargs)
+    if method == 'anemone':
+        from integrate.anemone_forward import forward_anemone
+        return forward_anemone(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
+    if method == 'simpeg':
+        from integrate.simpeg_forward import forward_simpeg
+        return forward_simpeg(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
+    raise ValueError("unhandled EM forward method %r" % method)
+
+
+def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs):
+    """
+    Generate prior data, dispatching to GA-AEM or anemone.
+
+    A thin wrapper around :func:`integrate.gaaem_forward.prior_data_gaaem` and
+    :func:`integrate.anemone_forward.prior_data_anemone`. Both already share
+    the same calling convention (``f_prior_h5``, ``file_gex``, ``N``, ``im``,
+    ``id``, ``doMakePriorCopy``, ``force_replace``, ``f_prior_data_h5``,
+    ``showInfo``, ...), so this only selects which one runs.
 
     Parameters
     ----------
     f_prior_h5 : str
-        Path to the prior data file in HDF5 format.
+        Path to the prior HDF5 file.
     file_gex : str, optional
-        Path to the file containing geophysical exploration data (.gex format).
-    stmfiles : list of str, optional
-        List of STM files for system configuration. If not provided, will be
-        generated from file_gex.
-    N : int, optional
-        Number of soundings to consider. Default is 0 (use all).
-    doMakePriorCopy : bool, optional
-        Flag indicating whether to make a copy of the prior file. Default is True.
-    im : int, optional
-        Index of the model. Default is 1.
-    id : int, optional
-        Index of the data. Default is 1.
-    im_height : int, optional
-        Index of the model for height. Default is 0.
-    Nhank : int, optional
-        Number of Hankel transform quadrature points. Default is 280.
-    Nfreq : int, optional
-        Number of frequencies. Default is 12.
-    is_log : bool, optional
-        Flag to apply logarithmic scaling to data. Default is False.
-    parallel : bool, optional
-        Flag indicating whether multiprocessing is used. Default is True.
-        When True, forward modeling is parallelized across available CPUs.
-    **kwargs : dict
-        Additional keyword arguments:
-
-        Ncpu : int, optional
-            Number of CPUs to use for parallel processing. Default is 0, which
-            uses all available CPUs. Only used when parallel=True.
-        force_replace : bool, optional
-            If True, delete an existing /D{id} dataset before writing.
-            If False (default), print a warning and return early if the
-            dataset already exists.
-        showInfo : int, optional
-            Level of verbosity for output (0=silent, 1=normal, 2=verbose).
+        Path to the GEX system file.
+    method : str, optional
+        ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
+        environment variable ``EM_FORWARD_METHOD`` is used, falling back to
+        ``'ga-aem'``. Raises ``ValueError`` for anything else.
+    device : str, optional
+        Torch device (e.g. ``'cpu'``, ``'cuda'``) used only when
+        ``method='anemone'``. If not given, the environment variable
+        ``EM_FORWARD_DEVICE`` is used, falling back to ``'cpu'``. Ignored for
+        ``'ga-aem'`` and ``'simpeg'``.
+    **kwargs
+        Passed through to the selected backend.
 
     Returns
     -------
     str
-        Filename of the HDF5 file containing the updated prior data.
+        Path to the prior-data HDF5 file (always the return value).
 
-    Notes
-    -----
-    This function computes forward-modeled electromagnetic responses for prior
-    model realizations using the GA-AEM forward modeling code. The forward
-    modeling can be parallelized for faster computation on multi-core systems.
+    Raises
+    ------
+    ImportError
+        If ``method='anemone'`` (``anemone``/``torch``) or ``method='simpeg'``
+        (``simpeg``) is requested but the package is not installed (the error
+        names the pip install command).
 
     Examples
     --------
-    >>> # Basic usage with all CPUs
-    >>> f_prior_data = prior_data_gaaem(f_prior_h5, file_gex)
-
-    >>> # Use specific number of CPUs
-    >>> f_prior_data = prior_data_gaaem(f_prior_h5, file_gex, Ncpu=4)
-
-    >>> # Sequential processing (no parallelization)
-    >>> f_prior_data = prior_data_gaaem(f_prior_h5, file_gex, parallel=False)
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone', device='cuda')
+    >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')
     """
-    import integrate as ig
-    import os
-    # Safety guard: if somehow called from a worker process, do nothing.
-    if multiprocessing.current_process().name != 'MainProcess':
-        return None
-
-    type = 'TDEM'
-    method = 'ga-aem'
-    showInfo = kwargs.get('showInfo', 0)
-    Ncpu = kwargs.get('Ncpu', 0)
-    # of 'Nproc' is set in kwargs use it
-    Ncpu = kwargs.get('Nproc', Ncpu)
-    # Pop (not get): the callback must never be pickled to worker processes
-    progress_callback = kwargs.pop('progress_callback', None)
-
-    if showInfo>0:
-        print('prior_data_gaaem: %s/%s -- starting' % (type, method))
-
-    # Force open/close of hdf5 file
-    if showInfo>0:
-        print('Forcing open and close of %s' % (f_prior_h5))
-    with h5py.File(f_prior_h5, 'r') as f:
-        # open and close
-        pass
-
-    with h5py.File(f_prior_h5, 'r') as f:
-        N_in = f['M1'].shape[0]
-    if N==0: 
-        N = N_in     
-    if N>N_in:
-        N=N_in
-
-    # if is not None file_gex
-    if (file_gex is not None):
-        if not os.path.isfile(file_gex):
-            print("ERRROR: file_gex=%s does not exist in the current folder." % file_gex)
-
-    if (stmfiles is not None):
-        for i in range(len(stmfiles)):
-            if not os.path.isfile(stmfiles[i]):
-                print("ERRROR: stmfiles[%d]=%s does not exist in the current folder." % (i,stmfiles[i]))
- 
-
-    if doMakePriorCopy:
-
-        # If file_gex is not None, then use it to get the file_base_name
-        if (file_gex is not None) and os.path.isfile(file_gex): 
-            file_basename = os.path.splitext(os.path.basename(file_gex))[0]
-        elif (stmfiles is not None) and (len(stmfiles)>0):
-            file_basename = os.path.splitext(os.path.basename(stmfiles[0]))[0]
-        else:
-            file_basename = 'GAAEM'
-        
-        print('Using file_basename=%s' % file_basename)
-
-        if N < N_in:
-            f_prior_data_h5 = '%s_%s_N%d_Nh%d_Nf%d.h5' % (os.path.splitext(f_prior_h5)[0], os.path.splitext(file_basename)[0], N, Nhank, Nfreq)
-        else:
-            f_prior_data_h5 = '%s_%s_Nh%d_Nf%d.h5' % (os.path.splitext(f_prior_h5)[0], os.path.splitext(file_basename)[0], Nhank, Nfreq)
-        
-
-        if (showInfo>0):
-            print("Creating a copy of %s" % (f_prior_h5))
-            print("                as %s" % (f_prior_data_h5))
-        if (showInfo>1):
-                print('  using N=%d of N_in=%d data' % (N,N_in))
-        
-        # make a copy of the prior file
-        ig.copy_hdf5_file(f_prior_h5, f_prior_data_h5,N,showInfo=showInfo)
-            
-    else:
-        f_prior_data_h5 = f_prior_h5
-
-    
-    Mname = '/M%d' % im
-    Mheight = '/M%d' % im_height
-    Dname = '/D%d' % id
-
-
-    with h5py.File(f_prior_data_h5, 'r') as f_prior_r:
-        if im_height>0:
-            if (showInfo>1):
-                print('Using M%d for height' % im_height)
-            tx_height = f_prior_r[Mheight][:]
-
-        # Get thickness
-        if 'x' in f_prior_r[Mname].attrs:
-            z = f_prior_r[Mname].attrs['x']
-        else:
-            z = f_prior_r[Mname].attrs['z']
-        thickness = np.diff(z)
-
-        # Get conductivity
-        if Mname in f_prior_r.keys():
-            C = 1 / f_prior_r[Mname][:]
-        else:
-            print('Could not load %s from %s' % (Mname, f_prior_data_h5))
-
-        N = f_prior_r[Mname].shape[0]
-
-    t1 = time.time()
-    if not parallel:
-        if (showInfo>-1):
-            print("prior_data_gaaem: Using 1 thread /(sequential).")
-        # Sequential
-        if im_height>0:
-            if (showInfo>0):
-                print('Using tx_height')
-            D = ig.forward_gaaem(C=C,
-                                 thickness=thickness,
-                                 tx_height=tx_height,
-                                 file_gex=file_gex,
-                                 stmfiles=stmfiles,
-                                 Nhank=Nhank,
-                                 Nfreq=Nfreq,
-                                 parallel=parallel,
-                                 progress_callback=progress_callback, **kwargs)
-        else:
-            D = ig.forward_gaaem(C=C,
-                                 thickness=thickness,
-                                 file_gex=file_gex,
-                                 stmfiles=stmfiles,
-                                 Nhank=Nhank,
-                                 Nfreq=Nfreq,
-                                 parallel=parallel,
-                                 progress_callback=progress_callback, **kwargs)
-        if is_log:
-            D = np.log10(D)
-    else:
-
-        # Make sure STM files are only written once!!! (need for multihreading)
-        # D = ig.forward_gaaem(C=C[0:1,:], thickness=thickness, file_gex=file_gex, Nhank=Nhank, Nfreq=Nfreq, parallel=False, **kwargs)
-        if stmfiles is None or len(stmfiles)==0:
-            stmfiles, _ = ig.gex_to_stm(file_gex, Nhank=Nhank, Nfreq=Nfreq, **kwargs)
-
-        # Parallel
-        if Ncpu < 1 :
-            #Ncpu =  int(multiprocessing.cpu_count()/2)
-            Ncpu =  int(multiprocessing.cpu_count())
-        if (showInfo>-1):
-            print("prior_data_gaaem: Using %d parallel threads." % (Ncpu))
-
-        # 1: Define a function to compute a chunk
-        ## OUTSIDE
-        # 2: Create chunks
-        if progress_callback is None:
-            n_chunks = Ncpu
-        else:
-            # Finer chunking gives smoother live progress updates
-            n_chunks = min(C.shape[0], Ncpu * 4)
-        C_chunks = np.array_split(C, n_chunks)
-
-        if im_height>0:
-            tx_height_chunks = np.array_split(tx_height, n_chunks)
-
-        else:
-            # create tx_height_chunks as a list of length n_chunks, where each entry is tx_height=np.array(())
-            tx_height_chunks = [np.array(())]*n_chunks
-
-
-        import os
-
-        # 3: Compute the chunks in parallel
-        forward_gaaem_chunk_partial = partial(forward_gaaem_chunk, thickness=thickness, stmfiles=stmfiles, file_gex=file_gex, Nhank=Nhank, Nfreq=Nfreq, **kwargs)
-
-        # On Windows and macOS, multiprocessing uses 'spawn' which normally
-        # re-executes the user's __main__ script in every worker process.
-        # We prevent this by setting __main__.__spec__ = SimpleNamespace(name='__main__')
-        # before creating the Pool.  The spawn bootstrap then calls
-        # _fixup_main_from_name('__main__'), which immediately returns because the
-        # worker's bootstrap module already has __name__ == '__main__' — so the
-        # user's script is never re-run in workers.  No if __name__=='__main__' guard
-        # is needed in user scripts on any platform.
-        _main_module = sys.modules.get('__main__')
-        _spec_patched = _main_module is not None and getattr(_main_module, '__spec__', None) is None
-        if _spec_patched:
-            _main_module.__spec__ = types.SimpleNamespace(name='__main__')
-
-        is_spawn = os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin')
-        try:
-            if is_spawn:
-                if os.name == 'nt':
-                    Ncpu = min(Ncpu, 60)  # Windows handle limit
-                ctx = multiprocessing.get_context('spawn')
-            else:
-                ctx = multiprocessing.get_context('fork')
-            with ctx.Pool(processes=Ncpu) as p:
-                if progress_callback is None:
-                    D_chunks = p.starmap(forward_gaaem_chunk_partial, zip(C_chunks, tx_height_chunks))
-                else:
-                    # apply_async + ordered get() keeps chunk order for the
-                    # concatenate below while reporting per finished chunk
-                    async_results = [p.apply_async(forward_gaaem_chunk_partial, args=(Cc, th))
-                                     for Cc, th in zip(C_chunks, tx_height_chunks)]
-                    D_chunks = []
-                    n_total = C.shape[0]
-                    n_done = 0
-                    for r in async_results:
-                        D_chunk = r.get()
-                        D_chunks.append(D_chunk)
-                        n_done += D_chunk.shape[0]
-                        _report_progress(progress_callback, n_done, n_total,
-                                         'computing', 'Forward modeling (%d/%d soundings)' % (n_done, n_total))
-        finally:
-            if _spec_patched:
-                _main_module.__spec__ = None
-
-  
-        D = np.concatenate(D_chunks)
-        
-        if is_log:
-            D = np.log10(D)
-
-        if os.name == 'nt' and 'get_process_handle_count' in globals():
-            # Log handle count after pool is closed
-            handle_count_after = get_process_handle_count()
-            #   print(f"Handle count after pool: {handle_count_after}")
-
-
-        # D = ig.forward_gaaem(C=C, thickness=thickness, file_gex=file_gex, Nhank=Nhank, Nfreq=Nfreq, parallel=parallel, **kwargs)
-
-    t2 = time.time()
-    t_elapsed = t2 - t1
-    if (showInfo>-1):
-        print('prior_data_gaaem: Time=%5.1fs/%d soundings. %4.1fms/sounding, %3.1fit/s' % (t_elapsed, N, 1000*t_elapsed/N,N/t_elapsed))
-
-    _report_progress(progress_callback, N, N,
-                     'saving', 'Saving forward data to %s' % f_prior_data_h5)
-
-    # Write D to f_prior['/D1']
-    with h5py.File(f_prior_data_h5, 'a') as f_prior:
-        if Dname in f_prior:
-            if force_replace:
-                del f_prior[Dname]
-            else:
-                print("Key '%s' already exists in %s. Use force_replace=True to overwrite." % (Dname, f_prior_data_h5))
-                return f_prior_data_h5
-        f_prior[Dname] = D
-
-        # Add method, type, file_ex, and im as attributes to '/D1'
-        f_prior[Dname].attrs['method'] = method
-        f_prior[Dname].attrs['type'] = type
-        f_prior[Dname].attrs['im'] = im
-        f_prior[Dname].attrs['Nhank'] = Nhank
-        f_prior[Dname].attrs['Nfreq'] = Nfreq
-
-    integrate_update_prior_attributes(f_prior_data_h5)
-
-    _report_progress(progress_callback, N, N,
-                     'completed', 'Forward data saved to %s' % f_prior_data_h5)
-
-    return f_prior_data_h5
+    method = _em_method(method)
+    if method == 'ga-aem':
+        from integrate.gaaem_forward import prior_data_gaaem
+        return prior_data_gaaem(f_prior_h5, file_gex=file_gex, **kwargs)
+    if method == 'anemone':
+        from integrate.anemone_forward import prior_data_anemone
+        return prior_data_anemone(f_prior_h5, file_gex=file_gex,
+                                   device=_em_device(device), **kwargs)
+    if method == 'simpeg':
+        from integrate.simpeg_forward import prior_data_simpeg
+        return prior_data_simpeg(f_prior_h5, file_gex=file_gex, **kwargs)
+    raise ValueError("unhandled EM forward method %r" % method)
 
 
 def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kwargs):
@@ -2338,6 +1835,318 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     return f_prior_h5
 
 
+def _clip_rho(rho, RHO_threshold, RHO_min, RHO_max):
+    """Force physically positive resistivity, then clip to [RHO_min, RHO_max]."""
+    rho = np.maximum(rho, RHO_threshold)
+    return np.clip(rho, max(RHO_min, RHO_threshold), RHO_max)
+
+
+def _draw_rho(RHO_dist, size, RHO_min, RHO_max, RHO_mean, RHO_std):
+    """Draw resistivity values from a named distribution.
+
+    Shared helper for the piecewise-constant (Sharp/MGS) prior. Mirrors the
+    distribution ladder used by prior_model_workbench_direct.
+    """
+    if RHO_dist == 'uniform':
+        return np.random.uniform(RHO_min, RHO_max, size=size)
+    if RHO_dist == 'log-uniform':
+        return np.exp(np.random.uniform(np.log(RHO_min), np.log(RHO_max), size=size))
+    if RHO_dist == 'normal':
+        return np.random.normal(RHO_mean, RHO_std, size=size)
+    if RHO_dist == 'log-normal' or RHO_dist == 'lognormal':
+        return np.random.lognormal(np.log(RHO_mean), RHO_std / RHO_mean, size=size)
+    raise ValueError('RHO_dist=%s not supported' % RHO_dist)
+
+
+def prior_model_smooth(N=100000, regularization='L2',
+                       z1=0, z_max=100, dz=1, nlayers=0, p=2,
+                       corr_length=15.0, sigma_logrho=0.25,
+                       blocky_scale=0.25, n_jumps_mean=3.0,
+                       RHO_dist=None, RHO_ref=100.0,
+                       RHO_min=1, RHO_max=300, RHO_mean=180, RHO_std=80,
+                       RHO_threshold=0.001, **kwargs):
+    """
+    Generate a prior model with a vertical regularization prior, reproducing the
+    Aarhus Workbench Smooth / Blocky / Sharp 1D model types as sample ensembles.
+
+    Output layout matches ``prior_model_workbench``:
+
+    - ``/M1`` ``Resistivity`` -- every realization resampled (piecewise
+      constant) onto a **regular** fixed-thickness grid
+      ``z = linspace(0, z_max, nz)`` with ``nz = ceil(z_max / dz) + 1``
+      (e.g. 91 layers of 1 m). This is the grid used for forward modelling.
+    - ``/M2`` ``sparse - depth-resistivity`` -- each realization in the
+      **native formulation** it was generated in: the concatenation of the
+      interface depths and the one-resistivity-per-layer vector, NaN-padded.
+    - ``/M3`` ``Number of layers`` -- native layer count per realization.
+
+    Workbench Smooth, Blocky and Sharp share their native discretization and
+    differ only in the norm applied to the vertical constraint between adjacent
+    layers; ``regularization`` selects it:
+
+    - ``'L2'`` (Smooth): ``nlayers`` geometrically thickening layers; native
+      log-resistivity is a correlated Gaussian process with exponential
+      covariance ``C(z_i, z_j) = sigma_logrho**2 * exp(-|z_i - z_j| /
+      corr_length)`` and mean ``log(RHO_ref)``. Set ``corr_length <= 0`` for
+      i.i.d. (uncorrelated) layers. ``RHO_dist='log-uniform'`` / ``'uniform'``
+      swaps the per-layer marginal to a (log-)uniform on
+      ``[RHO_min, RHO_max]`` via a Gaussian copula, keeping the vertical
+      correlation structure.
+    - ``'L1'`` (Blocky): same ``nlayers`` geometric stack; native
+      log-resistivity is a cumulative sum of i.i.d. Laplace increments with
+      scale ``blocky_scale`` about ``log(RHO_ref)``.
+    - ``'MGS'`` (Sharp): ``K ~ Poisson(n_jumps_mean)`` interfaces at depths
+      drawn uniformly in ``[z1, z_max]``, ``K + 1`` resistivities drawn from
+      ``RHO_dist`` -- a sparse, piecewise-constant native model.
+
+    Parameters
+    ----------
+    N : int, optional
+        Number of prior models to generate. Default is 100000.
+    regularization : str, optional
+        Vertical prior type: ``'L2'`` (default), ``'L1'`` or ``'MGS'``.
+    z1 : float, optional
+        Top depth of the native layer stack. Default is 0.
+    z_max : float, optional
+        Maximum depth value. Default is 100.
+    dz : float, optional
+        Thickness of the regular ``/M1`` output grid. Default is 1.
+    nlayers : int, optional
+        Number of layers in the native geometric stack (L2 / L1). Default is
+        0 (uses 30). Ignored for ``regularization='MGS'``.
+    p : int, optional
+        Power parameter for the geometric thickness increase (L2 / L1).
+        Default is 2.
+    corr_length : float, optional
+        Vertical correlation length (m) of the native log-resistivity Gaussian
+        process. Only used for ``regularization='L2'``. ``<= 0`` gives
+        uncorrelated (i.i.d.) layers. Default is 15.0.
+    sigma_logrho : float, optional
+        Prior standard deviation of log-resistivity (natural log). Analogous to
+        the Workbench BetaV vertical constraint strength. Only used for
+        ``regularization='L2'``. Default is 0.25.
+    blocky_scale : float, optional
+        Laplace scale of the per-interface log-resistivity increment. Only used
+        for ``regularization='L1'``. Default is 0.25.
+    n_jumps_mean : float, optional
+        Poisson mean number of sharp interfaces. Only used for
+        ``regularization='MGS'``. Default is 3.0.
+    RHO_dist : str or None, optional
+        Per-layer / per-segment resistivity marginal. ``None`` (default) uses
+        each branch's native form: ``'lognormal'`` for L2 (correlated GP in log
+        space about ``log(RHO_ref)``), ``'log-uniform'`` for MGS. Explicit
+        values: L2 accepts ``'log-uniform'`` / ``'uniform'`` (Gaussian-copula,
+        marginal on ``[RHO_min, RHO_max]``) or ``'lognormal'`` / ``'normal'``;
+        MGS accepts ``'log-uniform'`` / ``'uniform'`` / ``'normal'`` /
+        ``'lognormal'``. L1 (Blocky) ignores it.
+    RHO_ref : float, optional
+        Reference resistivity used as the process mean (in log space) for the
+        L2 and L1 priors. Default is 100.0.
+    RHO_min, RHO_max : float, optional
+        Hard resistivity clip bounds in Ohm.m. Defaults are 1 and 300.
+    RHO_mean, RHO_std : float, optional
+        Parameters for ``'normal'`` / ``'lognormal'`` inter-jump draws (MGS).
+        Defaults are 180 and 80.
+    RHO_threshold : float, optional
+        Minimum physical resistivity threshold in Ohm.m applied before
+        clipping. Default is 0.001.
+    f_prior_h5 : str, optional
+        Output path. Default is '' (auto-generated from the parameters).
+    showInfo : int, optional
+        Verbosity level.
+
+    Returns
+    -------
+    str
+        Filepath of the saved prior model.
+    """
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
+        return None
+
+    import integrate as ig
+
+    showInfo = kwargs.get('showInfo', 0)
+    f_prior_h5 = kwargs.get('f_prior_h5', '')
+    progress_callback = kwargs.get('progress_callback', None)
+
+    if regularization not in ('L2', 'L1', 'MGS'):
+        raise ValueError("regularization must be 'L2', 'L1' or 'MGS', got %r"
+                         % regularization)
+
+    # RHO_dist default is branch-specific (kept backward-compatible):
+    #   L2 -> 'lognormal' (correlated GP in log space, the historical L2 output)
+    #   MGS -> 'log-uniform' (per-segment draw, the historical Sharp output)
+    # L1 (Blocky) ignores RHO_dist entirely (a log-space Laplace random walk).
+    _rd_l2 = 'lognormal' if RHO_dist is None else RHO_dist
+    _rd_mgs = 'log-uniform' if RHO_dist is None else RHO_dist
+
+    _report_progress(progress_callback, 0, 100,
+                     'generating', 'Generating prior realizations')
+
+    if nlayers < 1:
+        nlayers = 30
+
+    # Regular output grid for /M1 (same convention as prior_model_workbench).
+    nz = int(np.ceil((z_max - 0) / dz)) + 1
+    z = np.linspace(0, z_max, nz)
+
+    if regularization in ('L2', 'L1'):
+        # Native model: a fixed stack of geometrically thickening layers.
+        z_native = z1 + (z_max - z1) * np.linspace(0, 1, nlayers) ** p
+
+        if regularization == 'L2':
+            dz_mat = np.abs(z_native[:, None] - z_native[None, :])
+            if corr_length is not None and corr_length > 0:
+                C = sigma_logrho ** 2 * np.exp(-dz_mat / corr_length)
+            else:
+                # corr_length <= 0  ->  no vertical correlation (i.i.d. layers)
+                C = sigma_logrho ** 2 * np.eye(nlayers)
+            Lc = np.linalg.cholesky(C + 1e-10 * np.eye(nlayers))
+            u = (Lc @ np.random.randn(nlayers, N)).T   # (N, nlayers), u_i ~ N(0, sigma_logrho**2)
+            if _rd_l2 in ('log-uniform', 'uniform'):
+                # Gaussian copula: keep the GP vertical correlation, swap the
+                # per-layer marginal to (log-)uniform on [RHO_min, RHO_max].
+                from scipy.stats import norm as _norm
+                q = _norm.cdf(u / max(sigma_logrho, 1e-12))   # ~ Uniform(0, 1) per layer
+                if _rd_l2 == 'log-uniform':
+                    rho_native = RHO_min * (RHO_max / RHO_min) ** q
+                else:
+                    rho_native = RHO_min + (RHO_max - RHO_min) * q
+            else:  # 'lognormal' / 'normal' / 'log-normal'  ->  GP in log space
+                rho_native = np.exp(np.log(RHO_ref) + u)
+            if len(f_prior_h5) < 1:
+                f_prior_h5 = 'PRIOR_SMOOTH_L%g_S%g_N%d.h5' % (corr_length or 0, sigma_logrho, N)
+        else:  # 'L1'
+            incr = np.random.laplace(0.0, blocky_scale, size=(N, nlayers))
+            incr[:, 0] = 0.0
+            rho_native = np.exp(np.log(RHO_ref) + np.cumsum(incr, axis=1))
+            if len(f_prior_h5) < 1:
+                f_prior_h5 = 'PRIOR_BLOCKY_B%g_N%d.h5' % (blocky_scale, N)
+
+        rho_native = _clip_rho(rho_native, RHO_threshold, RHO_min, RHO_max)
+
+        # /M1: resample the native stack onto the regular grid. Layer j covers
+        # [z_native[j], z_native[j+1]); the same map applies to all realizations.
+        layer_of = np.clip(np.searchsorted(z_native, z, side='right') - 1,
+                           0, nlayers - 1)
+        M_rho = rho_native[:, layer_of]
+
+        # /M2: native formulation, same encoding as prior_model_workbench ->
+        # [layer-top depths (nlayers-1), rho (nlayers)]
+        nm_sparse = nlayers + nlayers - 1
+        M_rho_sparse = np.ones((N, nm_sparse), dtype=np.float32) * np.nan
+        M_rho_sparse[:, :nlayers - 1] = z_native[:-1]
+        M_rho_sparse[:, nlayers - 1:] = rho_native
+
+        NLAY = np.full((N, 1), nlayers, dtype=np.float32)
+
+    else:  # 'MGS'
+        K = np.random.poisson(n_jumps_mean, N)
+        K = np.clip(K, 0, nz - 1)
+        Lmax = int(K.max()) + 1
+
+        M_rho = np.zeros((N, nz), dtype=np.float64)
+        nm_sparse = (Lmax - 1) + Lmax
+        M_rho_sparse = np.ones((N, nm_sparse), dtype=np.float32) * np.nan
+        NLAY = np.zeros((N, 1), dtype=np.float32)
+
+        progress_step = max(1, N // 100)
+        for i in range(N):
+            if progress_callback and ((i + 1) % progress_step == 0 or i + 1 == N):
+                _report_progress(progress_callback, i + 1, N,
+                                 'generating', 'Generating prior realizations')
+            k = int(K[i])
+            seg_rho = _draw_rho(_rd_mgs, k + 1, RHO_min, RHO_max, RHO_mean, RHO_std)
+            seg_rho = _clip_rho(seg_rho, RHO_threshold, RHO_min, RHO_max)
+            if k > 0:
+                bnd = np.sort(np.random.uniform(z1, z_max, k))
+            else:
+                bnd = np.zeros(0)
+
+            # /M1: piecewise-constant fill onto the regular grid.
+            M_rho[i, :] = seg_rho[0]
+            for j in range(k):
+                M_rho[i, z >= bnd[j]] = seg_rho[j + 1]
+
+            # /M2: native formulation -> [k interface depths, k+1 resistivities]
+            M_rho_sparse[i, :k] = bnd
+            M_rho_sparse[i, Lmax - 1:Lmax - 1 + k + 1] = seg_rho
+            NLAY[i, 0] = k + 1
+
+        if len(f_prior_h5) < 1:
+            f_prior_h5 = 'PRIOR_SHARP_K%g_%s_N%d.h5' % (n_jumps_mean, _rd_mgs, N)
+
+    M_rho = _clip_rho(M_rho, RHO_threshold, RHO_min, RHO_max)
+
+    if showInfo > 0:
+        print("prior_model_smooth: Saving prior model to %s" % f_prior_h5)
+    _report_progress(progress_callback, 80, 100,
+                     'saving', 'Saving prior model to %s' % f_prior_h5)
+
+    save_kwargs = {}
+    if 'compression' in kwargs:
+        save_kwargs['compression'] = kwargs['compression']
+    if 'compression_opts' in kwargs:
+        save_kwargs['compression_opts'] = kwargs['compression_opts']
+
+    if showInfo > 1:
+        print("Saving '/M1' prior model  %s" % f_prior_h5)
+    ig.save_prior_model(f_prior_h5, M_rho.astype(np.float32),
+                        im=1,
+                        name='Resistivity',
+                        is_discrete=0,
+                        x=z,
+                        z=z,
+                        delete_if_exist=True,
+                        force_replace=True,
+                        showInfo=showInfo,
+                        **save_kwargs,
+                        )
+
+    if showInfo > 1:
+        print("Saving '/M2' prior model  %s" % f_prior_h5)
+    ig.save_prior_model(f_prior_h5, M_rho_sparse,
+                        im=2,
+                        name='sparse - depth-resistivity',
+                        is_discrete=0,
+                        x=np.arange(0, nm_sparse),
+                        z=np.arange(0, nm_sparse),
+                        force_replace=True,
+                        showInfo=showInfo,
+                        **save_kwargs,
+                        )
+
+    if showInfo > 1:
+        print("Saving '/M3' prior model  %s" % f_prior_h5)
+    ig.save_prior_model(f_prior_h5, NLAY,
+                        im=3,
+                        name='Number of layers',
+                        is_discrete=0,
+                        x=np.array([0]),
+                        z=np.array([0]),
+                        force_replace=True,
+                        showInfo=showInfo,
+                        **save_kwargs,
+                        )
+
+    _report_progress(progress_callback, 100, 100,
+                     'completed', 'Prior model saved to %s' % f_prior_h5)
+
+    return f_prior_h5
+
+
+def prior_model_blocky(**kwargs):
+    """Blocky (L1 vertical constraint) prior. See prior_model_smooth."""
+    kwargs.setdefault('regularization', 'L1')
+    return prior_model_smooth(**kwargs)
+
+
+def prior_model_sharp(**kwargs):
+    """Sharp / MGS (sparse vertical jumps) prior. See prior_model_smooth."""
+    kwargs.setdefault('regularization', 'MGS')
+    return prior_model_smooth(**kwargs)
+
 
 def posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], usePrior=False, **kwargs):
     """
@@ -2970,7 +2779,7 @@ def entropy(P, base = None):
     return H
 
 
-def discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', showInfo=1):
+def discrete_data_entropy(f_data_h5, id_list=None, depth_reduce='min', showInfo=1):
     """
     Compute the pointwise (per survey location) entropy of one or more
     multinomial discrete /D{id} data entries in a DATA HDF5 file.
@@ -2990,9 +2799,11 @@ def discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', showInfo=1):
     ----------
     f_data_h5 : str
         Path to the DATA HDF5 file.
-    id_list : int or list of int
+    id_list : int or list of int, optional
         One or more dataset ids referencing multinomial /D{id} groups
         (e.g. from ``save_borehole_data()``'s ``id_out`` / ``id_borehole_list``).
+        If ``None`` (default), every /D{id} group in the file with
+        ``noise_model == 'multinomial'`` is used.
     depth_reduce : {'min', 'mean'}, optional
         How to collapse the per-location depth-layer axis, per id, before
         combining across ids. ``'min'`` (default) takes the lowest (most
@@ -3015,12 +2826,28 @@ def discrete_data_entropy(f_data_h5, id_list, depth_reduce='min', showInfo=1):
     """
     import scipy as sp
     import warnings
+    import re
+    import h5py
     import integrate as ig
 
-    if not isinstance(id_list, list):
-        id_list = [id_list]
     if depth_reduce not in ('mean', 'min'):
         raise ValueError("depth_reduce must be 'mean' or 'min'")
+
+    if id_list is None:
+        with h5py.File(f_data_h5, 'r') as f_data:
+            id_list = sorted(
+                int(re.search(r'D(\d+)', key).group(1))
+                for key in f_data.keys()
+                if re.match(r'D\d+$', key)
+                and f_data[f'/{key}'].attrs.get('noise_model', 'none') == 'multinomial'
+            )
+        if len(id_list) == 0:
+            raise ValueError(
+                "No multinomial /D{id} datasets found in %s" % f_data_h5)
+        if showInfo > 0:
+            print("discrete_data_entropy: using multinomial ids %s" % id_list)
+    elif not isinstance(id_list, list):
+        id_list = [id_list]
 
     DATA = ig.load_data(f_data_h5, id_arr=id_list, showInfo=showInfo)
 

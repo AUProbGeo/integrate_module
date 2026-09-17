@@ -100,7 +100,7 @@ f_prior_h5 = ig.prior_model_layered(N=N,
                                     RHO_dist='uniform', RHO_min=0.5*min(rho), RHO_max=2*max(rho))
 
 # make prior data realizations
-f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex)
 
 ig.plot_prior_stats(f_prior_h5)
 

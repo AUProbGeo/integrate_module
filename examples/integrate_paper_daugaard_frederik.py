@@ -109,8 +109,8 @@ if doSamplePrior:
     )
 
     # Compute prior data
-    f_prior_standard_h5 = ig.prior_data_gaaem(f_prior_standard_h5, file_gex, doMakePriorCopy=False)
-    f_prior_valley_h5 = ig.prior_data_gaaem(f_prior_valley_h5, file_gex, doMakePriorCopy=False)
+    f_prior_standard_h5 = ig.prior_data_em(f_prior_standard_h5, file_gex, doMakePriorCopy=False)
+    f_prior_valley_h5 = ig.prior_data_em(f_prior_valley_h5, file_gex, doMakePriorCopy=False)
 else:
     # Load precomputed prior data realizations
     f_prior_standard_h5='daugaard_standard_new_N1000000_dmax90_TX07_20231016_2x4_RC20-33_Nh280_Nf12.h5'
@@ -275,7 +275,7 @@ if useMergedPrior:
 # %%
 if useGenericPrior:
     f_prior_h5 = ig.prior_model_layered(N=N_use,lay_dist='chi2', NLAY_deg=4, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % (N_use))
-    f_prior_data_generic_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, NdoMakePriorCopy=True)
+    f_prior_data_generic_h5 = ig.prior_data_em(f_prior_h5, file_gex, NdoMakePriorCopy=True)
     f_prior_data_h5_list.append(f_prior_data_generic_h5)
 
 # %%
@@ -565,11 +565,11 @@ if doPlotAll:
             ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_2, hardcopy=hardcopy, title='b) P2')
     
         if plLevel>1:
-            ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy, plot_data_locations=True)
+            ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy, plotPoints=True)
             ig.plot_T_EV(f_post_h5, pl='T', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='EV', hardcopy=hardcopy)
             ig.plot_T_EV(f_post_h5, pl='ND', hardcopy=hardcopy)
-            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=nr, plot_data_locations=True)
+            ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1, N_UNIQUE_max=nr, plotPoints=True)
 
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' )
             plt.show()

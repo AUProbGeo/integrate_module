@@ -423,7 +423,10 @@ def load_prior_data(f_prior_h5, id_use=[], idx=[], N_use=0, Randomize=False, **k
             id_use = np.arange(1,Ndt+1) 
 
     with h5py.File(f_prior_h5, 'r') as f_prior:
-        N = f_prior['/D1'].shape[0]
+        # The requested datasets may hold a different number of realizations
+        # (e.g. when forwards were run with different N), so index by the
+        # smallest one rather than assuming /D1 sets the size.
+        N = min(f_prior['/D%d' % id].shape[0] for id in id_use)
         if N_use == 0:
             N_use = N    
         if N_use>N:
@@ -708,6 +711,24 @@ def load_data(f_data_h5, id_arr=[], ii=None, **kwargs):
 
 ## def ###################################################
 
+def _stm_lowpass_lists(GEX, ch):
+    """Cut-off frequencies / orders for the STM ``LowPassFilter`` block of channel ``ch``.
+
+    AarhusInv applies the channel's ``TiBLowPassFilter`` *and* every
+    ``General.RxCoilLPFilter*`` entry (each ``[order, fcut]``).  GA-AEM accepts
+    several filters only as space-separated lists inside ONE ``LowPassFilter``
+    block (extra blocks are silently ignored), so both are returned as strings.
+    Orders are rounded to integers (GA-AEM Butterworth order is integral).
+    """
+    rows = [np.atleast_1d(GEX['Channel%d' % ch]['TiBLowPassFilter']).astype(float)]
+    for key in sorted(k for k in GEX['General'] if k.startswith('RxCoilLPFilter')):
+        v = np.atleast_2d(np.asarray(GEX['General'][key], dtype=float))
+        rows.extend(v[i] for i in range(v.shape[0]))
+    fcut = ' '.join('%.0f' % r[1] for r in rows)
+    order = ' '.join('%d' % int(round(r[0])) for r in rows)
+    return fcut, order
+
+
 #def write_stm_files(GEX, Nhank=140, Nfreq=6, Ndig=7, **kwargs):
 def write_stm_files(GEX, **kwargs):
     """
@@ -871,11 +892,10 @@ def write_stm_files(GEX, **kwargs):
         #np.savetxt(fID_LM, windows_LM, fmt='%23.6e', delimiter=' ')
         np.savetxt(fID_LM, windows_LM[:,1::], fmt='%23.6e', delimiter=' ')
         fID_LM.write('\t\tWindowTimes End\n\n')
-        TiBFilt = GEX['Channel1']['TiBLowPassFilter']
-
+        fcut, order = _stm_lowpass_lists(GEX, 1)
         fID_LM.write('\t\tLowPassFilter Begin\n')
-        fID_LM.write('\t\t\tCutOffFrequency = %10.0f\n' % (TiBFilt[1]))
-        fID_LM.write('\t\t\tOrder = %d\n' % (TiBFilt[0]))
+        fID_LM.write('\t\t\tCutOffFrequency = %s\n' % fcut)
+        fID_LM.write('\t\t\tOrder = %s\n' % order)
         fID_LM.write('\t\tLowPassFilter End\n\n')
         
         fID_LM.write('\tReceiver End\n\n')
@@ -918,11 +938,10 @@ def write_stm_files(GEX, **kwargs):
         #np.savetxt(fID_HM, windows_HM, fmt='%23.6e', delimiter=' ')
         np.savetxt(fID_HM, windows_HM[:,1::], fmt='%23.6e', delimiter=' ')
         fID_HM.write('\t\tWindowTimes End\n\n')
-        TiBFilt = GEX['Channel2']['TiBLowPassFilter']
-        
+        fcut, order = _stm_lowpass_lists(GEX, 2)
         fID_HM.write('\t\tLowPassFilter Begin\n')
-        fID_HM.write('\t\t\tCutOffFrequency = %10.0f\n' % (TiBFilt[1]))
-        fID_HM.write('\t\t\tOrder = %d\n' % (TiBFilt[0]))
+        fID_HM.write('\t\t\tCutOffFrequency = %s\n' % fcut)
+        fID_HM.write('\t\t\tOrder = %s\n' % order)
         fID_HM.write('\t\tLowPassFilter End\n\n')
         
         fID_HM.write('\tReceiver End\n\n')
@@ -2144,7 +2163,7 @@ def post_to_csv(f_post_h5='', Mstr='/M1'):
 '''
 HDF% related functions
 '''
-def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, compress=True, **kwargs):
+def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, compress=True, randomize=True, **kwargs):
     """
     Copy the contents of an HDF5 file to another HDF5 file.
 
@@ -2158,6 +2177,10 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
     :type loadToMemory: bool, optional
     :param compress: Whether to compress the output dataset. Default is True.
     :type compress: bool, optional
+    :param randomize: When N < N_in, pick N realizations at random (True, default)
+        or copy the first N sequentially (False). Sequential copies made from the
+        same input file with different N share their leading realizations.
+    :type randomize: bool, optional
 
     :return: output_filename
     """
@@ -2216,7 +2239,7 @@ def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, c
                             N = N_in
                         if N > N_in:
                             N = N_in
-                        if N == N_in:
+                        if N == N_in or not randomize:
                             i_use = np.arange(N)
                         else:
                             i_use = np.sort(np.random.choice(N_in, N, replace=False))
@@ -3300,6 +3323,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         starting at ``id=3`` instead of ``id=2``.
     altitude_std : str, float, or None, optional
         Uncertainty for ``altitude``.
+
         - A **string** is treated as another flightlines column name
           (case-insensitive) holding the absolute std directly.
         - A **number** with ``abs(altitude_std) < 1`` is treated as a

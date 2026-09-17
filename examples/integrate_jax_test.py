@@ -26,8 +26,10 @@
 #   full run:  12s    (88x faster than NumPy)
 #
 #
-# Note that JAX warm up on GPU seems to 'hang'/Get stuck
-# A simple kill of the process is needed to stop it, but after that the GPU runs fine and the timing is good.
+# (An earlier version of the JAX backend appeared to 'hang' during GPU warm-up:
+# that was XLA compiling a giant vmap-fused likelihood kernel, made worse when
+# XLA fell back to an old system ptxas.  Both are fixed in integrate_rejection_jax.py;
+# warm-up should now take well under 5 s.)
 #
 
 # %%

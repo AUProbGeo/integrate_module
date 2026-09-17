@@ -8,6 +8,8 @@ Overview
 
 INTEGRATE supports integration of borehole (well log) data with geophysical surveys such as electromagnetic (EM) data. Boreholes provide direct observations of subsurface lithology at discrete depth intervals, which can be combined with spatially extensive geophysical data to improve characterization across the entire survey area.
 
+The approach used here -- treating logged lithology as an *uncertain* observation rather than a hard constraint -- follows [NORGAARD2026]_.
+
 This document describes:
 
 1. How borehole data is structured and stored
@@ -632,7 +634,7 @@ See Also
 
 * :doc:`format` - General data format specifications
 * :doc:`workflow` - Complete inversion workflow
-* :doc:`notebooks` - Jupyter notebook examples
+* :doc:`auto_examples/index` - worked examples
 
 References
 ----------

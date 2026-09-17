@@ -24,13 +24,24 @@ from integrate.integrate import prior_set
 from integrate.integrate import logl_T_est
 from integrate.integrate import lu_post_sample_logl
 from integrate.integrate import prior_data
-from integrate.integrate import prior_data_gaaem
+from integrate.integrate import prior_data_em
 from integrate.integrate import prior_data_identity
-from integrate.integrate import forward_gaaem
+from integrate.gaaem_forward import forward_gaaem
+from integrate.gaaem_forward import prior_data_gaaem
+from integrate.integrate import forward_em
+from integrate.anemone_forward import forward_anemone
+from integrate.anemone_forward import prior_data_anemone
+from integrate.anemone_forward import gex_to_anemone_system
+from integrate.simpeg_forward import forward_simpeg
+from integrate.simpeg_forward import prior_data_simpeg
+from integrate.em_system import gex_to_em_system
 from integrate.integrate import synthetic_case
 from integrate.integrate import prior_model_layered
 from integrate.integrate import prior_model_workbench
 from integrate.integrate import prior_model_workbench_direct
+from integrate.integrate import prior_model_smooth
+from integrate.integrate import prior_model_blocky
+from integrate.integrate import prior_model_sharp
 from integrate.integrate import posterior_cumulative_thickness
 #from integrate.integrate import integrate_rejection_multi  
 from integrate.integrate import use_parallel
@@ -108,6 +119,7 @@ from integrate.integrate_plot import get_colormap_and_limits
 from integrate.integrate_plot import plot_xy
 from integrate.integrate_plot import find_points_along_line_segments
 from integrate.integrate_plot import plot_boreholes
+from integrate.integrate_plot import plot_voronoi_cells
 
 # Import from borehole module
 from integrate.integrate_borehole import compute_P_obs_discrete
@@ -135,6 +147,15 @@ from integrate.integrate_query import prior_describe
 from integrate.integrate_query import query_from_text
 from integrate.integrate_query import title_from_json
 from integrate.integrate_query import query_test_llm
+
+# Import coherent-area (region-search) functions
+from integrate.integrate_query import voronoi_graph
+from integrate.integrate_query import voronoi_cells_ordered
+from integrate.integrate_query import cells_to_polygon
+from integrate.integrate_query import flag_edge_cells
+from integrate.integrate_query import grow_connected_region
+from integrate.integrate_query import find_coherent_area
+from integrate.integrate_query import region_volumes
 
 # Import gex module functions
 from integrate.gex import read_gex as read_gex2

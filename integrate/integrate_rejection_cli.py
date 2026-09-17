@@ -109,8 +109,10 @@ For more information, see the INTEGRATE documentation.
 
     parser.add_argument('--backend',
                        choices=['numpy', 'jax'],
-                       default='numpy',
-                       help='Rejection sampling backend: numpy (default) or jax')
+                       default=None,
+                       help="Rejection sampling backend: numpy or jax. "
+                            "If not given, uses the REJECTION_BACKEND "
+                            "environment variable if set, else numpy.")
 
     parser.add_argument('--verbose', '-v',
                        action='store_true',
@@ -171,7 +173,11 @@ For more information, see the INTEGRATE documentation.
         print(f"  Base temperature: {args.temp_base}")
         print(f"  Parallel processing: {parallel}")
         print(f"  CPU cores: {args.cpus if args.cpus > 0 else 'auto-detect'}")
-        print(f"  Backend: {args.backend}")
+        if args.backend:
+            print(f"  Backend: {args.backend}")
+        else:
+            print(f"  Backend: not specified (REJECTION_BACKEND={os.environ.get('REJECTION_BACKEND', 'unset')!r}, "
+                  f"falls back to 'numpy' if unset)")
         print("")
     
     try:

@@ -28,9 +28,10 @@ logger = logging.getLogger(__name__)
 def integrate_rejection(f_prior_h5='prior.h5', 
                               f_data_h5='DAUGAAD_AVG_inout.h5',
                               f_post_h5='',                              
-                              N_use=100000000000, 
-                              id_use=[], 
-                              ip_range=[], 
+                              N_use=100000000000,
+                              id_use=[],
+                              id_prior=None,
+                              ip_range=[],
                               nr=1000,
                               autoT=1,
                               T_base = 1,
@@ -42,7 +43,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
                               T_P_acc_level=None,
                               progress_callback=None,
                               console_progress=None,
-                              backend='numpy',
+                              backend=None,
                               **kwargs):
     """
     Perform probabilistic inversion using rejection sampling.
@@ -69,6 +70,18 @@ def integrate_rejection(f_prior_h5='prior.h5',
     id_use : list, optional
         List of data identifiers to use for inversion. If empty, uses all available data.
         Default is empty list.
+    id_prior : int, dict, or None, optional
+        Override which prior dataset(s) each observed dataset in ``id_use`` is
+        compared against, without needing to change ``/D{id}/id_prior`` in
+        ``f_data_h5``. Default is None (no override -- use whatever
+        ``load_data`` resolves from the data file, i.e. ``/D{id}/id_prior`` if
+        present, else ``id`` itself; identical to the pre-existing behaviour).
+        If an int, that prior id is used for every id in ``id_use`` (e.g.
+        ``id_use=[1], id_prior=2`` compares observed ``/D1`` against prior
+        ``/D2``). If a dict, it maps ``{data_id: prior_id}`` and only
+        overrides the listed data ids; any id in ``id_use`` not present as a
+        dict key keeps its normally-resolved prior id. Any other type raises
+        ``ValueError``.
     ip_range : list, optional
         List of data point indices to invert. If empty, inverts all data points.
         Default is empty list.
@@ -107,12 +120,17 @@ def integrate_rejection(f_prior_h5='prior.h5',
     console_progress : bool, optional
         Whether to show console TQDM progress bar. If None, auto-detects based on progress_callback.
         Default is None.
-    backend : str, optional
-        Computation backend to use.  ``'numpy'`` (default) uses the original
+    backend : str or None, optional
+        Computation backend to use.  ``'numpy'`` uses the original
         NumPy/multiprocessing implementation.  ``'jax'`` uses a JIT-compiled,
         vmapped JAX implementation that processes data points in batches; pass
-        ``Nbatch=<int>`` (via **kwargs, default 64) to tune the batch size.
+        ``Nbatch=<int>`` (via ``**kwargs``, default 64) to tune the batch size.
         JAX must be installed separately: ``pip install jax``.
+        Default is None, in which case the backend is taken from the
+        ``REJECTION_BACKEND`` environment variable if set (e.g.
+        ``os.environ['REJECTION_BACKEND'] = 'jax'``), else ``'numpy'``.
+        Passing ``backend`` explicitly always overrides the environment
+        variable.
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
         Nbatch (batch size for backend='jax'), and normalize_likelihood (bool,
@@ -138,12 +156,21 @@ def integrate_rejection(f_prior_h5='prior.h5',
     >>> import integrate as ig
     >>> f_post = ig.integrate_rejection('prior.h5', 'data.h5', N_use=10000)
     >>> print(f"Results saved to: {f_post}")
+
+    >>> # compare the same observed D1 against a different prior id, no DATA.h5 edits
+    >>> ig.integrate_rejection('prior1.h5', 'data.h5', id_use=[1])
+    >>> ig.integrate_rejection('prior2.h5', 'data.h5', id_use=[1], id_prior=2)
     """
     # Safety guard: if somehow called from a worker process, do nothing.
     if multiprocessing.current_process().name != 'MainProcess':
         return None
 
     import integrate as ig
+
+    # Resolve backend: explicit argument wins, else REJECTION_BACKEND env
+    # var, else the 'numpy' default.
+    if backend is None:
+        backend = os.environ.get('REJECTION_BACKEND', 'numpy')
 
     # get optional arguments
     showInfo = kwargs.get('showInfo', 0)
@@ -237,9 +264,29 @@ def integrate_rejection(f_prior_h5='prior.h5',
     
     # Load the observed data from the h5 files
     DATA = ig.load_data(f_data_h5, id_arr=id_use, showInfo=showInfo)
-    
+
     # Load the prior data from the h5 files
     id_data_prior = DATA['id_prior']
+    if id_prior is not None:
+        # Call-time override of which prior dataset each observed dataset is
+        # compared against -- does NOT touch f_data_h5. id_prior=None (the
+        # default) leaves id_data_prior exactly as resolved above.
+        if isinstance(id_prior, dict):
+            id_data_prior = [id_prior.get(id_, id_data_prior[i])
+                             for i, id_ in enumerate(id_use)]
+            unused = set(id_prior) - set(id_use)
+            if unused and showInfo > 0:
+                print('  -- id_prior override key(s) %s not in id_use=%s, ignored'
+                      % (sorted(unused), id_use))
+        elif isinstance(id_prior, (int, np.integer)):
+            id_data_prior = [int(id_prior)] * len(id_use)
+        else:
+            raise ValueError(
+                "id_prior must be None, an int, or a dict of {data_id: prior_id}, "
+                "got %r" % (id_prior,))
+        if showInfo > 1:
+            print('  -- id_prior override applied: id_use=%s -> prior ids=%s'
+                  % (id_use, id_data_prior))
     D, idx = ig.load_prior_data(f_prior_h5, id_use=id_data_prior, N_use=N_use, Randomize=True, showInfo=showInfo)
     
     

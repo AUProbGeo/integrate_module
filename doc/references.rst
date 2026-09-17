@@ -13,7 +13,7 @@ References
 
 .. [NORGAARD2026] Nørgaard, Jesper, Rasmus Bødker Madsen, Anne-Sophie Høyer, Ingelise Møller, and Thomas Mejer Hansen. "Quantifying and Incorporating Lithological Well Logging as Uncertain Data in Probabilistic Inverse Problems." Mathematical Geosciences (2026): 1-26. [https://doi.org/10.1007/s11004-026-10298-6]
 
-.. [GEOPRIOR1D] Nørgaard, Jesper, Rasmus Bødker Madsen, Ingelise Møller, Thomas Mejer Hansen, and Anne-Sophie Høyer. "GeoPrior1D: An application for generating 1D geological and geophysical realizations of the subsurface." Available at SSRN 6148572 (2026). [https://doi.org/10.1016/j.softx.2026.102654]
+.. [GEOPRIOR1D] Nørgaard, Jesper, Rasmus Bødker Madsen, Ingelise Møller, Thomas Mejer Hansen, and Anne-Sophie Høyer. "GeoPrior1D: An application for generating 1D geological and geophysical realizations of the subsurface." Software X, 34,(2026). [https://doi.org/10.1016/j.softx.2026.102654]
 
 
 .. [GA-AEM] https://github.com/GeoscienceAustralia/ga-aem
