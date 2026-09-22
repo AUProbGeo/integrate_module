@@ -1371,6 +1371,55 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
     return
 
 
+def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=None, seed=None):
+    """
+    Return one prior realization per plotted location, as an (nz, len(ii)) array.
+
+    Used by the ``'realization'`` panel of plot_profile_continuous/plot_profile_discrete.
+    If ``i_plot_realization`` is None, a random column of ``/i_use`` (the accepted prior
+    indices per sounding) is drawn for each location in ``ii``. Otherwise
+    ``i_plot_realization`` must be an array of prior row indices, one per location: either
+    of length ``len(ii)`` or of length ``nd`` (all soundings, subset by ``ii``).
+    """
+    ii = np.asarray(ii, dtype=int)
+    n_loc = len(ii)
+
+    if i_plot_realization is None:
+        with h5py.File(f_post_h5, 'r') as f_post:
+            if '/i_use' not in f_post:
+                raise KeyError("'%s' has no /i_use dataset; run the posterior sampling first "
+                               "or pass i_plot_realization" % f_post_h5)
+            i_use = f_post['/i_use'][:]
+        nd, nr = i_use.shape
+        rng = np.random.default_rng(seed)
+        r = rng.integers(0, nr, size=n_loc)
+        idx = i_use[ii, r].astype(int)
+    else:
+        idx = np.asarray(i_plot_realization)
+        with h5py.File(f_post_h5, 'r') as f_post:
+            nd = f_post['/T'].shape[0]
+        if idx.ndim == 0:
+            raise ValueError("i_plot_realization must be an array with one prior index per "
+                             "location (length %d or %d), not a scalar" % (n_loc, nd))
+        idx = idx.ravel().astype(int)
+        if len(idx) == n_loc:
+            pass
+        elif len(idx) == nd:
+            idx = idx[ii]
+        else:
+            raise ValueError("i_plot_realization has length %d; expected %d (locations in "
+                             "profile) or %d (all soundings)" % (len(idx), n_loc, nd))
+
+    # Read only the prior rows needed (h5py fancy indexing needs sorted unique indices)
+    u, inv = np.unique(idx, return_inverse=True)
+    with h5py.File(f_prior_h5, 'r') as f_prior:
+        N = f_prior[Mstr].shape[0]
+        if len(u) > 0.25 * N:
+            M_u = f_prior[Mstr][:][u, :]
+        else:
+            M_u = f_prior[Mstr][u, :]
+    return M_u[inv].T
+
 
 def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index', gap_threshold=None, panels=None, **kwargs):
     """

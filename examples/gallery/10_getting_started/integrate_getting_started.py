@@ -13,6 +13,11 @@ The workflow follows these main steps:
 3. Plot and analyze the results
 """
 # %%
+import os 
+os.environ["EM_FORWARD_METHOD"] = "anemone"
+os.environ["EM_FORWARD_DEVICE"] = "cuda"
+os.environ["REJECTION_BACKEND"] = "jax"
+
 import integrate as ig
 hardcopy = True
 import matplotlib.pyplot as plt
@@ -116,6 +121,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 # Select how many prior model realizations (N) should be generated
 N=2_000_000
 N=1_000_000
+N=100_000
 
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
                                     showInfo=1)

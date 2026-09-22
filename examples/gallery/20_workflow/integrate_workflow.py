@@ -18,6 +18,11 @@ except:
 
 # %%
 import os
+
+#os.environ["EM_FORWARD_METHOD"] = "anemone"
+#os.environ["EM_FORWARD_DEVICE"] = "cuda"
+#os.environ["REJECTION_BACKEND"] = "jax"
+
 import integrate as ig
 from geoprior1d import geoprior1d
 
@@ -191,7 +196,7 @@ ig.plot_boreholes(BHOLES, f_prior_h5)
 
 
 # %%
-f_prior_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)
+f_prior_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False, showInfo=1)
 
 
 # %%
