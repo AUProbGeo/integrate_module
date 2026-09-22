@@ -1371,7 +1371,8 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
     return
 
 
-def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=None, seed=None):
+def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=None, seed=None,
+                         plot_prior=False):
     """
     Return one prior realization per plotted location, as an (nz, len(ii)) array.
 
@@ -1380,6 +1381,8 @@ def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=Non
     indices per sounding) is drawn for each location in ``ii``. Otherwise
     ``i_plot_realization`` must be an array of prior row indices, one per location: either
     of length ``len(ii)`` or of length ``nd`` (all soundings, subset by ``ii``).
+    If ``plot_prior`` is True, ``/i_use`` is replaced by random prior indices of the same
+    shape, so the panel shows prior (not posterior) realizations.
     """
     ii = np.asarray(ii, dtype=int)
     n_loc = len(ii)
@@ -1392,6 +1395,10 @@ def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=Non
             i_use = f_post['/i_use'][:]
         nd, nr = i_use.shape
         rng = np.random.default_rng(seed)
+        if plot_prior:
+            with h5py.File(f_prior_h5, 'r') as f_prior:
+                N = f_prior[Mstr].shape[0]
+            i_use = rng.integers(0, N, size=(nd, nr))
         r = rng.integers(0, nr, size=n_loc)
         idx = i_use[ii, r].astype(int)
     else:
@@ -1456,11 +1463,21 @@ def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index',
         For continuous models: ['value', 'std', 'stats']
         For discrete models: ['mode', 'entropy', 'stats']
 
+        Both model types also accept 'realization', which replaces the first panel with
+        one posterior realization per location (a random entry of ``/i_use`` per sounding,
+        or the prior indices given by ``i_plot_realization``).
+
         See plot_profile_continuous() and plot_profile_discrete() for detailed options (default is None, shows all panels).
     **kwargs : dict
         Additional plotting arguments passed to discrete/continuous plotting functions.
         Both model types support 'alpha' (float, 0.0-1.0) to apply uncertainty-based
         transparency to the main profile panel (median/mean for continuous, mode for discrete).
+        For the 'realization' panel, ``i_plot_realization`` (array of prior indices, one per
+        location), ``seed`` (int, reproducible random draw) and ``plot_prior`` (bool, draw
+        from the prior instead of ``/i_use``) are supported.
+        ``title`` (str) adds a figure title above all panels.
+        With ``hardcopy=True``, ``f_png`` (str) sets the output filename (otherwise it is
+        generated automatically, with ``txt`` as an optional suffix).
 
     Returns
     -------
@@ -1490,6 +1507,10 @@ def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index',
     Plot discrete model with full uncertainty transparency on mode:
 
     >>> plot_profile(f_post_h5, im=2, alpha=1.0)
+
+    Plot one random posterior realization per location (reproducible with seed):
+
+    >>> plot_profile(f_post_h5, im=1, panels=['realization', 'std', 'stats'], seed=1)
 
     Plot continuous model with partial transparency:
 
@@ -1586,14 +1607,26 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         - ['mode']: Only mode (most probable class)
         - ['entropy']: Only entropy (uncertainty)
         - ['stats']: Only temperature and log-likelihood
+        - ['realization']: One posterior realization per location instead of mode (see ``i_plot_realization``, ``seed``, ``plot_prior``)
         - Any combination of the above (e.g., ['mode', 'stats'])
-        Accepted panel names: 'mode', 'entropy', 'stats', 'temperature', 't'
+        Accepted panel names: 'mode', 'realization', 'entropy', 'stats', 'temperature', 't'
 
         Note: The stats panel optionally shows the number of unique realizations
         when show_n_unique=True is passed in kwargs.
     alpha : float, optional
         Transparency scaling factor based on entropy (0.0=no transparency, default;
         1.0=full entropy-based transparency where high-uncertainty regions become transparent).
+    i_plot_realization : array_like of int, optional
+        Used with the 'realization' panel. Prior row indices, one per location: length
+        ``len(ii)`` (locations in the profile) or ``nd`` (all soundings, subset by ``ii``),
+        e.g. ``f_post['/i_use'][:, 5]`` shows posterior realization #5 everywhere. If None
+        (default), a random entry of ``/i_use`` is drawn for each location.
+    seed : int, optional
+        Seed for the random draw of realizations (default None, non-reproducible).
+    plot_prior : bool, optional
+        Used with the 'realization' panel. If True, ``/i_use`` is replaced by random
+        prior indices of the same shape, so the panel shows a prior (not posterior)
+        realization per location (default False).
     entropy_min : float, optional
         Minimum entropy for transparency scaling; values below are fully opaque.
         Default is ``np.nanmin(Entropy)`` from the data.
@@ -1602,8 +1635,11 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         Default is ``0.6 * np.nanmax(Entropy)``.
     hardcopy : bool, optional
         Save plot as PNG file (default False).
+    f_png : str, optional
+        Output filename used when ``hardcopy=True``. If not given, a name is built from
+        ``f_post_h5``, the index range, model, panels and ``txt``.
     txt : str, optional
-        Additional text for filename.
+        Additional text appended to the automatic filename (ignored if ``f_png`` is given).
     showInfo : int, optional
         Level of debug output (0=none, >0=verbose).
     show_n_unique : bool, optional
@@ -1618,6 +1654,8 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     fontsize : int or float, optional
         Font size applied to all text elements (titles, axis labels, colorbar labels,
         tick labels). If None, matplotlib's current default is used (default None).
+    title : str, optional
+        Figure title placed above all panels (``fig.suptitle``). Default None (no title).
 
     Returns
     -------
@@ -1664,6 +1702,10 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
 
     >>> plot_profile_discrete(f_post_h5, alpha=1.0)
 
+    Show one random posterior realization per location:
+
+    >>> plot_profile_discrete(f_post_h5, panels=['realization', 'entropy', 'stats'], seed=1)
+
     Show mode with custom entropy range for transparency:
 
     >>> plot_profile_discrete(f_post_h5, alpha=0.8, entropy_min=0.1, entropy_max=0.7)
@@ -1679,6 +1721,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
     plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of entropy
     fontsize = kwargs.get('fontsize', None)
+    i_plot_realization = kwargs.get('i_plot_realization', None)
+    seed = kwargs.get('seed', None)
+    plot_prior = kwargs.get('plot_prior', False)
 
     # Default to showing all panels
     if panels is None:
@@ -1688,7 +1733,8 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     panels = [p.lower() for p in panels]
 
     # Determine which panels to show
-    show_mode = 'mode' in panels
+    show_realization = 'realization' in panels
+    show_mode = 'mode' in panels and not show_realization
     show_entropy = 'entropy' in panels
     show_stats = any(p in panels for p in ['stats', 't', 'temperature'])
 
@@ -1982,12 +2028,39 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     fig, ax = plt.subplots(3,1,figsize=(20,10), gridspec_kw={'height_ratios': [3, 3, 1]})
 
     # Hide panels that are not requested
-    if not show_mode:
+    if not (show_mode or show_realization):
         ax[0].axis('off')
     if not show_entropy:
         ax[1].axis('off')
     if not show_stats:
         ax[2].axis('off')
+
+    # REALIZATION panel (ax[0]) - one posterior realization per location
+    if show_realization:
+        real_data = _profile_realization(f_post_h5, f_prior_h5, Mstr, ii,
+                                         i_plot_realization=i_plot_realization, seed=seed,
+                                         plot_prior=plot_prior)
+        real_label = 'Prior realization' if plot_prior else 'Realization'
+        if gap_alpha is not None:
+            real_data = np.ma.masked_where(gap_alpha == 0.0, real_data)
+
+        im1 = ax[0].pcolormesh(DDc, ZZc, real_data,
+                cmap=cmap,
+                vmin=clim[0]-.5,
+                vmax=clim[1]+.5,
+                shading='auto')
+
+        if alpha > 0:
+            im1.set_alpha(A[:,ii])
+            ax[0].set_title('%s (with uncertainty transparency)' % real_label)
+        else:
+            ax[0].set_title(real_label)
+
+        cbar1 = fig.colorbar(im1, ax=ax[0], label=name)
+        cbar1.set_ticks(class_id)
+        cbar1.set_ticklabels(class_name)
+        cbar1.ax.invert_yaxis()
+        ax[0].set_ylabel('Elevation (m)')
 
     # MODE panel (ax[0]) - only if requested
     if show_mode:
@@ -2049,7 +2122,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             fig.colorbar(im2, ax=ax[1], label='Entropy')
 
     ## Remove x-tick labels from non-bottom panels
-    if show_mode:
+    if show_mode or show_realization:
         ax[0].set_xticks([])
     if show_entropy:
         ax[1].set_xticks([])
@@ -2106,6 +2179,10 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         ax[2].set_xlabel({'x': 'X (m)', 'y': 'Y (m)', 'id': 'ID', 'index': 'Index'}.get(xaxis, xaxis))
         plt.grid(True)
 
+    title = kwargs.get('title', None)
+    if title:
+        fig.suptitle(title)
+
     if fontsize is not None:
         import matplotlib.text as _mtext
         for _t in fig.findobj(_mtext.Text):
@@ -2129,12 +2206,14 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
 
     # get filename without extension
     if kwargs['hardcopy']:
-        # Add panel information to filename if panels were specified
-        if panels is not None and panels != ['mode', 'entropy', 'stats']:
-            panel_str = '_panels_' + '-'.join(panels)
-        else:
-            panel_str = ''
-        f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
+        f_png = kwargs.get('f_png', None)
+        if not f_png:
+            # Add panel information to filename if panels were specified
+            if panels is not None and panels != ['mode', 'entropy', 'stats']:
+                panel_str = '_panels_' + '-'.join(panels)
+            else:
+                panel_str = ''
+            f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
         plt.savefig(f_png, bbox_inches='tight')
     plt.show()
 
@@ -2177,10 +2256,22 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         - ['value']: Only median/mean resistivity
         - ['std']: Only standard deviation
         - ['stats']: Only temperature and log-likelihood
+        - ['realization']: One posterior realization per location instead of a statistic (see ``i_plot_realization``, ``seed``, ``plot_prior``)
         - Any combination of the above (e.g., ['value', 'stats'])
-        Accepted panel names: 'value', 'median', 'mean', 'harmonicmean', 'std', 'uncertainty', 'stats', 'temperature', 't'
+        Accepted panel names: 'value', 'median', 'mean', 'harmonicmean', 'realization', 'std', 'uncertainty', 'stats', 'temperature', 't'
         Using a statistic name (``'median'``, ``'mean'``, ``'harmonicmean'``) as the panel name also
         selects that statistic as the plotted value, overriding the default ``key``.
+    i_plot_realization : array_like of int, optional
+        Used with the 'realization' panel. Prior row indices, one per location: length
+        ``len(ii)`` (locations in the profile) or ``nd`` (all soundings, subset by ``ii``),
+        e.g. ``f_post['/i_use'][:, 5]`` shows posterior realization #5 everywhere. If None
+        (default), a random entry of ``/i_use`` is drawn for each location.
+    seed : int, optional
+        Seed for the random draw of realizations (default None, non-reproducible).
+    plot_prior : bool, optional
+        Used with the 'realization' panel. If True, ``/i_use`` is replaced by random
+        prior indices of the same shape, so the panel shows a prior (not posterior)
+        realization per location (default False).
     hardcopy : bool, optional
         Save plot as PNG file (default False).
     cmap : str or colormap, optional
@@ -2190,8 +2281,11 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     alpha : float, optional
         Transparency scaling factor based on normalized standard deviation (0.0=no
         transparency, default; 1.0=full uncertainty-based transparency).
+    f_png : str, optional
+        Output filename used when ``hardcopy=True``. If not given, a name is built from
+        ``f_post_h5``, the index range, model, panels and ``txt``.
     txt : str, optional
-        Additional text for filename.
+        Additional text appended to the automatic filename (ignored if ``f_png`` is given).
     showInfo : int, optional
         Level of debug output (0=none, >0=verbose).
     clim : list, optional
@@ -2219,6 +2313,8 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     fontsize : int or float, optional
         Font size applied to all text elements (titles, axis labels, colorbar labels,
         tick labels). If None, matplotlib's current default is used (default None).
+    title : str, optional
+        Figure title placed above all panels (``fig.suptitle``). Default None (no title).
 
     Returns
     -------
@@ -2256,6 +2352,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     Show only standard deviation:
 
     >>> plot_profile_continuous(f_post_h5, panels=['std'])
+
+    Show one random posterior realization per location:
+
+    >>> plot_profile_continuous(f_post_h5, panels=['realization', 'std', 'stats'], seed=1)
     """
     from matplotlib.colors import LogNorm
 
@@ -2272,6 +2372,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     show_n_unique = kwargs.get('show_n_unique', False)  # Show number of unique realizations
     plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of Std
     fontsize = kwargs.get('fontsize', None)
+    i_plot_realization = kwargs.get('i_plot_realization', None)
+    seed = kwargs.get('seed', None)
+    plot_prior = kwargs.get('plot_prior', False)
 
     # Default to showing all panels
     if panels is None:
@@ -2290,7 +2393,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             key = 'HarmonicMean'
 
     # Determine which panels to show
-    show_value = any(p in panels for p in ['value', 'median', 'mean', 'harmonicmean'])
+    show_realization = 'realization' in panels
+    show_value = (any(p in panels for p in ['value', 'median', 'mean', 'harmonicmean'])
+                  and not show_realization)
     show_std = any(p in panels for p in ['std', 'uncertainty'])
     show_stats = any(p in panels for p in ['stats', 't', 'temperature'])
     
@@ -2601,12 +2706,33 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     fig, ax = plt.subplots(3,1,figsize=(20,10), gridspec_kw={'height_ratios': [3, 3, 1]})
 
     # Hide panels that are not requested
-    if not show_value:
+    if not (show_value or show_realization):
         ax[0].axis('off')
     if not show_std:
         ax[1].axis('off')
     if not show_stats:
         ax[2].axis('off')
+
+    if show_realization and (nm>1):
+        isp=0
+        # REALIZATION: one posterior realization per location
+        real_data = _profile_realization(f_post_h5, f_prior_h5, Mstr, ii,
+                                         i_plot_realization=i_plot_realization, seed=seed,
+                                         plot_prior=plot_prior)
+        real_label = 'Prior realization' if plot_prior else 'Realization'
+        if gap_alpha is not None:
+            real_data = np.ma.masked_where(gap_alpha == 0.0, real_data)
+
+        im_r = ax[isp].pcolormesh(DDc, ZZc, real_data,
+                cmap=cmap,
+                shading='auto',
+                norm=LogNorm())
+        im_r.set_clim(clim[0],clim[1])
+        if alpha>0:
+            im_r.set_alpha(A[:,ii])
+        ax[isp].set_title('%s %s' % (real_label, name))
+        ax[isp].set_ylabel('Elevation (m)')
+        fig.colorbar(im_r, ax=ax[isp], label='%s' % name)
 
     if show_value and (nm>1) and (key=='Mean'):
         isp=0
@@ -2721,7 +2847,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         ax[0].axis('off')
 
     ## Remove x-tick labels from non-bottom panels
-    if show_value:
+    if show_value or show_realization:
         ax[0].set_xticks([])
     if show_std:
         ax[1].set_xticks([])
@@ -2778,6 +2904,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         ax[2].set_xlabel({'x': 'X (m)', 'y': 'Y (m)', 'id': 'ID', 'index': 'Index'}.get(xaxis, xaxis))
         plt.grid(True)
 
+    title = kwargs.get('title', None)
+    if title:
+        fig.suptitle(title)
+
     if fontsize is not None:
         import matplotlib.text as _mtext
         for _t in fig.findobj(_mtext.Text):
@@ -2801,12 +2931,14 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
 
     # get filename without extension
     if kwargs['hardcopy']:
-        # Add panel information to filename if panels were specified
-        if panels is not None and panels != ['value', 'std', 'stats']:
-            panel_str = '_panels_' + '-'.join(panels)
-        else:
-            panel_str = ''
-        f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
+        f_png = kwargs.get('f_png', None)
+        if not f_png:
+            # Add panel information to filename if panels were specified
+            if panels is not None and panels != ['value', 'std', 'stats']:
+                panel_str = '_panels_' + '-'.join(panels)
+            else:
+                panel_str = ''
+            f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
         plt.savefig(f_png, bbox_inches='tight')
     plt.show()
 

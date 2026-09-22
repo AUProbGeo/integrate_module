@@ -23,9 +23,10 @@ Topics covered
 8. Choosing individual panels
 9. Uncertainty transparency (``alpha=``)
 10. KL divergence instead of entropy / std (``plot_kl=True``)
-11. Number of unique realizations (``show_n_unique=True``)
-12. Saving to file (``hardcopy=True``)
-13. Combined options
+11. Prior and posterior realizations (``panels=['realization']``)
+12. Number of unique realizations (``show_n_unique=True``)
+13. Titles and saving to file (``title=``, ``hardcopy=True``, ``f_png=``)
+14. Combined options
 """
 # %%
 try:
@@ -242,6 +243,9 @@ ig.plot_profile(f_post_h5, im=1, ii=id_line[::2], xaxis='x',  gap_threshold=50)
 #
 # **Discrete models** – available panels: ``'mode'``, ``'entropy'``, ``'stats'``
 # (alias: ``'t'``/``'temperature'`` → ``'stats'``)
+#
+# Both model types also accept ``'realization'`` in place of the first panel
+# (see section 11).
 
 # %%
 ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x',  gap_threshold=50,
@@ -335,7 +339,115 @@ ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x',
 plt.show()
 
 # %%
-# 11. Number of unique realizations
+# 11. Prior and posterior realizations
+# ------------------------------------
+#
+# Every panel so far shows a *statistic* of the posterior (median, mode, std,
+# entropy, ...). Statistics are smooth by construction and hide how a single
+# realization actually looks. ``panels=['realization']`` replaces the first
+# panel with one **realization per location**.
+#
+# The posterior file stores ``/i_use`` of shape ``(n_soundings, n_real)``: for each
+# sounding, the indices of the prior models that were accepted as posterior
+# samples. For each location in the profile one random entry of ``/i_use`` is
+# drawn and the corresponding prior model is plotted. Columns are therefore
+# independent draws – neighbouring soundings are *not* forced to be consistent –
+# which is exactly what a realization-based section should show.
+#
+# ``seed`` makes the random draw reproducible.
+
+# %%
+# Posterior realization – continuous resistivity, with std and stats panels
+ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization', 'std', 'stats'], seed=1,
+                title='Posterior realization (seed=1)')
+
+# %%
+# Two more draws – same location, different realizations
+for seed in (2, 3):
+    ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                    panels=['realization'], seed=seed,
+                    title='Posterior realization (seed=%d)' % seed)
+
+# %%
+# Posterior realization – discrete lithology
+ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization', 'entropy', 'stats'], seed=1,
+                title='Posterior realization (seed=1)')
+
+# %%
+# Prior realizations
+# ~~~~~~~~~~~~~~~~~~
+#
+# ``plot_prior=True`` replaces ``/i_use`` with random prior indices of the same
+# shape before the draw, so the panel shows a *prior* realization per location.
+# Comparing a prior and a posterior section with the same ``seed`` is a direct
+# visual check of how much the data constrain the model.
+
+# %%
+ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], plot_prior=True, seed=1,
+                title='Prior realization')
+ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], seed=1,
+                title='Posterior realization')
+
+# %%
+ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], plot_prior=True, seed=1,
+                title='Prior realization')
+ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], seed=1,
+                title='Posterior realization')
+
+# %%
+# Uncertainty transparency works on the realization panel too: cells with high
+# posterior std / entropy are faded, so the realization is shown together with
+# how well it is constrained.
+
+# %%
+ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], seed=1, alpha=1.0,
+                entropy_min=0.5, entropy_max=0.6)
+
+# %%
+# Choosing the realizations yourself
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# ``i_plot_realization`` bypasses the random draw. It must be an array of prior
+# indices with one entry per location – either of length ``len(ii)`` (the
+# locations in the profile) or of length ``n_soundings`` (all locations, subset
+# by ``ii`` internally). A scalar is rejected.
+#
+# The most common use is a fixed column of ``/i_use``, i.e. "posterior
+# realization number k at every location":
+
+# %%
+with h5py.File(f_post_h5, 'r') as f_post:
+    i_use = f_post['/i_use'][:]
+
+for k in (0, 5):
+    ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                    panels=['realization'], i_plot_realization=i_use[:, k],
+                    title='Posterior realization column %d of /i_use' % k)
+
+# %%
+# Any other selection works the same way, e.g. random prior models drawn here
+# in the script (equivalent to ``plot_prior=True``), or one entry per location
+# picked by some criterion of your own:
+
+# %%
+with h5py.File(f_prior_h5, 'r') as f_prior:
+    N = f_prior['/M1'].shape[0]
+rng = np.random.default_rng(1)
+i_prior = rng.integers(0, N, size=len(id_line))
+
+ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], i_plot_realization=i_prior,
+                title='Prior realization (indices chosen in the script)')
+
+# %%
+# 12. Number of unique realizations
 # ---------------------------------
 #
 # ``show_n_unique=True`` overlays the count of *distinct* accepted posterior
@@ -351,16 +463,20 @@ ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x',
                 show_n_unique=True, gap_threshold=50)
 
 # %%
-# 12. Saving figures to disk
-# --------------------------
+# 13. Titles and saving figures to disk
+# -------------------------------------
 #
-# ``hardcopy=True`` writes a PNG file with an auto-generated name derived
-# from the posterior file name, model index, and index range.
-# Use ``txt=`` to append a custom suffix.
+# ``title=`` adds a figure title above all panels.
+#
+# ``hardcopy=True`` writes a PNG file. By default the name is generated from
+# the posterior file name, index range, model index and panels; ``txt=``
+# appends a suffix to that name. ``f_png=`` sets the file name explicitly
+# instead (use it with a specific ``im``, since ``im=0`` would write every
+# model to the same file).
 
 # %%
 ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x',
-                gap_threshold=50,
+                gap_threshold=50, title='Line 100 – resistivity',
                 hardcopy=True)
 
 # %%
@@ -371,10 +487,16 @@ ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x',
 # %%
 ig.plot_profile(f_post_h5, im=2, ii=id_line, xaxis='x',
                 plot_kl=True, gap_threshold=50,
-                hardcopy=True, txt='kl')
+                hardcopy=True, f_png='line100_M2_kl.png')
 
 # %%
-# 13. Combined options
+ig.plot_profile(f_post_h5, im=1, ii=id_line, xaxis='x', gap_threshold=50,
+                panels=['realization'], seed=1,
+                title='Posterior realization',
+                hardcopy=True, f_png='line100_M1_realization.png')
+
+# %%
+# 14. Combined options
 # --------------------
 #
 # Putting it all together for publication-quality figures.
@@ -441,9 +563,27 @@ ig.plot_profile(f_post_h5, im=0, ii=id_line, xaxis='x',
 #    * - ``show_n_unique=``
 #      - bool
 #      - Overlay N_unique on stats panel
+#    * - ``panels=['realization']``
+#      - –
+#      - One posterior realization per location instead of a statistic
+#    * - ``seed=``
+#      - int
+#      - Reproducible random draw of realizations
+#    * - ``plot_prior=``
+#      - bool
+#      - Draw realizations from the prior instead of ``/i_use``
+#    * - ``i_plot_realization=``
+#      - array of int
+#      - Prior index to plot at each location (length ``len(ii)`` or n_soundings)
+#    * - ``title=``
+#      - str
+#      - Figure title above all panels
 #    * - ``hardcopy=``
 #      - bool
 #      - Save PNG file
 #    * - ``txt=``
 #      - str
 #      - Suffix appended to auto-generated filename
+#    * - ``f_png=``
+#      - str
+#      - Explicit output filename (overrides the automatic name)
