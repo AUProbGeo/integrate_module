@@ -1112,16 +1112,24 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone', device='cuda')
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')
     """
+    showInfo = kwargs.get('showInfo', 0)
     method = _em_method(method)
     if method == 'ga-aem':
         from integrate.gaaem_forward import prior_data_gaaem
+        if showInfo>0:
+            print(f"Using EM forward method: {method}")
         return prior_data_gaaem(f_prior_h5, file_gex=file_gex, **kwargs)
     if method == 'anemone':
         from integrate.anemone_forward import prior_data_anemone
+        device = _em_device(device)
+        if showInfo>0:
+            print(f"Using EM forward method: {method}, device: {device}")
         return prior_data_anemone(f_prior_h5, file_gex=file_gex,
                                    device=_em_device(device), **kwargs)
     if method == 'simpeg':
         from integrate.simpeg_forward import prior_data_simpeg
+        if showInfo>0:
+            print(f"Using EM forward method: {method}")
         return prior_data_simpeg(f_prior_h5, file_gex=file_gex, **kwargs)
     raise ValueError("unhandled EM forward method %r" % method)
 

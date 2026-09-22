@@ -158,6 +158,16 @@ Plot a profile of posterior statistics of model parameters 1 (resistivity)
 
     ig.plot_profile(f_post_h5, i1=1, i2=2000, im=1, hardcopy=True)
 
+Instead of statistics, one posterior (or prior) realization per location can be shown
+
+::
+
+    ig.plot_profile(f_post_h5, i1=1, i2=2000, im=1, panels=['realization'], seed=1)
+    ig.plot_profile(f_post_h5, i1=1, i2=2000, im=1, panels=['realization'], seed=1, plot_prior=True)
+
+See :doc:`plotting` for all profile options (panels, x-axis, gaps, transparency,
+realizations, titles and file names).
+
 
 Plot 2D Features
 -----------------

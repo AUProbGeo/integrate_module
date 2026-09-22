@@ -13,6 +13,11 @@ The workflow follows these main steps:
 3. Plot and analyze the results
 """
 # %%
+import os 
+os.environ["EM_FORWARD_METHOD"] = "anemone"
+os.environ["EM_FORWARD_DEVICE"] = "cuda"
+os.environ["REJECTION_BACKEND"] = "jax"
+
 import integrate as ig
 hardcopy = True
 import matplotlib.pyplot as plt
@@ -114,8 +119,9 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 # %%
 # Select how many prior model realizations (N) should be generated
-N=2000000
-N=10000
+N=2_000_000
+N=1_000_000
+N=100_000
 
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
                                     showInfo=1)
@@ -245,13 +251,34 @@ ig.plot_profile(f_post_h5, i1=1401, i2=2000, im=1, key='HarmonicMean', hardcopy=
 # Plot resistivity 'Mean' profile for model M1 from data point i1 to i2
 ig.plot_profile(f_post_h5, i1=1401, i2=2000, im=1, key='Mean', hardcopy=hardcopy)
 
-if useSubset:
-    # Plot resistivity profile for model M1 for specific data points, along 'x', 'y' and 'index' axes
-    ig.plot_profile(f_post_h5, ii=i_use, im=1, hardcopy=hardcopy, xaxis='x')
-    ig.plot_profile(f_post_h5, ii=i_use, im=1, hardcopy=hardcopy, xaxis='y')
-    ig.plot_profile(f_post_h5, ii=i_use, im=1, hardcopy=hardcopy, xaxis='index')
-    #
-    ig.plot_profile(f_post_h5, ii=i_use, im=1, hardcopy=hardcopy, xaxis='index', panels=['Median'])
+# %% 
+# Plot resistivity profile for model M1 for specific data points, along 'x', 'y' and 'index' axes
+ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, xaxis='x', gap_threshold=10)
+ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, xaxis='y', gap_threshold=10)
+ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, xaxis='index', gap_threshold=10)
+#
+ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, xaxis='index', panels=['Median'], gap_threshold=10)
+
+
+# %% plot random realizations for model M1
+# PLot a single posterior realization for model M1
+for i in range(1):
+    ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, 
+                    xaxis='x', gap_threshold=5, panels=['realization'], 
+                    seed=i, title='Posterior realization', f_png='post_%d.png' % (i))
+    # Plot a single prior realization for model M1
+    ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, 
+                    xaxis='x', gap_threshold=5, panels=['realization'], 
+                    seed=i, plot_prior=True, title='Prior realization', f_png='prior_%d.png' % (i))
+
+'''
+mogrify -trim prior*png
+mogrify -trim post*png
+magick -delay 10 -loop 0 prior*.png prior_reals.gif
+magick -delay 10 -loop 0 post*.png post_reals.gif
+'''
+
+ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, xaxis='x', gap_threshold=5)
 
 
 # %%

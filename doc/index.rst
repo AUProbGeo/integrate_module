@@ -96,6 +96,7 @@ The manual
    prior_data
    rejection
    workflow
+   plotting
    auto_examples/index
    contributions
    references
