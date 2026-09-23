@@ -1,4 +1,22 @@
-# %% 
+"""
+Compare EM forward models
+=========================
+
+This example computes prior EM data for the same set of prior models with
+each of the available EM forward backends, and compares them:
+
+* ``ga-aem`` (CPU)
+* ``simpeg`` (CPU)
+* ``anemone`` (CPU and CUDA GPU)
+
+It prints the run time for each backend and plots the forward response of
+the first 9 prior realizations, with all backends overlaid in each panel.
+
+All backends in the ``method``/``device`` lists below must be installed (and
+a CUDA GPU must be available for ``device='cuda'``); edit the lists to
+compare a subset.
+"""
+# %%
 import integrate as ig
 import time
 

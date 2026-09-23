@@ -141,7 +141,7 @@ def forward_gaaem(C=np.array(()),
         print('Error: No GEX or STM files provided')
         return -1
 
-    if (showInfo>0):
+    if (showInfo>1):
         print('Using STM files : ')
         print(stmfiles)
 
@@ -150,7 +150,7 @@ def forward_gaaem(C=np.array(()),
             print('Using GEX file: ', GEX['filename'])
 
     nstm=len(stmfiles)
-    if (showInfo>0):
+    if (showInfo>1):
         for i in range(len(stmfiles)):
             print('Using MOMENT:', stmfiles[i])
 
@@ -164,7 +164,7 @@ def forward_gaaem(C=np.array(()),
     if nt != (nl-1):
         raise ValueError('Error: thickness array (nt=%d) does not match the number of layers minus 1(nl=%d)' % (nt,nl))
 
-    if (showInfo>0):
+    if (showInfo>2):
         print('nd=%s, nl=%d,  nstm=%d' %(nd,nl,nstm))
 
     # SETTING UP t1=time.time()
@@ -236,7 +236,7 @@ def forward_gaaem(C=np.array(()),
         ng = 41
 
     # pinrt txrx_dx, txrx_dy, txrx_dz
-    if (showInfo>0):
+    if (showInfo>2):
         print('txrx_dx=%f, txrx_dy=%f, txrx_dz=%f' % (txrx_dx, txrx_dy, txrx_dz))
         print('ng=%d' % ng)
         
