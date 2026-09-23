@@ -967,7 +967,71 @@ _EM_METHODS = {'ga-aem': 'ga-aem', 'gaaem': 'ga-aem', 'anemone': 'anemone',
 
 
 _EM_METHOD_ENV = 'EM_FORWARD_METHOD'
-_EM_METHOD_DEFAULT = 'ga-aem'
+_EM_METHOD_PRIORITY = ('anemone', 'ga-aem', 'simpeg')
+_EM_METHOD_AVAILABLE = {}
+
+
+def _em_method_available(method):
+    """
+    Return ``(available, reason)`` for a normalised EM forward method.
+
+    Availability is tested by actually importing the backend package (for
+    ga-aem this also loads the gatdaem1d shared library). Results are cached.
+    """
+    if method in _EM_METHOD_AVAILABLE:
+        return _EM_METHOD_AVAILABLE[method]
+    try:
+        if method == 'anemone':
+            from integrate.anemone_forward import _require_anemone
+            _require_anemone()
+        elif method == 'ga-aem':
+            import gatdaem1d  # noqa: F401
+            from gatdaem1d import TDAEMSystem  # noqa: F401  (loads the DLL)
+        elif method == 'simpeg':
+            from integrate.simpeg_forward import _require_simpeg
+            _require_simpeg()
+        else:
+            raise ValueError("unhandled EM forward method %r" % method)
+        result = (True, '')
+    except (ImportError, OSError) as exc:
+        result = (False, str(exc) or exc.__class__.__name__)
+    _EM_METHOD_AVAILABLE[method] = result
+    return result
+
+
+def _em_method_resolve(method=None):
+    """
+    Resolve the EM forward method; return ``(method, source)``.
+
+    ``source`` is ``'method'`` (explicit kwarg), ``'EM_FORWARD_METHOD'``
+    (environment variable) or ``'auto'`` (first installed backend in the
+    order anemone, ga-aem, simpeg).
+    """
+    import os
+    source = 'method'
+    if method is None:
+        method = os.environ.get(_EM_METHOD_ENV, '').strip() or None
+        source = _EM_METHOD_ENV
+    if method is not None:
+        key = str(method).lower()
+        if key not in _EM_METHODS:
+            raise ValueError(
+                "unknown EM forward method %r (from %s); use 'ga-aem', 'anemone' or 'simpeg'"
+                % (method, source))
+        method = _EM_METHODS[key]
+        ok, reason = _em_method_available(method)
+        if not ok:
+            raise ImportError("EM forward method %r (from %s) is not available: %s"
+                              % (method, source, reason))
+        return method, source
+    reasons = []
+    for m in _EM_METHOD_PRIORITY:
+        ok, reason = _em_method_available(m)
+        if ok:
+            return m, 'auto'
+        reasons.append("  %s: %s" % (m, reason))
+    raise ImportError("no EM forward backend is available (tried %s):\n%s"
+                      % (', '.join(_EM_METHOD_PRIORITY), '\n'.join(reasons)))
 
 
 def _em_method(method=None):
@@ -975,26 +1039,16 @@ def _em_method(method=None):
     Normalise/validate a method string for forward_em / prior_data_em.
 
     If ``method`` is None, the environment variable ``EM_FORWARD_METHOD`` is
-    used (e.g. ``EM_FORWARD_METHOD=anemone``); if that is unset or empty,
-    ``'ga-aem'`` is used.
+    used (e.g. ``EM_FORWARD_METHOD=anemone``); if that is unset or empty, the
+    first installed backend in the order anemone, ga-aem, simpeg is used.
+
+    Raises ``ValueError`` for an unknown method, and ``ImportError`` if the
+    requested backend is not installed or no backend is installed at all.
     """
-    import os
-    source = 'method'
-    if method is None:
-        method = os.environ.get(_EM_METHOD_ENV, '').strip() or None
-        source = _EM_METHOD_ENV
-    if method is None:
-        return _EM_METHOD_DEFAULT
-    key = str(method).lower()
-    if key not in _EM_METHODS:
-        raise ValueError(
-            "unknown EM forward method %r (from %s); use 'ga-aem', 'anemone' or 'simpeg'"
-            % (method, source))
-    return _EM_METHODS[key]
+    return _em_method_resolve(method)[0]
 
 
 _EM_DEVICE_ENV = 'EM_FORWARD_DEVICE'
-_EM_DEVICE_DEFAULT = 'cpu'
 
 
 def _em_device(device=None):
@@ -1002,20 +1056,39 @@ def _em_device(device=None):
     Resolve the ``device`` kwarg used by the anemone EM forward backend.
 
     If ``device`` is None, the environment variable ``EM_FORWARD_DEVICE`` is
-    used (e.g. ``EM_FORWARD_DEVICE=cuda``); if that is unset or empty,
-    ``'cpu'`` is used.
+    used (e.g. ``EM_FORWARD_DEVICE=cuda``); if that is unset or empty, the
+    first usable device is picked:
+
+    1. ``'cuda'`` if ``torch.cuda.is_available()`` (CUDA-enabled torch build,
+       driver and GPU present);
+    2. ``'mps'`` (Apple Silicon GPU) if ``torch.backends.mps.is_available()``
+       *and* the device accepts float64 tensors -- anemone computes in
+       float64, which MPS has not supported so far;
+    3. ``'cpu'`` otherwise.
     """
     import os
     if device is None:
         device = os.environ.get(_EM_DEVICE_ENV, '').strip() or None
     if device is None:
-        return _EM_DEVICE_DEFAULT
+        device = 'cpu'
+        try:
+            import torch
+            if torch.cuda.is_available():
+                device = 'cuda'
+            elif torch.backends.mps.is_available():
+                try:
+                    torch.zeros(1, dtype=torch.float64, device='mps')
+                    device = 'mps'
+                except (TypeError, RuntimeError):
+                    pass  # MPS lacks float64 -> stay on cpu
+        except ImportError:
+            pass
     return device
 
 
 def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     """
-    Forward EM response, dispatching to GA-AEM or anemone.
+    Forward EM response, dispatching to anemone, GA-AEM or SimPEG.
 
     A thin wrapper around :func:`integrate.gaaem_forward.forward_gaaem` and
     :func:`integrate.anemone_forward.forward_anemone` that lets the two
@@ -1033,8 +1106,9 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
         Path to the GEX system file.
     method : str, optional
         ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
-        environment variable ``EM_FORWARD_METHOD`` is used, falling back to
-        ``'ga-aem'``. Raises ``ValueError`` for anything else.
+        environment variable ``EM_FORWARD_METHOD`` is used; if that is unset,
+        the first installed backend in the order ``'anemone'``, ``'ga-aem'``,
+        ``'simpeg'`` is used. Raises ``ValueError`` for anything else.
     **kwargs
         Passed through to the selected backend.
 
@@ -1046,9 +1120,9 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     Raises
     ------
     ImportError
-        If ``method='anemone'`` (``anemone``/``torch``) or ``method='simpeg'``
-        (``simpeg``) is requested but the package is not installed (the error
-        names the pip install command).
+        If the requested backend (``method`` or ``EM_FORWARD_METHOD``) is not
+        installed, or if no method is requested and none of anemone, ga-aem
+        and simpeg is installed (the error lists the install hints).
     """
     import numpy as np
     method = _em_method(method)
@@ -1058,6 +1132,7 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
         return forward_gaaem(C=C, thickness=thickness, file_gex=file_gex, **kwargs)
     if method == 'anemone':
         from integrate.anemone_forward import forward_anemone
+        kwargs['device'] = _em_device(kwargs.get('device'))
         return forward_anemone(M=M, thickness=thickness, file_gex=file_gex, **kwargs)
     if method == 'simpeg':
         from integrate.simpeg_forward import forward_simpeg
@@ -1067,7 +1142,7 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
 
 def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs):
     """
-    Generate prior data, dispatching to GA-AEM or anemone.
+    Generate prior data, dispatching to anemone, GA-AEM or SimPEG.
 
     A thin wrapper around :func:`integrate.gaaem_forward.prior_data_gaaem` and
     :func:`integrate.anemone_forward.prior_data_anemone`. Both already share
@@ -1083,12 +1158,15 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
         Path to the GEX system file.
     method : str, optional
         ``'ga-aem'``, ``'anemone'`` or ``'simpeg'``. If not given, the
-        environment variable ``EM_FORWARD_METHOD`` is used, falling back to
-        ``'ga-aem'``. Raises ``ValueError`` for anything else.
+        environment variable ``EM_FORWARD_METHOD`` is used; if that is unset,
+        the first installed backend in the order ``'anemone'``, ``'ga-aem'``,
+        ``'simpeg'`` is used. Raises ``ValueError`` for anything else.
     device : str, optional
         Torch device (e.g. ``'cpu'``, ``'cuda'``) used only when
         ``method='anemone'``. If not given, the environment variable
-        ``EM_FORWARD_DEVICE`` is used, falling back to ``'cpu'``. Ignored for
+        ``EM_FORWARD_DEVICE`` is used, falling back to ``'cuda'``, then
+        ``'mps'`` (Apple Silicon, only if it supports float64), then
+        ``'cpu'``, whichever is first usable. Ignored for
         ``'ga-aem'`` and ``'simpeg'``.
     **kwargs
         Passed through to the selected backend.
@@ -1101,9 +1179,9 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
     Raises
     ------
     ImportError
-        If ``method='anemone'`` (``anemone``/``torch``) or ``method='simpeg'``
-        (``simpeg``) is requested but the package is not installed (the error
-        names the pip install command).
+        If the requested backend (``method`` or ``EM_FORWARD_METHOD``) is not
+        installed, or if no method is requested and none of anemone, ga-aem
+        and simpeg is installed (the error lists the install hints).
 
     Examples
     --------
@@ -1113,23 +1191,24 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
     >>> ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')
     """
     showInfo = kwargs.get('showInfo', 0)
-    method = _em_method(method)
+    method, source = _em_method_resolve(method)
+    auto = ' (auto-selected)' if source == 'auto' else ''
     if method == 'ga-aem':
         from integrate.gaaem_forward import prior_data_gaaem
         if showInfo>0:
-            print(f"Using EM forward method: {method}")
+            print(f"Using EM forward method: {method}{auto}")
         return prior_data_gaaem(f_prior_h5, file_gex=file_gex, **kwargs)
     if method == 'anemone':
         from integrate.anemone_forward import prior_data_anemone
         device = _em_device(device)
         if showInfo>0:
-            print(f"Using EM forward method: {method}, device: {device}")
+            print(f"Using EM forward method: {method}{auto}, device: {device}")
         return prior_data_anemone(f_prior_h5, file_gex=file_gex,
-                                   device=_em_device(device), **kwargs)
+                                   device=device, **kwargs)
     if method == 'simpeg':
         from integrate.simpeg_forward import prior_data_simpeg
         if showInfo>0:
-            print(f"Using EM forward method: {method}")
+            print(f"Using EM forward method: {method}{auto}")
         return prior_data_simpeg(f_prior_h5, file_gex=file_gex, **kwargs)
     raise ValueError("unhandled EM forward method %r" % method)
 

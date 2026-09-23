@@ -35,47 +35,114 @@ id(s) used, which then feed into ``id_use``/``id_prior`` of
     f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex='system.gex')
 
 ``prior_data_em`` is a thin dispatcher: it forward-models ``/M<im>`` through
-one of the supported EM backends and writes the result as ``/D<id>``. The
-backend is chosen by ``method=``, or, if not given, by the
-``EM_FORWARD_METHOD`` environment variable, falling back to ``'ga-aem'``.
+one of the supported EM backends and writes the result as ``/D<id>``.
+:func:`ig.forward_em` (forward response for a resistivity array, without
+writing a file) uses exactly the same backend and device selection.
+
+Backends
+^^^^^^^^
+
+* ``'ga-aem'`` -- GA-AEM (``gatdaem1d``), see :mod:`integrate.gaaem_forward`.
+  **The only fully supported, production backend.**
+* ``'anemone'`` -- PyTorch-based forward model with optional GPU support, see
+  :mod:`integrate.anemone_forward`.
+* ``'simpeg'`` -- SimPEG's ``Simulation1DLayered``, see
+  :mod:`integrate.simpeg_forward`, :doc:`format` and ``SIMPEG_VS_GAAEM.md``
+  for its validation against GA-AEM/AarhusInv.
 
 .. important::
 
-    **Only ``method='ga-aem'`` is currently a fully supported, production
-    backend.** ``method='anemone'`` (a PyTorch-based forward model, see
-    :mod:`integrate.anemone_forward`) is **integration in development**: it
-    requires a local, unpublished checkout of the ``anemone`` package
+    ``method='anemone'`` is **integration in development**: it requires a
+    local, unpublished checkout of the ``anemone`` package
     (``pip install -e /path/to/anemone``) and has not yet been validated to
-    the same standard as GA-AEM. Do not rely on it for production results
-    yet -- it is provided for early testing only.
+    the same standard as GA-AEM. ``method='simpeg'`` is likewise newer and
+    less battle-tested than ``ga-aem``. Do not rely on either for production
+    results yet.
 
-``method='simpeg'`` is also available (:mod:`integrate.simpeg_forward`,
-wrapping SimPEG's ``Simulation1DLayered``); see :doc:`format` and
-``SIMPEG_VS_GAAEM.md`` for its validation against GA-AEM/AarhusInv. Treat it,
-like ``anemone``, as newer and less battle-tested than the ``ga-aem``
-default.
+Choosing the backend
+^^^^^^^^^^^^^^^^^^^^
+
+The backend is resolved in this order:
+
+1. the ``method=`` keyword (``'ga-aem'``/``'gaaem'``, ``'anemone'`` or
+   ``'simpeg'``; case-insensitive);
+2. the ``EM_FORWARD_METHOD`` environment variable (same values);
+3. otherwise, auto-selection of the first *installed* backend, in the order
+   ``'anemone'`` -> ``'ga-aem'`` -> ``'simpeg'``.
+
+A backend counts as installed if its package imports: ``torch`` and
+``anemone`` for anemone; ``gatdaem1d`` including its compiled library for
+ga-aem (a broken GA-AEM install counts as unavailable); ``simpeg`` >= 0.22 for
+simpeg. Call with ``showInfo=1`` to see which backend was used -- an
+auto-selected one is reported as e.g.
+``Using EM forward method: anemone (auto-selected)``.
+
+Because auto-selection prefers ``anemone`` whenever it is installed, pass
+``method='ga-aem'`` (or set ``EM_FORWARD_METHOD=ga-aem``) when you need the
+production backend.
 
 .. code-block:: python
 
-    # Default backend (ga-aem) -- recommended for production use
+    # Auto-selected backend (first installed of anemone, ga-aem, simpeg)
     ig.prior_data_em(f_prior_h5, file_gex='system.gex')
+
+    # GA-AEM -- recommended for production use
     ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='ga-aem')
 
     # Experimental / in development -- do not use for production results
     ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone')
-    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone', device='cuda')
     ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='simpeg')
 
-For ``method='anemone'``, ``device=`` selects the Torch device (``'cpu'`` or
-``'cuda'``); if not given, the ``EM_FORWARD_DEVICE`` environment variable is
-used, falling back to ``'cpu'``. It is ignored for ``'ga-aem'`` and
-``'simpeg'``. This is the same environment-variable pattern used by
-``EM_FORWARD_METHOD`` above -- an explicit keyword argument always overrides
-the environment variable, which in turn overrides the built-in default.
+.. code-block:: bash
 
-If ``method='anemone'`` or ``method='simpeg'`` is requested but the
-corresponding package is not installed, ``prior_data_em`` raises
-``ImportError`` naming the required ``pip install`` command.
+    # or select the backend once for a whole session / script
+    export EM_FORWARD_METHOD=ga-aem
+
+Choosing the device (anemone only)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For ``method='anemone'``, the Torch device is resolved in this order:
+
+1. the ``device=`` keyword (any string ``torch.device`` accepts, e.g.
+   ``'cpu'``, ``'cuda'``, ``'cuda:1'``, ``'mps'``);
+2. the ``EM_FORWARD_DEVICE`` environment variable;
+3. otherwise, auto-detection of the first usable device:
+
+   a. ``'cuda'`` if ``torch.cuda.is_available()`` -- i.e. a CUDA-enabled
+      torch build, an NVIDIA driver and a GPU are all present (merely having
+      ``torch`` installed is not enough);
+   b. ``'mps'`` (Apple Silicon GPU) if ``torch.backends.mps.is_available()``
+      *and* the device accepts float64 tensors. anemone computes in float64,
+      which MPS has so far not supported, so in practice Macs currently fall
+      through to ``'cpu'``; this switches to ``'mps'`` automatically once
+      float64 is supported;
+   c. ``'cpu'``.
+
+``device`` is ignored for ``'ga-aem'`` and ``'simpeg'``. The chosen device is
+printed with ``showInfo=1`` and stored as the ``device`` attribute of the
+written ``/D<id>`` dataset.
+
+.. code-block:: python
+
+    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone')                 # auto: cuda -> mps -> cpu
+    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone', device='cpu')   # force CPU
+    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone', device='cuda')  # force GPU
+
+An explicitly requested device is used as given, without any check: e.g.
+``device='cuda'`` on a machine without a usable GPU, or ``device='mps'``
+while MPS lacks float64, fails with the corresponding Torch error rather than
+falling back to CPU.
+
+Errors
+^^^^^^
+
+* An unknown ``method`` (keyword or ``EM_FORWARD_METHOD``) raises
+  ``ValueError``.
+* If the requested backend is not installed, ``ImportError`` is raised
+  immediately, naming the required install command; there is **no silent
+  fallback** to another backend.
+* If no backend is requested and none of the three is installed, the
+  ``ImportError`` lists the install hint for each.
 
 ``prior_data_borehole`` -- well-log conditioning
 ----------------------------------------------------
