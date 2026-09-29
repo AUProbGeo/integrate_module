@@ -1,4 +1,4 @@
-"""INTEGRATE Workbench — a FastHTML front end for the ``integrate`` module.
+"""INTEGRATE — a FastHTML front end for the ``integrate`` module.
 
 Self-contained: nothing here is imported by the core ``integrate`` package,
 and every heavy computation is delegated to ``integrate`` via

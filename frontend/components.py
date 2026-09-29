@@ -1,7 +1,8 @@
 """Design-system component helpers.
 
 Thin wrappers that emit the classes defined in ``static/modernist.css``
-(and a little chrome from ``static/app.css``). Pages compose these; they do
+(and a little chrome from ``static/app.css``; the look mirrors the React UI
+in ``ui/``). Pages compose these; they do
 not hand-write class strings.
 """
 
@@ -68,10 +69,13 @@ def nav(active: str):
               for cslug, clabel in children],
         ))
     return Nav(
-        Span("INTEGRATE", cls="wordmark"),
+        Div(Div("ig", cls="logo-tile"),
+            Div(Div("INTEGRATE", cls="logo-name"),
+                Div("probabilistic integration", cls="logo-sub")),
+            cls="wordmark"),
         *items,
         Div(cls="spacer"),
-        Span(APP_TITLE, cls="ws"),
+        Span(str(get_workspace()), cls="ws", title=str(get_workspace())),
         cls="wb-nav",
     )
 
@@ -171,11 +175,11 @@ def btn(label, *, kind: str = "secondary", block: bool = False, **kw):
 
 def tag(text: str):
     kind = {
-        "DATA": "tag-neutral",
-        "PRIOR": "tag-accent-2",
+        "DATA": "tag-warn",
+        "PRIOR": "tag-info",
         "POSTERIOR": "tag-accent",
-        "UNKNOWN": "tag-outline",
-        "UNREADABLE": "tag-outline",
+        "UNKNOWN": "tag-neutral",
+        "UNREADABLE": "tag-danger",
     }.get(str(text).upper(), "tag-neutral")
     return Span(text, cls=f"tag {kind}")
 

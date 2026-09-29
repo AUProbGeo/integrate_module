@@ -1251,8 +1251,15 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0, normalize=False,
     else:
         log_norm_const = 0.0
 
-    # Compute the likelihood (fully vectorized)
-    dd = D - d_obs
+    # Missing observations (NaN in d_obs or d_std) are ignored. NaN in the
+    # prior data D, where the observation exists, means an infinitely poor
+    # fit: L = 0, i.e. logL = -inf (issue #47).
+    ok = ~np.isnan(d_obs) & ~np.isnan(d_std)
+    if ok.all():
+        dd, s = D - d_obs, d_std
+    else:
+        dd, s = D[:, ok], d_std[ok]
+        dd -= d_obs[ok]
 
     if N_app > 0:
        L = np.ones(D.shape[0])*-1e+15
@@ -1261,8 +1268,11 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0, normalize=False,
        L[idx]=L_small
 
     else:
-        # Vectorized computation - already optimal
-        L = -0.5 * np.nansum((dd / d_std)**2, axis=1) + log_norm_const
+        # Vectorized computation, in place on the (fresh) residual array
+        dd /= s
+        np.square(dd, out=dd)
+        L = -0.5 * dd.sum(axis=1) + log_norm_const
+        L[np.isnan(L)] = -np.inf
 
     if return_norm_const:
         return L, log_norm_const
@@ -1392,9 +1402,9 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
     if checkNaN:
         # find index of non-nan values in d_obs or non-nan values in np.sum(Cd, axis=0)
         #ind = np.where(~np.isnan(d_obs))[0]
+        # NaN in D (where d_obs exists) is NOT removed here; such realizations
+        # get logL = -inf below (issue #47).
         ind = np.where(~np.isnan(d_obs) & ~np.isnan(np.sum(Cd, axis=0)))[0]
-        # Exclude also all data for which one Nan Is available.. This is probably not ideal
-        ind = np.where(~np.isnan(d_obs) & ~np.isnan(np.sum(Cd, axis=0)) & ~np.isnan(np.sum(D, axis=0)) )[0]
         dd = D[:,ind] - d_obs[ind]
         Cd_sub = Cd[np.ix_(ind, ind)]
         iCd = np.linalg.inv(Cd_sub)
@@ -1419,7 +1429,8 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
         else:
             L_small = np.zeros(idx.shape[0])
             for i in range(idx.shape[0]):
-                L_small[i] = -.5 * np.nansum(dd[idx[i]].T @ iCd @ dd[idx[i]]) + log_norm_const
+                L_small[i] = -.5 * (dd[idx[i]].T @ iCd @ dd[idx[i]]) + log_norm_const
+        L_small[np.isnan(L_small)] = -np.inf
         L[idx] = L_small
 
         if return_norm_const:
@@ -1434,7 +1445,8 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
         # non-vectorized
         L = np.zeros(D.shape[0])
         for i in range(D.shape[0]):
-            L[i] = -.5 * np.nansum(dd[i].T @ iCd @ dd[i]) + log_norm_const
+            L[i] = -.5 * (dd[i].T @ iCd @ dd[i]) + log_norm_const
+    L[np.isnan(L)] = -np.inf
 
     if return_norm_const:
         return L, log_norm_const

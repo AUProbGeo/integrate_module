@@ -1,4 +1,4 @@
-# INTEGRATE Workbench
+# INTEGRATE
 
 A desktop-style web front end for the `integrate` module. Pure Python
 (FastHTML + HTMX), no build step, completely separate from the core library —

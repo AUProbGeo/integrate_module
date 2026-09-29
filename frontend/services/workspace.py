@@ -1,7 +1,5 @@
 """Workspace root handling and path confinement.
 
-Vendored/adapted from ``ui/backend/workspace.py`` so the frontend stands
-alone (``ui/`` can be deleted without affecting it).
 """
 
 from __future__ import annotations

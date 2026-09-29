@@ -123,7 +123,9 @@ def _get_jax_kernels():
         d_obs_s = jnp.where(valid, d_obs, 0.0)
         d_std_s = jnp.where(valid, d_std, 1.0)
         dd = D - d_obs_s
-        return -0.5 * jnp.sum(valid * (dd / d_std_s) ** 2, axis=1)
+        # NaN in D where d_obs is valid -> logL = -inf (issue #47)
+        L = -0.5 * jnp.sum(jnp.where(valid, (dd / d_std_s) ** 2, 0.0), axis=1)
+        return jnp.where(jnp.isnan(L), -jnp.inf, L)
 
     # Batch over data points with lax.map (a sequential on-device loop), NOT
     # jax.vmap.  vmap fuses the whole (bsz, N, Nf) reduction into one giant
