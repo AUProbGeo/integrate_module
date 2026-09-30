@@ -204,7 +204,7 @@ corr_ranges = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]            # Correlation ranges
 corr_model = 'exponential'      # 'exponential' or 'gaussian'
 
 corr_stds = [0.00, 0.01, 0.02, 0.04, 0.08, 0.16, 0.32]       # Correlated noise std values in log10 units
-uncorr_stds = [0.01]     # Uncorrelated noise std values in log10 units
+uncorr_stds = [0.03]     # Uncorrelated noise std values in log10 units
 corr_ranges = [0, 1, 4, 8, 16, 32]            # Correlation ranges in gate numbers
 corr_model = 'gaussian'      # 'exponential' or 'gaussian'
 corr_model = 'exponential'      # 'exponential' or 'gaussian'

@@ -164,7 +164,7 @@ html_theme = 'furo'
 #html_static_path = ['_static']
 
 # GitHub Pages compatibility
-html_baseurl = 'https://cultpenguin.github.io/integrate_module/'
+html_baseurl = 'https://auprobgeo.github.io/integrate_module/'
 html_copy_source = False
 html_show_sourcelink = False
 

@@ -21,6 +21,7 @@ SPHINXPROJ    = INTEGRATE
 SOURCEDIR     = .
 BUILDDIR      = _build
 GALLERYDIR    = auto_examples
+DOCURL        = https://auprobgeo.github.io/integrate_module/
 
 TIER ?= cheap
 FILE ?=
@@ -54,3 +55,5 @@ clean-gallery:
 deploy:
 	@test -d "$(BUILDDIR)/html" || { echo "nothing built -- run 'make gallery' first"; exit 1; }
 	ghp-import -n -p -f -o "$(BUILDDIR)/html"
+	@echo "Deployed to gh-pages. Online in a minute or so at:"
+	@echo "  $(DOCURL)"
