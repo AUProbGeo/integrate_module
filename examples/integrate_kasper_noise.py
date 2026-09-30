@@ -14,6 +14,16 @@
 
 # %%
 import os
+os.environ["XLA_FLAGS"] = (
+    "--xla_gpu_autotune_level=1 "        # skip exhaustive GEMM/conv autotuning
+    "--xla_backend_optimization_level=1" # lower LLVM codegen effort for GPU kernels
+)
+os.environ["REJECTION_BACKEND"] = "jax" 
+
+os.environ["EM_FORWARD_METHOD"] = "anemone"
+os.environ["EM_FORWARD_DEVICE"] = "cuda" # "cpu" or "cuda   "
+
+
 from itertools import product
 import integrate as ig
 from geoprior1d import geoprior1d
@@ -24,12 +34,13 @@ import h5py
 
 hardcopy = True
 
+
 # %% [markdown]
 # ## Settings
 
 # %%
 N = 10_000_000        # Number of prior model realizations (increase for production runs)
-N = 200_000        # Number of prior model realizations (increase for production runs)
+N = 2_000_000        # Number of prior model realizations (increase for production runs)
 nr = 10_000          # Number of posterior realizations per sounding
 
 
@@ -164,8 +175,7 @@ file_basename = os.path.splitext(os.path.basename(file_gex))[0]
 f_prior_data_h5 = '%s_%s_Nh280_Nf12.h5' % (
     os.path.splitext(f_prior_h5)[0], file_basename)
 if not os.path.exists(f_prior_data_h5):
-    f_prior_data_h5 = ig.prior_data_gaaem(
-    #f_prior_data_h5 = ig.prior_data(
+    f_prior_data_h5 = ig.prior_data_em(
                 f_prior_h5,
         file_gex,
         doMakePriorCopy=True,
