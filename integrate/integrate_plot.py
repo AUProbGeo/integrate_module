@@ -1478,6 +1478,10 @@ def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index',
         ``title`` (str) adds a figure title above all panels.
         With ``hardcopy=True``, ``f_png`` (str) sets the output filename (otherwise it is
         generated automatically, with ``txt`` as an optional suffix).
+        Borehole overlay (on the mode/value/realization panel): ``BHOLES`` (borehole dict,
+        list of dicts from :func:`read_borehole`, or JSON path), ``bhole_max_dist``
+        (default 200), ``bhole_width`` (pixels, default 10), ``bhole_im``, ``bhole_label``
+        and ``bhole_alpha``. See plot_profile_discrete() for details.
 
     Returns
     -------
@@ -1527,6 +1531,11 @@ def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index',
     Plot profile with data IDs on x-axis:
 
     >>> plot_profile(f_post_h5, im=1, xaxis='id')
+
+    Overlay boreholes within 150 m of the profile as 12 pixel wide columns:
+
+    >>> BHOLES = ig.read_borehole('boreholes.json')
+    >>> plot_profile(f_post_h5, im=2, xaxis='x', BHOLES=BHOLES, bhole_max_dist=150, bhole_width=12)
     """
 
     with h5py.File(f_post_h5,'r') as f_post:
@@ -1656,6 +1665,25 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         tick labels). If None, matplotlib's current default is used (default None).
     title : str, optional
         Figure title placed above all panels (``fig.suptitle``). Default None (no title).
+    BHOLES : dict, list of dict or str, optional
+        Boreholes to overlay on the mode/realization panel: a borehole dict, a list of
+        dicts (e.g. from :func:`read_borehole`) or a JSON path, as for
+        :func:`plot_boreholes`. Each borehole is drawn as a column at the profile
+        location nearest to it, colored by class as in :func:`plot_boreholes`.
+        The column hangs from the borehole ``elevation`` if valid (not missing, 0 or
+        -9999), otherwise from the elevation of the nearest sounding (default None).
+    bhole_max_dist : float, optional
+        Maximum horizontal distance between a borehole and the nearest plotted
+        location for the borehole to be shown. Use ``np.inf`` for no limit (default 200).
+    bhole_width : float, optional
+        Width of the borehole columns in pixels (default 10).
+    bhole_im : int, optional
+        Discrete prior model (``/M<bhole_im>``) whose classes and colormap are used for
+        the boreholes (default None: the plotted model ``im``).
+    bhole_label : bool, optional
+        Write the borehole name above each column (default True).
+    bhole_alpha : bool, optional
+        Set the opacity of each borehole interval to its ``class_prob`` (default False).
 
     Returns
     -------
@@ -1709,6 +1737,10 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     Show mode with custom entropy range for transparency:
 
     >>> plot_profile_discrete(f_post_h5, alpha=0.8, entropy_min=0.1, entropy_max=0.7)
+
+    Overlay boreholes within 150 m of the profile:
+
+    >>> plot_profile_discrete(f_post_h5, im=2, xaxis='x', BHOLES=BHOLES, bhole_max_dist=150)
     """
     from matplotlib.colors import LogNorm
 
@@ -1724,6 +1756,12 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     i_plot_realization = kwargs.get('i_plot_realization', None)
     seed = kwargs.get('seed', None)
     plot_prior = kwargs.get('plot_prior', False)
+    BHOLES = kwargs.get('BHOLES', None)
+    bhole_max_dist = kwargs.get('bhole_max_dist', 200)
+    bhole_width = kwargs.get('bhole_width', 10)
+    bhole_im = kwargs.get('bhole_im', None)
+    bhole_label = kwargs.get('bhole_label', True)
+    bhole_alpha = kwargs.get('bhole_alpha', False)
 
     # Default to showing all panels
     if panels is None:
@@ -2093,6 +2131,14 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         cbar1.ax.invert_yaxis()
         ax[0].set_ylabel('Elevation (m)')
 
+    # BOREHOLE overlay on the mode/realization panel
+    if BHOLES is not None and (show_mode or show_realization):
+        Mstr_bh = Mstr if bhole_im is None else '/M%d' % bhole_im
+        _overlay_boreholes_on_profile(ax[0], BHOLES, ii, X, Y, ELEVATION, x_axis_values,
+                                      f_prior_h5, Mstr_bh, max_dist=bhole_max_dist,
+                                      width_px=bhole_width, label=bhole_label,
+                                      use_prob_alpha=bhole_alpha, showInfo=showInfo)
+
     # ENTROPY / KL panel (ax[1]) - only if requested
     if show_entropy:
         import matplotlib
@@ -2315,6 +2361,26 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         tick labels). If None, matplotlib's current default is used (default None).
     title : str, optional
         Figure title placed above all panels (``fig.suptitle``). Default None (no title).
+    BHOLES : dict, list of dict or str, optional
+        Boreholes to overlay on the value/realization panel: a borehole dict, a list of
+        dicts (e.g. from :func:`read_borehole`) or a JSON path, as for
+        :func:`plot_boreholes`. Each borehole is drawn as a column at the profile
+        location nearest to it, colored by the classes of a discrete prior model (see
+        ``bhole_im``). The column hangs from the borehole ``elevation`` if valid (not
+        missing, 0 or -9999), otherwise from the elevation of the nearest sounding
+        (default None).
+    bhole_max_dist : float, optional
+        Maximum horizontal distance between a borehole and the nearest plotted
+        location for the borehole to be shown. Use ``np.inf`` for no limit (default 200).
+    bhole_width : float, optional
+        Width of the borehole columns in pixels (default 10).
+    bhole_im : int, optional
+        Discrete prior model (``/M<bhole_im>``) whose classes and colormap are used for
+        the boreholes (default None: the first discrete model in the prior).
+    bhole_label : bool, optional
+        Write the borehole name above each column (default True).
+    bhole_alpha : bool, optional
+        Set the opacity of each borehole interval to its ``class_prob`` (default False).
 
     Returns
     -------
@@ -2356,6 +2422,10 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     Show one random posterior realization per location:
 
     >>> plot_profile_continuous(f_post_h5, panels=['realization', 'std', 'stats'], seed=1)
+
+    Overlay boreholes (colored by the lithology model M2) on the median panel:
+
+    >>> plot_profile_continuous(f_post_h5, im=1, panels=['median', 'std', 'stats'], BHOLES=BHOLES, bhole_im=2)
     """
     from matplotlib.colors import LogNorm
 
@@ -2375,6 +2445,12 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     i_plot_realization = kwargs.get('i_plot_realization', None)
     seed = kwargs.get('seed', None)
     plot_prior = kwargs.get('plot_prior', False)
+    BHOLES = kwargs.get('BHOLES', None)
+    bhole_max_dist = kwargs.get('bhole_max_dist', 200)
+    bhole_width = kwargs.get('bhole_width', 10)
+    bhole_im = kwargs.get('bhole_im', None)
+    bhole_label = kwargs.get('bhole_label', True)
+    bhole_alpha = kwargs.get('bhole_alpha', False)
 
     # Default to showing all panels
     if panels is None:
@@ -2792,6 +2868,18 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             ax[isp].set_title('HarmonicMean %s' % name)
             ax[isp].set_ylabel('Elevation (m)')
             fig.colorbar(im_hm, ax=ax[isp], label='%s' % name)
+
+    # BOREHOLE overlay on the value/realization panel, colored by a discrete prior model
+    if BHOLES is not None and (show_value or show_realization) and nm>1:
+        Mstr_bh = _first_discrete_model(f_prior_h5) if bhole_im is None else '/M%d' % bhole_im
+        if Mstr_bh is None:
+            print('plot_profile: no discrete model in %s to color boreholes; '
+                  'set bhole_im. Borehole overlay skipped.' % f_prior_h5)
+        else:
+            _overlay_boreholes_on_profile(ax[0], BHOLES, ii, X, Y, ELEVATION, x_axis_values,
+                                          f_prior_h5, Mstr_bh, max_dist=bhole_max_dist,
+                                          width_px=bhole_width, label=bhole_label,
+                                          use_prob_alpha=bhole_alpha, showInfo=showInfo)
 
     if show_std and nm>1:
         isp=1
@@ -4969,6 +5057,183 @@ def plot_cumulative_probability_profile(P_hypothesis, i1=0, i2=0, label=None, co
     plt.show()
 
 
+def _normalize_boreholes(W):
+    """Return borehole input (dict, list of dicts or JSON path) as a list of dicts."""
+    import json
+    if isinstance(W, str):
+        with open(W, 'r', encoding='utf-8') as fh:
+            W = json.load(fh)
+    if isinstance(W, dict):
+        W = [W]
+    return list(W)
+
+
+def _borehole_class_colors(W, f_prior_h5=None, Mstr='/M2', showInfo=0):
+    """
+    Map borehole class ids to colors and legend labels.
+
+    Uses ``class_id``/``class_name``/``cmap`` stored on ``Mstr`` in ``f_prior_h5`` when
+    available, otherwise a ``'tab10'`` colormap over the classes present in ``W``.
+
+    Returns
+    -------
+    color_map : dict
+        class id -> RGBA color.
+    label_map : dict
+        class id -> legend label.
+    legend_classes : list
+        Class ids to show in a legend (all prior classes if a prior is given).
+    """
+    from matplotlib.colors import ListedColormap
+
+    class_id   = None
+    class_name = None
+    cmap_lc    = None   # ListedColormap
+
+    if f_prior_h5 is not None:
+        try:
+            with h5py.File(f_prior_h5, 'r') as f_prior:
+                mkey = Mstr if Mstr.startswith('/') else '/' + Mstr
+                if mkey in f_prior:
+                    attrs = f_prior[mkey].attrs
+                    if 'class_id' in attrs:
+                        class_id = attrs['class_id'][:].flatten().astype(int)
+                    if 'class_name' in attrs:
+                        raw = attrs['class_name'][:].flatten()
+                        class_name = [
+                            r.decode('utf-8') if isinstance(r, bytes) else str(r)
+                            for r in raw
+                        ]
+                    if 'cmap' in attrs:
+                        cmap_arr = attrs['cmap'][:]   # shape (3, n_colors)
+                        cmap_lc  = ListedColormap(cmap_arr.T)
+                    if showInfo > 0:
+                        print(f'_borehole_class_colors: read {len(class_id) if class_id is not None else 0}'
+                              f' classes from {f_prior_h5}:{mkey}')
+        except Exception as e:
+            if showInfo > 0:
+                print(f'_borehole_class_colors: could not read prior attributes: {e}')
+
+    # collect all class ids appearing in data
+    all_classes = sorted({int(c) for bh in W for c in bh.get('class_obs', [])})
+
+    if class_id is not None and cmap_lc is not None:
+        # map each class_id to its colour in the stored cmap
+        color_map = {int(cid): cmap_lc(i / max(len(class_id) - 1, 1))
+                     for i, cid in enumerate(class_id)}
+    else:
+        tab10 = matplotlib.colormaps['tab10']
+        color_map = {cid: tab10(i % 10) for i, cid in enumerate(all_classes)}
+
+    # When prior info is available: show name + id, e.g. "Sand (2)"
+    # Otherwise: just the numeric id
+    if class_id is not None and class_name is not None:
+        label_map = {int(cid): f'{nm} ({cid})'
+                     for cid, nm in zip(class_id, class_name)}
+    else:
+        label_map = {cid: str(cid) for cid in all_classes}
+
+    # When a prior is provided use ALL its classes in the legend so the
+    # full legend is shown even if some classes are absent from this set
+    # of boreholes.  Without a prior, show only classes present in data.
+    if class_id is not None and color_map:
+        legend_classes = list(class_id)
+    else:
+        legend_classes = all_classes
+
+    return color_map, label_map, legend_classes
+
+
+def _first_discrete_model(f_prior_h5):
+    """Return the key (e.g. '/M2') of the first discrete model in f_prior_h5, or None."""
+    with h5py.File(f_prior_h5, 'r') as f_prior:
+        keys = sorted((k for k in f_prior.keys() if k[0] == 'M' and k[1:].isdigit()),
+                      key=lambda k: int(k[1:]))
+        for k in keys:
+            if f_prior[k].attrs.get('is_discrete', 0):
+                return '/' + k
+    return None
+
+
+def _overlay_boreholes_on_profile(ax, BHOLES, ii, X, Y, ELEVATION, x_axis_values,
+                                  f_prior_h5, Mstr_bh, max_dist=200, width_px=10,
+                                  label=True, use_prob_alpha=False, showInfo=0):
+    """
+    Draw boreholes as colored columns on a profile panel.
+
+    Each borehole is placed at the profile location (in ``ii``) nearest to it, if that
+    location is within ``max_dist`` (horizontal distance, same units as X/Y). The column
+    hangs from the borehole ``elevation`` if valid (not missing, 0 or -9999), otherwise
+    from ``ELEVATION`` at the nearest sounding. The column width is ``width_px`` pixels,
+    independent of the x-axis scale.
+    """
+    import matplotlib.patheffects as pe
+
+    W = _normalize_boreholes(BHOLES)
+    if len(W) == 0:
+        return
+    color_map, _, _ = _borehole_class_colors(W, f_prior_h5, Mstr_bh, showInfo=showInfo)
+
+    ii = np.asarray(ii, dtype=int)
+    x_axis_values = np.asarray(x_axis_values)
+    Xp = np.asarray(X)[ii]
+    Yp = np.asarray(Y)[ii]
+
+    fig = ax.get_figure()
+    width_pt = width_px * 72.0 / fig.dpi
+    stroke = [pe.withStroke(linewidth=width_pt + 1.5, foreground='k')]
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+
+    for bh in W:
+        try:
+            bx = float(bh['X'])
+            by = float(bh['Y'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        d = np.hypot(Xp - bx, Yp - by)
+        j = int(np.argmin(d))
+        bh_name = str(bh.get('name', ''))
+        if d[j] > max_dist:
+            if showInfo > 0:
+                print('plot_profile: borehole %s skipped, distance %.1f > bhole_max_dist=%g'
+                      % (bh_name, d[j], max_dist))
+            continue
+        if showInfo > 0:
+            print('plot_profile: borehole %s at profile index %d (distance %.1f)'
+                  % (bh_name, j, d[j]))
+
+        x = x_axis_values[j]
+        elev = bh.get('elevation', None)
+        if elev is None or not np.isfinite(float(elev)) or float(elev) in (0.0, -9999.0):
+            elev = ELEVATION[ii[j]]
+        elev = float(elev)
+
+        depth_top    = bh.get('depth_top',    [])
+        depth_bottom = bh.get('depth_bottom', [])
+        class_obs    = bh.get('class_obs',    [])
+        class_prob   = bh.get('class_prob',   [1.0] * len(class_obs))
+        for top, bot, cid, prob in zip(depth_top, depth_bottom, class_obs, class_prob):
+            col = color_map.get(int(cid), (0.7, 0.7, 0.7, 1.0))
+            ax.plot([x, x], [elev - top, elev - bot], color=col, linewidth=width_pt,
+                    alpha=float(prob) if use_prob_alpha else 1.0,
+                    solid_capstyle='butt', path_effects=stroke, zorder=5)
+        # Interval boundaries and ground surface as short horizontal ticks
+        z_bounds = [elev - t for t in depth_top] + [elev - b for b in depth_bottom]
+        if len(z_bounds) > 0:
+            ax.plot([x] * len(z_bounds), z_bounds, linestyle='none', marker='_',
+                    markersize=width_pt + 1.5, markeredgewidth=0.8, color='k', zorder=6)
+        ax.plot([x], [elev], linestyle='none', marker='_', markersize=width_pt + 4,
+                markeredgewidth=2.0, color='k', zorder=6)
+        if label and bh_name:
+            ax.annotate(bh_name, xy=(x, elev), xytext=(0, 3), textcoords='offset points',
+                        ha='center', va='bottom', fontsize=7, rotation=90,
+                        annotation_clip=True, zorder=7)
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+
 def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     """
     Plot borehole data as 1-D lithology sticks, one subplot per borehole.
@@ -5034,9 +5299,7 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     """
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
-    from matplotlib.colors import ListedColormap
     import numpy as np
-    import json
 
     showInfo  = kwargs.get('showInfo', 0)
     figsize_w = kwargs.get('figsize', (2, 8))
@@ -5055,11 +5318,7 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     fs_suptitle = (fontsize + 2) if fontsize is not None else 10
 
     # --- normalise input to a list of dicts ---
-    if isinstance(W, str):
-        with open(W, 'r', encoding='utf-8') as fh:
-            W = json.load(fh)
-    if isinstance(W, dict):
-        W = [W]
+    W = _normalize_boreholes(W)
 
     n_wells = len(W)
 
@@ -5078,73 +5337,9 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     elevations    = [float(bh.get('elevation', 0)) for bh in W]
     use_elevation = any(e != 0.0 for e in elevations)
 
-    # --- read class info from prior if available ---
-    class_id   = None
-    class_name = None
-    cmap_lc    = None   # ListedColormap
-
-    if f_prior_h5 is not None:
-        try:
-            with h5py.File(f_prior_h5, 'r') as f_prior:
-                mkey = Mstr if Mstr.startswith('/') else '/' + Mstr
-                if mkey in f_prior:
-                    attrs = f_prior[mkey].attrs
-                    if 'class_id' in attrs:
-                        class_id = attrs['class_id'][:].flatten().astype(int)
-                    if 'class_name' in attrs:
-                        raw = attrs['class_name'][:].flatten()
-                        class_name = [
-                            r.decode('utf-8') if isinstance(r, bytes) else str(r)
-                            for r in raw
-                        ]
-                    if 'cmap' in attrs:
-                        cmap_arr = attrs['cmap'][:]   # shape (3, n_colors)
-                        cmap_lc  = ListedColormap(cmap_arr.T)
-                    if showInfo > 0:
-                        print(f'plot_boreholes: read {len(class_id) if class_id is not None else 0}'
-                              f' classes from {f_prior_h5}:{mkey}')
-        except Exception as e:
-            if showInfo > 0:
-                print(f'plot_boreholes: could not read prior attributes: {e}')
-
-    # --- build class → color mapping ---
-    # collect all class ids appearing in data
-    all_classes = sorted({int(c) for bh in W for c in bh.get('class_obs', [])})
-
-    if class_id is not None and cmap_lc is not None:
-        # map each class_id to its colour in the stored cmap
-        n_colors = len(cmap_lc.colors)
-        def _color_for_class(cid):
-            if class_id is not None:
-                idx_arr = np.where(class_id == cid)[0]
-                if len(idx_arr):
-                    idx = idx_arr[0]
-                    # cmap colours run 0..n_colors-1; class_id may not be 0-based
-                    frac = idx / max(n_colors - 1, 1)
-                    return cmap_lc(frac)
-            return (0.7, 0.7, 0.7, 1.0)
-        color_map = {cid: cmap_lc(i / max(len(class_id) - 1, 1))
-                     for i, cid in enumerate(class_id)}
-    else:
-        tab10 = matplotlib.colormaps['tab10']
-        color_map = {cid: tab10(i % 10) for i, cid in enumerate(all_classes)}
-
-    # --- class labels for legend ---
-    # When prior info is available: show name + id, e.g. "Sand (2)"
-    # Otherwise: just the numeric id
-    if class_id is not None and class_name is not None:
-        label_map = {int(cid): f'{nm} ({cid})'
-                     for cid, nm in zip(class_id, class_name)}
-    else:
-        label_map = {cid: str(cid) for cid in all_classes}
-
-    # When a prior is provided use ALL its classes in the legend so the
-    # full legend is shown even if some classes are absent from this set
-    # of boreholes.  Without a prior, show only classes present in data.
-    if class_id is not None and color_map:
-        legend_classes = list(class_id)
-    else:
-        legend_classes = all_classes
+    # --- class -> color / label mapping (from prior if available) ---
+    color_map, label_map, legend_classes = _borehole_class_colors(
+        W, f_prior_h5, Mstr, showInfo=showInfo)
 
     # --- global y-axis range ---
     if use_elevation:

@@ -357,8 +357,12 @@ for id_use in id_use_arr:
 
 # %%
 for f_post_h5 in f_post_h5_list:
-    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha = 1,logstd_min = 0.5, logstd_max = 0.6)
-    ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
+    ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=100, xaxis='x',
+                    BHOLES=BHOLES, bhole_max_dist=100, bhole_width=20,  
+                    hardcopy=hardcopy, alpha = 1,logstd_min = 0.5, logstd_max = 0.6)
+    ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100, xaxis='x', 
+                    BHOLES=BHOLES, bhole_max_dist=100, bhole_width=20, 
+                    hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
 
 # %%
 for f_post_h5 in f_post_h5_list:
@@ -404,7 +408,7 @@ for f_post_h5 in f_post_h5_list:
 # %%
 doLoadQuery = False
 if doLoadQuery:
-    query = ig.load_query('query_ex1.json')
+    query = ig.load_query('query_daugaard.json')
 else:
     query = {
         "constraints": [
@@ -443,11 +447,7 @@ for f_post_h5 in f_post_h5_list:
     ig.query_plot(P, meta, ip=i_bh[1], query_dict=query, title = query_title, f_post_h5=f_post_h5, hardcopy=hardcopy)
 
 # %%
-
-ig.prior_describe(f_prior_h5)
-
-f_post_h5 = 'post_daugaard_merged_prior_N1000000_gf4_log0_id1.h5'
-f_post_h5 = 'post_daugaard_merged_prior_N500000_gf4_log0_id1.h5'
+f_post_h5 = f_post_h5_list[1]
 
 usellm = 'ollama'  # 'claude' or 'ollama'
 usellm = 'claude'  # 'claude' or 'ollama'
@@ -476,53 +476,42 @@ text1 = "What is the probability that the total cumulative thickness " \
 text1 = "What is the probability that there exist a continous layer ot least 10m thickness of " \
         "raw material (sand/gravel) starting at a depth not exceeding 5 m below ground?"
 
+try: 
+    query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+    print(json.dumps(query1, indent=2))
+    print(interp1)
 
-query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
-print(json.dumps(query1, indent=2))
-print(interp1)
-
-P1, meta1 = ig.query(f_post_h5, query1)
-print(f"N_data={meta1['N_data']}, mean P={P1.mean():.3f}")
-ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
-              plotPoints = True, 
-              text_panel=True, hardcopy='query1_%s' % (MODEL)
-)
-
-
-# %%
-text1 = "What is the probability that the Source File Index is class 2?"
-query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
-P1, meta1 = ig.query(f_post_h5, query1)
-ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
-              text_panel=True, hardcopy='query2_%s' % (MODEL)
-)
+    P1, meta1 = ig.query(f_post_h5, query1)
+    print(f"N_data={meta1['N_data']}, mean P={P1.mean():.3f}")
+    ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
+                plotPoints = True, 
+                text_panel=True, hardcopy='query1_%s' % (MODEL)
+    )
+except:
+    print("Error in query_from_text or query. Please check your LLM model and API key.")
 
 # %%
-text1 = "What is the 10th percentile of the cumulative thickness of sand and gravel in the upper 50m"
-query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
-P1, meta1 = ig.query(f_post_h5, query1)
-ig.query_percentile_plot(
-    P1, meta1,
-    query_text=text1,
-    interpretation=interp1,
-    text_panel=True,
-    hardcopy="query_pct"
-)
-
+try: 
+    text1 = "What is the probability that the Source File Index is class 2?"
+    query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+    P1, meta1 = ig.query(f_post_h5, query1)
+    ig.query_plot(P1, meta1, query_text=text1, interpretation=interp1,
+                text_panel=True, hardcopy='query2_%s' % (MODEL)
+    )
+except:
+    print("Error in query_from_text or query. Please check your LLM model and API key.")
 
 # %%
-# Find points within buffer distance
-X1 = 543500+100
-Y1 = 6175000
-X2 = X1
-Y2 = 6617500
-Xl = np.array([X1-100,X1, X2, X2+1500])
-Yl = np.array([Y1, Y1, Y2, Y2-150])
-buffer = 15.0
-indices, distances, segment_ids = ig.find_points_along_line_segments(
-    X, Y, Xl, Yl, tolerance=buffer
-)
-id_line = indices
-
-ig.plot_profile(f_post_h5, im=1, ii=id_line, gap_threshold=50, xaxis='y', hardcopy=hardcopy, alpha = 1,logstd_min = 0.5, logstd_max = 0.6)
-ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=50, xaxis='y', hardcopy=hardcopy, alpha=1, entropy_min =0.7, entropy_max=0.8)
+try:
+    text1 = "What is the 10th percentile of the cumulative thickness of sand and gravel in the upper 50m"
+    query1, interp1, prompt1 = ig.query_from_text(text1, f_prior_h5=f_prior_h5, model=MODEL, api_key=API_KEY)
+    P1, meta1 = ig.query(f_post_h5, query1)
+    ig.query_percentile_plot(
+        P1, meta1,
+        query_text=text1,
+        interpretation=interp1,
+        text_panel=True,
+        hardcopy="query_pct"
+    )
+except:
+    print("Error in query_from_text or query. Please check your LLM model and API key.")
