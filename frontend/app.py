@@ -1,4 +1,4 @@
-"""FastHTML application factory + ``integrate_workbench`` entry point."""
+"""FastHTML application factory + ``integrate`` entry point."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> None:
 
     import uvicorn
 
-    p = argparse.ArgumentParser(prog="integrate_workbench", description=APP_TITLE)
+    p = argparse.ArgumentParser(prog="integrate", description=APP_TITLE)
     p.add_argument("--host", default=DEFAULT_HOST)
     p.add_argument("--port", type=int, default=DEFAULT_PORT)
     p.add_argument("--workspace", default=None, help="Folder with the project .h5 files (default: CWD).")

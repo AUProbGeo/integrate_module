@@ -17,7 +17,7 @@ FIGURES_DIR = STATIC_DIR / "figures"
 # Never the workspace — previews must not touch the user's real files.
 SCRATCH_DIR = PKG_DIR / "_scratch"
 
-APP_TITLE = "INTEGRATE Workbench"
+APP_TITLE = "INTEGRATE"
 DEFAULT_PORT = 8051
 DEFAULT_HOST = "127.0.0.1"
 

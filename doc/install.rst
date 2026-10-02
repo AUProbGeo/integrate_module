@@ -196,6 +196,79 @@ First install Homebrew, then run:
     pip install .
 
 
+Running on GPU
+==============
+
+Two parts of a typical workflow can run on a GPU, and each is selected
+independently:
+
+- **Forward modelling** (:func:`integrate.prior_data_em`,
+  :func:`integrate.forward_em`) with the ``anemone`` backend, which uses
+  PyTorch. Requires ``anemone`` and ``torch`` (with CUDA support) to be
+  installed.
+- **Rejection sampling** (:func:`integrate.integrate_rejection`) with the
+  ``jax`` backend. Requires JAX with CUDA support, e.g.
+  ``pip install jax[cuda12]``. See :doc:`rejection` for details on this
+  backend, including compile times and ``XLA_FLAGS``.
+
+Instead of passing ``method=``, ``device=`` and ``backend=`` to every call,
+the defaults can be set once with environment variables. An explicit
+argument always overrides the environment variable.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Variable
+     - Values
+     - Effect
+   * - ``EM_FORWARD_METHOD``
+     - ``ga-aem`` (default), ``anemone``, ``simpeg``
+     - Forward method used by ``prior_data_em()`` / ``forward_em()`` when
+       ``method`` is not given.
+   * - ``EM_FORWARD_DEVICE``
+     - ``cpu`` (default), ``cuda``
+     - Torch device used by the ``anemone`` forward method when ``device``
+       is not given. Ignored by the other methods.
+   * - ``REJECTION_BACKEND``
+     - ``numpy`` (default), ``jax``
+     - Backend used by ``integrate_rejection()`` and the
+       ``integrate_rejection`` CLI when ``backend`` / ``--backend`` is not
+       given.
+   * - ``JAX_PLATFORMS``
+     - ``cuda``, ``cpu``
+     - Standard JAX variable. Forces JAX onto the GPU or CPU; if unset, JAX
+       uses the GPU when one is available.
+   * - ``XLA_FLAGS``
+     - see :doc:`rejection`
+     - Optional. Reduces JAX's first-run compile time.
+   * - ``CUDA_ROOT``
+     - path
+     - Normally leave unset: INTEGRATE points it at the pip-installed CUDA
+       toolkit automatically. If the first JAX run on GPU takes many minutes
+       and lots of RAM, XLA is probably using an old system ``ptxas``; check
+       that ``CUDA_ROOT`` is unset or points at a directory containing
+       ``bin/ptxas`` from the same CUDA version as JAX.
+
+A full GPU setup, from the shell before starting Python::
+
+    export EM_FORWARD_METHOD=anemone
+    export EM_FORWARD_DEVICE=cuda
+    export REJECTION_BACKEND=jax
+
+or at the top of a script, before ``import integrate``::
+
+    import os
+    os.environ["EM_FORWARD_METHOD"] = "anemone"
+    os.environ["EM_FORWARD_DEVICE"] = "cuda"
+    os.environ["REJECTION_BACKEND"] = "jax"
+
+    import integrate as ig
+
+To check what is used, pass ``showInfo=1``: ``prior_data_em()`` then prints
+the forward method and device.
+
+
 Development
 ===========
 

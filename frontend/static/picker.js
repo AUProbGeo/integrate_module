@@ -50,10 +50,10 @@
       let s = "";
       if (pts.length > 1) {
         s += '<polyline points="' + pts.map(function (q) { return q[0] + "," + q[1]; }).join(" ") +
-             '" fill="none" stroke="#ec3013" stroke-width="3" vector-effect="non-scaling-stroke"/>';
+             '" fill="none" stroke="#059669" stroke-width="3" vector-effect="non-scaling-stroke"/>';
       }
       pts.forEach(function (q, i) {
-        s += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="6" fill="#ec3013" stroke="#fff" stroke-width="2"/>';
+        s += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="6" fill="#059669" stroke="#fff" stroke-width="2"/>';
         s += '<text x="' + (q[0] + 9) + '" y="' + (q[1] - 8) + '" font-size="20" fill="#201e1d">' + (i + 1) + "</text>";
       });
       svg.innerHTML = s;

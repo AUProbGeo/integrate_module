@@ -252,7 +252,7 @@ def _preview_block(st: dict):
         Div(P("Enable auto-update, or hit Refresh preview, to generate a small "
               "sample and see the realization panels.", cls="wb-empty"),
             id="gp-preview-figs", cls="gp-preview-figs"),
-        id="gp-preview", style="margin-top:24px;border-top:2px solid var(--color-divider);padding-top:16px;",
+        id="gp-preview", style="margin-top:24px;border-top:1px solid var(--color-divider);padding-top:16px;",
     )
 
 

@@ -1,139 +1,52 @@
-/* Modernist — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
-/* vietnamese */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-vietnamese.woff2") format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-latin-ext.woff2") format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-latin.woff2") format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-vietnamese.woff2") format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-latin-ext.woff2") format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-latin.woff2") format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 800;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-vietnamese.woff2") format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 800;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-latin-ext.woff2") format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Archivo';
-  font-style: normal;
-  font-weight: 800;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url("fonts/archivo-latin.woff2") format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
+/* Design-system tokens and component classes. This file is the source of truth
+   for the look; the palette, font stack and radii mirror the React UI in
+   ui/frontend/src/index.css (dark theme, emerald accent). */
 
 :root {
-  --color-bg: #f3f2f2;
-  --color-surface: #eae9e9;
-  --color-text: #201e1d;
-  --color-accent: #ec3013;
-  --color-accent-2: #e15b47;
-  --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
+  color-scheme: dark;
 
-  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
-     same step of any role matches the others in visual value. */
-  --color-neutral-100: #f8f4f4;
-  --color-neutral-200: #eae7e7;
-  --color-neutral-300: #d7d3d3;
-  --color-neutral-400: #bab6b6;
-  --color-neutral-500: #9b9797;
-  --color-neutral-600: #7d7979;
-  --color-neutral-700: #605d5d;
-  --color-neutral-800: #444141;
-  --color-neutral-900: #2d2b2b;
+  --color-bg: #0a0d13;
+  --color-panel: #11151d;
+  --color-surface: #171c26;          /* = ui "panel-2" */
+  --color-text: #e7eaf1;
+  --color-muted: #8b94a7;
+  --color-accent: #34d399;
+  --color-accent-dim: #064e3b;
+  --color-accent-2: #38bdf8;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #38bdf8;
+  --color-divider: #232b3a;          /* = ui "edge" */
 
-  --color-accent-100: #fff2ef;
-  --color-accent-200: #ffe0d9;
-  --color-accent-300: #ffc4b8;
-  --color-accent-400: #ff9783;
-  --color-accent-500: #ff563c;
-  --color-accent-600: #dd2b0f;
-  --color-accent-700: #ae1800;
-  --color-accent-800: #7c1405;
-  --color-accent-900: #4d170e;
+  /* Tonal ramps, oriented for a dark ground: low steps are light (text on
+     dark), high steps are dark (backgrounds). */
+  --color-neutral-100: #f1f3f7;
+  --color-neutral-200: #e7eaf1;
+  --color-neutral-300: #c7ccd7;
+  --color-neutral-400: #a7aebd;
+  --color-neutral-500: #6b7385;
+  --color-neutral-600: #8b94a7;
+  --color-neutral-700: #a7aebd;
+  --color-neutral-800: #e7eaf1;
+  --color-neutral-900: #0a0d13;
 
-  --color-accent-2-100: #fff2ef;
-  --color-accent-2-200: #ffe0da;
-  --color-accent-2-300: #ffc4b9;
-  --color-accent-2-400: #ff9784;
-  --color-accent-2-500: #ef6853;
-  --color-accent-2-600: #c94b39;
-  --color-accent-2-700: #9e3526;
-  --color-accent-2-800: #71261b;
-  --color-accent-2-900: #471d16;
+  --color-accent-100: color-mix(in srgb, #34d399 10%, transparent);
+  --color-accent-200: color-mix(in srgb, #34d399 20%, transparent);
+  --color-accent-300: #6ee7b7;
+  --color-accent-400: #4ade9f;
+  --color-accent-500: #34d399;
+  --color-accent-600: color-mix(in srgb, #34d399 90%, black);
+  --color-accent-700: color-mix(in srgb, #34d399 80%, black);
+  --color-accent-800: #34d399;
+  --color-accent-900: #064e3b;
 
-  --font-heading: "Archivo", system-ui, sans-serif;
-  --font-heading-weight: 800;
-  --font-body: "Archivo", system-ui, sans-serif;
+  --color-accent-2-100: color-mix(in srgb, #38bdf8 10%, transparent);
+  --color-accent-2-800: #38bdf8;
+
+  --font-heading: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading-weight: 600;
+  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
   --space-1: 4.0px;
   --space-2: 8.0px;
@@ -142,84 +55,81 @@
   --space-6: 24.0px;
   --space-8: 32.0px;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
-  /* Elevation — derived from the ground: soft ink-tinted shadows on a
-     light theme, a hairline edge + ambient darkness on a dark one. */
-  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
-  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
-  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.25);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.2);
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-heading-weight); }
 
 .grayscale{filter:grayscale(1) contrast(1.08)}
 
+/* Slim scrollbars for the dark theme */
+* { scrollbar-width: thin; scrollbar-color: var(--color-divider) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--color-divider); border-radius: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
 /* ══════════════════════════════════════════════════════════════════════════
-   Components — built with the tokens above. Plain CSS
-   on plain HTML: no JavaScript, no build step. Each class is documented in
-   readme.md and demonstrated in foundations/ and components/.
+   Components — built with the tokens above. Plain CSS on plain HTML.
    ══════════════════════════════════════════════════════════════════════ */
 
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
+body { margin: 0; font-size: 14px; line-height: 1.55; font-weight: 400; }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+  line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 var(--space-2);
 }
-h1 { font-size: 42px; }
-h2 { font-size: 32px; }
-h3 { font-size: 25px; }
-h4 { font-size: 20px; }
-h5 { font-size: 16px; }
-h6 { font-size: 13px; }
-h6 { letter-spacing: 0.08em; text-transform: uppercase; }
+h1 { font-size: 28px; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+h4 { font-size: 16px; }
+h5 { font-size: 14px; }
+h6 { font-size: 12px; }
+h6 { letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
 p { margin: 0 0 var(--space-3); }
 a { color: var(--color-accent); text-underline-offset: 3px; }
 img { display: block; max-width: 100%; }
 figure { margin: 0; }
-figcaption {
-  font-size: 11px; margin-top: var(--space-1);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-}
-.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+figcaption { font-size: 11px; margin-top: var(--space-1); color: var(--color-muted); }
+.text-muted { color: var(--color-muted); }
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--color-accent) 60%, transparent); outline-offset: 2px; }
+::selection { background: var(--color-accent-dim); }
 
 /* — rules — */
-.hr {
-  height: 2px; border: 0; margin: var(--space-4) 0;
-  background: var(--color-divider);
-}
+.hr { height: 1px; border: 0; margin: var(--space-4) 0; background: var(--color-divider); }
 
 /* — buttons — */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   cursor: pointer; text-decoration: none;
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 14px; line-height: 1.2; color: var(--color-text); /* matches the .input's 14px —
-     the pair sits side by side in sign-up rows */
+  font-family: var(--font-body); font-weight: 500;
+  font-size: 14px; line-height: 1.2; color: var(--color-text);
   background: transparent; border: 1px solid transparent;
-  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
+  transition: background-color .15s, border-color .15s, color .15s;
 }
 .btn svg { display: block; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { background: var(--color-accent); color: var(--color-bg); }
-.btn-primary:hover { background: var(--color-accent-600); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: #000; font-weight: 600; }
+.btn-primary:hover { background: color-mix(in srgb, var(--color-accent) 90%, transparent); }
 .btn-primary:active { background: var(--color-accent-700); }
-.btn-secondary { border-color: var(--color-divider); }
-.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
-.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
-.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+.btn-secondary { background: var(--color-surface); border-color: var(--color-divider); }
+.btn-secondary:hover { border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); }
+.btn-secondary:active { background: var(--color-panel); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-2); }
 .btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 .btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
 .btn-icon { width: 36px; height: 36px; padding: 0; }
@@ -227,17 +137,25 @@ figcaption {
 
 /* — forms — */
 .field > label {
-  display: block; font-size: 12px; margin-bottom: 5px;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;
+  color: var(--color-muted);
 }
 .input {
-  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  width: 100%; min-height: 36px; padding: 7px 12px; font: inherit;
   font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
   background: var(--color-surface);
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  transition: border-color .15s, box-shadow .15s;
 }
-.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
-.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+.input::placeholder { color: color-mix(in srgb, var(--color-muted) 50%, transparent); }
+.input:hover { border-color: color-mix(in srgb, var(--color-muted) 45%, transparent); }
+.input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+.input:disabled { opacity: 0.5; }
+select.input option { background: var(--color-surface); color: var(--color-text); }
 textarea.input { min-height: 90px; resize: vertical; }
 .radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
 .radio input, .seg-opt input {
@@ -254,88 +172,82 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .seg {
-  display: inline-flex; overflow: hidden;
+  display: inline-flex; overflow: hidden; background: var(--color-surface);
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
 }
 .seg-opt {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 12px; font-size: 13px; cursor: pointer;
+  padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--color-muted);
 }
 .seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
-.seg-opt:has(input:checked) { background: var(--color-accent); color: var(--color-bg); }
-.seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.seg-opt:has(input:checked) {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent); font-weight: 600;
+}
+.seg-opt:not(:has(input:checked)):hover { background: var(--color-panel); color: var(--color-text); }
 .seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
 /* — cards — */
 .card {
   display: flex; flex-direction: column; gap: var(--space-2);
-  padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-panel); border: 1px solid var(--color-divider);
+  box-shadow: var(--shadow-lg);
 }
 .card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
-.card-title {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 17px; line-height: 1.2;
-}
-.card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
-.card-meta {
-  display: flex; align-items: center; gap: 6px; font-size: 11px;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
-}
+.card-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 16px; line-height: 1.25; }
+.card-body { margin: 0; font-size: 13px; color: var(--color-muted); flex: 1; }
+.card-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-muted); }
 .elev-sm { box-shadow: var(--shadow-sm); }
 .elev-md { box-shadow: var(--shadow-md); }
 .elev-lg { box-shadow: var(--shadow-lg); }
 
-/* — tags — */
+/* — tags (tinted badges, as in ui/) — */
 .tag {
-  display: inline-flex; align-items: center; font-size: 11px;
-  letter-spacing: 0.02em; padding: 3px 10px;
-  border-radius: calc(var(--radius-md) * 0.75);
+  display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.03em; padding: 2px 8px;
+  border-radius: var(--radius-sm); border: 1px solid transparent;
 }
-.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
-.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
-.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
-.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+.tag-accent  { background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.tag-accent-2, .tag-info
+             { background: color-mix(in srgb, var(--color-info) 10%, transparent); color: var(--color-info); border-color: color-mix(in srgb, var(--color-info) 30%, transparent); }
+.tag-warn    { background: color-mix(in srgb, var(--color-warn) 10%, transparent); color: var(--color-warn); border-color: color-mix(in srgb, var(--color-warn) 30%, transparent); }
+.tag-danger  { background: color-mix(in srgb, var(--color-danger) 10%, transparent); color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
+.tag-neutral { background: color-mix(in srgb, var(--color-muted) 10%, transparent); color: var(--color-muted); border-color: color-mix(in srgb, var(--color-muted) 30%, transparent); }
+.tag-outline { border-color: var(--color-accent); color: var(--color-accent); }
 
 /* — navigation — */
 .nav {
   display: flex; align-items: center; gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border-bottom: 2px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
 }
-.nav-brand {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 18px; margin-right: auto;
-}
+.nav-brand { font-family: var(--font-heading); font-weight: 700; font-size: 16px; margin-right: auto; }
 .nav a { color: inherit; text-decoration: none; font-size: 14px; }
 .nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
 
 /* — tables — */
-.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th {
-  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent);
-  padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
+  text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--color-muted);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-divider);
 }
-.table td {
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--color-divider);
-}
-.table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+.table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-divider); }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover { background: var(--color-surface); }
 
 /* — dialog — */
 .dialog-backdrop {
   position: fixed; inset: 0; display: grid; place-items: center;
   padding: var(--space-4);
-  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+  background: rgb(0 0 0 / 0.6);
 }
 .dialog {
   width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
   padding: var(--space-4); border-radius: var(--radius-lg);
-  background: var(--color-surface); box-shadow: var(--shadow-lg);
+  background: var(--color-panel); border: 1px solid var(--color-divider); box-shadow: var(--shadow-lg);
 }
-.dialog-title {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 20px;
-}
-.dialog-body { font-size: 14px; opacity: 0.85; }
+.dialog-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 18px; }
+.dialog-body { font-size: 14px; color: var(--color-muted); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
