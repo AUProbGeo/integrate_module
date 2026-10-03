@@ -109,6 +109,7 @@ def setup_matplotlib_backend():
     matplotlib.use('Agg')
 
 import os
+import re
 import numpy as np
 import h5py
 import matplotlib
@@ -3032,6 +3033,31 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
 
     return
 
+def _data_axis_label(f_data, Dkey, default):
+    """Axis label for a data group from its optional 'label' and 'unit' attributes.
+
+    Returns 'LABEL [UNIT]', or 'LABEL' if no unit is set. If no label is set,
+    returns ``default`` (with ' [UNIT]' appended if a unit is set). Matplotlib
+    mathtext ($...$) may be used in label and unit; in the unit, '^4' / '^{-2}'
+    is converted to a superscript automatically.
+    """
+    def _attr(key):
+        val = f_data['/%s' % Dkey].attrs.get(key, None)
+        if isinstance(val, bytes):
+            val = val.decode('utf-8')
+        val = None if val is None else str(val).strip()
+        return val or None
+
+    label = _attr('label')
+    unit = _attr('unit')
+    if unit is not None and '$' not in unit:
+        # 'V/Am^4' or 'Am^{-2}' -> mathtext superscripts ('V/Am$^{4}$')
+        unit = re.sub(r'\^(\{[^}]*\}|[+-]?\d+)',
+                      lambda m: '$^{%s}$' % m.group(1).strip('{}'), unit)
+    base = label if label is not None else default
+    return '%s [%s]' % (base, unit) if unit is not None else base
+
+
 def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=False, clim=[], **kwargs):
     """
     Create 2D spatial plot of actual data values from electromagnetic surveys.
@@ -3285,6 +3311,8 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
 
             # Get name attribute if it exists
             name_attr = f_data['/%s' % Dkey].attrs.get('name', None)
+            lab_obs = _data_axis_label(f_data, Dkey, 'd_obs')
+            lab_std = _data_axis_label(f_data, Dkey, 'd_std')
 
             # Force plot type for discrete/multinomial data
             cur_plType = plType
@@ -3338,8 +3366,8 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
                     ax[1].set_xlim(xlim)
                     ax[2].set_xlim(xlim)
                     ax[2].set_ylim([0, 20])
-                    ax[0].set_ylabel('d_obs')
-                    ax[1].set_ylabel('d_std')
+                    ax[0].set_ylabel(lab_obs)
+                    ax[1].set_ylabel(lab_std)
                     ax[2].set_ylabel('Relative noise [%] (d_std/d_obs × 100)')
 
                 elif cur_plType=='imshow':
@@ -3370,8 +3398,8 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
                     im3 = ax[2].imshow(rel_noise.T, aspect='auto', vmin=0, vmax=20,
                                        cmap=_cmap_white_bad('turbo'), extent=extent)
 
-                    fig.colorbar(im1, ax=ax[0])
-                    fig.colorbar(im2, ax=ax[1])
+                    fig.colorbar(im1, ax=ax[0]).set_label(lab_obs)
+                    fig.colorbar(im2, ax=ax[1]).set_label(lab_std)
                     fig.colorbar(im3, ax=ax[2])
 
                     ax[0].set_ylabel('gate number')
@@ -3504,6 +3532,7 @@ def plot_data_prior(f_prior_data_h5,
         name_attr = f_data[dh5_str_name].attrs.get('name', None) if dh5_str_name in f_data else None
         if isinstance(name_attr, bytes):
             name_attr = name_attr.decode('utf-8')
+        data_label = _data_axis_label(f_data, dh5_str_name, 'Data value') if dh5_str_name in f_data else 'Data value'
 
         # Load prior data
         if do_prior:
@@ -3554,7 +3583,7 @@ def plot_data_prior(f_prior_data_h5,
             plt.hist(obs_data, bins=bins, alpha=alpha, color=cols[2],
                     label='Observed data', density=True, histtype='stepfilled')
 
-        plt.xlabel('Data Value')
+        plt.xlabel(data_label)
         plt.ylabel('Probability Density')
         plt.legend()
         name_suffix = ': %s' % name_attr if name_attr else ''
@@ -3573,7 +3602,7 @@ def plot_data_prior(f_prior_data_h5,
                         label='Observed data', color=cols[2])
 
         plt.xlabel('Data #')
-        plt.ylabel('Data Value')
+        plt.ylabel(data_label)
         name_suffix = ': %s' % name_attr if name_attr else ''
         shown = ' vs '.join([s for s, ok in
                              (('Prior (black)', prior_data is not None),
@@ -3725,6 +3754,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                 print("plot_data_prior_post: Using data set %s" % Dkey)
 
         noise_model = f_data['/%s' % Dkey].attrs['noise_model']
+        data_label = _data_axis_label(f_data, Dkey, 'Data value')
         if noise_model == 'gaussian':
             noise_model = 'Gaussian'
             d_obs = f_data['/%s' % Dkey]['d_obs'][:]
@@ -3776,7 +3806,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                         ax.plot(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
                     except:
                         pass
-                    plt.ylabel('log10(dBDt)', **fs_kw)
+                    plt.ylabel('log10(%s)' % data_label, **fs_kw)
                 else:
                     ax.semilogy(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
 
@@ -3801,7 +3831,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
 
                     if ylim is not None:
                         plt.ylim(ylim)
-                    plt.ylabel('dBDt', **fs_kw)
+                    plt.ylabel(data_label, **fs_kw)
                     plt.xlabel('Data #', **fs_kw)
                     if fontsize is not None:
                         ax.tick_params(labelsize=fontsize)
@@ -3814,7 +3844,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                 plt.hist(d_post.flatten(), bins=50, alpha=0.5, color=cols[1], label='d_post', density=True)
                 plt.plot([d_obs[i_plot],d_obs[i_plot]], [0, plt.ylim()[1]], 'r-', label='d_obs', linewidth=2)
 
-                plt.xlabel('Value', **fs_kw)
+                plt.xlabel(data_label, **fs_kw)
                 plt.ylabel('PDF', **fs_kw)
                 plt.legend(**(({'fontsize': fontsize} if fontsize is not None else {})))
                 if fontsize is not None:

@@ -101,6 +101,19 @@ The attribute ``D1/noise_model`` is mandatory for all data types, and describes 
      -
      - Optional human-readable name for this dataset (e.g. ``'dBdT'``). When present,
        plotting routines use it to label figures as ``"D1: dBdT"``.
+   * - /D1/label
+     - [string]
+     - *
+     -
+     - Optional axis label for the data (e.g. ``'dB/dt'``). When present, plotting routines
+       (:func:`integrate.plot_data`, :func:`integrate.plot_data_prior`,
+       :func:`integrate.plot_data_prior_post`) use it as the label of the data axis or colorbar.
+   * - /D1/unit
+     - [string]
+     - *
+     -
+     - Optional unit of the data (e.g. ``'V/Am^4'``). If both ``label`` and ``unit`` are set the
+       axis is labelled ``"LABEL [UNIT]"``; if only ``label`` is set, it is labelled ``"LABEL"``.
    * - /D1/i_use
      - [NP,1] int [0/1]
      - 

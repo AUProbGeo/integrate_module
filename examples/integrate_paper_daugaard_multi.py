@@ -38,7 +38,7 @@ backend = 'jax'
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
-inflateNoise = 4   # 1,2, 4
+inflateNoise = 2   # 1,2, 4
 useLogData = False
 N_use = 1_000_000
 N_use_org= N_use
@@ -436,6 +436,17 @@ for i_post in range(len(f_post_h5_list)):
     except:
         pass
 
+# %% TEST 
+
+# update label and units for d_data_h5
+import h5py
+with h5py.File(f_data_h5, 'a') as f:
+    f['D1'].attrs['label'] = 'dB/dt'
+    f['D1'].attrs['unit'] = 'V/(Am^4)'
+
+ig.plot_data_prior(f_prior_data_h5, f_data_h5, i_plot=100, hardcopy=hardcopy)
+ig.plot_data_prior_post(f_post_h5, i_plot=i_plot_1, hardcopy=hardcopy)
+
 
 # %% [markdown]
 # ## Effect of size of prior data set
@@ -629,7 +640,7 @@ if doPlotAll:
             f.write("%s\n" % item)
 
 # %%
-doReadList = True
+doReadList = False
 if doReadList:
     #f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
 

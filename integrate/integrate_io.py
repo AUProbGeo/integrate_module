@@ -3022,7 +3022,7 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
 
 
 
-def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, i_use=None, is_log = 0, f_data_h5='data.h5', UTMX=None, UTMY=None, LINE=None, ELEVATION=None, delete_if_exist=False, name=None, compression=None, compression_opts=None, **kwargs):
+def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, i_use=None, is_log = 0, f_data_h5='data.h5', UTMX=None, UTMY=None, LINE=None, ELEVATION=None, delete_if_exist=False, name=None, label=None, unit=None, compression=None, compression_opts=None, **kwargs):
     """
     Save observational data with Gaussian noise model to HDF5 file.
 
@@ -3076,6 +3076,12 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     name : str, optional
         Optional name attribute to be written to the data group. If provided,
         this string will be stored as an attribute alongside 'noise_model' (default is None).
+    label : str, optional
+        Optional axis label for the data (e.g. 'dB/dt'), stored as the 'label' attribute
+        and used by plotting routines for the data axis (default is None).
+    unit : str, optional
+        Optional unit of the data (e.g. 'V/Am^4'), stored as the 'unit' attribute.
+        Plots label the axis 'LABEL [UNIT]', or 'LABEL' if no unit is set (default is None).
     compression : str or None, optional
         Compression filter to use. Options: 'gzip', 'lzf', or None.
         If None (default), uses global DEFAULT_COMPRESSION setting.
@@ -3257,6 +3263,10 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
         f['/%s/' % D_str].attrs['is_log'] = is_log
         if name is not None:
             f['/%s/' % D_str].attrs['name'] = name
+        if label is not None:
+            f['/%s/' % D_str].attrs['label'] = label
+        if unit is not None:
+            f['/%s/' % D_str].attrs['unit'] = unit
         if len(f_gex)>0:
             f['/%s/' % D_str].attrs['gex'] = f_gex
     
@@ -3602,7 +3612,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     return f_data_h5
 
 
-def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='data.h5', name=None, compression=None, compression_opts=None, **kwargs):
+def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='data.h5', name=None, label=None, unit=None, compression=None, compression_opts=None, **kwargs):
     """
     Save observed data to an HDF5 file in a specified group with a multinomial noise model.
 
@@ -3617,6 +3627,12 @@ def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='d
     :param name: Optional human-readable name for this dataset (e.g. 'Lithology'). Stored as
         the ``name`` attribute on the HDF5 group and used by plotting routines for titles.
     :type name: str, optional
+    :param label: Optional axis label for this dataset (e.g. 'dB/dt'). Stored as the ``label``
+        attribute on the HDF5 group and used by plotting routines as the data axis label.
+    :type label: str, optional
+    :param unit: Optional unit of this dataset (e.g. 'V/Am^4'). Stored as the ``unit`` attribute;
+        plots label the axis as 'LABEL [UNIT]' (or 'LABEL' if no unit is set).
+    :type unit: str, optional
     :param kwargs: Additional keyword arguments.
     :return: The path to the HDF5 file where the data was written.
     :rtype: str
@@ -3705,6 +3721,10 @@ def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='d
         f['/%s/' % D_str].attrs['noise_model'] = 'multinomial'
         if name is not None:
             f['/%s/' % D_str].attrs['name'] = name
+        if label is not None:
+            f['/%s/' % D_str].attrs['label'] = label
+        if unit is not None:
+            f['/%s/' % D_str].attrs['unit'] = unit
 
     return id, f_data_h5
 
