@@ -300,6 +300,10 @@ def prior_set(f_prior_h5, im=1, **kwargs):
         Model parameter index (e.g., 1 for /M1, 2 for /M2, default is 1).
     name : str, optional
         Display name of the model parameter (e.g., 'Resistivity', 'Lithology').
+    label : str, optional
+        Axis/colorbar label (default: ``name``). Plots show 'LABEL (UNIT)', or 'LABEL' if no unit.
+    unit : str, optional
+        Unit of the parameter (e.g., 'ohm-m').
     class_name : list of str, optional
         Class names for discrete parameters. If fewer names than existing classes
         are given, only the first N entries are updated and the rest are kept.
@@ -349,9 +353,10 @@ def prior_set(f_prior_h5, im=1, **kwargs):
 
         ds = f[Mstr]
 
-        if 'name' in kwargs:
-            _set_attr(ds, 'name', str(kwargs['name']))
-            print('prior_set: %s/name = %r' % (Mstr, kwargs['name']))
+        for _k in ('name', 'label', 'unit'):
+            if _k in kwargs:
+                _set_attr(ds, _k, str(kwargs[_k]))
+                print('prior_set: %s/%s = %r' % (Mstr, _k, kwargs[_k]))
 
         if 'class_name' in kwargs:
             new_names = [str(n) for n in kwargs['class_name']]

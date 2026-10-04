@@ -55,6 +55,20 @@ but are not used in the inversion itself.
 
 The attribute ``D1/noise_model`` is mandatory for all data types, and describes the noise model used for the data.
 
+.. _name_label_unit:
+
+All data sets (``/Dn`` in DATA.h5 and PRIOR.h5, and ``/Mn`` in PRIOR.h5) can have the optional attributes
+``name``, ``label`` and ``unit``, which are used by the plotting routines:
+
+* ``name``: short human-readable name, used in **titles** (e.g. ``'Resistivity'``, ``'dBdT'``).
+* ``label``: text used on **axes and colorbars**. If not set, ``name`` is used.
+* ``unit``: unit of the quantity (e.g. ``'ohm-m'``, ``'V/Am^4'``). Axes are labelled ``"LABEL (UNIT)"``,
+  or ``"LABEL"`` if no unit is set. A trailing ``^n`` in the unit is shown as a superscript;
+  LaTeX math (``$...$``) can also be used.
+
+If none of them are set, axes are labelled with the name of the group: ``M1`` for a model ``/M1``,
+``D3`` for prior data ``/D3``, and ``D1_obs`` (``D1_std``) for observed data ``/D1`` in DATA.h5.
+
 .. list-table:: Data and attributes for DATA.h5
    :widths: 10 10 5 5 70 
    :header-rows: 1
@@ -99,21 +113,21 @@ The attribute ``D1/noise_model`` is mandatory for all data types, and describes 
      - [string]
      - *
      -
-     - Optional human-readable name for this dataset (e.g. ``'dBdT'``). When present,
-       plotting routines use it to label figures as ``"D1: dBdT"``.
+     - Optional name of this dataset (e.g. ``'dBdT'``), used in titles (e.g. ``"D1: dBdT"``).
+       See :ref:`name_label_unit`.
    * - /D1/label
      - [string]
      - *
      -
-     - Optional axis label for the data (e.g. ``'dB/dt'``). When present, plotting routines
-       (:func:`integrate.plot_data`, :func:`integrate.plot_data_prior`,
-       :func:`integrate.plot_data_prior_post`) use it as the label of the data axis or colorbar.
+     - Optional axis/colorbar label of the data (e.g. ``'dB/dt'``). Defaults to ``name``.
+       Used by :func:`integrate.plot_data`, :func:`integrate.plot_data_prior` and
+       :func:`integrate.plot_data_prior_post`.
    * - /D1/unit
      - [string]
      - *
      -
-     - Optional unit of the data (e.g. ``'V/Am^4'``). If both ``label`` and ``unit`` are set the
-       axis is labelled ``"LABEL [UNIT]"``; if only ``label`` is set, it is labelled ``"LABEL"``.
+     - Optional unit of the data (e.g. ``'V/Am^4'``). Axes are labelled ``"LABEL (UNIT)"``,
+       or ``"LABEL"`` if no unit is set.
    * - /D1/i_use
      - [NP,1] int [0/1]
      - 
@@ -256,7 +270,17 @@ PRIOR.h5 contains ``N`` realizations of a prior model (represented as potentiall
      - [string]
      - *
      - 
-     - Name of model parameter /M1
+     - Name of model parameter /M1, used in titles
+   * - /M1/label
+     - [string]
+     - *
+     - 
+     - Axis/colorbar label of /M1 (default: ``name``)
+   * - /M1/unit
+     - [string]
+     - *
+     - 
+     - Unit of /M1 (e.g. ``'ohm-m'``). Axes are labelled ``"LABEL (UNIT)"``, or ``"LABEL"`` if no unit is set.
    * - /M1/is_discrete
      - [nm]
      - *
@@ -312,6 +336,11 @@ PRIOR.h5 contains ``N`` realizations of a prior model (represented as potentiall
      - *
      - N realizations of data number 1, 
        each consisting of ``Nd`` model parameters
+   * - /D1/name, /D1/label, /D1/unit
+     - [string]
+     - *
+     - 
+     - Optional, as for DATA.h5 (see :ref:`name_label_unit`).
    * - /D1/f5_forward
      - [string]
      - *

@@ -537,8 +537,6 @@ def query_plot(P, meta, ip=None, query_dict=None, f_prior_h5=None, f_post_h5=Non
                             cmap=_cmap, clim=_clim,
                             title=_title, colorbar=_colorbar, colorbar_label=_colorbar_label,
                             ax=ax, s=_s, plotPoints=_plotPoints, **kwargs)
-        ax.set_xlabel('UTMX [m]')
-        ax.set_ylabel('UTMY [m]')
 
         if has_text:
             import textwrap
@@ -764,9 +762,8 @@ def query_percentile_plot(percentile_values, meta, query_text=None, interpretati
             _, ax, _ = plot_xy(vals, X=X, Y=Y,
                                cmap=cmap, clim=clim,
                                ax=ax, **kwargs)
-            ax.set_xlabel('UTMX')
-            if k == 0:
-                ax.set_ylabel('UTMY')
+            if k != 0:
+                ax.set_ylabel('')
         else:
             ax.plot(vals)
             ax.set_xlabel('Location index')

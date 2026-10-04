@@ -216,6 +216,8 @@ def save_prior_model(f_prior_h5, M_new,
     **kwargs : dict
         Additional arguments:
         - showInfo : int, verbosity level (0=silent, >0=verbose)
+        - name, label, unit : str, optional attributes. ``name`` is used in titles;
+          ``label`` (default ``name``) and ``unit`` give axis labels 'LABEL (UNIT)'.
 
     Returns
     -------
@@ -340,6 +342,10 @@ def save_prior_model(f_prior_h5, M_new,
              f_prior[key].attrs['x'] = kwargs['x']
         if 'name' in kwargs:
              f_prior[key].attrs['name'] = kwargs['name']
+        if 'label' in kwargs:
+             f_prior[key].attrs['label'] = kwargs['label']
+        if 'unit' in kwargs:
+             f_prior[key].attrs['unit'] = kwargs['unit']
         if 'method' in kwargs:
              f_prior[key].attrs['method'] = kwargs['method']
         if 'is_discrete' in kwargs:
@@ -488,6 +494,8 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
     **kwargs : dict
         Additional arguments:
         - showInfo : int, verbosity level (0=silent, >0=verbose)
+        - name, label, unit : str, optional attributes. ``name`` is used in titles;
+          ``label`` (default ``name``) and ``unit`` give axis labels 'LABEL (UNIT)'.
 
     Returns
     -------
@@ -565,6 +573,9 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
         if showInfo>1:
             print("New prior data '%s' saved to file: %s " % (key,f_prior_h5))
         # if kwarg has keyy 'method' then write it to the file as att
+        for _k in ('name', 'label', 'unit'):
+            if _k in kwargs:
+                f_prior[key].attrs[_k] = kwargs[_k]
         if 'method' in kwargs:
              f_prior[key].attrs['method'] = kwargs['method']
         if 'type' in kwargs:
@@ -3081,7 +3092,7 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
         and used by plotting routines for the data axis (default is None).
     unit : str, optional
         Optional unit of the data (e.g. 'V/Am^4'), stored as the 'unit' attribute.
-        Plots label the axis 'LABEL [UNIT]', or 'LABEL' if no unit is set (default is None).
+        Plots label the axis 'LABEL (UNIT)', or 'LABEL' if no unit is set (default is None).
     compression : str or None, optional
         Compression filter to use. Options: 'gzip', 'lzf', or None.
         If None (default), uses global DEFAULT_COMPRESSION setting.
@@ -3273,7 +3284,7 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     return f_data_h5
 
 
-def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None):
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None):
     """
     Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
 
@@ -3358,6 +3369,12 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     rx_altitude_std : str, float, or None, optional
         Uncertainty for ``rx_altitude``. Same rules as ``altitude_std``.
         Only used if ``rx_altitude`` is given.
+    name : str, optional
+        Name of the dB/dt data in ``/D1`` (used in titles). Default ``'dBdT'``.
+    label : str, optional
+        Axis label of the dB/dt data in ``/D1``. Default ``'dB/dt'``.
+    unit : str, optional
+        Unit of the dB/dt data in ``/D1``. Default ``'V/(Am^4)'``.
 
     Returns
     -------
@@ -3550,6 +3567,9 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         UTMX=UTMX, UTMY=UTMY, LINE=LINE, ELEVATION=ELEVATION,
         delete_if_exist=True,
         f_gex=file_gex,
+        name='dBdT' if name is None else name,
+        label='dB/dt' if label is None else label,
+        unit='V/(Am^4)' if unit is None else unit,
         showInfo=showInfo,
     )
 
@@ -3572,7 +3592,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
             return 0.05 * np.abs(obs)  # default: 5% relative
 
     next_id = 2
-    for col, col_std, name in (
+    for col, col_std, blk_name in (
         (altitude, altitude_std, 'Altitude'),
         (tx_altitude, tx_altitude_std, 'Tx_altitude'),
         (rx_altitude, rx_altitude_std, 'Rx_altitude'),
@@ -3584,7 +3604,8 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
                 obs, D_std=std,
                 f_data_h5=f_data_h5,
                 id=next_id,
-                name=name,
+                name=blk_name,
+                unit='m',
                 delete_if_exist=False,
                 showInfo=showInfo,
             )
@@ -3631,7 +3652,7 @@ def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='d
         attribute on the HDF5 group and used by plotting routines as the data axis label.
     :type label: str, optional
     :param unit: Optional unit of this dataset (e.g. 'V/Am^4'). Stored as the ``unit`` attribute;
-        plots label the axis as 'LABEL [UNIT]' (or 'LABEL' if no unit is set).
+        plots label the axis as 'LABEL (UNIT)' (or 'LABEL' if no unit is set).
     :type unit: str, optional
     :param kwargs: Additional keyword arguments.
     :return: The path to the HDF5 file where the data was written.

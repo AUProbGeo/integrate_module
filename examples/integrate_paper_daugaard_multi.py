@@ -2,7 +2,7 @@
 # %%
 # # Daugaard Case Study with three lithology-resistivity prior models.
 #
-# This notebook contains an example of inverison of the DAUGAARD tTEM data using three different lithology-resistivity prior models
+# This notebook contains an example of inversion of the DAUGAARD tTEM data using three different lithology-resistivity prior models
 
 # %%
 try:
@@ -28,6 +28,8 @@ plt.ion()
 import h5py
 
 from integrate.integrate_io import copy_prior
+os.environ["EM_FORWARD_METHOD"] = "anemone"
+os.environ["EM_FORWARD_METHOD"] = "ga-aem"
 hardcopy=True
 backend = 'jax'
 
@@ -38,12 +40,12 @@ backend = 'jax'
 cmap, clim = ig.get_colormap_and_limits('resistivity')
 useMergedPrior=True
 useGenericPrior=True
-inflateNoise = 2   # 1,2, 4
+inflateNoise = 1   # 1,2, 4
 useLogData = False
 N_use = 1_000_000
 N_use_org= N_use
 #N_use = 100000
-#N_use = 100_000
+#N_use = 10_000
 
 doEffectSize = True
 doTbase = True
@@ -121,6 +123,24 @@ else:
 
 # %%
 
+if inflateNoise != 0:
+    gf=inflateNoise
+    print("="*60)
+    print("Increasing noise level (std) by a factor of %d" % gf)
+    print("="*60)
+    D = ig.load_data(f_data_h5)
+    D_obs = D['d_obs'][0]
+    D_std = D['d_std'][0]*gf
+    f_data_old_h5 = f_data_h5
+    f_data_h5 = 'DAUGAARD_AVG_gf%g.h5' % (gf) 
+    ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
+    ig.save_data_gaussian(D_obs, D_std=D_std, f_data_h5=f_data_h5, file_gex=file_gex,
+                        label='dB/dt', unit='V/(Am^4)', id=1, showInfo=0, is_log=0)
+
+    ig.plot_data(f_data_h5, uselog = 0, hardcopy= hardcopy)
+    plt.show()
+# %%
+useLogData=False
 if useLogData:
     f_data_h5_org = f_data_h5
     f_data_h5 = 'DATA_LOGSPACE.h5'
@@ -133,26 +153,12 @@ if useLogData:
     lD_std_down = np.abs(np.log10(D_obs-D_std)-lD_obs)
     corr_std = 0.02
     lD_std = np.abs((lD_std_up+lD_std_down)/2) + corr_std
-    ig.save_data_gaussian(lD_obs, D_std = lD_std, f_data_h5 = f_data_h5, id=1, showInfo=0, is_log=1)
+    ig.save_data_gaussian(lD_obs, D_std = lD_std, f_data_h5 = f_data_h5, id=1, showInfo=0, is_log=1,
+                        label='dB/dt', unit='log10(V/(Am^4))', file_gex=file_gex)
 
-
-
-# %%
-if inflateNoise != 0:
-    gf=inflateNoise
-    print("="*60)
-    print("Increasing noise level (std) by a factor of %d" % gf)
-    print("="*60)
-    D = ig.load_data(f_data_h5)
-    D_obs = D['d_obs'][0]
-    D_std = D['d_std'][0]*gf
-    f_data_old_h5 = f_data_h5
-    f_data_h5 = 'DAUGAARD_AVG_gf%g.h5' % (gf) 
-    ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
-    ig.save_data_gaussian(D_obs, D_std=D_std, f_data_h5=f_data_h5, file_gex=file_gex)
-
-ig.plot_data(f_data_h5, useLog = 0, hardcopy= hardcopy)
-plt.show()
+    
+    ig.plot_data(f_data_h5, uselog=True, hardcopy= hardcopy)
+    plt.show()
 
 # %%
 X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
@@ -593,10 +599,10 @@ if doPlotAll:
             ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' , fontsize = fontsize)
             ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean)' , fontsize = fontsize)
             plt.show()
-            ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
-            ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
+            ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title='Median' , fontsize = fontsize)
+            ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title='Median' , fontsize = fontsize)
             plt.show()
-            ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title= 'Median (ohm-m)' , fontsize = fontsize)
+            ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='Median', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title='Median' , fontsize = fontsize)
             plt.show()
            
             try:

@@ -265,7 +265,8 @@ def plot_xy(values, X=None, Y=None,
             title=None, colorbar=True, colorbar_label=None,
             colorbar_ticks=None, colorbar_ticklabels=None, colorbar_invert=False,
             ax=None, s=5, hardcopy=False, plotPoints=False, plotPoints_color='0.7', plotPoints_marker='.',
-            plotPoints_size=None, plotPoints_alpha=0.6, fontsize=None, **kwargs):
+            plotPoints_size=None, plotPoints_alpha=0.6, fontsize=None,
+            xlabel='X (m)', ylabel='Y (m)', **kwargs):
     """
     Core 2D scatter map: plot any array of values at survey (X, Y) locations.
 
@@ -344,6 +345,8 @@ def plot_xy(values, X=None, Y=None,
         (default: ``max(0.3, s * 0.4)``).
     plotPoints_alpha : float, optional
         Marker alpha for the background dots when ``plotPoints=True`` (default ``0.6``).
+    xlabel, ylabel : str, optional
+        Axis labels (default 'X (m)' and 'Y (m)').
     **kwargs
         Forwarded to ``ax.scatter()`` for the main (coloured) scatter.
 
@@ -426,9 +429,7 @@ def plot_xy(values, X=None, Y=None,
         if colorbar_label is None and (f_prior_h5 is not None) and (im is not None):
             try:
                 with h5py.File(f_prior_h5, 'r') as f_prior:
-                    prior_name = f_prior['/M%d' % im].attrs.get('name', None)
-                if prior_name is not None and prior_name != '':
-                    colorbar_label = str(prior_name)
+                    colorbar_label = _axis_label(f_prior, 'M%d' % im, 'M%d' % im)
             except Exception:
                 pass
 
@@ -452,14 +453,14 @@ def plot_xy(values, X=None, Y=None,
     # --- Decoration ---
     if fontsize is not None:
         ax.set_title(title, fontsize=fontsize + 2) if title else None
-        ax.set_xlabel('X', fontsize=fontsize)
-        ax.set_ylabel('Y', fontsize=fontsize)
+        ax.set_xlabel(xlabel, fontsize=fontsize)
+        ax.set_ylabel(ylabel, fontsize=fontsize)
         ax.tick_params(labelsize=fontsize - 2)
     else:
         if title:
             ax.set_title(title)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
     ax.set_aspect('equal')
     ax.grid(True, linestyle='--', alpha=0.5)
 
@@ -776,6 +777,7 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
             name = f_prior[dstr].attrs['name']
         else:
             name = dstr
+        cbar_label = _axis_label(f_prior, dstr, dstr.lstrip('/'))
 
         # Check if this is a discrete model parameter
         is_discrete = f_prior[dstr].attrs['is_discrete']
@@ -930,7 +932,7 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         uselog=(bool(uselog) and not is_discrete_stat),
         title=title,
         colorbar=not use_discrete_cbar,
-        colorbar_label=None if use_discrete_cbar else str(name),
+        colorbar_label=None if use_discrete_cbar else cbar_label,
         s=s_val,
         plotPoints=plotPoints,
         plotPoints_color=plotPoints_color,
@@ -1097,8 +1099,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
 
     if (pl=='all') or (pl=='T'):
         f_png = '%s_%d_%d_T.png' % (base, i1, i2) if hardcopy else False
-        plot_xy(np.log10(T[i1:i2]), cmap='jet', clim=list(np.log10(clim)),
-                colorbar_label='log10(T)', title='Temperature',
+        plot_xy(T[i1:i2], cmap='jet', clim=list(clim), uselog=True,
+                colorbar_label='Temperature', title='Temperature',
                 hardcopy=f_png, **shared)
         plt.show()
 
@@ -1149,15 +1151,13 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
                 N_UNIQUE_min = max(np.nanmin(N_UNIQUE[i1:i2]), 1)
             if N_UNIQUE_max is None:
                 N_UNIQUE_max = np.nanmax(N_UNIQUE[i1:i2])
-            N_UNIQUE_log = np.log10(np.maximum(N_UNIQUE, N_UNIQUE_min))
-            N_UNIQUE_min_log = np.log10(N_UNIQUE_min)
-            N_UNIQUE_max_log = np.log10(N_UNIQUE_max)
+            N_UNIQUE_plot = np.maximum(N_UNIQUE, N_UNIQUE_min)
             cmap_n_unique, _ = get_colormap_and_limits(cmap_type='evidence',
-                                                        custom_clim=[N_UNIQUE_min_log, N_UNIQUE_max_log])
+                                                        custom_clim=[N_UNIQUE_min, N_UNIQUE_max])
             f_png = '%s_%d_%d_N_UNIQUE.png' % (base, i1, i2) if hardcopy else False
-            plot_xy(N_UNIQUE_log[i1:i2], cmap=cmap_n_unique,
-                    clim=[N_UNIQUE_min_log, N_UNIQUE_max_log],
-                    colorbar_label='log10(N_UNIQUE)',
+            plot_xy(N_UNIQUE_plot[i1:i2], cmap=cmap_n_unique,
+                    clim=[N_UNIQUE_min, N_UNIQUE_max], uselog=True,
+                    colorbar_label='N_UNIQUE',
                     title='N_UNIQUE (Number of Unique Realizations, log scale)',
                     hardcopy=f_png, **shared)
             plt.show()
@@ -1359,8 +1359,8 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
 
             scatter = ax.scatter(X[ii],Y[ii],c=n_data_per_location[ii],**kwargs)
             ax.grid()
-            ax.set_xlabel('X')
-            ax.set_ylabel('Y')
+            ax.set_xlabel('X (m)')
+            ax.set_ylabel('Y (m)')
             ax.set_title('Number of Data (non-NaN)')
             ax.set_aspect('equal')
         except Exception as e:
@@ -1800,6 +1800,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
                 name = name.decode('utf-8')
         else:
             name = 'M%d' % im
+        cbar_label = _axis_label(f_prior, Mstr.lstrip('/'), name)
         if 'clim' in f_prior[Mstr].attrs.keys():
             clim = f_prior[Mstr].attrs['clim'][:].flatten()
         else:
@@ -2095,7 +2096,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         else:
             ax[0].set_title(real_label)
 
-        cbar1 = fig.colorbar(im1, ax=ax[0], label=name)
+        cbar1 = fig.colorbar(im1, ax=ax[0], label=cbar_label)
         cbar1.set_ticks(class_id)
         cbar1.set_ticklabels(class_name)
         cbar1.ax.invert_yaxis()
@@ -2126,7 +2127,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             ax[0].set_title('Mode')
 
         # Set the ticks at the center of each color band (at class_id values)
-        cbar1 = fig.colorbar(im1, ax=ax[0], label=name)
+        cbar1 = fig.colorbar(im1, ax=ax[0], label=cbar_label)
         cbar1.set_ticks(class_id)
         cbar1.set_ticklabels(class_name)
         cbar1.ax.invert_yaxis()
@@ -2484,6 +2485,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             name = f_prior['/M%d' % im].attrs['name']
         else:
             name='M%d' % im
+        name_label = _axis_label(f_prior, 'M%d' % im, 'M%d' % im)
 
     X, Y, LINE, ELEVATION = get_geometry(f_data_h5)
 
@@ -2809,7 +2811,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             im_r.set_alpha(A[:,ii])
         ax[isp].set_title('%s %s' % (real_label, name))
         ax[isp].set_ylabel('Elevation (m)')
-        fig.colorbar(im_r, ax=ax[isp], label='%s' % name)
+        fig.colorbar(im_r, ax=ax[isp], label=name_label)
 
     if show_value and (nm>1) and (key=='Mean'):
         isp=0
@@ -2829,7 +2831,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             im1.set_alpha(A[:,ii])
         ax[isp].set_title('Mean %s' % name)
         ax[isp].set_ylabel('Elevation (m)')
-        fig.colorbar(im1, ax=ax[isp], label='%s' % name)
+        fig.colorbar(im1, ax=ax[isp], label=name_label)
 
     if show_value and (nm>1) and (key=='Median'):
         isp=0
@@ -2849,7 +2851,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             im2.set_alpha(A[:,ii])
         ax[isp].set_title('Median %s' % name)
         ax[isp].set_ylabel('Elevation (m)')
-        fig.colorbar(im2, ax=ax[isp], label='%s' % name)
+        fig.colorbar(im2, ax=ax[isp], label=name_label)
 
     if show_value and (nm>1) and (key=='HarmonicMean'):
         isp=0
@@ -2868,7 +2870,7 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
                 im_hm.set_alpha(A[:,ii])
             ax[isp].set_title('HarmonicMean %s' % name)
             ax[isp].set_ylabel('Elevation (m)')
-            fig.colorbar(im_hm, ax=ax[isp], label='%s' % name)
+            fig.colorbar(im_hm, ax=ax[isp], label=name_label)
 
     # BOREHOLE overlay on the value/realization panel, colored by a discrete prior model
     if BHOLES is not None and (show_value or show_realization) and nm>1:
@@ -3033,29 +3035,34 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
 
     return
 
-def _data_axis_label(f_data, Dkey, default):
-    """Axis label for a data group from its optional 'label' and 'unit' attributes.
+def _axis_label(f_h5, key, default):
+    """Axis/colorbar label for a dataset or group from its optional attributes.
 
-    Returns 'LABEL [UNIT]', or 'LABEL' if no unit is set. If no label is set,
-    returns ``default`` (with ' [UNIT]' appended if a unit is set). Matplotlib
-    mathtext ($...$) may be used in label and unit; in the unit, '^4' / '^{-2}'
-    is converted to a superscript automatically.
+    ``key`` is e.g. 'D1' or 'M1' in an open HDF5 file. Returns 'LABEL (UNIT)', or
+    'LABEL' if no unit is set. If no 'label' is set, 'name' is used instead; if
+    neither is set, ``default`` is used (with ' (UNIT)' appended if a unit is set).
+    Matplotlib mathtext ($...$) may be used in label and unit; in the unit, '^4' /
+    '^{-2}' is converted to a superscript automatically.
     """
-    def _attr(key):
-        val = f_data['/%s' % Dkey].attrs.get(key, None)
+    attrs = f_h5['/' + key.lstrip('/')].attrs
+
+    def _attr(k):
+        val = attrs.get(k, None)
         if isinstance(val, bytes):
             val = val.decode('utf-8')
         val = None if val is None else str(val).strip()
         return val or None
 
-    label = _attr('label')
+    base = _attr('label') or _attr('name') or default
     unit = _attr('unit')
     if unit is not None and '$' not in unit:
         # 'V/Am^4' or 'Am^{-2}' -> mathtext superscripts ('V/Am$^{4}$')
         unit = re.sub(r'\^(\{[^}]*\}|[+-]?\d+)',
                       lambda m: '$^{%s}$' % m.group(1).strip('{}'), unit)
-    base = label if label is not None else default
-    return '%s [%s]' % (base, unit) if unit is not None else base
+    return '%s (%s)' % (base, unit) if unit is not None else base
+
+
+_data_axis_label = _axis_label
 
 
 def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=False, clim=[], **kwargs):
@@ -3124,6 +3131,7 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
         
         # Get name attribute if it exists
         name_attr = f[Dkey].attrs.get('name', None)
+        cbar_label = _axis_label(f, Dkey, '%s_%s' % (Dkey, data_key[2:])) if data_key in ('d_obs', 'd_std') else data_key
     
     # Handle data dimensions
     if data.ndim == 1:
@@ -3161,13 +3169,11 @@ def plot_data_xy(f_data_h5, Dkey='D1', data_key='d_obs', data_channel=0, uselog=
         plot_data, X=X/1000, Y=Y/1000,
         cmap=kwargs['cmap'], clim=clim_kw,
         uselog=uselog, title=title,
-        colorbar=True, colorbar_label=data_key,
-        ax=ax, s=kwargs['s'],
+        colorbar=True, colorbar_label=cbar_label,
+        ax=ax, s=kwargs['s'], xlabel='X (km)', ylabel='Y (km)',
         hardcopy=f"{os.path.splitext(f_data_h5)[0]}_{Dkey}_{data_key}_ch{data_channel}.png"
                  if kwargs['hardcopy'] else False,
     )
-    ax.set_xlabel('X (km)')
-    ax.set_ylabel('Y (km)')
 
     return fig
 
@@ -3311,8 +3317,8 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
 
             # Get name attribute if it exists
             name_attr = f_data['/%s' % Dkey].attrs.get('name', None)
-            lab_obs = _data_axis_label(f_data, Dkey, 'd_obs')
-            lab_std = _data_axis_label(f_data, Dkey, 'd_std')
+            lab_obs = _data_axis_label(f_data, Dkey, '%s_obs' % Dkey)
+            lab_std = _data_axis_label(f_data, Dkey, '%s_std' % Dkey)
 
             # Force plot type for discrete/multinomial data
             cur_plType = plType
@@ -3532,7 +3538,7 @@ def plot_data_prior(f_prior_data_h5,
         name_attr = f_data[dh5_str_name].attrs.get('name', None) if dh5_str_name in f_data else None
         if isinstance(name_attr, bytes):
             name_attr = name_attr.decode('utf-8')
-        data_label = _data_axis_label(f_data, dh5_str_name, 'Data value') if dh5_str_name in f_data else 'Data value'
+        data_label = _data_axis_label(f_data, dh5_str_name, '%s_obs' % dh5_str_name) if dh5_str_name in f_data else '%s_obs' % dh5_str_name
 
         # Load prior data
         if do_prior:
@@ -3754,7 +3760,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                 print("plot_data_prior_post: Using data set %s" % Dkey)
 
         noise_model = f_data['/%s' % Dkey].attrs['noise_model']
-        data_label = _data_axis_label(f_data, Dkey, 'Data value')
+        data_label = _data_axis_label(f_data, Dkey, '%s_obs' % Dkey)
         if noise_model == 'gaussian':
             noise_model = 'Gaussian'
             d_obs = f_data['/%s' % Dkey]['d_obs'][:]
@@ -3806,7 +3812,7 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                         ax.plot(d_obs[i_plot,:]+2*d_std[i_plot,:],'-',linewidth=1, label='d_obs', color=cols[2])
                     except:
                         pass
-                    plt.ylabel('log10(%s)' % data_label, **fs_kw)
+                    plt.ylabel(data_label, **fs_kw)
                 else:
                     ax.semilogy(d_prior.T,'-',linewidth=.2, label='d_prior', color=cols[0])
 
@@ -3861,9 +3867,9 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                         if len(CHI2.shape) == 2:
                             CHI2_total = np.nansum(CHI2[i_plot, :])
                             n_types = np.sum(~np.isnan(CHI2[i_plot, :]))
-                            ax.text(0.1, 0.3, f'CHI2 = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes, **fs_kw)
+                            ax.text(0.1, 0.3, f'χ² = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes, **fs_kw)
                         else:
-                            ax.text(0.1, 0.3, f'CHI2 = {CHI2[i_plot]:.2f}', transform=ax.transAxes, **fs_kw)
+                            ax.text(0.1, 0.3, f'χ² = {CHI2[i_plot]:.2f}', transform=ax.transAxes, **fs_kw)
                 except:
                     pass
                 if 'title' in kwargs:
@@ -4140,6 +4146,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
             #print(name)
         else:
             name = Mkey
+        label = _axis_label(f_prior, Mkey, name)
 
 
         f_prior['/%s'%Mkey].attrs.keys()
@@ -4247,20 +4254,20 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                     m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
                     m1 = ax_left.hist([], 101)
-                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ax_left.set_xlabel('log10(%s)' % label, **fs_kw)
                 ticks = ax_left.get_xticks()
                 ax_left.set_xticks(ticks)
                 ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
             else:
                 M_hist = M.flatten()
                 m1 = ax_left.hist(M_hist, 101)
-                ax_left.set_xlabel(name, **fs_kw)
+                ax_left.set_xlabel(label, **fs_kw)
             ax_left.set_ylabel('Counts', **fs_kw)
         elif ax_left is not None:
             # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M.flatten()
             m1 = ax_left.hist(M_hist, 101)
-            ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_xlabel(label, **fs_kw)
             ax_left.set_ylabel('Counts', **fs_kw)
 
         if ax_left is not None:
@@ -4283,13 +4290,13 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
                 ax_middle.set_xscale('log')
-                ax_middle.set_xlabel(name, **fs_kw)
+                ax_middle.set_xlabel(label, **fs_kw)
             else:
                 ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
                 ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
-                ax_middle.set_xlabel(name, **fs_kw)
+                ax_middle.set_xlabel(label, **fs_kw)
 
             if clim is not None and len(clim) == 2:
                 ax_middle.set_xlim(clim[0], clim[1])
@@ -4315,7 +4322,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                                     cmap=cmap,
                                     shading='auto')
                 m2.set_clim(clim[0],clim[1])
-                cbar_label = '%s: %s' % (Mkey[1::], name)
+                cbar_label = '%s: %s' % (Mkey[1::], label)
                 cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
                 if fontsize is not None:
                     cbar.set_label(cbar_label, **fs_kw)
@@ -4325,7 +4332,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                 ax_right.set_xlim(1,nr)
 
             ax_right.set_xlabel('Realization #', **fs_kw)
-            ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+            ax_right.set_ylabel('Depth (m)' if Nm > 1 else label, **fs_kw)
             if fontsize is not None:
                 ax_right.tick_params(labelsize=fontsize)
 
@@ -4354,7 +4361,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
 
         if ax_left is not None:
             m1 = ax_left.hist(M.flatten(), bins=np.arange(0.5, n_class+1.5, 1), orientation='horizontal')
-            ax_left.set_ylabel(name, **fs_kw)
+            ax_left.set_ylabel(label, **fs_kw)
             ax_left.set_xlabel('Counts', **fs_kw)
             ax_left.set_yticks(np.arange(n_class)+1)
             ax_left.set_yticklabels(class_name)
@@ -4418,12 +4425,12 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                                 cmap=cmap,
                                 shading='auto')
                 m2.set_clim(clim[0]-.5,clim[1]+.5)
-                cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],name))
+                cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' %(Mkey[1::],label))
                 cbar1.set_ticks(np.arange(n_class)+1)
                 cbar1.set_ticklabels(class_name)
                 cbar1.ax.invert_yaxis()
                 if fontsize is not None:
-                    cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
+                    cbar1.set_label('%s : %s' % (Mkey[1::], label), **fs_kw)
                     cbar1.ax.tick_params(labelsize=fontsize)
             else:
                 m2 = ax_right.plot(np.arange(1,nr+1), M[0:nr,:].flatten(), '.', markersize=4)
@@ -4435,7 +4442,7 @@ def plot_prior_stats(f_prior_h5, Mkey=[], nr=100, use_log=None, showInfo=0, im=N
                 ax_right.yaxis.set_label_position('right')
 
             ax_right.set_xlabel('Realization #', **fs_kw)
-            ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+            ax_right.set_ylabel('Depth (m)' if Nm > 1 else label, **fs_kw)
             if fontsize is not None:
                 ax_right.tick_params(labelsize=fontsize)
 
@@ -4614,6 +4621,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             name = '%s' % (f_prior['/%s' % Mkey].attrs['name'][:])
         else:
             name = Mkey
+        label = _axis_label(f_prior, Mkey, name)
 
         # Get depth/coordinate vector
         if 'x' in f_prior['/%s' % Mkey].attrs.keys():
@@ -4712,7 +4720,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                     m1 = ax_left.hist(np.log10(M_hist), 101)
                 else:
                     m1 = ax_left.hist([], 101)
-                ax_left.set_xlabel('log10(%s)' % name, **fs_kw)
+                ax_left.set_xlabel('log10(%s)' % label, **fs_kw)
                 ticks = ax_left.get_xticks()
                 ax_left.set_xticks(ticks)
                 ax_left.set_xticklabels(['$10^{%3.1f}$' % i for i in ticks])
@@ -4727,7 +4735,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             else:
                 M_hist = M_all.flatten()
                 m1 = ax_left.hist(M_hist, 101)
-                ax_left.set_xlabel(name, **fs_kw)
+                ax_left.set_xlabel(label, **fs_kw)
                 if stat_mean is not None:
                     ax_left.axvline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
                 if stat_median is not None:
@@ -4739,7 +4747,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             # Scalar: vertical histogram (parameter on x-axis, Counts on y-axis), always linear
             M_hist = M_all.flatten()
             m1 = ax_left.hist(M_hist, 101)
-            ax_left.set_xlabel(name, **fs_kw)
+            ax_left.set_xlabel(label, **fs_kw)
             ax_left.set_ylabel('Counts', **fs_kw)
             if stat_mean is not None:
                 ax_left.axvline(np.mean(stat_mean), color='red', linestyle='--', linewidth=2, label='Mean')
@@ -4773,13 +4781,13 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
                 ax_middle.set_xscale('log')
-                ax_middle.set_xlabel(name, **fs_kw)
+                ax_middle.set_xlabel(label, **fs_kw)
             else:
                 ax_middle.plot(M_mean, z, 'r-', linewidth=2, label='Mean')
                 ax_middle.plot(M_median, z, 'b-', linewidth=2, label='Median')
                 ax_middle.fill_betweenx(z, M_p2_5, M_p97_5,
                                        alpha=0.3, color='gray', label='95% CI')
-                ax_middle.set_xlabel(name, **fs_kw)
+                ax_middle.set_xlabel(label, **fs_kw)
 
             if clim is not None and len(clim) == 2:
                 ax_middle.set_xlim(clim[0], clim[1])
@@ -4806,7 +4814,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                                      cmap=cmap,
                                      shading='auto')
             m2.set_clim(clim[0], clim[1])
-            cbar_label = '%s: %s' % (Mkey[1::], name)
+            cbar_label = '%s: %s' % (Mkey[1::], label)
             cbar = fig.colorbar(m2, ax=ax_right, label=cbar_label)
             if fontsize is not None:
                 cbar.set_label(cbar_label, **fs_kw)
@@ -4816,7 +4824,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             ax_right.set_xlim(1, nr_actual)
 
         ax_right.set_xlabel('Realization #', **fs_kw)
-        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+        ax_right.set_ylabel('Depth (m)' if Nm > 1 else label, **fs_kw)
         if fontsize is not None:
             ax_right.tick_params(labelsize=fontsize)
 
@@ -4851,7 +4859,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
 
         if show_histogram:
             m1 = ax_left.hist(M_all.flatten(), bins=np.arange(0.5, n_class + 1.5, 1), orientation='horizontal')
-            ax_left.set_ylabel(name, **fs_kw)
+            ax_left.set_ylabel(label, **fs_kw)
             ax_left.set_xlabel('Counts', **fs_kw)
             ax_left.set_yticks(np.arange(n_class) + 1)
             ax_left.set_yticklabels(class_name)
@@ -4919,12 +4927,12 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
                                  cmap=cmap,
                                  shading='auto')
             m2.set_clim(clim[0] - .5, clim[1] + .5)
-            cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' % (Mkey[1::], name))
+            cbar1 = fig.colorbar(m2, ax=ax_right, label='%s : %s' % (Mkey[1::], label))
             cbar1.set_ticks(np.arange(n_class) + 1)
             cbar1.set_ticklabels(class_name)
             cbar1.ax.invert_yaxis()
             if fontsize is not None:
-                cbar1.set_label('%s : %s' % (Mkey[1::], name), **fs_kw)
+                cbar1.set_label('%s : %s' % (Mkey[1::], label), **fs_kw)
                 cbar1.ax.tick_params(labelsize=fontsize)
         else:
             m2 = ax_right.plot(np.arange(1, nr_actual + 1), M_display[:, :].flatten(), '.', markersize=4)
@@ -4936,7 +4944,7 @@ def plot_post_stats(f_post_h5, i_plot=0, Mkey=[], nr=100, use_log=None, showInfo
             ax_right.yaxis.set_label_position('right')
 
         ax_right.set_xlabel('Realization #', **fs_kw)
-        ax_right.set_ylabel('Depth (m)' if Nm > 1 else name, **fs_kw)
+        ax_right.set_ylabel('Depth (m)' if Nm > 1 else label, **fs_kw)
         if fontsize is not None:
             ax_right.tick_params(labelsize=fontsize)
 
