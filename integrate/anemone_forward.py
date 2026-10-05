@@ -106,8 +106,173 @@ def _remake_loop(loop, tx_z, torch):
 
 
 def _filter_sig(fc):
-    """Return signature (fcut, order) tuples for a FilterChain."""
+    """Return signature (fcut, order) tuples for a FilterChain (None -> [])."""
+    if fc is None:
+        return []
     return [(round(float(f.fcut), 3), int(f.order)) for f in fc]
+
+
+# ---------------------------------------------------------------------------
+# System response (.sr2) support
+# ---------------------------------------------------------------------------
+
+def read_sr2(file_sr2):
+    """Read a Workbench/AarhusInv ``.sr2`` system-response file.
+
+    Format: ``//`` comment lines, then one or more blocks of a header line
+    ``channel# #repetitions #npts t_begin(yyyy mm dd hh nn ss zzz) t_end(...)``
+    followed by ``npts`` rows ``time [s]  dSR/dt``.  The samples are the
+    second time-derivative of the (unit-current) transmitter waveform with the
+    system's own filtering folded in, i.e. they take the place of anemone's
+    ``Waveform.d2wdt2`` (after multiplying by the sample spacing).
+
+    Returns
+    -------
+    dict
+        ``{channel: {"time", "dsrdt", "n_rep", "header"}}`` with numpy arrays.
+    """
+    with open(file_sr2, "r") as f:
+        lines = [ln.split("//")[0].strip() for ln in f]
+    lines = [ln for ln in lines if ln]
+    out = {}
+    i = 0
+    while i < len(lines):
+        head = lines[i].split()
+        if len(head) < 3:
+            raise ValueError(f"read_sr2: bad block header in {file_sr2}: "
+                             f"'{lines[i]}'")
+        ch, n_rep, npts = int(head[0]), int(head[1]), int(head[2])
+        rows = np.array([lines[j].split()[:2]
+                         for j in range(i + 1, i + 1 + npts)], dtype=float)
+        if rows.shape[0] != npts:
+            raise ValueError(f"read_sr2: channel {ch} expects {npts} rows, "
+                             f"found {rows.shape[0]} in {file_sr2}")
+        out[ch] = {"time": rows[:, 0], "dsrdt": rows[:, 1], "n_rep": n_rep,
+                   "header": lines[i]}
+        i += 1 + npts
+    if not out:
+        raise ValueError(f"read_sr2: no data blocks in {file_sr2}")
+    return out
+
+
+def _make_waveform(time, weights, amplitude, torch):
+    """anemone ``Waveform``-compatible object with explicit convolution weights.
+
+    anemone only uses ``.time``, ``.amplitude`` and ``.d2wdt2`` (the impulse
+    weights convolved with the B step response), so the weights are set
+    directly instead of being derived from a piecewise-linear current.
+    """
+    from anemone.system import Waveform
+    wf = Waveform.__new__(Waveform)
+    wf.time = torch.as_tensor(np.asarray(time, dtype=float), dtype=torch.float64)
+    wf.amplitude = torch.as_tensor(np.asarray(amplitude, dtype=float),
+                                   dtype=torch.float64)
+    wf.d2wdt2 = torch.as_tensor(np.asarray(weights, dtype=float),
+                                dtype=torch.float64)
+    return wf
+
+
+def _sr2_to_waveform(t, dsrdt, torch):
+    """Convert sampled dSR/dt to an anemone waveform with trapezoid weights.
+
+    ``anemone.system.SystemResponse`` uses backward-difference weights
+    ``dSR/dt[j] * (t[j]-t[j-1])``, which shifts each sample half a step late;
+    trapezoid weights ``dSR/dt[j] * (t[j+1]-t[j-1])/2`` are centred.
+    """
+    t = np.asarray(t, dtype=float)
+    dsrdt = np.asarray(dsrdt, dtype=float)
+    dt = np.diff(t)
+    w = np.zeros_like(t)
+    w[:-1] += 0.5 * dt
+    w[1:] += 0.5 * dt
+    weights = dsrdt * w
+    # Recovered unit-normalised current (diagnostics only).
+    didt = np.cumsum(weights)
+    current = np.concatenate([[0.0], np.cumsum(0.5 * (didt[1:] + didt[:-1]) * dt)])
+    return _make_waveform(t, weights, current, torch)
+
+
+def _waveform_arrays(wf):
+    return (wf.time.detach().cpu().numpy().astype(float),
+            wf.d2wdt2.detach().cpu().numpy().astype(float),
+            wf.amplitude.detach().cpu().numpy().astype(float))
+
+
+def _add_previous_pulses(wf, rep_freq, sign_pattern, n, torch):
+    """Prepend ``n`` earlier pulses (period ``1/(2 rep_freq)``) to ``wf``.
+
+    Pulse ``k`` back in time is shifted by ``-k/(2 rep_freq)`` and carries the
+    relative polarity from ``sign_pattern`` (``[1, -1]`` -> alternating), as for
+    a bipolar SkyTEM/tTEM transmitter.  The returned waveform's convolution
+    weights are the superposition of all pulses.
+    """
+    if not n or n <= 0:
+        return wf
+    if not rep_freq or rep_freq <= 0:
+        raise ValueError("n_previous_pulses needs a positive RepFreq in the GEX")
+    pat = np.atleast_1d(np.asarray(sign_pattern if sign_pattern is not None
+                                   else [1.0, -1.0], dtype=float))
+    t, w, a = _waveform_arrays(wf)
+    t_half = 0.5 / float(rep_freq)
+    ts, ws = [t], [w]
+    for k in range(1, int(n) + 1):
+        sign = pat[(-k) % len(pat)] * pat[0]
+        ts.insert(0, t - k * t_half)
+        ws.insert(0, sign * w)
+    t_all = np.concatenate(ts)
+    w_all = np.concatenate(ws)
+    order = np.argsort(t_all, kind="stable")
+    # amplitude is diagnostic only; keep the current pulse's, zero elsewhere
+    a_all = np.concatenate([np.zeros(t.size * int(n)), a])[order]
+    return _make_waveform(t_all[order], w_all[order], a_all, torch)
+
+
+def _resolve_sr2(gex, g, file_sr2):
+    """Return the SR2 path to use (or None).
+
+    Explicit ``file_sr2`` wins.  Otherwise, if any channel of the GEX sets
+    ``SystemResponseConvolution=1`` and the GEX was given as a path, look for
+    ``<gex stem>.sr2`` next to it; a missing file is an error since the GEX
+    waveform is then usually a placeholder.
+    """
+    if file_sr2:
+        if not os.path.isfile(file_sr2):
+            raise FileNotFoundError(f"file_sr2={file_sr2} does not exist")
+        return file_sr2
+    wants_sr = any(
+        float(np.atleast_1d(v.get("SystemResponseConvolution", 0))[0]) == 1
+        for k, v in g.gex_dict.items()
+        if k.startswith("Channel") and isinstance(v, dict))
+    if not wants_sr:
+        return None
+    if isinstance(gex, str):
+        cand = os.path.splitext(gex)[0] + ".sr2"
+        if os.path.isfile(cand):
+            return cand
+    raise FileNotFoundError(
+        "GEX sets SystemResponseConvolution=1 but no system-response file was "
+        "found; pass file_sr2=... (looked for '<gex stem>.sr2' next to the GEX)")
+
+
+def _file_md5(path):
+    import hashlib
+    with open(path, "rb") as f:
+        return hashlib.md5(f.read()).hexdigest()
+
+
+# Floor for the transform time grid (s); see _build_forward.
+_TMIN_FLOOR = 1e-8
+
+
+def _grid_tmin(times, wf):
+    """Smallest positive gate-minus-waveform delay, floored at _TMIN_FLOOR."""
+    d = (np.asarray(times, dtype=float)[:, None]
+         - wf.time.detach().cpu().numpy()[None, :])
+    w = wf.d2wdt2.detach().cpu().numpy()
+    d = d[(d > 0) & (w[None, :] != 0)]
+    if d.size == 0:
+        return None
+    return max(float(d.min()), _TMIN_FLOOR)
 
 
 def _build_forward(system, tx_z, device):
@@ -130,14 +295,15 @@ def _build_forward(system, tx_z, device):
     # Hoist and build shared source, receiver, filterfunc from first moment
     m0 = system["moments"][0]
     shared_src = _remake_loop(m0["source"], tx_z, torch)
-    # The Rx coil position in the GEX is an OFFSET from the Tx frame, so the
-    # receiver height tracks the loop height: receiver_z = loop_z + dz.
-    # anemone uses sfield_dz = |srcz| + |rz| and pfield_dz = |srcz - rz|, so
-    # both must be positive heights above ground (parity with GA-AEM's
-    # tx_height / txrx_dz).
+    # The Rx coil position in the GEX is an OFFSET from the Tx frame in the
+    # GEX frame, where z is positive DOWN (SkyTEM RxCoilPosition z=-2: Rx 2 m
+    # above the frame).  anemone's z is height above ground (positive up), so
+    # receiver_z = loop_z - dz.  anemone uses sfield_dz = |srcz| + |rz| and
+    # pfield_dz = |srcz - rz|, so both must be positive heights above ground.
+    # Validated against AarhusInv on SkyTEM (see ISSUE_rx_z_sign.md).
     loop_z = float(shared_src.z[0])
     dx, dy, _dz = system.get("rx_offset", (0.0, 0.0, 0.0))
-    receiver_z = loop_z + float(system.get("rx_offset_z_rel_tx", 0.0))
+    receiver_z = loop_z - float(system.get("rx_offset_z_rel_tx", 0.0))
     shared_rcv = Receiver(x=float(dx), y=float(dy), z=float(receiver_z))
     shared_filt = m0["filterfunc"]
     shared_filt_sig = _filter_sig(shared_filt)
@@ -159,7 +325,19 @@ def _build_forward(system, tx_z, device):
         # Each moment uses its own waveform (LM vs HM transmitter waveforms differ)
         wf = m["waveform"]
         times = torch.as_tensor(m["gate_times"], dtype=torch.float64).to(dev)
-        part = Forward(src, rcv, times, wf, filt, tolerance=1e-6)
+        # anemone puts the floor of its transform time grid at min(gate)/2 and
+        # only lowers it when the whole waveform precedes the first gate.  The
+        # convolution sum_j w_j Bstep(t - t_j) silently drops any term whose
+        # delay t - t_j falls below that floor (waveform/SR samples just before
+        # an early gate, e.g. a turn-off tail past t=0).  Lower the floor to
+        # cover the smallest delay before building the transform.
+        dmin = _grid_tmin(m["gate_times"], wf)
+        part = Forward(src, rcv, times, wf, filt, tolerance=1e-6,
+                       do_setup=False)
+        if dmin is not None and dmin / 2. < float(part.tmin):
+            part.tmin = torch.as_tensor(dmin / 2., dtype=torch.float64).to(dev)
+        part.setup()
+        part.device = dev
         parts.append(part)
         fwr = part if fwr is None else (fwr + part)
 
@@ -176,7 +354,23 @@ def _build_forward(system, tx_z, device):
     return _FORWARD_CACHE[key]
 
 
-def gex_to_anemone_system(gex, showInfo=0):
+def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
+                          n_previous_pulses=0):
+    """Build the anemone system description from a GEX (+ optional SR2).
+
+    file_sr2 : str, optional
+        Workbench ``.sr2`` system-response file.  If omitted and the GEX sets
+        ``SystemResponseConvolution=1``, ``<gex stem>.sr2`` next to the GEX is
+        used (error if missing).  Channels with an SR block use it instead of
+        the GEX waveform.
+    sr_filters : bool
+        Also apply the GEX Butterworth low-pass filters to SR channels.  Off by
+        default: the measured system response already contains the system's
+        filtering.
+    n_previous_pulses : int
+        Number of earlier bipolar pulses (``RepFreq``/``SignPattern`` from the
+        GEX channel) superposed on the waveform (default 0 = single pulse).
+    """
     anemone, torch = _require_anemone()
     from anemone.system import (Loop, Receiver, Waveform, FilterChain,
                                 ButterworthFilter)
@@ -196,7 +390,8 @@ def gex_to_anemone_system(gex, showInfo=0):
 
     rxkey = "RxCoilPosition1" if "RxCoilPosition1" in G else "RxCoilPosition"
     # Signed Rx coil position; it is an OFFSET from the transmitter frame, not
-    # an absolute height (parity with forward_gaaem's txrx_dx/dy/dz).
+    # an absolute height.  Kept in the GEX frame (z positive down);
+    # rx_offset_z_rel_tx > 0 means the receiver is BELOW the transmitter.
     rx_offset = np.atleast_1d(np.asarray(G[rxkey], dtype=float))
     if has_txpos:  # ground system (tTEM): offset relative to the Tx coil
         rx_offset_z_rel_tx = float(rx_offset[2]) - tx_pos_z
@@ -219,6 +414,12 @@ def gex_to_anemone_system(gex, showInfo=0):
 
     rx_rows = _butter_rows(G["RxCoilLPFilter"]) if "RxCoilLPFilter" in G else []
 
+    sr2_path = _resolve_sr2(gex, g, file_sr2)
+    sr = read_sr2(sr2_path) if sr2_path else {}
+    if sr2_path and showInfo > 0:
+        print(f"gex_to_anemone_system: system response from {sr2_path} "
+              f"(channels {sorted(sr)})")
+
     moments = []
     for ch in range(1, n_moments + 1):
         chan = g.gex_dict.get(f"Channel{ch}", {})
@@ -228,9 +429,9 @@ def gex_to_anemone_system(gex, showInfo=0):
         zs = np.full_like(xs, tx_z)
         source = Loop(torch.tensor(xs), torch.tensor(ys), torch.tensor(zs))
         # Placeholder receiver; the real one is rebuilt per tx_z in
-        # _build_forward() at loop_z + rx_offset_z_rel_tx.
+        # _build_forward() at loop_z - rx_offset_z_rel_tx.
         receiver = Receiver(x=float(rx_offset[0]), y=float(rx_offset[1]),
-                            z=float(tx_z + rx_offset_z_rel_tx))
+                            z=float(tx_z - rx_offset_z_rel_tx))
 
         # Waveform/turns are keyed off the CHANNEL INDEX, never the free-text
         # TransmitterMoment label (which is only used as the moment's name).
@@ -243,8 +444,18 @@ def gex_to_anemone_system(gex, showInfo=0):
             keys = sorted((k for k in G if k.startswith(f"{wf_key}Point")),
                           key=lambda k: int(k.replace(f"{wf_key}Point", "") or "0"))
             wf = np.array([np.atleast_1d(G[k])[:2] for k in keys], dtype=float)
-        wf = np.asarray(wf, dtype=float)
-        waveform = Waveform(torch.tensor(wf[:, 0]), torch.tensor(wf[:, 1]))
+        use_sr = ch in sr and (
+            bool(file_sr2) or float(np.atleast_1d(
+                chan.get("SystemResponseConvolution", 0))[0]) == 1)
+        if use_sr:
+            waveform = _sr2_to_waveform(sr[ch]["time"], sr[ch]["dsrdt"], torch)
+        else:
+            wf = np.asarray(wf, dtype=float)
+            waveform = Waveform(torch.tensor(wf[:, 0]), torch.tensor(wf[:, 1]))
+        if n_previous_pulses:
+            waveform = _add_previous_pulses(
+                waveform, float(np.atleast_1d(chan.get("RepFreq", 0))[0]),
+                chan.get("SignPattern"), n_previous_pulses, torch)
 
         filt = []
         tib = chan.get("TiBLowPassFilter")
@@ -253,7 +464,9 @@ def gex_to_anemone_system(gex, showInfo=0):
             filt.append(ButterworthFilter(float(tib[1]), int(round(tib[0]))))
         for order, fcut in rx_rows:
             filt.append(ButterworthFilter(float(fcut), int(round(order))))
-        filterfunc = FilterChain(filt)
+        filterfunc = FilterChain(filt) if filt else None
+        if use_sr and not sr_filters:
+            filterfunc = None
 
         i0 = int(g.remove_initial_gates(ch))
         i1 = int(g.no_gates(ch))
@@ -273,7 +486,14 @@ def gex_to_anemone_system(gex, showInfo=0):
             "tx_area": tx_area_poly,
             "front_gate_delay": float(np.atleast_1d(
                 G.get("FrontGateDelay", 0.0))[0]),
+            "system_response": bool(use_sr),
         })
+
+    signature = _gex_signature(g)
+    if sr2_path or sr_filters or n_previous_pulses:
+        signature = "%s|sr=%s|srf=%d|npp=%d" % (
+            signature, _file_md5(sr2_path) if sr2_path else "",
+            int(bool(sr_filters)), int(n_previous_pulses or 0))
 
     return {
         "n_moments": n_moments,
@@ -282,8 +502,9 @@ def gex_to_anemone_system(gex, showInfo=0):
                       float(rx_offset[2])),
         "rx_offset_z_rel_tx": float(rx_offset_z_rel_tx),
         "moments": moments,
-        "gex_signature": _gex_signature(g),
+        "gex_signature": signature,
         "gex": g,
+        "sr2_path": sr2_path,
     }
 
 
@@ -472,12 +693,17 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     calibration_reference=None, calibration_factor=None,
                     calibration_tol=0.05, doCompress=True, showtime=False,
                     showInfo=0, progress_callback=None, batch_size=1000,
+                    file_sr2=None, sr_filters=False, n_previous_pulses=0,
                     **kwargs):
     """Forward TDEM data for one or more resistivity models with anemone.
 
     batch_size : int, optional
         Number of soundings sent through anemone per call (default 1000).
         Bounds peak (GPU) memory; ``0``/``None`` forwards everything at once.
+    file_sr2, sr_filters, n_previous_pulses
+        System-response / pulse options, see :func:`gex_to_anemone_system`.
+        A GEX with ``SystemResponseConvolution=1`` picks up ``<gex stem>.sr2``
+        automatically.
     """
     anemone, torch = _require_anemone()
     import time
@@ -494,7 +720,11 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
             "(nl=%d)" % (thickness.shape[0], nl))
 
     system = gex_to_anemone_system(GEX if GEX is not None else file_gex,
-                                   showInfo=showInfo)
+                                   showInfo=showInfo, file_sr2=file_sr2,
+                                   sr_filters=sr_filters,
+                                   n_previous_pulses=n_previous_pulses)
+
+    forward_anemone.last_sr2 = system.get("sr2_path")
 
     tx_height = np.asarray(tx_height, dtype=float).ravel()
     if tx_height.size > 1 and tx_height.size != nd:
@@ -571,6 +801,7 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
 
 
 forward_anemone.last_calibration = {"mode": None, "k": {}, "residual": {}}
+forward_anemone.last_sr2 = None
 
 
 def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
@@ -621,7 +852,8 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        calibration="auto", calibration_reference=None,
                        calibration_factor=None, calibration_tol=0.05,
                        doCompress=True, force_replace=False, f_prior_data_h5="",
-                       batch_size=1000, randomize=True, **kwargs):
+                       batch_size=1000, randomize=True, file_sr2=None,
+                       sr_filters=False, n_previous_pulses=0, **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
     Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
@@ -684,7 +916,9 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                         calibration_factor=calibration_factor,
                         calibration_tol=calibration_tol, doCompress=doCompress,
                         batch_size=batch_size,
-                        progress_callback=progress_callback, showInfo=showInfo)
+                        progress_callback=progress_callback, showInfo=showInfo,
+                        file_sr2=file_sr2, sr_filters=sr_filters,
+                        n_previous_pulses=n_previous_pulses)
     if showInfo > -1:
         dt = time.time() - t1
         n_sound = M.shape[0]
@@ -717,6 +951,11 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
         a["batch_size"] = int(batch_size or 0)
         a["calibration"] = str(cal.get("mode") or "gex")
         a["anemone_version"] = str(getattr(anemone, "__version__", "unknown"))
+        sr2_used = getattr(forward_anemone, "last_sr2", None)
+        if sr2_used:
+            a["sr2"] = str(sr2_used)
+            a["sr_filters"] = bool(sr_filters)
+        a["n_previous_pulses"] = int(n_previous_pulses or 0)
         for name, kval in (cal.get("k") or {}).items():
             a["calibration_factor_%s" % name] = float(kval)
         for name, rval in (cal.get("residual") or {}).items():

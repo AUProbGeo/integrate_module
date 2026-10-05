@@ -17,9 +17,8 @@ in ``integrate_io``) so that any backend built on it is comparable with
   SkyTEM ``RxCoilPosition1 z = -2`` means the receiver sits 2 m *above* the
   frame, so a backend must place it at ``tx_height - rx_dz``.  (Validated
   against AarhusInv on SkyTEM: 1.8 %/0.8 % LM/HM with the receiver above vs
-  8 %/5 % below.  Note ``forward_gaaem`` passes this value straight to GA-AEM,
-  whose ``txrx_dz`` is positive *up*, i.e. it currently puts the SkyTEM
-  receiver below the frame; anemone does the same.)
+  8 %/5 % below.  ``forward_gaaem`` and ``forward_anemone`` use the same
+  convention: GA-AEM gets ``txrx_dz = -rx_dz`` (its z is positive up).)
 
 The GA-AEM low-pass transfer function is ``(1/(1 + i f/fc))**order`` (cascaded
 first-order poles); ``lowpass_response`` reproduces it.

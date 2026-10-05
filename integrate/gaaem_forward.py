@@ -16,6 +16,25 @@ import h5py
 import numpy as np
 
 
+def gex_txrx_offset(GEX):
+    """Tx->Rx offset ``(dx, dy, dz)`` from a GEX dict in GA-AEM's convention.
+
+    The GEX frame has z positive DOWN (SkyTEM ``RxCoilPosition1 z = -2``: the
+    receiver is 2 m *above* the frame); GA-AEM's ``txrx_dz`` is positive UP
+    (``RX_height = TX_height + txrx_dz``), so the GEX z offset is negated.
+    Ground systems (tTEM) give the Rx position relative to ``TxCoilPosition1``,
+    airborne systems (SkyTEM) relative to the Tx frame.  Validated against
+    AarhusInv on SkyTEM (see ISSUE_rx_z_sign.md).
+    """
+    G = GEX['General']
+    rx = np.atleast_1d(np.asarray(G['RxCoilPosition1'], dtype=float))
+    if 'TxCoilPosition1' in G:
+        tx = np.atleast_1d(np.asarray(G['TxCoilPosition1'], dtype=float))
+    else:
+        tx = np.zeros(3)
+    return float(rx[0] - tx[0]), float(rx[1] - tx[1]), -float(rx[2] - tx[2])
+
+
 def forward_gaaem(C=np.array(()), 
                     thickness=np.array(()), 
                     stmfiles=None, 
@@ -45,7 +64,9 @@ def forward_gaaem(C=np.array(()),
     txrx_dy : float, optional
         Y-distance between transmitter and receiver. Default is 0.
     txrx_dz : float, optional
-        Z-distance between transmitter and receiver. Default is 0.1.
+        Z-distance between transmitter and receiver, positive UP (GA-AEM
+        convention). Default is 0.1. Ignored when a GEX is given: the offsets
+        are then taken from the GEX (see :func:`gex_txrx_offset`).
     GEX : dict, optional
         GEX dictionary. Default is {}.
     file_gex : str, optional
@@ -190,20 +211,15 @@ def forward_gaaem(C=np.array(()),
             if showInfo > 0:
                 print(f"Legacy read_gex() failed ({type(e).__name__}), trying read_gex_workbench()...")
             GEX = ig.read_gex_workbench(file_gex, showInfo=showInfo)
+        txrx_dx, txrx_dy, txrx_dz = gex_txrx_offset(GEX)
         if 'TxCoilPosition1' in GEX['General']:
             # Typical for tTEM system
-            txrx_dx = float(GEX['General']['RxCoilPosition1'][0])-float(GEX['General']['TxCoilPosition1'][0])
-            txrx_dy = float(GEX['General']['RxCoilPosition1'][1])-float(GEX['General']['TxCoilPosition1'][1])
-            txrx_dz = float(GEX['General']['RxCoilPosition1'][2])-float(GEX['General']['TxCoilPosition1'][2])
             if len(tx_height)==0:
                 tx_height = -float(GEX['General']['TxCoilPosition1'][2])
                 tx_height=np.array([tx_height])
 
         else:
             # Typical for SkyTEM system
-            txrx_dx = float(GEX['General']['RxCoilPosition1'][0])
-            txrx_dy = float(GEX['General']['RxCoilPosition1'][1])
-            txrx_dz = float(GEX['General']['RxCoilPosition1'][2])
             if len(tx_height)==0:
                 tx_height=np.array([40])
     
