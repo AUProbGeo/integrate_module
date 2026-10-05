@@ -103,3 +103,12 @@ frontend = ["static/**/*"]
 dev = [
     "ipykernel>=7.3.0",
 ]
+
+[tool.ruff]
+builtins = ["get_ipython"]   # IPython injects this at runtime
+
+[tool.ruff.lint]
+ignore = [
+    "E722",  # allow bare `except:` (used in the autoreload blocks)
+    "S110",  # allow try-except-pass (same blocks)
+]
