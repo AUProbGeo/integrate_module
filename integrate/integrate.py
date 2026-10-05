@@ -2993,7 +2993,9 @@ def class_id_to_idx(D, class_id=None):
         A tuple containing the following elements:
         
         D_idx : numpy.ndarray
-            Array with class identifiers converted to indices.
+            Array with class identifiers converted to indices. Values that are
+            NaN or not in `class_id` get index -1 (no valid class), so the
+            multinomial likelihood can assign them logL = -inf (issue #47).
         class_id : numpy.ndarray
             Array of unique class identifiers.
         class_id_out : numpy.ndarray
@@ -3001,13 +3003,11 @@ def class_id_to_idx(D, class_id=None):
     """
 
     if class_id is None:
-        class_id = np.unique(D)
-    D_idx = np.zeros(D.shape)
+        class_id = np.unique(D[~np.isnan(D)])
+    D_idx = np.full(D.shape, -1, dtype=int)
     for i in range(len(class_id)):
         D_idx[D==class_id[i]]=i
-    # Make sure the indices are integers
-    D_idx = D_idx.astype(int)
-    class_id_out = np.unique(D_idx)
+    class_id_out = np.unique(D_idx[D_idx >= 0])
     
     return D_idx, class_id, class_id_out
 

@@ -373,8 +373,8 @@ def integrate_rejection_range_jax(
     # Transfer D to device once per data type (diagonal-Gaussian only)
     use_jax_diag = [
         noise_model[i] == 'gaussian'
-        and DATA['Cd'][0] is None
-        and DATA['d_std'][0] is not None
+        and DATA['Cd'][i] is None
+        and DATA['d_std'][i] is not None
         for i in range(Ndt)
     ]
     D_jax = [jnp.asarray(D[i]) if use_jax_diag[i] else None for i in range(Ndt)]
@@ -426,21 +426,21 @@ def integrate_rejection_range_jax(
                             np.sum(~np.isnan(DATA['d_obs'][i][ip]))
                         )
 
-                if DATA['Cd'][0] is not None:
+                if DATA['Cd'][i] is not None:
                     # Full-covariance fallback — NumPy, converted once per batch
                     L_np = np.zeros((bsz, N), dtype=np.float32)
                     for b, ip in enumerate(ip_batch):
                         if active[b]:
-                            Cd = (DATA['Cd'][0][ip]
-                                  if len(DATA['Cd'][0].shape) == 3
-                                  else DATA['Cd'][0][:])
+                            Cd = (DATA['Cd'][i][ip]
+                                  if len(DATA['Cd'][i].shape) == 3
+                                  else DATA['Cd'][i][:])
                             L_np[b], log_norm_const_b[b, i] = likelihood_gaussian_full(
                                 D[i], DATA['d_obs'][i][ip], Cd, N_app=use_N_best,
                                 normalize=normalize_likelihood, return_norm_const=True,
                             )
                     L_per_type_list.append(jnp.asarray(L_np))
 
-                elif DATA['d_std'][0] is not None:
+                elif DATA['d_std'][i] is not None:
                     # Diagonal case: batched JAX kernel (fast on both CPU and GPU)
                     d_obs_batch = np.array([DATA['d_obs'][i][ip] for ip in ip_batch])
                     d_std_batch = np.array([DATA['d_std'][i][ip] for ip in ip_batch])
@@ -458,7 +458,7 @@ def integrate_rejection_range_jax(
                     L_per_type_list.append(jnp.where(jnp.asarray(active[:, None]) > 0, L_jax, 0.0))
 
                 else:
-                    L_per_type_list.append(jnp.zeros((bsz, N), dtype=jnp.float32))
+                    raise ValueError('Gaussian data type %d has neither d_std or Cd' % i)
 
             elif noise_model[i] == 'multinomial':
                 # Multinomial fallback — NumPy, converted once per batch

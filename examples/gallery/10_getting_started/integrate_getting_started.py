@@ -15,7 +15,7 @@ The workflow follows these main steps:
 # %%
 import os 
 os.environ["EM_FORWARD_METHOD"] = "anemone"
-os.environ["EM_FORWARD_DEVICE"] = "cuda"
+#os.environ["EM_FORWARD_DEVICE"] = "cuda"
 os.environ["REJECTION_BACKEND"] = "jax"
 
 import integrate as ig

@@ -758,18 +758,18 @@ def integrate_rejection_range(D,
                     total_n_data_non_nan += n_data_non_nan
                     n_data_per_type[i] = n_data_non_nan
                         
-                    if DATA['Cd'][0] is not None:                    
-                        # if Cd is 3 dimensional, take the first slice
-                        if len(DATA['Cd'][0].shape) == 3:
-                            Cd = DATA['Cd'][0][ip]
+                    if DATA['Cd'][i] is not None:
+                        # if Cd is 3 dimensional, take the slice for this data point
+                        if len(DATA['Cd'][i].shape) == 3:
+                            Cd = DATA['Cd'][i][ip]
                         else:
-                            Cd = DATA['Cd'][0][:]
+                            Cd = DATA['Cd'][i][:]
 
                         L_single, log_norm_const_per_type[i] = likelihood_gaussian_full(
                             D[i_prior], d_obs, Cd, N_app = use_N_best,
                             normalize=normalize_likelihood, return_norm_const=True)
 
-                    elif DATA['d_std'][0] is not None:
+                    elif DATA['d_std'][i] is not None:
                         d_std = DATA['d_std'][i][ip]
                         #print(d_obs)
                         #print(d_std)
@@ -779,7 +779,7 @@ def integrate_rejection_range(D,
                             normalize=normalize_likelihood, return_norm_const=True)
                         #print(L_single[0:3])
                     else:
-                        print('No d_std or Cd in %s' % DS)
+                        raise ValueError('Gaussian data type %d has neither d_std or Cd' % i)
 
                     L[i] = L_single
                     t.append(time.time()-t0)
@@ -1502,6 +1502,11 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
     This means exp(logL[i]) equals the product of probabilities across features.
     For single-feature cases, exp(logL) directly equals the observed probability.
 
+    NaN handling (issue #47): features with NaN in P_obs (not observed) are
+    ignored; if no feature is observed, logL = 0. A NaN prior class value, or a
+    class without a row in P_obs, where the feature is observed gives
+    probability 0, i.e. logL = -inf.
+
     When entropyFilter is True, only features with entropy below the threshold
     are used in the likelihood calculation, which can improve computational efficiency
     for datasets with many uninformative features.
@@ -1518,17 +1523,18 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
 
     from scipy.stats import entropy
 
-    if class_id is None:
-        class_id = np.unique(D).astype(int)
-
     D = np.atleast_2d(D)
+
+    if class_id is None:
+        class_id = np.unique(D[~np.isnan(D)]).astype(int)
 
     # Filter out columns with NaN values in P_obs before any processing
     valid_features = ~np.any(np.isnan(P_obs), axis=0)
 
     if not np.any(valid_features):
-        # If all features have NaN, return array of NaN
-        return np.full(D.shape[0], np.nan)
+        # No observed features: no information, logL = 0 (as for Gaussian data
+        # with all d_obs NaN)
+        return np.zeros(D.shape[0])
 
     # Apply NaN filtering to both D and P_obs
     D = D[:, valid_features]
@@ -1544,10 +1550,12 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
 
     N, nm = D.shape
 
-    # Convert D to integer indices
+    # Convert D to integer indices. NaN (and, below, unknown class ids) become
+    # -1: no valid class, i.e. probability 0 and logL = -inf (issue #47).
+    nan_D = np.isnan(D) if D.dtype.kind == 'f' else np.zeros(D.shape, dtype=bool)
     if class_is_idx:
-        # D already contains indices
-        indices = D.astype(int)
+        # D already contains indices (-1 for no valid class, see class_id_to_idx)
+        indices = np.where(nan_D, -1, D).astype(int)
     else:
         # Create vectorized mapping from class_id to indices
         class_id = class_id.astype(int)
@@ -1562,7 +1570,9 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
         lookup[class_id] = np.arange(len(class_id))
 
         # Vectorized conversion of all class IDs to indices
-        indices = lookup[D.astype(int)]
+        ids = np.where(nan_D, -1, D).astype(int)
+        in_table = (ids >= 0) & (ids <= max_class_id)
+        indices = np.where(in_table, lookup[np.where(in_table, ids, 0)], -1)
 
     # Create column indices for advanced indexing
     col_indices = np.arange(nm)
@@ -1570,7 +1580,11 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
     # Vectorized probability extraction using advanced indexing
     # indices has shape (N, nm), col_indices has shape (nm,)
     # Broadcasting: indices[:, j] selects row, col_indices[j] selects column
-    probs = P_obs[indices, col_indices]
+    # Samples with no valid class (NaN prior value or a class without a row in
+    # P_obs) get probability 0, i.e. logL = -inf.
+    invalid = (indices < 0) | (indices >= P_obs.shape[0])
+    probs = P_obs[np.where(invalid, 0, indices), col_indices]
+    probs[invalid] = 0.0
 
     # Vectorized log-likelihood calculation
     # Sum log probabilities along features axis
