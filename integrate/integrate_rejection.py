@@ -18,6 +18,7 @@ import os
 import time
 import multiprocessing
 from multiprocessing import shared_memory
+from threadpoolctl import threadpool_limits
 from datetime import datetime
 from tqdm import tqdm
 import logging
@@ -134,7 +135,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
         Nbatch (batch size for backend='jax'), and normalize_likelihood (bool,
-        default False; if True, Gaussian likelihoods include the full
+        default True; if True, Gaussian likelihoods include the full
         normalization constant, giving a properly comparable EV/entropy across
         data points and hypotheses, without changing P_acc/T/CHI2).
 
@@ -184,7 +185,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # this needs to be extracted here and threaded explicitly into
     # integrate_posterior_main. The backend='jax' and non-parallel branches
     # already forward **kwargs and pick this up on their own.
-    normalize_likelihood = kwargs.get('normalize_likelihood', False)
+    normalize_likelihood = kwargs.get('normalize_likelihood', True)
     
     # Setup progress callback functionality
     if console_progress is None:
@@ -564,7 +565,7 @@ def integrate_rejection_range(D,
         Default is None (no callbacks).
     **kwargs : dict
         Additional arguments including useRandomData, showInfo, use_N_best, and
-        normalize_likelihood (bool, default False; use the full normalized
+        normalize_likelihood (bool, default True; use the full normalized
         Gaussian log-pdf. Inert for P_acc/T; CHI2 is de-normalized back out;
         EV becomes a properly comparable evidence across data points/hypotheses).
     
@@ -614,7 +615,7 @@ def integrate_rejection_range(D,
     # evidence across data points/hypotheses with differing noise or valid
     # channel counts. CHI2 is de-normalized back out below so it stays a
     # pure misfit statistic.
-    normalize_likelihood = kwargs.get('normalize_likelihood', False)
+    normalize_likelihood = kwargs.get('normalize_likelihood', True)
 
 
     # Get number of data points
@@ -885,7 +886,7 @@ def integrate_rejection_range(D,
         # Compute the evidence
         # Numerically stable log-mean-exp calculation
         max_L = np.nanmax(L)
-        EV = max_L + np.log(np.nanmean(np.exp(L - max_L)))
+        EV = max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
 
         # BUG !!!
         # Compute log-'posterior evidence' - mean posterior log-likelihood
@@ -929,7 +930,7 @@ def integrate_rejection_range(D,
 
 
 
-def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=False, progress_callback=None):
+def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=True, progress_callback=None):
     """
     Coordinate parallel processing of posterior sampling across multiple chunks.
     
@@ -1138,21 +1139,25 @@ def integrate_posterior_chunk(args):
 
         #print(f'Chunk {i_chunk+1}/{len(ip_chunks)}, ndp={len(ip_range)}')
 
-        i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(
-            D,
-            DATA,
-            idx,
-            N_use=N_use,
-            id_use=id_use,
-            ip_range=ip_range,
-            autoT=autoT,
-            T_base=T_base,
-            nr=nr,
-            use_N_best=use_N_best,
-            T_N_above=T_N_above,
-            T_P_acc_level=T_P_acc_level,
-            normalize_likelihood=normalize_likelihood,
-        )
+        # Limit BLAS to one thread per worker: Ncpu workers each spawning a
+        # full multithreaded BLAS pool oversubscribe the cores, making the
+        # parallel run slower than the serial one (~7x speedup measured).
+        with threadpool_limits(limits=1):
+            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(
+                D,
+                DATA,
+                idx,
+                N_use=N_use,
+                id_use=id_use,
+                ip_range=ip_range,
+                autoT=autoT,
+                T_base=T_base,
+                nr=nr,
+                use_N_best=use_N_best,
+                T_N_above=T_N_above,
+                T_P_acc_level=T_P_acc_level,
+                normalize_likelihood=normalize_likelihood,
+            )
 
         return i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range
     

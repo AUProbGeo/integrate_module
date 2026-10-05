@@ -37,6 +37,7 @@ dependencies = [
     "python-fasthtml",
     "openpyxl",
     "httpx",
+    "threadpoolctl",
 ]
 
 [project.optional-dependencies]

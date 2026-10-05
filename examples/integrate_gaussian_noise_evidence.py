@@ -11,7 +11,7 @@
 #                                      generate the data
 #
 # Each of the 4 assumed-noise inversions is repeated with
-# `normalize_likelihood=False` (default) and `normalize_likelihood=True`.
+# `normalize_likelihood=False` and `normalize_likelihood=True` (default).
 # The Bayesian evidence (`EV`) is then plotted along the profile for all
 # 8 cases.
 #

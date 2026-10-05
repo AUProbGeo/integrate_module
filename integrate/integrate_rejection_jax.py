@@ -221,7 +221,7 @@ def _get_postprocess_kernel(nr):
         i_use_raw = jnp.clip(i_use_raw, 0, N - 1)
 
         # 4. Evidence (log-mean-exp trick for numerical stability)
-        EV = max_L + jnp.log(jnp.nanmean(jnp.exp(L - max_L)))
+        EV = max_L + jnp.log(jnp.nansum(jnp.exp(L - max_L)) / N)
 
         # 5. Reduced chi-squared per data type
         L_accepted = L_per_type_b[:, i_use_raw]           # (Ndt, nr)
@@ -293,7 +293,7 @@ def integrate_rejection_range_jax(
     progress_callback : callable      — optional (current, total) callback
     Nbatch        : int               — data points per JAX batch (default 64)
     **kwargs      : use_N_best, showInfo, console_progress, useRandomData,
-                    normalize_likelihood (bool, default False — include the
+                    normalize_likelihood (bool, default True — include the
                     full Gaussian normalization constant; inert for
                     P_acc/T/EV weighting, CHI2 is de-normalized back out), …
 
@@ -325,7 +325,7 @@ def integrate_rejection_range_jax(
     # Inert for P_acc/T/EV weighting (constant shift); CHI2 is de-normalized
     # back out below so it stays a pure misfit statistic. See
     # integrate_rejection_range (NumPy backend) for the full rationale.
-    normalize_likelihood = kwargs.get('normalize_likelihood', False)
+    normalize_likelihood = kwargs.get('normalize_likelihood', True)
 
     Ndp = DATA['d_obs'][0].shape[0]
     if len(ip_range) == 0:
@@ -455,7 +455,7 @@ def integrate_rejection_range_jax(
                         ) * active
                         log_norm_const_b[:, i] = lnc_batch
                         L_jax = L_jax + jnp.asarray(lnc_batch)[:, None]
-                    L_per_type_list.append(L_jax * jnp.asarray(active[:, None]))
+                    L_per_type_list.append(jnp.where(jnp.asarray(active[:, None]) > 0, L_jax, 0.0))
 
                 else:
                     L_per_type_list.append(jnp.zeros((bsz, N), dtype=jnp.float32))
@@ -549,7 +549,7 @@ def integrate_rejection_range_jax(
                     i_use = idx[i_use]
 
                 max_L = np.nanmax(L)
-                EV = max_L + np.log(np.nanmean(np.exp(L - max_L)))
+                EV = max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
 
                 i_use_all[j]    = i_use
                 T_all[j]        = T
