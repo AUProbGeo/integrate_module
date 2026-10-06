@@ -1,6 +1,6 @@
 """
-Compare EM forward models
-=========================
+Run time of the EM forward models
+=================================
 
 This example computes prior EM data for the same set of prior models with
 each of the available EM forward backends, and compares them:
@@ -72,10 +72,15 @@ for i in range(len(method)):
 import matplotlib.pyplot as plt
 import numpy as np
 
+# The responses nearly coincide, so the first backend is drawn thickest and each
+# following one thinner on top of it, keeping all of them visible.
+lw = np.linspace(6, 1, len(method))
+ls = ['-', '--', '-.', ':']
 fig, axs = plt.subplots(3, 3, figsize=(12, 10), sharex=True)
 for k, ax in enumerate(axs.flat):
     for i in range(len(method)):
-        ax.semilogy(np.abs(D_all[i][k]), '.-', label='%s (%s)' % (method[i], device[i]))
+        ax.semilogy(np.abs(D_all[i][k]), linestyle=ls[i % len(ls)], linewidth=lw[i],
+                    label='%s (%s)' % (method[i], device[i]))
     ax.set_title('Prior data #%d' % k)
     ax.grid(True, which='both', alpha=0.3)
 for ax in axs[-1, :]:

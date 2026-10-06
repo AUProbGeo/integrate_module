@@ -89,11 +89,12 @@ _GALLERY_FILE = os.environ.get('GALLERY_FILE', '')
 # Self-contained (data fetched via ig.get_case_data) and small enough to run
 # routinely.
 _TIER_CHEAP = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
-               r'|dual_data|priors|merge_prior|query|compare_forward_models)\.py')
+               r'|dual_data|priors|merge_prior|query'
+               r'|forward_accuracy_workbench|forward_backends_runtime)\.py')
 # Also self-contained, but slow: N up to 2e6, or a full timing sweep.
 _TIER_ALL = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
              r'|dual_data|priors|merge_prior|query|gaussian_noise|esbjerg'
-             r'|merge_data|timing_example|multiple_forward|compare_forward_models)\.py')
+             r'|merge_data|timing_example|forward_.*)\.py')
 
 if _GALLERY_FILE:
     _filename_pattern = re.escape(_GALLERY_FILE) + r'$'
