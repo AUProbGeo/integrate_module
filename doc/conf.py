@@ -89,11 +89,11 @@ _GALLERY_FILE = os.environ.get('GALLERY_FILE', '')
 # Self-contained (data fetched via ig.get_case_data) and small enough to run
 # routinely.
 _TIER_CHEAP = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
-               r'|dual_data|priors|merge_prior|query)\.py')
+               r'|dual_data|priors|merge_prior|query|compare_forward_models)\.py')
 # Also self-contained, but slow: N up to 2e6, or a full timing sweep.
 _TIER_ALL = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
              r'|dual_data|priors|merge_prior|query|gaussian_noise|esbjerg'
-             r'|merge_data|timing_example)\.py')
+             r'|merge_data|timing_example|multiple_forward|compare_forward_models)\.py')
 
 if _GALLERY_FILE:
     _filename_pattern = re.escape(_GALLERY_FILE) + r'$'
@@ -115,6 +115,7 @@ sphinx_gallery_conf = {
         '../examples/gallery/20_workflow',
         '../examples/gallery/30_data',
         '../examples/gallery/40_noise',
+        '../examples/gallery/45_forward',
         '../examples/gallery/50_hypothesis',
         '../examples/gallery/60_query',
         '../examples/gallery/70_synthetic',

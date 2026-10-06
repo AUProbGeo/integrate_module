@@ -3247,7 +3247,7 @@ def allocate_large_page():
         return None
 
 
-def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
+def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0, forward='ga-aem', device=None):
     """
     Execute timing benchmark for INTEGRATE workflow components.
     
@@ -3266,6 +3266,12 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
         Fixed number of CPUs to use for forward modeling. When > 0, forward modeling always
         uses this many CPUs regardless of the current Nproc_arr entry. The inversion
         (rejection sampling) still varies over Nproc_arr. Default is 0 (use Nproc_arr value).
+    forward : str, optional
+        EM forward backend: 'ga-aem' (default), 'anemone' or 'simpeg'.
+        Dispatched through :func:`prior_data_em`.
+    device : str, optional
+        Torch device for ``forward='anemone'`` (e.g. 'cpu', 'cuda'). If None,
+        ``EM_FORWARD_DEVICE`` or auto-detection is used. Ignored otherwise.
 
     Returns
     -------
@@ -3276,8 +3282,8 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
     -----
     The benchmark tests four main components:
     1. Prior model generation (layered geological models)
-    2. Forward modeling using GA-AEM electromagnetic simulation
-    3. Rejection sampling for Bayesian inversion  
+    2. Forward modeling (GA-AEM, anemone or SimPEG)
+    3. Rejection sampling for Bayesian inversion (numpy or jax)
     4. Posterior statistics computation
     
     Results are saved to an NPZ file with timing arrays and system information.
@@ -3360,7 +3366,14 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
             except Exception:
                 backend_label = 'jax_cpu'
         print("JAX backend label: %s (JAX_PLATFORMS='%s')" % (backend_label, jax_platform_env))
-    file_out  = 'timing_%s-%s-%dcore_Nproc%d_N%d_%s.npz' % (hostname,system,Ncpu,len(Nproc_arr), len(N_arr), backend_label)
+
+    forward = _em_method(forward)
+    forward_label = forward.replace('-', '')
+    if forward == 'anemone':
+        device = _em_device(device)
+        forward_label = 'anemone_%s' % device
+    print("Forward backend: %s" % forward_label)
+    file_out  = 'timing_%s-%s-%dcore_Nproc%d_N%d_%s_%s.npz' % (hostname,system,Ncpu,len(Nproc_arr), len(N_arr), forward_label, backend_label)
     print("Writing results to %s " % file_out)
 
     ## TIMING
@@ -3410,7 +3423,10 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
                 #% A2. Compute prior DATA
                 t0_forward = time.time()
                 Ncpu_fwd = NcpuForward if NcpuForward > 0 else Ncpu
-                f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, Ncpu=Ncpu_fwd, showInfo=showInfo)
+                if forward == 'anemone':
+                    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex=file_gex, method=forward, device=device, showInfo=showInfo)
+                else:
+                    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex=file_gex, method=forward, Ncpu=Ncpu_fwd, showInfo=showInfo)
                 T_forward[i,j]=time.time()-t0_forward
 
                 #% READY FOR INVERSION
@@ -3427,7 +3443,7 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0):
                     T_poststat[i,j]=time.time()-t0_poststat
 
             T_total = T_prior + T_forward + T_rejection + T_poststat
-            np.savez(file_out, T_total=T_total, T_prior=T_prior, T_forward=T_forward, T_rejection=T_rejection, T_poststat=T_poststat, N_arr=N_arr, Nproc_arr=Nproc_arr, nobs=nobs, backend=backend)
+            np.savez(file_out, T_total=T_total, T_prior=T_prior, T_forward=T_forward, T_rejection=T_rejection, T_poststat=T_poststat, N_arr=N_arr, Nproc_arr=Nproc_arr, nobs=nobs, backend=backend, forward=forward_label)
             
             
     return file_out

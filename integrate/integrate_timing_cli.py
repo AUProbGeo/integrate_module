@@ -58,8 +58,14 @@ def print_timing_summary(f_timing):
         except:
             backend = 'numpy'
 
+        try:
+            forward = str(data['forward'])
+        except:
+            forward = 'gaaem'
+
         print(f"\n{'='*60}")
         print(f"INTEGRATE Timing Summary: {f_timing}")
+        print(f"Forward backend:   {forward}")
         print(f"Rejection backend: {backend}")
         print(f"{'='*60}")
 
@@ -224,6 +230,10 @@ Custom CPU configurations:
 
 Combined options:
   integrate_timing time small --Ncpu 32 --Nmin 50000    # 50k models on 32 CPUs
+
+Forward / rejection backends:
+  integrate_timing time small --forward anemone --device cuda --backend jax
+  integrate_timing time small --forward simpeg --backend numpy
   integrate_timing time medium --N 25000 --cpu-scale linear  # 25k models, all CPU counts
 
 Plotting results:
@@ -275,6 +285,11 @@ Results are saved as .npz files and automatically plotted with performance analy
                             help='Disable timing summary output (enabled by default)')
     time_parser.add_argument('--backend', choices=['numpy', 'jax'], default='numpy',
                             help='Rejection sampling backend: numpy (default) or jax')
+    time_parser.add_argument('--forward', choices=['ga-aem', 'anemone', 'simpeg'], default='ga-aem',
+                            help='EM forward backend: ga-aem (default), anemone or simpeg')
+    time_parser.add_argument('--device', default=None,
+                            help="Torch device for --forward anemone, e.g. 'cpu' or 'cuda' "
+                                 "(default: EM_FORWARD_DEVICE or auto-detect)")
     time_parser.add_argument('--NcpuForward', type=int, default=0,
                             help='Fix the number of CPUs used for forward modeling only. '
                                  'When set, forward modeling always uses this many CPUs while '
@@ -389,6 +404,8 @@ Results are saved as .npz files and automatically plotted with performance analy
             Nproc_arr=Nproc_arr,
             backend=args.backend,
             NcpuForward=args.NcpuForward,
+            forward=args.forward,
+            device=args.device,
         )
 
         # Show summary and plot the results
