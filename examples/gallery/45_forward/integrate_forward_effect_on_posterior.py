@@ -24,7 +24,7 @@ import time
 
 #
 N=4_000_000
-N=100_000
+#N=100_000
 
 # %%
 # 0. Get TTEM data

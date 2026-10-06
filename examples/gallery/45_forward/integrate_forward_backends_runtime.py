@@ -53,12 +53,15 @@ D_all = []
 
 for i in range(len(method)):
     t0=time.time()
-    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False, id=1,
-                                        method=method[i], device=device[i], showInfo=1)
+    # Each backend writes its own data set, /D1, /D2, ..., to the prior file
+    # (force_replace so a re-run never reads data left over from an earlier run)
+    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False, id=i+1,
+                                        method=method[i], device=device[i],
+                                        force_replace=True, showInfo=1)
 #    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=True, 
 #                                       f_prior_data_h5='PRIOR_DATA_N%d.h5_%s_%s' % (N, method[i],device[i]), 
 #                                       method=method[i], device=device[i], showInfo=0)
-    D = ig.load_prior_data(f_prior_data_h5)[0][0]
+    D = ig.load_prior_data(f_prior_data_h5, id_use=[i+1], showInfo=0)[0][0]
     D_all.append(D)
     t_run.append(time.time()-t0)
 
@@ -69,13 +72,14 @@ for i in range(len(method)):
     print('%-10s %-6s %10.1f %14.3f' % (method[i], device[i], t_run[i], 1000*t_run[i]/N))
 
 # %% COMPARE FORWARD RESPONSES (first 9 soundings)
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 # The responses nearly coincide, so the first backend is drawn thickest and each
 # following one thinner on top of it, keeping all of them visible.
-lw = np.linspace(6, 1, len(method))
-ls = ['-', '--', '-.', ':']
+lw = np.linspace(4, 1, len(method))
+ls = ['-', '-', '-', '-']
 fig, axs = plt.subplots(3, 3, figsize=(12, 10), sharex=True)
 for k, ax in enumerate(axs.flat):
     for i in range(len(method)):
@@ -91,4 +95,30 @@ axs.flat[0].legend(fontsize=8)
 fig.suptitle('Forward response comparison, N=%d' % N)
 fig.tight_layout()
 plt.savefig('tiny_forward_compare_N%d.png' % N)
+plt.show()
+
+# %%
+# Relative difference to ga-aem, (d - d_gaaem) / d_gaaem, for the same 9
+# prior realizations.
+i_ref = method.index('ga-aem')
+fig, axs = plt.subplots(3, 3, figsize=(12, 10), sharex=True, sharey=True)
+for k, ax in enumerate(axs.flat):
+    d_ref = D_all[i_ref][k]
+    for i in range(len(method)):
+        if i == i_ref:
+            continue
+        ax.plot(100 * (D_all[i][k] - d_ref) / d_ref, linestyle=ls[i % len(ls)],
+                linewidth=lw[i], color='C%d' % i,
+                label='%s (%s)' % (method[i], device[i]))
+    ax.axhline(0, color='C%d' % i_ref, lw=1)
+    ax.set_title('Prior data #%d' % k)
+    ax.grid(True, alpha=0.3)
+for ax in axs[-1, :]:
+    ax.set_xlabel('Gate index')
+for ax in axs[:, 0]:
+    ax.set_ylabel('Difference to ga-aem [%]')
+axs.flat[0].legend(fontsize=8)
+fig.suptitle('Relative difference to ga-aem, N=%d' % N)
+fig.tight_layout()
+plt.savefig('tiny_forward_compare_diff_N%d.png' % N)
 plt.show()

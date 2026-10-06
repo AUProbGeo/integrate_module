@@ -11,6 +11,8 @@ inversion models with each of the EM forward models available in INTEGRATE,
 * ``anemone`` on the CPU
 * ``ga-aem``
 * ``simpeg`` (skipped if SimPEG is not installed)
+* ``anemone`` on the CPU with ``rx_coil_filter='damped2'`` and
+  ``gate_integration='boxcar'`` (label ``anemone_wb``)
 
 and compares them gate-by-gate to the Workbench response, used here as the
 reference.
@@ -111,10 +113,19 @@ def _loglog(t_dst, t_src, y_src):
 #
 # Forward the Workbench inversion models with each forward model. The GPU
 # and SimPEG runs are skipped if not available.
+#
+# All forward models read the receiver-coil filter of the GEX,
+# ``RxCoilLPFilter1= 0.87 420E+3``, as a second-order low pass with damping
+# 0.87 at 420 kHz, modelled as two first-order filters at 420/0.87 kHz.
+# ``anemone_wb`` uses the exact second-order filter instead, and averages
+# dB/dt over each gate. This reading of the GEX is inferred from comparisons
+# with Workbench (see ``ISSUE_rx_coil_filter.md``).
 wb_forwards = [('anemone_gpu', dict(method='anemone', device='cuda')),
                ('anemone_cpu', dict(method='anemone', device='cpu')),
                ('gaaem',       dict(method='ga-aem')),
-               ('simpeg',      dict(method='simpeg'))]
+               ('simpeg',      dict(method='simpeg')),
+               ('anemone_wb',  dict(method='anemone', device='cpu',
+                                    rx_coil_filter='damped2', gate_integration='boxcar'))]
 D_wb = {}
 for lab_, kw_ in wb_forwards:
     try:
@@ -161,12 +172,12 @@ ls_wb = ['-', '--', ':', '-.']
 fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 for j in np.linspace(0, len(i_wb) - 1, 5).astype(int):
     for c_, (lab_, D_) in enumerate(D_wb.items()):
-        axs[0].loglog(t_all, np.abs(D_[j]), ls_wb[c_], color='C%d' % c_, lw=1)
+        axs[0].loglog(t_all, np.abs(D_[j]), ls_wb[c_ % len(ls_wb)], color='C%d' % c_, lw=1)
     for row in (lm_row, hm_row):
         t_s, d_s = _syn_gates(row[key_inv[i_wb[j]]])
         axs[0].loglog(t_s, np.abs(d_s), 'ok', ms=3)
 for c_, lab_ in enumerate(D_wb):
-    axs[0].plot([], [], ls_wb[c_], color='C%d' % c_, label=lab_)
+    axs[0].plot([], [], ls_wb[c_ % len(ls_wb)], color='C%d' % c_, label=lab_)
 axs[0].plot([], [], 'ok', label='HGG Workbench')
 axs[0].set_xlabel('Time [s]')
 axs[0].set_ylabel('|dB/dt| [V/Am$^4$]')
@@ -177,7 +188,7 @@ axs[0].grid(True, which='both', alpha=0.3)
 t_ = np.r_[t_wb['LM'], t_wb['HM']]
 for c_, lab_ in enumerate(D_wb):
     r_ = 100 * np.asarray(rel_wb[lab_]['LM'] + rel_wb[lab_]['HM'])
-    axs[1].semilogx(t_ * (1 + 0.03 * (c_ - 1.5)), r_, '.', ms=2, color='C%d' % c_, label=lab_)
+    axs[1].semilogx(t_ * (1 + 0.03 * (c_ - 2)), r_, '.', ms=2, color='C%d' % c_, label=lab_)
 axs[1].axhline(0, color='k', lw=0.6)
 axs[1].set_ylim(-8, 8)
 axs[1].set_xlabel('Time [s]')
@@ -189,7 +200,7 @@ axs[1].grid(True, which='both', alpha=0.3)
 bins = np.linspace(-8, 8, 65)
 for c_, lab_ in enumerate(D_wb):
     r_ = 100 * np.asarray(rel_wb[lab_]['LM'] + rel_wb[lab_]['HM'])
-    axs[2].hist(r_, bins=bins, histtype='step', lw=1.5, ls=ls_wb[c_], color='C%d' % c_, label=lab_)
+    axs[2].hist(r_, bins=bins, histtype='step', lw=1.5, ls=ls_wb[c_ % len(ls_wb)], color='C%d' % c_, label=lab_)
 axs[2].axvline(0, color='k', lw=0.6)
 axs[2].set_xlabel('Relative difference to HGG Workbench [%]')
 axs[2].set_ylabel('Gate count')

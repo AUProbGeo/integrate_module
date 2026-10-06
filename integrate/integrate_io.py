@@ -725,16 +725,18 @@ def load_data(f_data_h5, id_arr=[], ii=None, **kwargs):
 def _stm_lowpass_lists(GEX, ch):
     """Cut-off frequencies / orders for the STM ``LowPassFilter`` block of channel ``ch``.
 
-    AarhusInv applies the channel's ``TiBLowPassFilter`` *and* every
-    ``General.RxCoilLPFilter*`` entry (each ``[order, fcut]``).  GA-AEM accepts
-    several filters only as space-separated lists inside ONE ``LowPassFilter``
-    block (extra blocks are silently ignored), so both are returned as strings.
+    The channel's ``TiBLowPassFilter`` (``[order, fcut]``) plus the receiver-coil
+    filter of the channel's ``RxCoilNumber``, as two first-order poles from
+    :func:`integrate.em_system.rx_coil_lowpass`.  GA-AEM accepts several
+    filters only as space-separated lists inside ONE ``LowPassFilter`` block
+    (extra blocks are silently ignored), so both are returned as strings.
     Orders are rounded to integers (GA-AEM Butterworth order is integral).
     """
-    rows = [np.atleast_1d(GEX['Channel%d' % ch]['TiBLowPassFilter']).astype(float)]
-    for key in sorted(k for k in GEX['General'] if k.startswith('RxCoilLPFilter')):
-        v = np.atleast_2d(np.asarray(GEX['General'][key], dtype=float))
-        rows.extend(v[i] for i in range(v.shape[0]))
+    from integrate.em_system import rx_coil_lowpass
+    chan = GEX['Channel%d' % ch]
+    rows = [np.atleast_1d(chan['TiBLowPassFilter']).astype(float)]
+    coil = int(np.atleast_1d(chan.get('RxCoilNumber', 1))[0])
+    rows.extend(rx_coil_lowpass(GEX['General'], coil))
     fcut = ' '.join('%.0f' % r[1] for r in rows)
     order = ' '.join('%d' % int(round(r[0])) for r in rows)
     return fcut, order

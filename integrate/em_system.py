@@ -11,8 +11,9 @@ in ``integrate_io``) so that any backend built on it is comparable with
 
 * gates ``[RemoveInitialGates:NoGates]`` per channel, times shifted by
   ``GateTimeShift + MeaTimeDelay``;
-* filters = the channel's ``TiBLowPassFilter`` **plus every**
-  ``General.RxCoilLPFilter*`` entry, orders rounded;
+* filters = the channel's ``TiBLowPassFilter`` (order rounded) plus the
+  receiver-coil filter of the channel's ``RxCoilNumber`` from
+  :func:`rx_coil_lowpass` (two first-order poles at ``fcut/zeta``);
 * ``rx_dz = Rx_z - Tx_z`` in the GEX frame, where **z is positive down**: a
   SkyTEM ``RxCoilPosition1 z = -2`` means the receiver sits 2 m *above* the
   frame, so a backend must place it at ``tx_height - rx_dz``.  (Validated
@@ -34,18 +35,60 @@ import hashlib
 
 import numpy as np
 
-__all__ = ["gex_to_em_system", "lowpass_response", "chain_response", "compress_model"]
+__all__ = ["gex_to_em_system", "lowpass_response", "chain_response", "compress_model",
+           "rx_coil_lowpass"]
 
 
 # --------------------------------------------------------------------------- #
 # small helpers (also imported by anemone_forward)
 # --------------------------------------------------------------------------- #
 def _butter_rows(arr):
-    """Normalise an RxCoilLPFilter value to a list of (order, fcut) rows."""
+    """Normalise an RxCoilLPFilter value to a list of (first value, fcut) rows."""
     a = np.atleast_2d(np.asarray(arr, dtype=float))
     if a.shape == (1, 2):
         return [(a[0, 0], a[0, 1])]
     return [(row[0], row[1]) for row in a]
+
+
+def _rx_coil_filter_by_coil(G):
+    """``{coil number: (first value, fcut)}`` from the GEX ``RxCoilLPFilter`` entries.
+
+    Handles both the libaarhusxyz form (one ``RxCoilLPFilter`` array, row i =
+    coil i+1) and the ``read_gex_workbench`` form (``RxCoilLPFilter1``, ...).
+    """
+    out = {}
+    if "RxCoilLPFilter" in G:
+        for i, row in enumerate(_butter_rows(G["RxCoilLPFilter"])):
+            out[i + 1] = (float(row[0]), float(row[1]))
+    for k in G:
+        suffix = k[len("RxCoilLPFilter"):]
+        if k.startswith("RxCoilLPFilter") and suffix.isdigit():
+            row = _butter_rows(G[k])[0]
+            out[int(suffix)] = (float(row[0]), float(row[1]))
+    return out
+
+
+def rx_coil_lowpass(G, coil=1):
+    """Receiver-coil low-pass filter of ``coil`` as first-order poles ``[(1, fc), ...]``.
+
+    ``RxCoilLPFilter<coil> = zeta fcut`` (GEX ``General`` section) is read as
+    the second-order coil response ``1/(1 + 2 zeta s + s^2)``, ``s = i f/fcut``,
+    of the receiver coil with that number (``Channel*.RxCoilNumber``); entries
+    for other coils are not applied.  It is returned as two first-order poles
+    at ``fcut/zeta``: the same delay (exact for ``zeta = 1``), and a filter
+    every backend supports.  Returns ``[]`` if the GEX has no entry for ``coil``.
+
+    This reading is inferred from comparisons with the HGG Workbench
+    (AarhusInv) forward response (tTEM ``0.87 420E+3``, SkyTEM
+    ``0.99 204.2E+3``), where it removes a 3-15 % bias at the early gates;
+    see ``ISSUE_rx_coil_filter.md``.  It replaces the earlier reading of
+    every ``RxCoilLPFilter*`` entry as ``(order, fcut)``.
+    """
+    rows = _rx_coil_filter_by_coil(G)
+    if coil not in rows:
+        return []
+    zeta, fcut = rows[coil]
+    return [(1, fcut / zeta), (1, fcut / zeta)]
 
 
 def _polygon_area(x, y):
@@ -216,10 +259,6 @@ def gex_to_em_system(gex, showInfo=0):
               f"from TxLoopArea {tx_area_gex:.3g} m^2; using the polygon.")
     loop_closed = np.vstack([loop, loop[:1]])
 
-    rx_rows = []
-    for key in sorted(k for k in G if k.startswith("RxCoilLPFilter")):
-        rx_rows.extend(_butter_rows(G[key]))
-
     gates = np.asarray(G["GateArray"], dtype=float)
     if gates.ndim != 2 or gates.shape[1] < 3:
         raise ValueError("GateArray must be (n, 3) = (centre, open, close)")
@@ -251,7 +290,7 @@ def gex_to_em_system(gex, showInfo=0):
         if tib is not None:
             tib = np.atleast_1d(np.asarray(tib, dtype=float))
             filters.append((int(round(tib[0])), float(tib[1])))
-        filters.extend((int(round(o)), float(fc)) for o, fc in rx_rows)
+        filters.extend(rx_coil_lowpass(G, int(_first(chan.get("RxCoilNumber"), 1))))
 
         moments.append({
             "name": name,

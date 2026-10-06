@@ -12,7 +12,8 @@ import os
 
 import numpy as np
 
-from integrate.em_system import _butter_rows, _polygon_area  # shared geometry helpers
+from integrate.em_system import (_butter_rows, _polygon_area,  # shared helpers
+                                 _rx_coil_filter_by_coil, rx_coil_lowpass)
 
 _IMPORT_HINT = (
     "anemone backend requires 'anemone' and 'torch': "
@@ -106,10 +107,33 @@ def _remake_loop(loop, tx_z, torch):
 
 
 def _filter_sig(fc):
-    """Return signature (fcut, order) tuples for a FilterChain (None -> [])."""
+    """Return signature (fcut, order, damping) tuples for a FilterChain (None -> [])."""
     if fc is None:
         return []
-    return [(round(float(f.fcut), 3), int(f.order)) for f in fc]
+    return [(round(float(f.fcut), 3), int(f.order),
+             round(float(getattr(f, "damping", 0.0)), 6)) for f in fc]
+
+
+class _DampedLowPass:
+    """Second-order low-pass ``1/(1 + 2 zeta s + s^2)``, ``s = i f/fcut``.
+
+    Same interface as ``anemone.system.ButterworthFilter`` (``__call__(f)`` in
+    Hz, ``omega_filter(omega)``, ``fcut``, ``order``), but with a free damping
+    ``zeta``; anemone's order-2 Butterworth is the special case zeta = 1/sqrt(2).
+    Used for the receiver-coil response with ``rx_coil_filter='damped2'``.
+    """
+
+    def __init__(self, fcut, damping):
+        self.fcut = float(fcut)
+        self.damping = float(damping)
+        self.order = 2
+
+    def __call__(self, f):
+        s = 1j * f / self.fcut
+        return 1.0 / (1.0 + 2.0 * self.damping * s + s * s)
+
+    def omega_filter(self, omega):
+        return self(omega / (2.0 * np.pi))
 
 
 # ---------------------------------------------------------------------------
@@ -324,15 +348,24 @@ def _build_forward(system, tx_z, device):
 
         # Each moment uses its own waveform (LM vs HM transmitter waveforms differ)
         wf = m["waveform"]
-        times = torch.as_tensor(m["gate_times"], dtype=torch.float64).to(dev)
+        # 'boxcar': anemone averages dB/dt over [gate open, gate close] when
+        # given the open times as `times` and the close times as `t_end`.
+        if system.get("gate_integration") == "boxcar":
+            t_first = m["gate_open"]
+            t_end = torch.as_tensor(m["gate_close"], dtype=torch.float64).to(dev)
+        else:
+            t_first = m["gate_times"]
+            t_end = None
+        times = torch.as_tensor(t_first, dtype=torch.float64).to(dev)
         # anemone puts the floor of its transform time grid at min(gate)/2 and
         # only lowers it when the whole waveform precedes the first gate.  The
         # convolution sum_j w_j Bstep(t - t_j) silently drops any term whose
         # delay t - t_j falls below that floor (waveform/SR samples just before
         # an early gate, e.g. a turn-off tail past t=0).  Lower the floor to
         # cover the smallest delay before building the transform.
-        dmin = _grid_tmin(m["gate_times"], wf)
-        part = Forward(src, rcv, times, wf, filt, tolerance=1e-6,
+        dmin = _grid_tmin(t_first, wf)
+        part = Forward(src, rcv, times, wf, filt, t_end=t_end,
+                       tolerance=system.get("tolerance", 1e-6),
                        do_setup=False)
         if dmin is not None and dmin / 2. < float(part.tmin):
             part.tmin = torch.as_tensor(dmin / 2., dtype=torch.float64).to(dev)
@@ -355,9 +388,38 @@ def _build_forward(system, tx_z, device):
 
 
 def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
-                          n_previous_pulses=0):
+                          n_previous_pulses=0, rx_coil_filter="two_pole",
+                          gate_integration="centre", tolerance=1e-6):
     """Build the anemone system description from a GEX (+ optional SR2).
 
+    rx_coil_filter : {'two_pole', 'damped2', 'cascade'}
+        How the GEX ``RxCoilLPFilter`` entries are modelled.  All readings but
+        ``'cascade'`` use only the entry of the channel's ``RxCoilNumber``,
+        ``zeta fcut``, as the second-order coil response
+        ``1/(1 + 2 zeta s + s^2)`` (see ``ISSUE_rx_coil_filter.md``):
+
+        * ``'two_pole'`` (default): two first-order poles at ``fcut/zeta``
+          (:func:`integrate.em_system.rx_coil_lowpass`), the same filters
+          GA-AEM and SimPEG use;
+        * ``'damped2'``: the exact second-order response;
+        * ``'cascade'``: the earlier reading, every entry as a Butterworth
+          filter of order ``round(first value)``; kept for comparisons.
+    gate_integration : {'centre', 'boxcar'}
+        ``'centre'`` (default) evaluates dB/dt at the gate centre time;
+        ``'boxcar'`` averages it over the gate (open to close), using anemone's
+        built-in gating.
+    tolerance : float or None
+        anemone's kernel pruning (default ``1e-6``).  At setup, for each gate
+        the (frequency, wavenumber) terms are ranked by their contribution for
+        a 100 ohm-m half-space, and the smallest terms adding up to at most
+        ``tolerance`` of the gate's total absolute contribution are dropped.
+        Fewer terms = faster evaluation (tTEM GEX, GPU: ``1e-5`` ~1.4x,
+        ``1e-4`` ~1.7x faster than ``1e-6``).  On rough random 8-layer models,
+        the share of gates within 1 % of the unpruned result is 99.4 % for
+        ``1e-6``, 96 % for ``1e-5``, 86 % for ``1e-4`` and 76 % for ``1e-3``;
+        the large errors are on gates far below the sounding's peak.
+        ``None`` keeps all terms (~70x more; needs a small ``batch_size`` on
+        GPU).  See ``FORWARD_MODELS.md``.
     file_sr2 : str, optional
         Workbench ``.sr2`` system-response file.  If omitted and the GEX sets
         ``SystemResponseConvolution=1``, ``<gex stem>.sr2`` next to the GEX is
@@ -374,6 +436,15 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
     anemone, torch = _require_anemone()
     from anemone.system import (Loop, Receiver, Waveform, FilterChain,
                                 ButterworthFilter)
+
+    if rx_coil_filter not in ("two_pole", "damped2", "cascade"):
+        raise ValueError("rx_coil_filter must be 'two_pole', 'damped2' or 'cascade', "
+                         "not %r" % (rx_coil_filter,))
+    if tolerance is not None and not 0 < float(tolerance) < 1:
+        raise ValueError("tolerance must be None or between 0 and 1, not %r" % (tolerance,))
+    if gate_integration not in ("centre", "boxcar"):
+        raise ValueError("gate_integration must be 'centre' or 'boxcar', not %r"
+                         % (gate_integration,))
 
     g = _load_gex(gex)
     G = g.gex_dict["General"]
@@ -413,6 +484,7 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
               f"TxLoopArea {tx_area_gex:.3g}")
 
     rx_rows = _butter_rows(G["RxCoilLPFilter"]) if "RxCoilLPFilter" in G else []
+    rx_by_coil = _rx_coil_filter_by_coil(G)
 
     sr2_path = _resolve_sr2(gex, g, file_sr2)
     sr = read_sr2(sr2_path) if sr2_path else {}
@@ -462,15 +534,25 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
         if tib is not None:
             tib = np.atleast_1d(np.asarray(tib, dtype=float))
             filt.append(ButterworthFilter(float(tib[1]), int(round(tib[0]))))
-        for order, fcut in rx_rows:
-            filt.append(ButterworthFilter(float(fcut), int(round(order))))
+        coil = int(np.atleast_1d(chan.get("RxCoilNumber", 1))[0])
+        if rx_coil_filter == "two_pole":
+            for order, fcut in rx_coil_lowpass(G, coil):
+                filt.append(ButterworthFilter(float(fcut), int(order)))
+        elif rx_coil_filter == "damped2":
+            if coil in rx_by_coil:
+                damping, fcut = rx_by_coil[coil]
+                filt.append(_DampedLowPass(fcut, damping))
+        else:
+            for order, fcut in rx_rows:
+                filt.append(ButterworthFilter(float(fcut), int(round(order))))
         filterfunc = FilterChain(filt) if filt else None
         if use_sr and not sr_filters:
             filterfunc = None
 
         i0 = int(g.remove_initial_gates(ch))
         i1 = int(g.no_gates(ch))
-        gate_times = np.asarray(g.gate_times(ch), dtype=float)[i0:i1, 0]
+        gate_table = np.asarray(g.gate_times(ch), dtype=float)[i0:i1]
+        gate_times = gate_table[:, 0]
 
         turns_key = "NumberOfTurnsLM" if mom == "LM" else "NumberOfTurnsHM"
         moments.append({
@@ -480,6 +562,8 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
             "waveform": waveform,
             "filterfunc": filterfunc,
             "gate_times": gate_times,
+            "gate_open": gate_table[:, 1] if gate_table.shape[1] > 2 else None,
+            "gate_close": gate_table[:, 2] if gate_table.shape[1] > 2 else None,
             "n_turns": float(np.atleast_1d(G.get(turns_key, 1))[0]),
             "tx_current": float(np.atleast_1d(
                 chan.get("TxApproximateCurrent", 1.0))[0]),
@@ -494,9 +578,18 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
         signature = "%s|sr=%s|srf=%d|npp=%d" % (
             signature, _file_md5(sr2_path) if sr2_path else "",
             int(bool(sr_filters)), int(n_previous_pulses or 0))
+    if rx_coil_filter != "two_pole" or gate_integration != "centre":
+        signature = "%s|rxf=%s|gi=%s" % (signature, rx_coil_filter, gate_integration)
+    if tolerance != 1e-6:
+        signature = "%s|tol=%r" % (signature, tolerance)
+
+    if gate_integration == "boxcar" and any(m["gate_open"] is None for m in moments):
+        raise ValueError("gate_integration='boxcar' needs gate open/close times in the GEX")
 
     return {
         "n_moments": n_moments,
+        "gate_integration": gate_integration,
+        "tolerance": tolerance,
         "has_tx_coil_position": bool(has_txpos),
         "rx_offset": (float(rx_offset[0]), float(rx_offset[1]),
                       float(rx_offset[2])),
@@ -694,7 +787,8 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     calibration_tol=0.05, doCompress=True, showtime=False,
                     showInfo=0, progress_callback=None, batch_size=1000,
                     file_sr2=None, sr_filters=False, n_previous_pulses=0,
-                    **kwargs):
+                    rx_coil_filter="two_pole", gate_integration="centre",
+                    tolerance=1e-6, **kwargs):
     """Forward TDEM data for one or more resistivity models with anemone.
 
     batch_size : int, optional
@@ -704,6 +798,12 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         System-response / pulse options, see :func:`gex_to_anemone_system`.
         A GEX with ``SystemResponseConvolution=1`` picks up ``<gex stem>.sr2``
         automatically.
+    rx_coil_filter, gate_integration
+        Receiver-coil filter model and gate integration, see
+        :func:`gex_to_anemone_system`.
+    tolerance : float or None
+        Kernel pruning tolerance (default ``1e-6``); larger is faster and less
+        accurate, see :func:`gex_to_anemone_system`.
     """
     anemone, torch = _require_anemone()
     import time
@@ -722,7 +822,10 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     system = gex_to_anemone_system(GEX if GEX is not None else file_gex,
                                    showInfo=showInfo, file_sr2=file_sr2,
                                    sr_filters=sr_filters,
-                                   n_previous_pulses=n_previous_pulses)
+                                   n_previous_pulses=n_previous_pulses,
+                                   rx_coil_filter=rx_coil_filter,
+                                   gate_integration=gate_integration,
+                                   tolerance=tolerance)
 
     forward_anemone.last_sr2 = system.get("sr2_path")
 
@@ -853,7 +956,9 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        calibration_factor=None, calibration_tol=0.05,
                        doCompress=True, force_replace=False, f_prior_data_h5="",
                        batch_size=1000, randomize=True, file_sr2=None,
-                       sr_filters=False, n_previous_pulses=0, **kwargs):
+                       sr_filters=False, n_previous_pulses=0,
+                       rx_coil_filter="two_pole", gate_integration="centre",
+                       tolerance=1e-6, **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
     Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
@@ -861,7 +966,8 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
     ``batch_size`` soundings are forwarded per anemone call (bounds peak GPU
     memory; ``0`` forwards all ``N`` at once). ``randomize`` controls whether a
     copy with ``N < N_in`` draws ``N`` random realizations (default) or the
-    first ``N`` sequentially.
+    first ``N`` sequentially.  ``rx_coil_filter``, ``gate_integration`` and
+    ``tolerance`` are passed to :func:`forward_anemone`.
     Returns the path to the prior-data h5 (always the return value).
     """
     import multiprocessing
@@ -918,7 +1024,10 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                         batch_size=batch_size,
                         progress_callback=progress_callback, showInfo=showInfo,
                         file_sr2=file_sr2, sr_filters=sr_filters,
-                        n_previous_pulses=n_previous_pulses)
+                        n_previous_pulses=n_previous_pulses,
+                        rx_coil_filter=rx_coil_filter,
+                        gate_integration=gate_integration,
+                        tolerance=tolerance)
     if showInfo > -1:
         dt = time.time() - t1
         n_sound = M.shape[0]
@@ -956,6 +1065,9 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
             a["sr2"] = str(sr2_used)
             a["sr_filters"] = bool(sr_filters)
         a["n_previous_pulses"] = int(n_previous_pulses or 0)
+        a["rx_coil_filter"] = str(rx_coil_filter)
+        a["gate_integration"] = str(gate_integration)
+        a["tolerance"] = "none" if tolerance is None else float(tolerance)
         for name, kval in (cal.get("k") or {}).items():
             a["calibration_factor_%s" % name] = float(kval)
         for name, rval in (cal.get("residual") or {}).items():
