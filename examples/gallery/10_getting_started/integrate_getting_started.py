@@ -42,8 +42,12 @@ files = ig.get_case_data(case=case, showInfo=2)
 f_data_h5 = files[0]
 file_gex= ig.get_gex_file_from_data(f_data_h5)
 
-print("Using data file: %s" % f_data_h5)
-print("Using GEX file: %s" % file_gex)
+print(f"Using data file: {f_data_h5}")
+print(f"Using GEX file: {file_gex}")
+
+# update name, label, unit
+ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
+
 
 # %%
 # Plot the geometry and data
@@ -123,9 +127,9 @@ N=2_000_000
 N=1_000_000
 N=100_000
 
-f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5='PRIOR_N%d.h5' % N, 
+f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5', 
                                     showInfo=1)
-#print('%s is used to hold prior realizations' % (f_prior_h5))
+#print(f'{f_prior_h5} is used to hold prior realizations')
 
 
 # %%
@@ -146,19 +150,19 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 # Option 1: Update the existing PRIOR.h5 file with forward-modeled data
 
 # set the default hdf file to be the f_prior_data_h5 (without extension) + file_gex (without extension) + .h5
-f_prior_data_h5 = '%s_%s_Nh280_Nf12.h5' % (f_prior_h5[:-3], file_gex[:-4])
+f_prior_data_h5 = f'{f_prior_h5[:-3]}_{file_gex[:-4]}_Nh280_Nf12.h5' # type: ignore
 useExistingData = True
 if useExistingData:
     # if exist f_post_data_h5 then used it, otherwise create it
-    import os 
+
     if not os.path.exists(f_prior_data_h5):
         f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=True, f_prior_data_h5=f_prior_data_h5)
     else:
-        print('Using existing prior data file: %s' % f_prior_data_h5)
+        print(f'Using existing prior data file: {f_prior_data_h5}')
 
 #f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, doMakePriorCopy=False)
 
-print('Updated %s to hold prior data (forward-modeled responses)' % (f_prior_data_h5))
+print(f'Updated {f_prior_data_h5} to hold prior data (forward-modeled responses)')
 
 # %%
 D = ig.load_prior_data(f_prior_data_h5)[0][0]
@@ -187,7 +191,7 @@ ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,hardcopy=hardcopy)
 N_use = N   # Number of prior samples to use (use all available)
 T_base = 1  # Base annealing temperature for rejection sampling
 autoT = 1   # Automatically estimate optimal annealing temperature
-f_post_h5 = ig.integrate_rejection(f_prior_data_h5,
+f_post_h5 = ig.integrate_rejection(f_prior_data_h5, # type: ignore
                                    f_data_h5,
                                    f_post_h5 = 'POST.h5',
                                    N_use = N_use,
@@ -265,11 +269,11 @@ ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, xaxis='index', pa
 for i in range(1):
     ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, 
                     xaxis='x', gap_threshold=5, panels=['realization'], 
-                    seed=i, title='Posterior realization', f_png='post_%d.png' % (i))
+                    seed=i, title='Posterior realization', f_png=f'post_{i}.png')
     # Plot a single prior realization for model M1
     ig.plot_profile(f_post_h5, ii=i_line, im=1, hardcopy=hardcopy, 
                     xaxis='x', gap_threshold=5, panels=['realization'], 
-                    seed=i, plot_prior=True, title='Prior realization', f_png='prior_%d.png' % (i))
+                    seed=i, plot_prior=True, title='Prior realization', f_png=f'prior_{i}.png')
 
 '''
 mogrify -trim prior*png
@@ -376,9 +380,9 @@ if plPyVista:
     #filtered_df = df[(df['LINE'] > 1000) & (df['LINE'] < 1400) ]
     points = filtered_df[['X', 'Y', 'Z']].values[:]
     median = np.log10(filtered_df['Mean'].values[:])
-    opacity = np.where(filtered_df['Median'].values[:] < 100, 0.5, 1.0)
+    opacity = np.where(filtered_df['Median'].values[:] < 100, 0.5, 1.0) # type: ignore
     #p.add_points(points, render_points_as_spheres=True, point_size=3, scalars=median, cmap='jet', opacity=opacity)
     p.add_points(points, render_points_as_spheres=True, point_size=6, scalars=median, cmap='hot')
-    p.show_grid()
+    p.show_grid() # type: ignore
     p.show()
 

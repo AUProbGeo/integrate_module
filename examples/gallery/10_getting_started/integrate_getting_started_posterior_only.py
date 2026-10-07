@@ -43,14 +43,18 @@ case = 'DAUGAARD'
 files = ig.get_case_data(case=case,  loadType='post')
 f_data_h5 = files[0]
 f_post_h5 = files[-1]
-f_prior_h5 = files[3]
+f_prior_h5 = files[4]
 file_gex= ig.get_gex_file_from_data(f_data_h5)
-    
 
 print("Using data file: %s" % f_data_h5)
 print("Using GEX file: %s" % file_gex)
 print("Using prior in file: %s" % f_prior_h5)
 print("Using posterior in file: %s" % f_post_h5)
+
+
+# update name, label, unit
+ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
+ig.prior_set(f_prior_h5, im=1, name='dBdT', label='Resistivity', unit='V/Am^4')
 
 # %%
 # Plot the geometry and the data

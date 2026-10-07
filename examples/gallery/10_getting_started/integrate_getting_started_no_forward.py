@@ -13,11 +13,11 @@ GA-AEM is not need to run this example.
 # %%
 try:
     # Check if the code is running in an IPython kernel (which includes Jupyter notebooks)
-    get_ipython()
+    get_ipython() # type: ignore
     # If the above line doesn't raise an error, it means we are in a Jupyter environment
     # Execute the magic commands using IPython's run_line_magic function
-    get_ipython().run_line_magic('load_ext', 'autoreload')
-    get_ipython().run_line_magic('autoreload', '2')
+    get_ipython().run_line_magic('load_ext', 'autoreload') # type: ignore
+    get_ipython().run_line_magic('autoreload', '2') # type: ignore
 except:
     # If get_ipython() raises an error, we are not in a Jupyter environment
     # # # # # #%load_ext autoreload
@@ -52,6 +52,10 @@ file_gex= ig.get_gex_file_from_data(f_data_h5)
 print("Using data file: %s" % f_data_h5)
 print("Using GEX file: %s" % file_gex)
 print("Using prior model and data file: %s" % f_prior_h5)
+
+# update name, label, unit
+ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
+ig.prior_set(f_prior_h5, im=1, name='dBdT', label='Resistivity', unit='V/Am^4')
 
 # %%
 # Plot the geometry and the data
@@ -186,6 +190,7 @@ f_csv, f_point_csv = ig.post_to_csv(f_post_h5)
 # Read the CSV file
 #f_point_csv = 'POST_DAUGAARD_AVG_PRIOR_CHI2_NF_3_log-uniform_N100000_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu100000_aT1_M1_point.csv'
 import pandas as pd
+
 df = pd.read_csv(f_point_csv)
 df.head()
 
@@ -193,10 +198,8 @@ df.head()
 # Use Pyvista to plot X,Y,Z,Median
 plPyVista = False
 if plPyVista:
-    import pyvista as pv
     import numpy as np
-    from pyvista import examples
-    #pv.set_jupyter_backend('client')
+    import pyvista as pv
     pv.set_plot_theme("document")
     p = pv.Plotter(notebook=True)
     p = pv.Plotter()
@@ -204,10 +207,10 @@ if plPyVista:
     #filtered_df = df[(df['LINE'] > 1000) & (df['LINE'] < 1400) ]
     points = filtered_df[['X', 'Y', 'Z']].values[:]
     median = np.log10(filtered_df['Mean'].values[:])
-    opacity = np.where(filtered_df['Median'].values[:] < 100, 0.5, 1.0)
+    opacity = np.where(filtered_df['Median'].values[:] < 100, 0.5, 1.0) # type: ignore
     #p.add_points(points, render_points_as_spheres=True, point_size=3, scalars=median, cmap='jet', opacity=opacity)
     p.add_points(points, render_points_as_spheres=True, point_size=6, scalars=median, cmap='hot')
-    p.show_grid()
+    p.show_grid() # type: ignore
     p.show()
 
 
