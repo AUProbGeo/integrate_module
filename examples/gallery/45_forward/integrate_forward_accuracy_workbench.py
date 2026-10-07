@@ -24,6 +24,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
+# Test the soundings of the longest flight line (False, about 120 soundings),
+# or all soundings of the Workbench inversion (True). With True, GA-AEM
+# (single core here) takes several minutes.
+test_all_data = False
+
 # %%
 # 0. Get TTEM data
 # ----------------
@@ -81,12 +86,18 @@ syn_key = syn.flightlines['line_no'].values.astype(np.int64) * n_rec + syn_rec
 lm_row = {k: i for i, k in zip(np.where(syn_seg == 1)[0], syn_key[syn_seg == 1])}
 hm_row = {k: i for i, k in zip(np.where(syn_seg == 2)[0], syn_key[syn_seg == 2])}
 
-# Use every sounding on the longest line that has both an LM and an HM response
-main_line = np.bincount(line_inv).argmax()
+# Use every sounding (on the longest line, or on all lines) that has both an
+# LM and an HM response
 key_inv = line_inv * n_rec + rec_inv
-i_wb = np.array([i for i in np.where(line_inv == main_line)[0]
-                 if key_inv[i] in lm_row and key_inv[i] in hm_row])
-print('Workbench line %d: %d soundings, %d layers' % (main_line, len(i_wb), rho_inv.shape[1]))
+if test_all_data:
+    i_cand = np.arange(len(line_inv))
+    sel_label = 'All lines'
+else:
+    main_line = np.bincount(line_inv).argmax()
+    i_cand = np.where(line_inv == main_line)[0]
+    sel_label = 'Line %d' % main_line
+i_wb = np.array([i for i in i_cand if key_inv[i] in lm_row and key_inv[i] in hm_row])
+print('Workbench %s: %d soundings, %d layers' % (sel_label, len(i_wb), rho_inv.shape[1]))
 
 # Gate centre times of the used GEX gates, i.e. the columns of the forward output
 system = ig.gex_to_em_system(file_gex)
@@ -181,7 +192,7 @@ for c_, lab_ in enumerate(D_wb):
 axs[0].plot([], [], 'ok', label='HGG Workbench')
 axs[0].set_xlabel('Time [s]')
 axs[0].set_ylabel('|dB/dt| [V/Am$^4$]')
-axs[0].set_title('Line %d, 5 soundings' % main_line)
+axs[0].set_title('%s, 5 soundings' % sel_label)
 axs[0].legend(fontsize=8)
 axs[0].grid(True, which='both', alpha=0.3)
 
@@ -193,7 +204,7 @@ axs[1].axhline(0, color='k', lw=0.6)
 axs[1].set_ylim(-8, 8)
 axs[1].set_xlabel('Time [s]')
 axs[1].set_ylabel('Relative difference to HGG Workbench [%]')
-axs[1].set_title('Line %d, %d soundings, LM and HM' % (main_line, len(i_wb)))
+axs[1].set_title('%s, %d soundings, LM and HM' % (sel_label, len(i_wb)))
 axs[1].legend(fontsize=8, markerscale=5)
 axs[1].grid(True, which='both', alpha=0.3)
 
@@ -204,7 +215,7 @@ for c_, lab_ in enumerate(D_wb):
 axs[2].axvline(0, color='k', lw=0.6)
 axs[2].set_xlabel('Relative difference to HGG Workbench [%]')
 axs[2].set_ylabel('Gate count')
-axs[2].set_title('Line %d, %d soundings, LM and HM' % (main_line, len(i_wb)))
+axs[2].set_title('%s, %d soundings, LM and HM' % (sel_label, len(i_wb)))
 axs[2].legend(fontsize=8)
 axs[2].grid(True, alpha=0.3)
 fig.tight_layout()
