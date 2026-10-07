@@ -66,6 +66,10 @@ All data sets (``/Dn`` in DATA.h5 and PRIOR.h5, and ``/Mn`` in PRIOR.h5) can hav
   or ``"LABEL"`` if no unit is set. A trailing ``^n`` in the unit is shown as a superscript;
   LaTeX math (``$...$``) can also be used.
 
+They can be given when saving (e.g. ``ig.save_data_gaussian(..., label='dB/dt', unit='V/Am^4')``),
+and set, changed or removed later with ``ig.data_set(f_h5, id=1, ...)`` for ``/Dn`` (DATA.h5 or PRIOR.h5)
+and ``ig.prior_set(f_prior_h5, im=1, ...)`` for ``/Mn``.
+
 If none of them are set, axes are labelled with the name of the group: ``M1`` for a model ``/M1``,
 ``D3`` for prior data ``/D3``, and ``D1_obs`` (``D1_std``) for observed data ``/D1`` in DATA.h5.
 

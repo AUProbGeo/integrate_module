@@ -418,6 +418,61 @@ def prior_set(f_prior_h5, im=1, **kwargs):
             print('prior_set: %s/cmap updated' % Mstr)
 
 
+def data_set(f_h5, id=1, **kwargs):
+    """
+    Set, update or remove the optional ``name``, ``label`` and ``unit`` of a data set.
+
+    Works on ``/D{id}`` in both DATA.h5 (observed data) and PRIOR.h5 (prior
+    data); the plotting routines use these attributes for titles, axes and
+    colorbars (see :func:`prior_set` for model parameters ``/M{im}``).
+
+    Parameters
+    ----------
+    f_h5 : str
+        Path to the DATA.h5 or PRIOR.h5 file to update.
+    id : int
+        Data set index (e.g., 1 for /D1, default is 1).
+    name : str or None, optional
+        Short display name, used in titles (e.g., 'dBdT').
+    label : str or None, optional
+        Axis/colorbar label (default: ``name``). Plots show 'LABEL (UNIT)', or
+        'LABEL' if no unit is set.
+    unit : str or None, optional
+        Unit of the data (e.g., 'V/Am^4').
+
+    Only the attributes given are changed. Passing ``None`` removes that
+    attribute, so plots fall back to the default label.
+
+    Examples
+    --------
+    >>> ig.data_set('DATA.h5', id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
+    >>> ig.data_set('PRIOR.h5', id=1, label='dB/dt', unit='V/Am^4')
+    >>> ig.data_set('DATA.h5', id=1, unit=None)   # remove the unit
+    """
+    Dstr = 'D%d' % id
+
+    if not os.path.exists(f_h5):
+        print('data_set: File %s does not exist (will not create)' % f_h5)
+        return
+
+    with h5py.File(f_h5, 'a') as f:
+        if Dstr not in f:
+            print('data_set: %s not found in %s' % (Dstr, f_h5))
+            return
+
+        ds = f[Dstr]
+        for _k in ('name', 'label', 'unit'):
+            if _k not in kwargs:
+                continue
+            if _k in ds.attrs:
+                del ds.attrs[_k]
+            if kwargs[_k] is None:
+                print('data_set: %s/%s removed' % (Dstr, _k))
+            else:
+                ds.attrs[_k] = str(kwargs[_k])
+                print('data_set: %s/%s = %r' % (Dstr, _k, kwargs[_k]))
+
+
 def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     """
     Compute posterior statistics for all model parameters in a POST HDF5 file.
@@ -1531,7 +1586,9 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
     im = im + 1
     ig.save_prior_model(f_prior_h5, M_rho,
                 im=im,
-                name='resistivity',
+                name='Resistivity',
+                label='Resistivity',
+                unit='ohmm',
                 is_discrete=0,
                 x=z,
                 z=z,
@@ -1696,6 +1753,8 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
     ig.save_prior_model(f_prior_h5,M_rho.astype(np.float32),
                 im=1,
                 name='Resistivity',
+                label='Resistivity',
+                unit='ohmm',
                 is_discrete = 0,
                 x = z,
                 z = z,
@@ -1888,6 +1947,8 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     ig.save_prior_model(f_prior_h5,M_rho.astype(np.float32),
                 im=1,
                 name='Resistivity',
+                label='Resistivity',
+                unit='ohmm',
                 is_discrete = 0, 
                 x = z,
                 z = z,
@@ -2187,6 +2248,8 @@ def prior_model_smooth(N=100000, regularization='L2',
     ig.save_prior_model(f_prior_h5, M_rho.astype(np.float32),
                         im=1,
                         name='Resistivity',
+                        label='Resistivity',
+                        unit='ohmm',
                         is_discrete=0,
                         x=z,
                         z=z,

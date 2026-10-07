@@ -21,6 +21,7 @@ from integrate.integrate_rejection import compute_hypothesis_probability
 from integrate.integrate import integrate_update_prior_attributes
 from integrate.integrate import integrate_posterior_stats
 from integrate.integrate import prior_set
+from integrate.integrate import data_set
 from integrate.integrate import logl_T_est
 from integrate.integrate import lu_post_sample_logl
 from integrate.integrate import prior_data
