@@ -1010,6 +1010,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         - plotPoints : bool, plot grey background dots at all data locations
           (default is False). ``plot_data_locations`` is accepted as a
           deprecated alias.
+        - EV_min : float, minimum log(EV) color scale value (default is the 1st percentile)
+        - EV_max : float, maximum log(EV) color scale value (default is the 99th percentile)
         - CHI2_min : float, minimum CHI2 color scale value (default is 0)
         - CHI2_max : float, maximum CHI2 color scale value (default is 5)
         - N_UNIQUE_min : float, minimum N_UNIQUE color scale value (default is auto)
@@ -1043,6 +1045,8 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
             "plot_T_EV: 'plot_data_locations' is deprecated, use 'plotPoints'",
             DeprecationWarning, stacklevel=2)
         plotPoints = kwargs.pop('plot_data_locations')
+    EV_min = kwargs.pop('EV_min', None)
+    EV_max = kwargs.pop('EV_max', None)
     CHI2_min = kwargs.pop('CHI2_min', 0)
     CHI2_max = kwargs.pop('CHI2_max', 5)
     N_UNIQUE_min = kwargs.pop('N_UNIQUE_min', None)
@@ -1105,8 +1109,16 @@ def plot_T_EV(f_post_h5, i1=1, i2=1e+9, T_min=1, T_max=100, pl='all', hardcopy=F
         plt.show()
 
     if (pl=='all') or (pl=='EV'):
-        EV_max = 0
-        EV_min = np.percentile(EV, 1)
+        # Colour scale from the plotted values (1st-99th percentile); the
+        # normalized evidence is not bounded above by 0
+        ev_ok = np.asarray(EV[i1:i2], dtype=float)
+        ev_ok = ev_ok[np.isfinite(ev_ok)]
+        if EV_min is None:
+            EV_min = np.percentile(ev_ok, 1) if ev_ok.size else 0
+        if EV_max is None:
+            EV_max = np.percentile(ev_ok, 99) if ev_ok.size else 1
+        if EV_max <= EV_min:
+            EV_max = EV_min + 1
         cmap_ev, clim_ev = get_colormap_and_limits(cmap_type='evidence', custom_clim=[EV_min, EV_max])
         f_png = '%s_%d_%d_EV.png' % (base, i1, i2) if hardcopy else False
         plot_xy(EV[i1:i2], cmap=cmap_ev, clim=list(clim_ev),
