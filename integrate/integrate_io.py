@@ -5412,7 +5412,7 @@ def write_borehole(W, filename, **kwargs):
     return filename
 
 
-def read_borehole(filename, **kwargs):
+def read_borehole(filename, **kwargs) -> Any:
     """
     Read one or more borehole dictionaries from a JSON file.
 
