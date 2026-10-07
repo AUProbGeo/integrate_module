@@ -225,9 +225,9 @@ def _compute_mode_parallel(M_lithology, z, depth_top, depth_bottom, nl, Ncpu, sh
 
     Splits realizations across worker processes and uses shared memory for efficiency.
     """
+    import os
     import numpy as np
     import multiprocessing
-    from multiprocessing import Pool
     import integrate as ig
     import time
     from tqdm import tqdm
@@ -269,8 +269,13 @@ def _compute_mode_parallel(M_lithology, z, depth_top, depth_bottom, nl, Ncpu, sh
             for chunk_indices in realization_chunks
         ]
 
-        # Execute in parallel
-        with Pool(processes=Ncpu) as p:
+        # Execute in parallel.  Linux: 'fork' explicitly, since Python 3.14
+        # defaults to 'forkserver', which re-imports the calling script and
+        # fails without an `if __name__ == "__main__":` guard.  Windows/macOS:
+        # 'spawn', as in gaaem_forward and integrate_rejection.
+        is_spawn = os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin')
+        ctx = multiprocessing.get_context('spawn' if is_spawn else 'fork')
+        with ctx.Pool(processes=Ncpu) as p:
             if showInfo > 1:
                 # Use imap to get results as they complete and show progress
                 results = list(tqdm(

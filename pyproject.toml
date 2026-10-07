@@ -7,7 +7,7 @@ name = "integrate_module"
 version = "0.99.9"
 description = "Localized probabilistic data integration"
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = "==3.13.*"
+requires-python = ">=3.11"
 authors = [{ name = "Thomas Mejer Hansen", email = "tmeha@geo.au.dk" }]
 license = {text = "MIT"}
 keywords = ["inversion","electromagnetic", "geophysics", "geology", "prior", "tarantola"]
