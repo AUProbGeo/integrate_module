@@ -1,0 +1,1158 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Raw Material Assessment" href="../85_rawmaterial/index.html"><link rel="prev" title="Plotting" href="index.html">
+        <link rel="canonical" href="https://auprobgeo.github.io/integrate_module/auto_examples/80_plotting/integrate_profiles.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>Profile Visualization in INTEGRATE - INTEGRATE 0.99.9 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=fd6457a4" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">INTEGRATE 0.99.9 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">INTEGRATE 0.99.9 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../gettingstarted.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../format.html">Data format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../format_wells.html">Borehole Data Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../format_query.html">Query Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../prior_data.html">Prior Data Generation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../rejection.html">Rejection Sampling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../workflow.html">Workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../plotting.html">Plotting profiles</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Example Gallery</a><input aria-label="Toggle navigation of Example Gallery" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../10_getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../10_getting_started/integrate_getting_started.html">Getting started with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../10_getting_started/integrate_getting_started_no_forward.html">Getting started with INTEGRATE - with no forward code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../10_getting_started/integrate_getting_started_posterior_only.html">Getting started with INTEGRATE - posterior analysis only</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../20_workflow/index.html">The Complete Workflow</a><input aria-label="Toggle navigation of The Complete Workflow" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../20_workflow/integrate_workflow.html">The complete INTEGRATE workflow: from data to posterior</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../20_workflow/test.html">The complete INTEGRATE workflow: from data to posterior</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../30_data/index.html">Data</a><input aria-label="Toggle navigation of Data" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../30_data/integrate_boreholes.html">Borehole data in INTEGRATE – representation and integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../30_data/integrate_dual_data.html">Dual data types (low and high moment seperately)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../40_noise/index.html">Noise</a><input aria-label="Toggle navigation of Noise" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../40_noise/integrate_gaussian_noise.html">Synthetic Case Study example with different noise models (uncorrelated/correlated)</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../45_forward/index.html">Forward Models</a><input aria-label="Toggle navigation of Forward Models" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../45_forward/integrate_forward_accuracy_workbench.html">Compare forward models to HGG Workbench</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../45_forward/integrate_forward_backends_runtime.html">Run time of the EM forward models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../45_forward/integrate_forward_effect_on_posterior.html">Effect of the EM forward model on the posterior</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../50_hypothesis/index.html">Hypothesis Testing</a><input aria-label="Toggle navigation of Hypothesis Testing" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../50_hypothesis/integrate_daugaard_multi_prior.html">Daugaard Case Study with three lithology-resistivity prior models.</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../50_hypothesis/integrate_daugaard_multi_prior_multi_data.html">Daugaard Case Study with geology-resistivity-category prior models.</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../60_query/index.html">Querying the Posterior</a><input aria-label="Toggle navigation of Querying the Posterior" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../60_query/integrate_query.html">query: Posterior Query Tool</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../70_synthetic/index.html">Synthetic Case</a><input aria-label="Toggle navigation of Synthetic Case" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../70_synthetic/integrate_synthetic_case.html">INTEGRATE Synthetic Case Study example</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Plotting</a><input aria-label="Toggle navigation of Plotting" checked="" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Profile Visualization in INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../85_rawmaterial/index.html">Raw Material Assessment</a><input aria-label="Toggle navigation of Raw Material Assessment" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../85_rawmaterial/integrate_rawmaterial_daugaard.html">Daugaard: probabilistic raw-material assessment with INTEGRATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../85_rawmaterial/integrate_rawmaterial_sdrfelding.html">Sdr. Felding: probabilistic raw-material assessment with INTEGRATE</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../90_other/index.html">Other Examples</a><input aria-label="Toggle navigation of Other Examples" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_esbjerg.html">INTEGRATE on ESBJERG data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_linear_logspace.html">Data, and noise, in linear or log space</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_merge_data.html">Merging multiple data files from the same survey (ESBJERG)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_merge_prior.html">INTEGRATE - Demonstration of merge_prior() function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_priors.html">INTEGRATE -Generic Prior Model Generation Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../90_other/integrate_timing_example.html">INTEGRATE Timing Analysis Example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../contributions.html">Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../modules.html">Modules (documentation)</a><input aria-label="Toggle navigation of Modules (documentation)" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate.html">integrate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_rejection.html">integrate_rejection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_io.html">integrate_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_plot.html">integrate_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_borehole.html">integrate_borehole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../modules/integrate_query.html">integrate_query</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          
+
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-auto-examples-80-plotting-integrate-profiles-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="profile-visualization-in-integrate">
+<span id="sphx-glr-auto-examples-80-plotting-integrate-profiles-py"></span><h1>Profile Visualization in INTEGRATE<a class="headerlink" href="#profile-visualization-in-integrate" title="Link to this heading">¶</a></h1>
+<p>This notebook demonstrates the many ways to visualize posterior inversion
+results as 2-D cross-section profiles using <code class="docutils literal notranslate"><span class="pre">ig.plot_profile()</span></code>.</p>
+<p>The DAUGAARD tTEM case study is used throughout: it contains two model types</p>
+<ul class="simple">
+<li><p><strong>M1</strong> – continuous resistivity (log-resistivity layers)</p></li>
+<li><p><strong>M2</strong> – discrete lithology classes</p></li>
+</ul>
+<section id="topics-covered">
+<h2>Topics covered<a class="headerlink" href="#topics-covered" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Setup and data files</p></li>
+<li><p>Survey map and profile-line selection</p></li>
+<li><p>X-axis choices: sequential index, UTM-X, UTM-Y</p></li>
+<li><p>Handling spatial gaps (<code class="docutils literal notranslate"><span class="pre">gap_threshold=</span></code>)</p></li>
+<li><p>Selecting a single model (<code class="docutils literal notranslate"><span class="pre">im=</span></code>)</p></li>
+<li><p>All models at once (<code class="docutils literal notranslate"><span class="pre">im=0</span></code>)</p></li>
+<li><p>Index-range selection (<code class="docutils literal notranslate"><span class="pre">i1=</span></code>, <code class="docutils literal notranslate"><span class="pre">i2=</span></code>) as an alternative to <code class="docutils literal notranslate"><span class="pre">ii=</span></code></p></li>
+<li><p>Choosing individual panels</p></li>
+<li><p>Uncertainty transparency (<code class="docutils literal notranslate"><span class="pre">alpha=</span></code>)</p></li>
+<li><p>KL divergence instead of entropy / std (<code class="docutils literal notranslate"><span class="pre">plot_kl=True</span></code>)</p></li>
+<li><p>Prior and posterior realizations (<code class="docutils literal notranslate"><span class="pre">panels=['realization']</span></code>)</p></li>
+<li><p>Number of unique realizations (<code class="docutils literal notranslate"><span class="pre">show_n_unique=True</span></code>)</p></li>
+<li><p>Titles and saving to file (<code class="docutils literal notranslate"><span class="pre">title=</span></code>, <code class="docutils literal notranslate"><span class="pre">hardcopy=True</span></code>, <code class="docutils literal notranslate"><span class="pre">f_png=</span></code>)</p></li>
+<li><p>Combined options</p></li>
+</ol>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="n">get_ipython</span><span class="p">()</span>
+    <span class="n">get_ipython</span><span class="p">()</span><span class="o">.</span><span class="n">run_line_magic</span><span class="p">(</span><span class="s1">'load_ext'</span><span class="p">,</span> <span class="s1">'autoreload'</span><span class="p">)</span>
+    <span class="n">get_ipython</span><span class="p">()</span><span class="o">.</span><span class="n">run_line_magic</span><span class="p">(</span><span class="s1">'autoreload'</span><span class="p">,</span> <span class="s1">'2'</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">integrate</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ig</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">ion</span><span class="p">()</span>
+
+<span class="c1"># Global flag – set to True to write PNG files alongside each plot</span>
+<span class="n">hardcopy</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+</section>
+<section id="data-files">
+<h2>1. Data files<a class="headerlink" href="#data-files" title="Link to this heading">¶</a></h2>
+<p>All examples below rely on three files from the DAUGAARD case study.
+Download them once with <code class="docutils literal notranslate"><span class="pre">ig.get_case_data()</span></code> (commented out below).</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">f_prior_h5</span> <span class="o">=</span> <span class="s1">'daugaard_merged_N2000000.h5'</span>
+<span class="n">f_post_h5</span> <span class="o">=</span> <span class="s1">'post_daugaard_merged_N2000000_Nuse1000000_inflateNoise2.h5'</span>
+<span class="n">f_data_h5</span>  <span class="o">=</span> <span class="s1">'DAUGAARD_AVG_gf2.h5'</span>
+<span class="n">file_gex</span>   <span class="o">=</span> <span class="s1">'TX07_20231016_2x4_RC20-33.gex'</span>
+
+<span class="n">ig</span><span class="o">.</span><span class="n">get_case_data</span><span class="p">(</span><span class="n">case</span><span class="o">=</span><span class="s1">'DAUGAARD'</span><span class="p">,</span> <span class="n">filelist</span><span class="o">=</span><span class="p">[</span>
+    <span class="n">f_prior_h5</span><span class="p">,</span> <span class="n">f_post_h5</span><span class="p">,</span> <span class="n">f_data_h5</span><span class="p">,</span> <span class="n">file_gex</span>
+<span class="p">])</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting data for case: DAUGAARD
+
+Downloading DAUGAARD:   0%|          | 0/4 [00:00&lt;?, ?it/s]Downloaded daugaard_merged_N2000000.h5
+
+Downloading DAUGAARD:  25%|██▌       | 1/4 [01:37&lt;04:52, 97.49s/it]Downloaded post_daugaard_merged_N2000000_Nuse1000000_inflateNoise2.h5
+
+Downloading DAUGAARD:  50%|█████     | 2/4 [01:43&lt;01:27, 43.68s/it]Downloaded DAUGAARD_AVG_gf2.h5
+
+Downloading DAUGAARD:  75%|███████▌  | 3/4 [01:47&lt;00:25, 25.34s/it]Downloaded TX07_20231016_2x4_RC20-33.gex
+
+Downloading DAUGAARD: 100%|██████████| 4/4 [01:47&lt;00:00, 15.41s/it]
+Downloading DAUGAARD: 100%|██████████| 4/4 [01:47&lt;00:00, 26.80s/it]
+--&gt; Got data for case: DAUGAARD
+
+['daugaard_merged_N2000000.h5', 'post_daugaard_merged_N2000000_Nuse1000000_inflateNoise2.h5', 'DAUGAARD_AVG_gf2.h5', 'TX07_20231016_2x4_RC20-33.gex']
+</pre></div>
+</div>
+</section>
+<section id="survey-overview-and-profile-line-selection">
+<h2>2. Survey overview and profile-line selection<a class="headerlink" href="#survey-overview-and-profile-line-selection" title="Link to this heading">¶</a></h2>
+<p>Before plotting profiles we need to know <em>which</em> data points form a
+coherent line.  Two strategies are shown:</p>
+<ul class="simple">
+<li><p><strong>Strategy A</strong> – select by survey line number</p></li>
+<li><p><strong>Strategy B</strong> – spatial buffer query along a UTM line segment</p></li>
+</ul>
+<p>The result in both cases is <code class="docutils literal notranslate"><span class="pre">id_line</span></code>: a 1-D index array that is passed
+to every subsequent call via <code class="docutils literal notranslate"><span class="pre">ii=id_line</span></code>.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="n">pl</span><span class="o">=</span><span class="s1">'NDATA'</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'viridis'</span><span class="p">,</span> <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_001.png" srcset="../../_images/sphx_glr_integrate_profiles_001.png" alt="Number of Data (non-NaN)" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>f_data_h5=DAUGAARD_AVG_gf2.h5
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">LINE</span><span class="p">,</span> <span class="n">ELEVATION</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">get_geometry</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">f_data_h5</span><span class="p">,</span> <span class="s1">'r'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f_data</span><span class="p">:</span>
+    <span class="n">NON_NAN</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">f_data</span><span class="p">[</span><span class="s1">'/D1/d_obs'</span><span class="p">]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># --- Strategy A: use the most-common survey line number ---</span>
+<span class="n">unique_lines</span><span class="p">,</span> <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">LINE</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">most_frequent_line</span>   <span class="o">=</span> <span class="n">unique_lines</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">counts</span><span class="p">)]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Most frequent line number:"</span><span class="p">,</span> <span class="n">most_frequent_line</span><span class="p">)</span>
+
+<span class="n">id_line_A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">LINE</span> <span class="o">==</span> <span class="n">most_frequent_line</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="c1"># Trim to the first continuous run of consecutive indices</span>
+<span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">id_line_A</span><span class="p">)</span>
+<span class="n">cut</span>  <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">diff</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cut</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="n">id_line_A</span> <span class="o">=</span> <span class="n">id_line_A</span><span class="p">[:</span> <span class="n">cut</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+
+<span class="c1"># --- Strategy B: spatial buffer along UTM coordinates ---</span>
+<span class="n">Xl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">544500</span><span class="p">,</span> <span class="mi">543150</span><span class="p">])</span>
+<span class="n">Yl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">6175000</span><span class="p">,</span> <span class="mi">6176500</span><span class="p">])</span>
+<span class="n">id_line_B</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ig</span><span class="o">.</span><span class="n">find_points_along_line_segments</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Xl</span><span class="p">,</span> <span class="n">Yl</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="mf">10.0</span>
+<span class="p">)</span>
+
+<span class="c1"># Use strategy B as the default profile line for all examples below</span>
+<span class="n">id_line</span> <span class="o">=</span> <span class="n">id_line_B</span>
+
+<span class="c1"># Map showing the selected profile</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">NON_NAN</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'All survey points'</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">id_line</span><span class="p">],</span> <span class="n">Y</span><span class="p">[</span><span class="n">id_line</span><span class="p">],</span> <span class="s1">'r.'</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+         <span class="n">label</span><span class="o">=</span><span class="s1">'Selected profile (id_line)'</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s1">'Non-NaN gate count'</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">'Easting (m)'</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">'Northing (m)'</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">'Survey overview – selected profile highlighted in red'</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">'equal'</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">hardcopy</span><span class="p">:</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s1">'profile_survey_overview.png'</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_002.png" srcset="../../_images/sphx_glr_integrate_profiles_002.png" alt="Survey overview – selected profile highlighted in red" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Most frequent line number: 150.0
+</pre></div>
+</div>
+</section>
+<section id="x-axis-choices">
+<h2>3. X-axis choices<a class="headerlink" href="#x-axis-choices" title="Link to this heading">¶</a></h2>
+<p>The horizontal axis of the profile cross-section can show different
+coordinate types.  All remaining examples use <code class="docutils literal notranslate"><span class="pre">xaxis='x'</span></code> (UTM easting)
+because it gives physically meaningful spacing.</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">xaxis=</span></code></p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">'index'</span></code></p></td>
+<td><p>Renumbered sequential indices 0, 1, 2, … (default)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">'id'</span></code></p></td>
+<td><p>Original data-point IDs from the file</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">'x'</span></code></p></td>
+<td><p>UTM easting (metres)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">'y'</span></code></p></td>
+<td><p>UTM northing (metres)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'index'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_003.png" srcset="../../_images/sphx_glr_integrate_profiles_003.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_004.png" srcset="../../_images/sphx_glr_integrate_profiles_004.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'y'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_005.png" srcset="../../_images/sphx_glr_integrate_profiles_005.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+</section>
+<section id="handling-spatial-gaps">
+<h2>4. Handling spatial gaps<a class="headerlink" href="#handling-spatial-gaps" title="Link to this heading">¶</a></h2>
+<p>When the selected points are not all adjacent (e.g. data from multiple
+flight lines are concatenated) a <code class="docutils literal notranslate"><span class="pre">gap_threshold</span></code> renders the discontinuous
+regions fully transparent, making line breaks clearly visible.</p>
+<p>The threshold is expressed in the same units as the chosen x-axis:
+metres for <code class="docutils literal notranslate"><span class="pre">'x'</span></code> / <code class="docutils literal notranslate"><span class="pre">'y'</span></code>, point count for <code class="docutils literal notranslate"><span class="pre">'index'</span></code>.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_006.png" srcset="../../_images/sphx_glr_integrate_profiles_006.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_007.png" srcset="../../_images/sphx_glr_integrate_profiles_007.png" alt="Mode, Entropy" class = "sphx-glr-single-img"/><p>—
+All examples from here on use <strong>``ii=id_line``</strong> and <strong>``xaxis=’x’``</strong>
+as the standard spatial profile configuration.
+—</p>
+</section>
+<section id="selecting-a-single-model">
+<h2>5. Selecting a single model<a class="headerlink" href="#selecting-a-single-model" title="Link to this heading">¶</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">im=1</span></code>, <code class="docutils literal notranslate"><span class="pre">im=2</span></code>, … to target a specific model in the posterior file.</p>
+<ul class="simple">
+<li><p><strong>M1</strong> – continuous resistivity (log-resistivity layers)</p></li>
+<li><p><strong>M2</strong> – discrete lithology classes</p></li>
+</ul>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_008.png" srcset="../../_images/sphx_glr_integrate_profiles_008.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_009.png" srcset="../../_images/sphx_glr_integrate_profiles_009.png" alt="Mode, Entropy" class = "sphx-glr-single-img"/></section>
+<section id="all-models-at-once">
+<h2>6. All models at once<a class="headerlink" href="#all-models-at-once" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">im=0</span></code> (the default) detects every model stored in the posterior file and
+produces one figure per model automatically.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_010.png" srcset="../../_images/sphx_glr_integrate_profiles_010.png" alt="LogStd Resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_011.png" srcset="../../_images/sphx_glr_integrate_profiles_011.png" alt="Mode, Entropy" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Plot profile for all model parameters
+Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+Only nm=1, model parameters. no profile will be plot
+</pre></div>
+</div>
+</section>
+<section id="index-range-selection-as-an-alternative-to-ii">
+<h2>7. Index-range selection as an alternative to <code class="docutils literal notranslate"><span class="pre">ii=</span></code><a class="headerlink" href="#index-range-selection-as-an-alternative-to-ii" title="Link to this heading">¶</a></h2>
+<p>When you just want a quick look at a contiguous block of data points you
+can use <code class="docutils literal notranslate"><span class="pre">i1</span></code> / <code class="docutils literal notranslate"><span class="pre">i2</span></code> instead of building an explicit index array.</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>How to use</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">i1</span></code> / <code class="docutils literal notranslate"><span class="pre">i2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">plot_profile(f,</span> <span class="pre">i1=100,</span> <span class="pre">i2=300)</span></code></p></td>
+<td><p>1-based inclusive range</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ii=</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">plot_profile(f,</span> <span class="pre">ii=id_line)</span></code></p></td>
+<td><p>Arbitrary array; overrides <code class="docutils literal notranslate"><span class="pre">i1</span></code>/<code class="docutils literal notranslate"><span class="pre">i2</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">i1</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">i2</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_012.png" srcset="../../_images/sphx_glr_integrate_profiles_012.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">[::</span><span class="mi">2</span><span class="p">],</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>  <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_013.png" srcset="../../_images/sphx_glr_integrate_profiles_013.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+</section>
+<section id="choosing-individual-panels">
+<h2>8. Choosing individual panels<a class="headerlink" href="#choosing-individual-panels" title="Link to this heading">¶</a></h2>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">panels=</span></code> to show only a subset of the three panels.</p>
+<p><strong>Continuous models</strong> – available panels: <code class="docutils literal notranslate"><span class="pre">'value'</span></code>, <code class="docutils literal notranslate"><span class="pre">'std'</span></code>, <code class="docutils literal notranslate"><span class="pre">'stats'</span></code>
+(aliases: <code class="docutils literal notranslate"><span class="pre">'median'</span></code>/<code class="docutils literal notranslate"><span class="pre">'mean'</span></code> → <code class="docutils literal notranslate"><span class="pre">'value'</span></code>; <code class="docutils literal notranslate"><span class="pre">'uncertainty'</span></code> → <code class="docutils literal notranslate"><span class="pre">'std'</span></code>;
+<code class="docutils literal notranslate"><span class="pre">'t'</span></code>/<code class="docutils literal notranslate"><span class="pre">'temperature'</span></code> → <code class="docutils literal notranslate"><span class="pre">'stats'</span></code>)</p>
+<p><strong>Discrete models</strong> – available panels: <code class="docutils literal notranslate"><span class="pre">'mode'</span></code>, <code class="docutils literal notranslate"><span class="pre">'entropy'</span></code>, <code class="docutils literal notranslate"><span class="pre">'stats'</span></code>
+(alias: <code class="docutils literal notranslate"><span class="pre">'t'</span></code>/<code class="docutils literal notranslate"><span class="pre">'temperature'</span></code> → <code class="docutils literal notranslate"><span class="pre">'stats'</span></code>)</p>
+<p>Both model types also accept <code class="docutils literal notranslate"><span class="pre">'realization'</span></code> in place of the first panel
+(see section 11).</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>  <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">])</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_014.png" srcset="../../_images/sphx_glr_integrate_profiles_014.png" alt="integrate profiles" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">])</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_015.png" srcset="../../_images/sphx_glr_integrate_profiles_015.png" alt="integrate profiles" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>  <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'std'</span><span class="p">])</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_016.png" srcset="../../_images/sphx_glr_integrate_profiles_016.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">])</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_017.png" srcset="../../_images/sphx_glr_integrate_profiles_017.png" alt="Mode" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">])</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_018.png" srcset="../../_images/sphx_glr_integrate_profiles_018.png" alt="Mode" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'entropy'</span><span class="p">])</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_019.png" srcset="../../_images/sphx_glr_integrate_profiles_019.png" alt="Entropy" class = "sphx-glr-single-img"/></section>
+<section id="uncertainty-transparency">
+<h2>9. Uncertainty transparency<a class="headerlink" href="#uncertainty-transparency" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">alpha</span></code> (0–1) fades out uncertain regions in the primary panel:</p>
+<ul class="simple">
+<li><p><strong>M1</strong> (continuous): driven by standard deviation</p></li>
+<li><p><strong>M2</strong> (discrete):   driven by entropy</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">alpha=0</span></code> → fully opaque everywhere (default)
+<code class="docutils literal notranslate"><span class="pre">alpha=1</span></code> → maximum fade where uncertainty is highest</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">std_min</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">std_max</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_020.png" srcset="../../_images/sphx_glr_integrate_profiles_020.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">std_min</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">std_max</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_021.png" srcset="../../_images/sphx_glr_integrate_profiles_021.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">entropy_min</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">entropy_max</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+                <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_022.png" srcset="../../_images/sphx_glr_integrate_profiles_022.png" alt="Mode (with uncertainty transparency), Entropy" class = "sphx-glr-single-img"/></section>
+<section id="kl-divergence">
+<h2>10. KL divergence<a class="headerlink" href="#kl-divergence" title="Link to this heading">¶</a></h2>
+<p>KL divergence measures how much the posterior distribution differs from
+the prior.  It is stored under <code class="docutils literal notranslate"><span class="pre">Mx/KL</span></code> in the posterior file after
+running <code class="docutils literal notranslate"><span class="pre">ig.integrate_posterior_stats(...,</span> <span class="pre">computeKL=True)</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">plot_kl=True</span></code> substitutes it for the uncertainty panel:</p>
+<ul class="simple">
+<li><p><strong>M1</strong>: replaces Std</p></li>
+<li><p><strong>M2</strong>: replaces Entropy</p></li>
+</ul>
+<p>If <code class="docutils literal notranslate"><span class="pre">Mx/KL</span></code> is absent the function falls back to the standard panel
+with a warning.</p>
+<p>ig.integrate_posterior_stats(f_post_h5, computeKL=True)</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span> <span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_023.png" srcset="../../_images/sphx_glr_integrate_profiles_023.png" alt="KL Divergence Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+/home/tmeha/PROGRAMMING/integrate_module/.venv/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py:4798: UserWarning: Warning: 'partition' will ignore the 'mask' of the MaskedArray.
+  arr.partition(
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_024.png" srcset="../../_images/sphx_glr_integrate_profiles_024.png" alt="Mode, KL Divergence" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">,</span> <span class="s1">'entropy'</span><span class="p">],</span>
+                <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_025.png" srcset="../../_images/sphx_glr_integrate_profiles_025.png" alt="Mode, KL Divergence" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'entropy'</span><span class="p">],</span> <span class="n">plot_kl</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'entropy'</span><span class="p">],</span> <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_026.png" srcset="../../_images/sphx_glr_integrate_profiles_026.png" alt="Entropy" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_027.png" srcset="../../_images/sphx_glr_integrate_profiles_027.png" alt="KL Divergence" class = "sphx-glr-multi-img"/></li>
+</ul>
+</section>
+<section id="prior-and-posterior-realizations">
+<h2>11. Prior and posterior realizations<a class="headerlink" href="#prior-and-posterior-realizations" title="Link to this heading">¶</a></h2>
+<p>Every panel so far shows a <em>statistic</em> of the posterior (median, mode, std,
+entropy, …). Statistics are smooth by construction and hide how a single
+realization actually looks. <code class="docutils literal notranslate"><span class="pre">panels=['realization']</span></code> replaces the first
+panel with one <strong>realization per location</strong>.</p>
+<p>The posterior file stores <code class="docutils literal notranslate"><span class="pre">/i_use</span></code> of shape <code class="docutils literal notranslate"><span class="pre">(n_soundings,</span> <span class="pre">n_real)</span></code>: for each
+sounding, the indices of the prior models that were accepted as posterior
+samples. For each location in the profile one random entry of <code class="docutils literal notranslate"><span class="pre">/i_use</span></code> is
+drawn and the corresponding prior model is plotted. Columns are therefore
+independent draws – neighbouring soundings are <em>not</em> forced to be consistent –
+which is exactly what a realization-based section should show.</p>
+<p><code class="docutils literal notranslate"><span class="pre">seed</span></code> makes the random draw reproducible.</p>
+<p>Posterior realization – continuous resistivity, with std and stats panels</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">,</span> <span class="s1">'std'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization (seed=1)'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_028.png" srcset="../../_images/sphx_glr_integrate_profiles_028.png" alt="Posterior realization (seed=1), Realization Resistivity, LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+</pre></div>
+</div>
+<p>Two more draws – same location, different realizations</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+    <span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                    <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+                    <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization (seed=</span><span class="si">%d</span><span class="s1">)'</span> <span class="o">%</span> <span class="n">seed</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_029.png" srcset="../../_images/sphx_glr_integrate_profiles_029.png" alt="Posterior realization (seed=2), Realization Resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_030.png" srcset="../../_images/sphx_glr_integrate_profiles_030.png" alt="Posterior realization (seed=3), Realization Resistivity" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Getting cmap from attribute
+</pre></div>
+</div>
+<p>Posterior realization – discrete lithology</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">,</span> <span class="s1">'entropy'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization (seed=1)'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_031.png" srcset="../../_images/sphx_glr_integrate_profiles_031.png" alt="Posterior realization (seed=1), Realization, Entropy" class = "sphx-glr-single-img"/><section id="prior-realizations">
+<h3>Prior realizations<a class="headerlink" href="#prior-realizations" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">plot_prior=True</span></code> replaces <code class="docutils literal notranslate"><span class="pre">/i_use</span></code> with random prior indices of the same
+shape before the draw, so the panel shows a <em>prior</em> realization per location.
+Comparing a prior and a posterior section with the same <code class="docutils literal notranslate"><span class="pre">seed</span></code> is a direct
+visual check of how much the data constrain the model.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">plot_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Prior realization'</span><span class="p">)</span>
+<span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization'</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_032.png" srcset="../../_images/sphx_glr_integrate_profiles_032.png" alt="Prior realization, Prior realization Resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_033.png" srcset="../../_images/sphx_glr_integrate_profiles_033.png" alt="Posterior realization, Realization Resistivity" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Getting cmap from attribute
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">plot_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Prior realization'</span><span class="p">)</span>
+<span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization'</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_034.png" srcset="../../_images/sphx_glr_integrate_profiles_034.png" alt="Prior realization, Prior realization" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_035.png" srcset="../../_images/sphx_glr_integrate_profiles_035.png" alt="Posterior realization, Realization" class = "sphx-glr-multi-img"/></li>
+</ul>
+<p>Uncertainty transparency works on the realization panel too: cells with high
+posterior std / entropy are faded, so the realization is shown together with
+how well it is constrained.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+                <span class="n">entropy_min</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">entropy_max</span><span class="o">=</span><span class="mf">0.6</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_036.png" srcset="../../_images/sphx_glr_integrate_profiles_036.png" alt="Realization (with uncertainty transparency)" class = "sphx-glr-single-img"/></section>
+<section id="choosing-the-realizations-yourself">
+<h3>Choosing the realizations yourself<a class="headerlink" href="#choosing-the-realizations-yourself" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">i_plot_realization</span></code> bypasses the random draw. It must be an array of prior
+indices with one entry per location – either of length <code class="docutils literal notranslate"><span class="pre">len(ii)</span></code> (the
+locations in the profile) or of length <code class="docutils literal notranslate"><span class="pre">n_soundings</span></code> (all locations, subset
+by <code class="docutils literal notranslate"><span class="pre">ii</span></code> internally). A scalar is rejected.</p>
+<p>The most common use is a fixed column of <code class="docutils literal notranslate"><span class="pre">/i_use</span></code>, i.e. “posterior
+realization number k at every location”:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="s1">'r'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f_post</span><span class="p">:</span>
+    <span class="n">i_use</span> <span class="o">=</span> <span class="n">f_post</span><span class="p">[</span><span class="s1">'/i_use'</span><span class="p">][:]</span>
+
+<span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span>
+    <span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                    <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">i_plot_realization</span><span class="o">=</span><span class="n">i_use</span><span class="p">[:,</span> <span class="n">k</span><span class="p">],</span>
+                    <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization column </span><span class="si">%d</span><span class="s1"> of /i_use'</span> <span class="o">%</span> <span class="n">k</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_037.png" srcset="../../_images/sphx_glr_integrate_profiles_037.png" alt="Posterior realization column 0 of /i_use, Realization Resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_038.png" srcset="../../_images/sphx_glr_integrate_profiles_038.png" alt="Posterior realization column 5 of /i_use, Realization Resistivity" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Getting cmap from attribute
+</pre></div>
+</div>
+<p>Any other selection works the same way, e.g. random prior models drawn here
+in the script (equivalent to <code class="docutils literal notranslate"><span class="pre">plot_prior=True</span></code>), or one entry per location
+picked by some criterion of your own:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">f_prior_h5</span><span class="p">,</span> <span class="s1">'r'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f_prior</span><span class="p">:</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">f_prior</span><span class="p">[</span><span class="s1">'/M1'</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">i_prior</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">id_line</span><span class="p">))</span>
+
+<span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">i_plot_realization</span><span class="o">=</span><span class="n">i_prior</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Prior realization (indices chosen in the script)'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_039.png" srcset="../../_images/sphx_glr_integrate_profiles_039.png" alt="Prior realization (indices chosen in the script), Realization Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+</pre></div>
+</div>
+</section>
+</section>
+<section id="number-of-unique-realizations">
+<h2>12. Number of unique realizations<a class="headerlink" href="#number-of-unique-realizations" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">show_n_unique=True</span></code> overlays the count of <em>distinct</em> accepted posterior
+realizations at each location onto the stats panel.  Requires <code class="docutils literal notranslate"><span class="pre">N_UNIQUE</span></code>
+to be stored in the posterior file.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'y'</span><span class="p">,</span>
+                <span class="n">show_n_unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_040.png" srcset="../../_images/sphx_glr_integrate_profiles_040.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">show_n_unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_041.png" srcset="../../_images/sphx_glr_integrate_profiles_041.png" alt="Mode, Entropy" class = "sphx-glr-single-img"/></section>
+<section id="titles-and-saving-figures-to-disk">
+<h2>13. Titles and saving figures to disk<a class="headerlink" href="#titles-and-saving-figures-to-disk" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">title=</span></code> adds a figure title above all panels.</p>
+<p><code class="docutils literal notranslate"><span class="pre">hardcopy=True</span></code> writes a PNG file. By default the name is generated from
+the posterior file name, index range, model index and panels; <code class="docutils literal notranslate"><span class="pre">txt=</span></code>
+appends a suffix to that name. <code class="docutils literal notranslate"><span class="pre">f_png=</span></code> sets the file name explicitly
+instead (use it with a specific <code class="docutils literal notranslate"><span class="pre">im</span></code>, since <code class="docutils literal notranslate"><span class="pre">im=0</span></code> would write every
+model to the same file).</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">'Line 100 – resistivity'</span><span class="p">,</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_042.png" srcset="../../_images/sphx_glr_integrate_profiles_042.png" alt="Line 100 – resistivity, LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">],</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">txt</span><span class="o">=</span><span class="s1">'value_only'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_043.png" srcset="../../_images/sphx_glr_integrate_profiles_043.png" alt="integrate profiles" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">f_png</span><span class="o">=</span><span class="s1">'line100_M2_kl.png'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_044.png" srcset="../../_images/sphx_glr_integrate_profiles_044.png" alt="Mode, KL Divergence" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'realization'</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="s1">'Posterior realization'</span><span class="p">,</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">f_png</span><span class="o">=</span><span class="s1">'line100_M1_realization.png'</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_045.png" srcset="../../_images/sphx_glr_integrate_profiles_045.png" alt="Posterior realization, Realization Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+</pre></div>
+</div>
+</section>
+<section id="combined-options">
+<h2>14. Combined options<a class="headerlink" href="#combined-options" title="Link to this heading">¶</a></h2>
+<p>Putting it all together for publication-quality figures.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_046.png" srcset="../../_images/sphx_glr_integrate_profiles_046.png" alt="LogStd Resistivity" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_047.png" srcset="../../_images/sphx_glr_integrate_profiles_047.png" alt="Mode, KL Divergence" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'value'</span><span class="p">,</span> <span class="s1">'stats'</span><span class="p">],</span>
+                <span class="n">show_n_unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_048.png" srcset="../../_images/sphx_glr_integrate_profiles_048.png" alt="integrate profiles" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">panels</span><span class="o">=</span><span class="p">[</span><span class="s1">'mode'</span><span class="p">],</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../../_images/sphx_glr_integrate_profiles_049.png" srcset="../../_images/sphx_glr_integrate_profiles_049.png" alt="Mode (with uncertainty transparency)" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">ig</span><span class="o">.</span><span class="n">plot_profile</span><span class="p">(</span><span class="n">f_post_h5</span><span class="p">,</span> <span class="n">im</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ii</span><span class="o">=</span><span class="n">id_line</span><span class="p">,</span> <span class="n">xaxis</span><span class="o">=</span><span class="s1">'x'</span><span class="p">,</span>
+                <span class="n">plot_kl</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_threshold</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="n">hardcopy</span><span class="o">=</span><span class="n">hardcopy</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../../_images/sphx_glr_integrate_profiles_050.png" srcset="../../_images/sphx_glr_integrate_profiles_050.png" alt="KL Divergence Resistivity" class = "sphx-glr-multi-img"/></li>
+<li><img src="../../_images/sphx_glr_integrate_profiles_051.png" srcset="../../_images/sphx_glr_integrate_profiles_051.png" alt="Mode, KL Divergence" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Plot profile for all model parameters
+Getting cmap from attribute
+Warning: HarmonicMean not found in file. Run integrate_posterior_stats() first.
+/home/tmeha/PROGRAMMING/integrate_module/.venv/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py:4798: UserWarning: Warning: 'partition' will ignore the 'mask' of the MaskedArray.
+  arr.partition(
+Only nm=1, model parameters. no profile will be plot
+</pre></div>
+</div>
+</section>
+<section id="summary-of-key-plot-profile-options">
+<h2>Summary of key <code class="docutils literal notranslate"><span class="pre">plot_profile()</span></code> options<a class="headerlink" href="#summary-of-key-plot-profile-options" title="Link to this heading">¶</a></h2>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Values</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">im=</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code> (all), <code class="docutils literal notranslate"><span class="pre">1</span></code>, <code class="docutils literal notranslate"><span class="pre">2</span></code>, …</p></td>
+<td><p>Select model; 0 plots all</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ii=</span></code></p></td>
+<td><p>array</p></td>
+<td><p>Explicit index selection (overrides <code class="docutils literal notranslate"><span class="pre">i1</span></code>/<code class="docutils literal notranslate"><span class="pre">i2</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">i1=</span></code>, <code class="docutils literal notranslate"><span class="pre">i2=</span></code></p></td>
+<td><p>int</p></td>
+<td><p>1-based range, alternative to <code class="docutils literal notranslate"><span class="pre">ii=</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">xaxis=</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">'index'</span></code>, <code class="docutils literal notranslate"><span class="pre">'x'</span></code>, <code class="docutils literal notranslate"><span class="pre">'y'</span></code>, <code class="docutils literal notranslate"><span class="pre">'id'</span></code></p></td>
+<td><p>Horizontal axis type</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gap_threshold=</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Mark gaps beyond this distance as transparent</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">alpha=</span></code></p></td>
+<td><p>0–1</p></td>
+<td><p>Uncertainty-driven transparency of primary panel</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">panels=</span></code></p></td>
+<td><p>list of str</p></td>
+<td><p>Subset of panels to show</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">plot_kl=</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>KL divergence instead of entropy / std</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">show_n_unique=</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Overlay N_unique on stats panel</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">panels=['realization']</span></code></p></td>
+<td><p>–</p></td>
+<td><p>One posterior realization per location instead of a statistic</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">seed=</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Reproducible random draw of realizations</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">plot_prior=</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Draw realizations from the prior instead of <code class="docutils literal notranslate"><span class="pre">/i_use</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">i_plot_realization=</span></code></p></td>
+<td><p>array of int</p></td>
+<td><p>Prior index to plot at each location (length <code class="docutils literal notranslate"><span class="pre">len(ii)</span></code> or n_soundings)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">title=</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Figure title above all panels</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hardcopy=</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Save PNG file</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">txt=</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Suffix appended to auto-generated filename</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">f_png=</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Explicit output filename (overrides the automatic name)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (1 minutes 56.696 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-auto-examples-80-plotting-integrate-profiles-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/e760a27efa554353401918990667e7e6/integrate_profiles.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">integrate_profiles.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/58773d7b28424b88b888d20e8189b964/integrate_profiles.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">integrate_profiles.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../../_downloads/f76b453490106e3634cb06a8a8b74a42/integrate_profiles.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">integrate_profiles.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../85_rawmaterial/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Raw Material Assessment</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Plotting</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023,2024,2025 INTEGRATE WORKING GROUP
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Profile Visualization in INTEGRATE</a><ul>
+<li><a class="reference internal" href="#topics-covered">Topics covered</a></li>
+<li><a class="reference internal" href="#data-files">1. Data files</a></li>
+<li><a class="reference internal" href="#survey-overview-and-profile-line-selection">2. Survey overview and profile-line selection</a></li>
+<li><a class="reference internal" href="#x-axis-choices">3. X-axis choices</a></li>
+<li><a class="reference internal" href="#handling-spatial-gaps">4. Handling spatial gaps</a></li>
+<li><a class="reference internal" href="#selecting-a-single-model">5. Selecting a single model</a></li>
+<li><a class="reference internal" href="#all-models-at-once">6. All models at once</a></li>
+<li><a class="reference internal" href="#index-range-selection-as-an-alternative-to-ii">7. Index-range selection as an alternative to <code class="docutils literal notranslate"><span class="pre">ii=</span></code></a></li>
+<li><a class="reference internal" href="#choosing-individual-panels">8. Choosing individual panels</a></li>
+<li><a class="reference internal" href="#uncertainty-transparency">9. Uncertainty transparency</a></li>
+<li><a class="reference internal" href="#kl-divergence">10. KL divergence</a></li>
+<li><a class="reference internal" href="#prior-and-posterior-realizations">11. Prior and posterior realizations</a><ul>
+<li><a class="reference internal" href="#prior-realizations">Prior realizations</a></li>
+<li><a class="reference internal" href="#choosing-the-realizations-yourself">Choosing the realizations yourself</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#number-of-unique-realizations">12. Number of unique realizations</a></li>
+<li><a class="reference internal" href="#titles-and-saving-figures-to-disk">13. Titles and saving figures to disk</a></li>
+<li><a class="reference internal" href="#combined-options">14. Combined options</a></li>
+<li><a class="reference internal" href="#summary-of-key-plot-profile-options">Summary of key <code class="docutils literal notranslate"><span class="pre">plot_profile()</span></code> options</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=9017cc89"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/sg-tags.js?v=d80f6fa4"></script>
+    </body>
+</html>
