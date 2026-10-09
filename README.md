@@ -4,14 +4,15 @@
 [![PyPI](https://badge.fury.io/py/integrate-module.svg)](https://badge.fury.io/py/integrate-module)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://auprobgeo.github.io/integrate_module/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AUProbGeo/integrate_module/blob/main/examples/gallery/10_getting_started/integrate_getting_started.ipynb)
 
 This repository contains the INTEGRATE Python module for localized probabilistic data integration in geophysics.
 
 
 ## Installation
 
-Assuming you already have Python 3.10+ installed:
+Assuming you already have Python 3.11+ installed:
 
     pip install integrate_module
 
@@ -29,7 +30,7 @@ On Linux/macOS, you will need to install GA-AEM manually.
 
     # Create virtual environment in .venv/ inside the module root
     cd path/to/integrate_module
-    uv venv .venv --python 3.11
+    uv venv .venv --python 3.13
 
     # Activate
     source .venv/bin/activate      # Linux/macOS
@@ -97,7 +98,7 @@ To also install the packages needed to build the Sphinx documentation, use the `
 
 Create a Conda environment (called integrate) and install the required modules: 
 
-    conda create --name integrate python=3.10 numpy pandas matplotlib scipy tqdm requests h5py psutil
+    conda create --name integrate python=3.13 numpy pandas matplotlib scipy tqdm requests h5py psutil
     conda activate integrate
     pip install integrate_module
     
@@ -106,7 +107,7 @@ Create a Conda environment (called integrate) and install the required modules:
 
 Create a Conda environment (called integrate) and install the required modules: 
 
-    conda create --name integrate python=3.10 numpy pandas matplotlib scipy tqdm requests h5py psutil
+    conda create --name integrate python=3.12 numpy pandas matplotlib scipy tqdm requests h5py psutil
     conda activate integrate
     pip install -e .
 

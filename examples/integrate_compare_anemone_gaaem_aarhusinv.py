@@ -36,7 +36,7 @@ except ImportError:
 
 DUMMY = 9999.0
 N_PLOT = 6          # soundings shown in the overlay figure
-N_PRIOR = 10000     # prior realizations for comparison 2 (timing); raise for steadier numbers
+N_PRIOR = 1000     # prior realizations for comparison 2 (timing); raise for steadier numbers
 
 # %% [markdown]
 # ## 0. Get TTEM data
@@ -453,3 +453,5 @@ fig3.tight_layout()
 if hardcopy:
     fig3.savefig('%s_compare_prior_timing.png' % case, dpi=140)
     print('wrote %s_compare_prior_timing.png' % case)
+
+# %%
