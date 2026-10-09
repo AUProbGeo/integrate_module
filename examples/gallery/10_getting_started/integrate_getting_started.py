@@ -21,7 +21,9 @@ except:
     IN_COLAB = False    
 
 if IN_COLAB:
-    !pip install integrate_module --upgrade
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "integrate_module", "--upgrade"])
     
 # %%
 import os
