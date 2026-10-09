@@ -12,9 +12,20 @@ The workflow follows these main steps:
 2. Perform probabilistic inversion using integrate_rejection, creating POST.h5
 3. Plot and analyze the results
 """
+
+# %% Check if we are on google colab and install integrate if needed
+try:
+    import google.colab
+    IN_COLAB = True
+except:
+    IN_COLAB = False    
+
+if IN_COLAB:
+    !pip install integrate_module --upgrade
+    
 # %%
 import os
-os.environ["EM_FORWARD_METHOD"] = "anemone"
+#os.environ["EM_FORWARD_METHOD"] = "anemone"
 #os.environ["EM_FORWARD_DEVICE"] = "cuda"
 os.environ["REJECTION_BACKEND"] = "jax"
 
