@@ -399,7 +399,7 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
         ``1/(1 + 2 zeta s + s^2)`` (see ``ISSUE_rx_coil_filter.md``):
 
         * ``'two_pole'`` (default): two first-order poles at ``fcut/zeta``
-          (:func:`integrate.em_system.rx_coil_lowpass`), the same filters
+          (``rx_coil_lowpass`` in ``integrate.em_system``), the same filters
           GA-AEM and SimPEG use;
         * ``'damped2'``: the exact second-order response;
         * ``'cascade'``: the earlier reading, every entry as a Butterworth
@@ -961,7 +961,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        tolerance=1e-6, **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
-    Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
+    Mirrors :func:`integrate.gaaem_forward.prior_data_gaaem` but loads ``M{im}`` **as
     resistivity** (no ``1/``) and forwards it through :func:`forward_anemone`.
     ``batch_size`` soundings are forwarded per anemone call (bounds peak GPU
     memory; ``0`` forwards all ``N`` at once). ``randomize`` controls whether a

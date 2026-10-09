@@ -168,7 +168,7 @@ First install Homebrew, then run:
 
 ## Alternative EM forward backends (anemone, SimPEG)
 
-GA-AEM is the default TDEM forward modeller. Two pure-Python alternatives can be
+GA-AEM is the default TDEM forward modeller. Two alternatives can be
 selected with `method=` in `ig.forward_em()` / `ig.prior_data_em()` (or via the
 `EM_FORWARD_METHOD` environment variable):
 
@@ -176,9 +176,11 @@ selected with `method=` in `ig.forward_em()` / `ig.prior_data_em()` (or via the
     ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')   # PyTorch, GPU-capable
     ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')    # SimPEG 1D layered TDEM
 
-* **anemone** (`pip install "integrate[anemone]"`): see `ANEMONE_VS_GAAEM_VS_AI.md`.
-* **SimPEG** (`pip install "integrate[simpeg]"`, or `uv pip install -e ../simpeg` from a
-  checkout): `ig.forward_simpeg()` / `ig.prior_data_simpeg()`. The `.gex` low-pass filters
+* **anemone** (PyTorch, GPU-capable): not on PyPI yet. Install it from a local checkout
+  with `pip install -e path/to/anemone`, plus a `torch` build for your hardware. See the
+  install guide in `doc/install.rst`.
+* **SimPEG**: installed with `integrate_module` (core dependency, `simpeg>=0.25`).
+  Use `ig.forward_simpeg()` / `ig.prior_data_simpeg()`. The `.gex` low-pass filters
   and gate integration are applied by INTEGRATE on top of SimPEG's
   `Simulation1DLayered`; agreement with GA-AEM is ~1 % (LM) / ~0.2 % (HM) on Daugaard tTEM,
   see `SIMPEG_VS_GAAEM.md`.
@@ -189,7 +191,7 @@ The `main` branch is the most stable, with less frequent updates but larger chan
 
 The `develop` branch contains the current development code and may be updated frequently. Some functions and examples may be broken.
 
-An extra set of tests and examples are located in the ``experimental`` sub-branch `https://github.com/cultpenguin/integrate_module_experimental/ <https://github.com/cultpenguin/integrate_module_experimental/>`_.
+An extra set of tests and examples are located in the `experimental` submodule repository: https://github.com/cultpenguin/integrate_module_experimental/.
 Please ask the developers for access to this branch if needed. To clone the main repository with the experimental branch, use:
 
     git clone --recurse-submodules git@github.com:AUProbGeo/integrate_module.git

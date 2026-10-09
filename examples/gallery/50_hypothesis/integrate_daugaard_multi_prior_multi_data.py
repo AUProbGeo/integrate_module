@@ -136,7 +136,7 @@ plt.show()
 # Now write the 'observed data as a new data type
 # If the 'id' is not set, it will be set to the next available id
 #ig.save_data_multinomial(D_obs, f_data_h5 = f_data_h5, showInfo=2)
-# If the if is set, the data will be written to the given id, even if it allready exists
+# If `id` is set, the data will be written to the given id, even if it already exists
 ig.save_data_multinomial(D_obs, id=2, f_data_h5 = f_data_h5, showInfo=-1)
 
 

@@ -1,11 +1,8 @@
-.. INTEGRATE documentation master file, created by
-   sphinx-quickstart on Thu Jan 24 09:18:42 2019.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
 
+==============================================================================
 INTEGRATE: Fast Probabilistic inversion of EM data using informed prior models
-------------------------------------------------------------------------------
+==============================================================================
 Last updated: |today| (version |version|).
 
 INTEGRATE provides a python module and methods for fast probabilistic inversion of local information (e.g. electromagnetic data (EM), well log data, ...) using informed prior models. 
@@ -19,7 +16,7 @@ Prior modeling
 Forward modeling
    For each type of data considered a forward model must be available. 
 
-   For EM type data use GA-AEM (https://github.com/GeoscienceAustralia/ga-aem), based on [FALK2025]_.
+   For EM type data, forward modelling uses GA-AEM (https://github.com/GeoscienceAustralia/ga-aem), based on [FALK2025]_, or the anemone (PyTorch) and SimPEG backends. See :doc:`prior_data`.
 
   
 Probabilistic Inversion
@@ -42,6 +39,23 @@ Refer to the documentation in :doc:`install` for installation instructions.
 
 Examples of using the module can be found in the :doc:`example gallery <auto_examples/index>`.
 
+Start with :doc:`the getting started examples <auto_examples/10_getting_started/index>`.
+
+The gallery is organised in sections:
+
+* :doc:`Getting started <auto_examples/10_getting_started/index>`
+* :doc:`The complete workflow <auto_examples/20_workflow/index>`
+* :doc:`Data <auto_examples/30_data/index>`
+* :doc:`Noise <auto_examples/40_noise/index>`
+* :doc:`Forward models <auto_examples/45_forward/index>`
+* :doc:`Hypothesis testing <auto_examples/50_hypothesis/index>`
+* :doc:`Querying the posterior <auto_examples/60_query/index>`
+* :doc:`Synthetic case <auto_examples/70_synthetic/index>`
+* :doc:`Plotting <auto_examples/80_plotting/index>`
+* :doc:`Raw material assessment <auto_examples/85_rawmaterial/index>`
+* :doc:`Other examples <auto_examples/90_other/index>`
+
+
 
 
 The INTEGRATE project
@@ -57,33 +71,15 @@ Source Code
    https://github.com/AUProbGeo/integrate_module
 
 
-License (MIT)
-=============
+License
+=======
 
-MIT License
+INTEGRATE is released under the MIT License. See the
+`LICENSE <https://github.com/AUProbGeo/integrate_module/blob/main/LICENSE>`_ file
+in the repository for the full text.
 
-Copyright (c) 2023-2025 Thomas Mejer Hansen and INTEGRATE Working Group
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-The manual
-----------
+Contents
+========
 
 .. toctree::
    :maxdepth: 3
@@ -97,6 +93,7 @@ The manual
    rejection
    workflow
    plotting
+   cli
    auto_examples/index
    contributions
    references

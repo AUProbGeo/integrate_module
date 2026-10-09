@@ -3636,7 +3636,7 @@ def plot_data_prior(f_prior_data_h5,
     plt.grid()
     plt.tight_layout()
 
-    # set plot in kwarg to True if not allready set
+    # set plot in kwarg to True if not already set
     if 'hardcopy' not in kwargs:
         kwargs['hardcopy'] = True
     if kwargs['hardcopy']:

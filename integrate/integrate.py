@@ -942,84 +942,31 @@ def sample_from_posterior(is_, d_sim, f_data_h5='tTEM-Djursland.h5', N_use=10000
 #def sample_from_posterior_chunk(is_,d_sim,f_data_h5, N_use,autoT,ns):
 #    return sample_from_posterior(is_,d_sim,f_data_h5, N_use,autoT,ns) 
 
-#%% integrate_prior_data: updates PRIOR strutcure with DATA
+#%% prior_data: retired FORWARD.h5 entry point
 def prior_data(f_prior_in_h5, f_forward_h5, id=1, im=1, doMakePriorCopy=0, parallel=True):
     """
-    Update prior structure with forward modeled data.
-    
-    This function integrates forward modeling results into the prior data structure,
-    supporting different data types including TDEM (time-domain electromagnetic) data
-    with GA-AEM forward modeling and identity transforms.
-    
-    Parameters
-    ----------
-    f_prior_in_h5 : str
-        Path to input prior HDF5 file containing prior models.
-    f_forward_h5 : str
-        Path to forward modeling results HDF5 file.
-    id : int, optional
-        Data identifier for the prior structure. Default is 1.
-    im : int, optional
-        Model identifier for the prior structure. Default is 1.
-    doMakePriorCopy : int, optional
-        Flag to create a copy of the prior file (0=no copy, 1=copy). Default is 0.
-    parallel : bool, optional
-        Enable parallel processing for forward modeling. Default is True.
-    
-    Returns
-    -------
-    str
-        Path to the updated prior HDF5 file containing integrated data.
-    
-    Notes
-    -----
-    The function automatically detects the data type from the forward modeling file
-    and calls appropriate integration methods (GA-AEM for TDEM, identity for direct data).
-    Prints error messages for unsupported data types or methods.
+    Removed. Use the forward-specific functions instead.
+
+    The generic FORWARD.h5 route this function used to dispatch to was never
+    completed: its GA-AEM and identity helpers were not implemented. Calling
+    this function raises ``NotImplementedError``.
+
+    Use instead:
+
+    - ``prior_data_em`` (or ``prior_data_gaaem``, ``prior_data_anemone``,
+      ``prior_data_simpeg``) for EM forward modelling
+    - ``prior_data_identity`` for data that is already in the prior
+    - ``prior_data_borehole`` for borehole observations
+
+    Raises
+    ------
+    NotImplementedError
+        Always.
     """
-    # Check if at least two inputs are provided
-    if f_prior_in_h5 is None or f_forward_h5 is None:
-        print(f'{__name__}: Use at least two inputs to')
-        help(__name__)
-        return ''
-
-    # Open HDF5 files
-    with h5py.File(f_forward_h5, 'r') as f:
-        # Check type=='TDEM'
-        if 'type' in f.attrs:
-            data_type = f.attrs['type']
-        else:
-            data_type = 'TDEM'
-
-    f_prior_h5 = ''
-    if data_type.lower() == 'tdem':
-        # TDEM
-        with h5py.File(f_forward_h5, 'r') as f:
-            if 'method' in f.attrs:
-                method = f.attrs['method']
-            else:
-                print(f'{__name__}: "TDEM/{method}" not supported')
-                return
-
-        if method.lower() == 'ga-aem':
-            f_prior_h5, id, im = integrate_prior_data_gaaem(f_prior_in_h5, f_forward_h5, id, im, doMakePriorCopy)
-        else:
-            print(f'{__name__}: "TDEM/{method}" not supported')
-            return
-    elif data_type.lower() == 'identity':
-        f_prior_h5, id, im = integrate_prior_data_identity(f_prior_in_h5, f_forward_h5, id, im, doMakePriorCopy)
-    else:
-        print(f'{__name__}: "{data_type}" not supported')
-        return
-
-    # update prior data with an attribute defining the prior
-    with h5py.File(f_prior_h5, 'a') as f:
-        f.attrs[f'/D{id}'] = 'f5_forward'
-
-
-    integrate_update_prior_attributes(f_prior_h5)
-
-    return f_prior_h5
+    raise NotImplementedError(
+        "prior_data() is not available. Use prior_data_em() for EM forward "
+        "modelling, prior_data_identity() for identity data, or "
+        "prior_data_borehole() for borehole data.")
 
 
 _EM_METHODS = {'ga-aem': 'ga-aem', 'gaaem': 'ga-aem', 'anemone': 'anemone',
@@ -1317,13 +1264,14 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
 
     Returns
     -------
-    str
-        Path to the HDF5 file containing the updated prior data.
+    tuple of (str, int)
+        Path to the HDF5 file containing the updated prior data, and the data id
+        that was written.
     """
     import integrate as ig
     import time
 
-    type = 'idenity'
+    type = 'identity'
     method = '--'
     showInfo = kwargs.get('showInfo', 0)
     forceDeleteExisting = kwargs.get('forceDeleteExisting', True)
@@ -1379,14 +1327,14 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
         # check if Dname exists, if so, delete it
         if Dname in f.keys():
             if forceDeleteExisting:
-                print('Key %s allready exists -- DELETING !!!!' % Dname)
+                print('Key %s already exists -- DELETING !!!!' % Dname)
                 del f[Dname]
             else:
-                print('Key %s allready exists - doing nothing' % Dname)
-                return f_prior_data_h5
+                print('Key %s already exists - doing nothing' % Dname)
+                return f_prior_data_h5, id
         
         dataset = f.create_dataset(Dname, data=D)  # 'i4' represents 32-bit integers
-        dataset.attrs['description'] = 'Identiy of %s' % Mname
+        dataset.attrs['description'] = 'Identity of %s' % Mname
         dataset.attrs['f5_forward'] = 'none'
         dataset.attrs['with_noise'] = 0
         #f_prior.close()

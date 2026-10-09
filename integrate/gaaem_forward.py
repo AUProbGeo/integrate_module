@@ -85,7 +85,7 @@ def forward_gaaem(C=np.array(()),
     """
     from gatdaem1d import Earth;
     from gatdaem1d import Geometry;
-    # Next should probably only be loaded if the DLL is not allready loaded!!!
+    # Next should probably only be loaded if the DLL is not already loaded!!!
     from gatdaem1d import TDAEMSystem; # loads the DLL!!
     import integrate as ig
     from integrate.integrate import _report_progress

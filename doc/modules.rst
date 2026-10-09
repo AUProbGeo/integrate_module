@@ -11,3 +11,8 @@ Modules (documentation)
    modules/integrate_plot
    modules/integrate_borehole
    modules/integrate_query
+   modules/gaaem_forward
+   modules/anemone_forward
+   modules/simpeg_forward
+   modules/integrate_rejection_jax
+   modules/gex

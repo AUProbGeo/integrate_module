@@ -7,7 +7,7 @@ INTEGRATE Python Module
 
 This repository contains the INTEGRATE Python module for localized probabilistic data integration in geophysics.
 
-Assuming you already have Python 3.10+ installed:
+Assuming you already have Python 3.11 or newer installed:
 
 ::
     
@@ -16,6 +16,14 @@ Assuming you already have Python 3.10+ installed:
 On Windows, this will also install the Python wrapper for GA-AEM (1D EM forward modeling - GPL v2 code): `ga-aem-forward-win <https://pypi.org/project/ga-aem-forward-win/>`_.
 
 On Linux/macOS, you will need to install GA-AEM manually.
+
+Optional extras
+===============
+
+- ``integrate_module[jax-cuda]``: JAX with CUDA 13 support, for GPU rejection sampling (see :doc:`rejection`).
+- ``integrate_module[ml]``, ``[examples]``, ``[dev]``, ``[docs]``: optional tooling; see ``pyproject.toml``.
+
+JAX and SimPEG are core dependencies and are installed by default. The anemone forward backend is not yet on PyPI, see below.
 
 Using uv (recommended, from PyPI)
 ==================================
@@ -202,13 +210,14 @@ Running on GPU
 Two parts of a typical workflow can run on a GPU, and each is selected
 independently:
 
-- **Forward modelling** (:func:`integrate.prior_data_em`,
-  :func:`integrate.forward_em`) with the ``anemone`` backend, which uses
-  PyTorch. Requires ``anemone`` and ``torch`` (with CUDA support) to be
-  installed.
-- **Rejection sampling** (:func:`integrate.integrate_rejection`) with the
-  ``jax`` backend. Requires JAX with CUDA support, e.g.
-  ``pip install jax[cuda12]``. See :doc:`rejection` for details on this
+- **Forward modelling** (:func:`integrate.integrate.prior_data_em`,
+  :func:`integrate.integrate.forward_em`) with the ``anemone`` backend, which uses
+  PyTorch. anemone is not on PyPI yet: install it from a local checkout
+  with ``pip install -e path/to/anemone``, and install a CUDA build of
+  ``torch`` following https://pytorch.org.
+- **Rejection sampling** (:func:`integrate.integrate_rejection.integrate_rejection`) with the
+  ``jax`` backend. Requires JAX with CUDA support, installed with
+  ``pip install "integrate_module[jax-cuda]"``. See :doc:`rejection` for details on this
   backend, including compile times and ``XLA_FLAGS``.
 
 Instead of passing ``method=``, ``device=`` and ``backend=`` to every call,
@@ -269,6 +278,8 @@ To check what is used, pass ``showInfo=1``: ``prior_data_em()`` then prints
 the forward method and device.
 
 
+Examples of GPU and timing runs are in the example gallery: :doc:`forward model run times <auto_examples/45_forward/integrate_forward_backends_runtime>` and :doc:`timing benchmark <auto_examples/90_other/integrate_timing_example>`.
+
 Development
 ===========
 
@@ -276,7 +287,7 @@ The ``main`` branch is the most stable, with less frequent updates but larger ch
 
 The ``develop`` branch contains the current development code and may be updated frequently. Some functions and examples may be broken.
 
-An extra set of tests and examples are located in the ``experimental`` sub-branch `https://github.com/cultpenguin/integrate_module_experimental/ <https://github.com/cultpenguin/integrate_module_experimental/>`_.
+An extra set of tests and examples are located in the ``experimental`` submodule repository `https://github.com/cultpenguin/integrate_module_experimental/ <https://github.com/cultpenguin/integrate_module_experimental/>`_.
 Please ask the developers for access to this branch if needed. To clone the main repository with the experimental branch, use:
 
 ::

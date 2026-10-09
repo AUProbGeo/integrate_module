@@ -80,7 +80,7 @@ ig.plot_data(f_data_h5, hardcopy=hardcopy)
 # 1. Setup the prior model ($\rho(\mathbf{m},\mathbf{d}))
 # -------------------------------------------------------
 #
-# In this case prior data and models are allready available in the HDF% in 'f_prior_h5'.
+# In this case prior data and models are already available in the HDF5 in 'f_prior_h5'.
 
 # %%
 # Plot some summary statistics of the prior model, to QC the prior choice

@@ -12,15 +12,12 @@ import sys
 # Add the parent directory (where the integrate package is located)
 sys.path.insert(0, os.path.abspath('..'))
 
-# Try to import integrate to ensure it's available
-try:
-    import integrate
-    print(f"Successfully imported integrate from {integrate.__file__}")
-except ImportError as e:
-    print(f"Failed to import integrate: {e}")
+# Import fails loudly here, so a broken install cannot produce empty API pages.
+import integrate
 
-# Set up the environment for Sphinx autodoc
-autodoc_mock_imports = []
+# Optional backends that are not installed in the docs build. Mocking them lets
+# autodoc import the modules that import them at top level.
+autodoc_mock_imports = ['torch', 'anemone', 'gatdaem1d']
 
 # Mock problematic imports if needed
 autodoc_default_options = {
@@ -30,46 +27,34 @@ autodoc_default_options = {
 }
 
 project = 'INTEGRATE'
-copyright = '2023,2024,2025 INTEGRATE WORKING GROUP'
-author = 'INTEGRATE WORKING GROUP'
+copyright = '2023-2026, Thomas Mejer Hansen and INTEGRATE Working Group'
+author = 'Thomas Mejer Hansen and INTEGRATE Working Group'
 
-# Dynamically get version from pyproject.toml
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    try:
-        import tomli as tomllib  # Fallback for older Python
-    except ImportError:
-        tomllib = None
+# Version is read from pyproject.toml, the single source of truth.
+import tomllib
 
-if tomllib:
-    pyproject_path = os.path.join(os.path.dirname(__file__), '..', 'pyproject.toml')
-    with open(pyproject_path, 'rb') as f:
-        pyproject_data = tomllib.load(f)
-    version = pyproject_data['project']['version']
-    release = version
-else:
-    # Fallback to importlib.metadata if tomllib not available
-    try:
-        from importlib.metadata import version as get_version
-        version = get_version('integrate_module')
-        release = version
-    except Exception:
-        version = '0.31'  # Fallback version
-        release = version
+pyproject_path = os.path.join(os.path.dirname(__file__), '..', 'pyproject.toml')
+with open(pyproject_path, 'rb') as f:
+    pyproject_data = tomllib.load(f)
+version = pyproject_data['project']['version']
+release = version
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
     'sphinx_gallery.gen_gallery',
-    'sphinx.ext.duration',
-    'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
-
+    'sphinx.ext.intersphinx',
 ]
-autosummary_generate = True
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'matplotlib': ('https://matplotlib.org/stable/', None),
+    'h5py': ('https://docs.h5py.org/en/stable/', None),
+}
 
 # -- Gallery -----------------------------------------------------------------
 # Which examples are *executed* is chosen per run; everything in the gallery is
@@ -79,11 +64,12 @@ autosummary_generate = True
 #   make gallery                the cheap, self-contained examples
 #   make gallery TIER=all       adds the slow but still self-contained ones
 #   make gallery FILE=x.py      one specific example
+# A plain sphinx-build without GALLERY_TIER set executes nothing, like make html.
 import re
 
 from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
-_GALLERY_TIER = os.environ.get('GALLERY_TIER', 'cheap')
+_GALLERY_TIER = os.environ.get('GALLERY_TIER', 'none')
 _GALLERY_FILE = os.environ.get('GALLERY_FILE', '')
 
 # Self-contained (data fetched via ig.get_case_data) and small enough to run
@@ -145,8 +131,7 @@ napoleon_numpy_docstring = True
 # Sphinx cannot pickle into its environment cache. Harmless, but noisy.
 suppress_warnings = ['config.cache']
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.md', 'tools']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.md', 'tools', 'notes']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:

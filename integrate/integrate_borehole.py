@@ -600,11 +600,13 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, range_data=10, range_xyz=100, doPlo
     f_data_h5 : str
         Path to HDF5 data file containing survey geometry (X, Y coordinates).
     range_data : float, optional
-        Inner radius in meters within which observations have full strength.
-        Default is 10 meters.
+        Data-misfit scale (dimensionless). The data weight is
+        ``w_data = exp(-sum_dd**2 / range_data**2)``, where ``sum_dd`` is the
+        summed absolute difference between the gates of each location and the
+        reference location. Default is 10.
     range_xyz : float, optional
-        Outer radius in meters for distance-based weighting. Beyond this distance,
-        observations are fully attenuated (temperature → ∞). Default is 100 meters.
+        Distance scale in metres. The distance weight is
+        ``w_dis = exp(-dis**2 / range_xyz**2)``. Default is 100 metres.
     doPlot : bool, optional
         If True, creates diagnostic plots showing weight distributions.
         Default is False.
@@ -635,7 +637,7 @@ def Pobs_to_datagrid(P_obs, X, Y, f_data_h5, range_data=10, range_xyz=100, doPlo
     -----
     The function uses distance-based temperature annealing:
     1. Computes distance-based weights using `get_weight_from_position()`
-    2. Converts distance weight to temperature: T = 1 / w_dis
+    2. Converts the combined weight to temperature: T = 1 / (w_data * w_dis)
     3. Caps maximum temperature at 100 (very weak influence)
     4. For each grid point:
 

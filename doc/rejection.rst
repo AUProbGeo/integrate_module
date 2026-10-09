@@ -14,7 +14,7 @@ a temperature-controlled tolerance -- are rejected. What remains is a
 posterior ensemble of ``nr`` samples per data point, written to a posterior
 HDF5 file.
 
-It can be run either from Python, via :func:`ig.integrate_rejection`, or
+It can be run either from Python, via :func:`integrate.integrate_rejection.integrate_rejection`, or
 from the command line, via the ``integrate_rejection`` script installed
 with the package.
 
@@ -44,7 +44,7 @@ A more complete call, matching the options available on the command line::
         showInfo=1,
     )
 
-See the ``Parameters`` section of :func:`ig.integrate_rejection` (or
+See the ``Parameters`` section of :func:`integrate.integrate_rejection.integrate_rejection` (or
 ``help(ig.integrate_rejection)``) for the full, current list of keyword
 arguments -- including less commonly used ones such as ``id_prior``,
 ``use_N_best``, ``T_N_above``/``T_P_acc_level``, and ``progress_callback``
@@ -87,7 +87,7 @@ Common options::
      - Output posterior HDF5 path (auto-generated if omitted)
    * - ``--samples``
      - ``-n``
-     - Max number of prior samples to use
+     - Max number of prior samples to use (default 100000000)
    * - ``--auto-temp``
      - ``-T``
      - Enable automatic temperature estimation
@@ -96,7 +96,7 @@ Common options::
      - Base temperature when ``--auto-temp`` is not set
    * - ``--nr``
      -
-     - Posterior samples retained per data point (default 400 on the CLI)
+     - Number of resamples used for temperature estimation (default 400)
    * - ``--cpus``
      - ``-c``
      - Number of CPU cores (0 = auto-detect)
@@ -112,6 +112,9 @@ Common options::
    * - ``--use-n-best``
      -
      - Restrict to the N best-fitting samples (0 = disabled)
+   * - ``--ip-range``
+     -
+     - Comma-separated range of prior sample indices, for distributed processing
    * - ``--backend``
      -
      - ``numpy`` (default) or ``jax``
@@ -204,3 +207,11 @@ fusions used here. Both must be set as a single ``XLA_FLAGS`` string
 If compile time is still a bottleneck after this, consider keeping ``N``
 (and other shape-determining parameters) constant across runs so the
 per-shape cache is reused, rather than lowering optimization further.
+
+Examples
+--------
+
+See the example gallery:
+
+* :doc:`Timing of the rejection sampler and backends <auto_examples/90_other/integrate_timing_example>`
+* :doc:`Run time of the EM forward models <auto_examples/45_forward/integrate_forward_backends_runtime>`

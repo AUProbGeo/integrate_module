@@ -2,7 +2,7 @@
 Daugaard Case Study with three lithology-resistivity prior models.
 ==================================================================
 
-This notebook contains an example of inverison of the DAUGAARD tTEM data using three different lithology-resistivity prior models
+This notebook contains an example of inversion of the DAUGAARD tTEM data using three different lithology-resistivity prior models
 """
 # %%
 try:

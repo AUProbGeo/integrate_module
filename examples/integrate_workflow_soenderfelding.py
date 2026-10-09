@@ -292,7 +292,7 @@ if usePrecomp:
 # ### INVERSION
 # The data is now ready for inversion with the rejection sampler.
 #
-# On total we have 3 data types (one tTEM and two WellLog). They can be all jointly inverted (the default) or one can select which data types to ínver using `id_use`
+# In total we have 3 data types (one tTEM and two WellLog). They can be all jointly inverted (the default) or one can select which data types to invert using `id_use`
 #
 #     id_use = [1] # tTEM 
 #     id_use = [2] # Well 1

@@ -38,7 +38,7 @@ import numpy as np
 
 # %% [markdown]
 # 0\. Get TTEM data
-# ----------------
+# -----------------
 #
 # Several test cases are available in the INTEGRATE package.
 # To see which cases are available, check the ``get_case_data`` function.
@@ -114,7 +114,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 # %% [markdown]
 # 1\. Set up the prior model ($\rho(\mathbf{m},\mathbf{d})$)
-# ---------------------------------------------------------
+# ----------------------------------------------------------
 #
 # In this example, a simple layered prior model will be considered.
 # The prior represents our initial beliefs about subsurface resistivity structure.
@@ -190,7 +190,7 @@ ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,hardcopy=hardcopy)
 
 # %% [markdown]
 # 2\. Sample the posterior distribution $\sigma(\mathbf{m})$
-# ---------------------------------------------------------
+# ----------------------------------------------------------
 #
 # The posterior distribution is sampled using the extended rejection sampler.
 # Rejection sampling of the posterior can be done with default settings using
@@ -221,7 +221,7 @@ f_post_h5 = ig.integrate_rejection(f_prior_data_h5, # type: ignore
 
 # %% [markdown]
 # 3\. Plot statistics from the posterior $\sigma(\mathbf{m})$
-# ----------------------------------------------------------
+# -----------------------------------------------------------
 #
 # **Compare prior and posterior data**
 #
@@ -361,8 +361,10 @@ f_csv, f_point_csv = ig.post_to_csv(f_post_h5)
 
 # %%
 # Read the exported CSV file for inspection
-# Example filename (actual filename will be generated automatically):
-#f_point_csv = 'POST_DAUGAARD_AVG_PRIOR_CHI2_NF_3_log-uniform_N100000_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu100000_aT1_M1_point.csv'
+#
+# Example filename (the actual name is generated automatically)::
+#
+#     f_point_csv = 'POST_DAUGAARD_AVG_PRIOR_CHI2_NF_3_log-uniform_N100000_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu100000_aT1_M1_point.csv'
 import pandas as pd
 df = pd.read_csv(f_point_csv)
 df.head()

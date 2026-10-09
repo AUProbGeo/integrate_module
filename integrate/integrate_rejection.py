@@ -232,10 +232,10 @@ def integrate_rejection(f_prior_h5='prior.h5',
         # Construct the new filename
         f_post_h5 = os.path.join(posterior_output_path, "POST_%s_Nu%d_aT%d.h5" % (f_prior_basename, N_use, autoT))
 
-    # Check that f_post_h5 allready exists, and warn the user   
+    # Check that f_post_h5 already exists, and warn the user   
     if os.path.isfile(f_post_h5):
         if (showInfo>0):    
-            print('File %s allready exists' % f_post_h5)
+            print('File %s already exists' % f_post_h5)
             print('Overwriting...')    
 
     
