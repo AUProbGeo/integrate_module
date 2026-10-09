@@ -290,7 +290,7 @@ if useGenericPrior:
 for i_prior in range(len(f_prior_data_h5_list)):
 
     f_prior_data_h5= f_prior_data_h5_list[i_prior]
-    ig.prior_set(f_prior_data_h5, im=1, name='Resistivity', label='Resistivity', unit='V/Am^4')
+    ig.prior_set(f_prior_data_h5, im=1, name='Resistivity', label='Resistivity', unit='Ohmm')
     ig.integrate_update_prior_attributes(f_prior_data_h5)
     ig.plot_data_prior(f_prior_data_h5, f_data_h5, i_plot=100, hardcopy=hardcopy)
 
