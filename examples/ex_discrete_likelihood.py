@@ -131,6 +131,87 @@ print(P_obs)
 logL_well = ig.likelihood_multinomial(D_well, P_obs, class_id)
 
 # %% [markdown]
+# ## F2: The multinomial pmf in detail
+# This section computes the same log-likelihood as above, step by step, without
+# `ig.likelihood_multinomial`.
+#
+# **Model.** Let the well log have J intervals and K classes. In interval j the
+# lithology is a categorical random variable Z_j with probabilities
+#
+#     p_kj = P(Z_j = k) = P_obs[k, j],    sum_k p_kj = 1  for every j.
+#
+# A multinomial pmf for n trials with class counts n_1, ..., n_K and class
+# probabilities p_1, ..., p_K is
+#
+#     P(n_1, ..., n_K | n, p) = n! / (n_1! ... n_K!) * prod_k p_k^n_k.
+#
+# Here each interval is a single observation (n = 1 per interval), so each
+# count vector has exactly one 1 and the multinomial coefficient equals 1.
+# The pmf of one interval therefore reduces to the probability of the observed
+# class:
+#
+#     P(Z_j = c_j) = p_{c_j, j}
+#
+# where c_j is the class that prior realization m assigns to interval j, i.e.
+# c_j = D_well[m, j].
+#
+# **Likelihood.** The intervals are treated as independent, so the probabilities
+# multiply over the intervals:
+#
+#     L(m) = prod_j p_{c_j(m), j}      =>     log L(m) = sum_j log p_{c_j(m), j}
+#
+# **Special cases.**
+# * A column of P_obs containing NaN means the interval was not observed: it
+#   contributes a factor 1 (log = 0) and is skipped.
+# * A NaN class in the prior, or a class that has no row in P_obs, has
+#   probability 0: log L(m) = -inf.
+
+# %%
+# Map each class ID to its row in P_obs
+row_of_class = {}
+for k in range(len(class_id)):
+    row_of_class[int(class_id[k])] = k
+
+n_int = P_obs.shape[1]
+observed_int = []
+for j in range(n_int):
+    if not np.any(np.isnan(P_obs[:, j])):
+        observed_int.append(j)
+
+print(f"Observed intervals: {len(observed_int)} of {n_int}")
+print('Column sums of P_obs (should be 1):', np.round(np.sum(P_obs[:, observed_int], axis=0), 6))
+
+# Log-likelihood of every prior realization, one interval at a time
+N_prior = D_well.shape[0]
+logL_manual = np.zeros(N_prior)
+for i in range(N_prior):
+    logL_i = 0.0
+    for j in observed_int:
+        c = D_well[i, j]
+        if np.isnan(c) or int(c) not in row_of_class:
+            p = 0.0
+        else:
+            p = P_obs[row_of_class[int(c)], j]
+        if p == 0.0:
+            logL_i = -np.inf
+            break
+        logL_i += np.log(p)
+    logL_manual[i] = logL_i
+
+# Worked example for the best-matching realization (the one with the largest log L)
+i_max = np.argmax(logL_manual)
+print(f"Realization {i_max}: prior classes per interval = {D_well[i_max].astype(int).tolist()}")
+p_used = []
+for j in observed_int:
+    c = int(D_well[i_max, j])
+    p_used.append(P_obs[row_of_class[c], j])
+print('p of observed class per interval:', np.round(p_used, 3))
+print(f"log L = sum of log p = {np.sum(np.log(p_used)):.4f}")
+
+# Check against the result of ig.likelihood_multinomial above
+print('Matches ig.likelihood_multinomial:', np.allclose(logL_manual, logL_well))
+
+# %% [markdown]
 # ## G: Joint likelihood
 # The two data types are independent, so the log-likelihoods add up
 
