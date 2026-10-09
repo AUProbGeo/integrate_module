@@ -78,6 +78,8 @@ if doSamplePrior is False:
 f_data_h5 = 'DAUGAARD_AVG.h5'
 file_gex= ig.get_gex_file_from_data(f_data_h5)
 
+ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
+
 # check that file_gex exists
 if not os.path.isfile(file_gex):
     print("file_gex=%s does not exist in the current folder." % file_gex)
@@ -288,6 +290,7 @@ if useGenericPrior:
 for i_prior in range(len(f_prior_data_h5_list)):
 
     f_prior_data_h5= f_prior_data_h5_list[i_prior]
+    ig.prior_set(f_prior_data_h5, im=1, name='Resistivity', label='Resistivity', unit='V/Am^4')
     ig.integrate_update_prior_attributes(f_prior_data_h5)
     ig.plot_data_prior(f_prior_data_h5, f_data_h5, i_plot=100, hardcopy=hardcopy)
 

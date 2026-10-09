@@ -55,7 +55,7 @@ print("Using prior model and data file: %s" % f_prior_h5)
 
 # update name, label, unit
 ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
-ig.prior_set(f_prior_h5, im=1, name='dBdT', label='Resistivity', unit='V/Am^4')
+ig.prior_set(f_prior_h5, im=1, name='Resistivity', label='Resistivity', unit='V/Am^4')
 
 # %%
 # Plot the geometry and the data
