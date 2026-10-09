@@ -1059,19 +1059,24 @@ def _em_method_available(method):
     return result
 
 
-def _em_method_resolve(method=None):
+def _em_method_resolve(method=None, fallback=True):
     """
     Resolve the EM forward method; return ``(method, source)``.
 
     ``source`` is ``'method'`` (explicit kwarg), ``'EM_FORWARD_METHOD'``
-    (environment variable) or ``'auto'`` (first installed backend in the
-    order anemone, ga-aem, simpeg).
+    (environment variable), ``'auto'`` (first installed backend in the
+    order anemone, ga-aem, simpeg) or ``'fallback'`` (the requested backend
+    is not installed, so the first installed one in that order is used and a
+    warning is issued; only if ``fallback=True``).
     """
     import os
+    import warnings
     source = 'method'
     if method is None:
         method = os.environ.get(_EM_METHOD_ENV, '').strip() or None
         source = _EM_METHOD_ENV
+    requested = None
+    reasons = []
     if method is not None:
         key = str(method).lower()
         if key not in _EM_METHODS:
@@ -1080,15 +1085,25 @@ def _em_method_resolve(method=None):
                 % (method, source))
         method = _EM_METHODS[key]
         ok, reason = _em_method_available(method)
-        if not ok:
+        if ok:
+            return method, source
+        if not fallback:
             raise ImportError("EM forward method %r (from %s) is not available: %s"
                               % (method, source, reason))
-        return method, source
-    reasons = []
+        requested = method
+        reasons.append("  %s: %s" % (method, reason))
     for m in _EM_METHOD_PRIORITY:
+        if m == requested:
+            continue
         ok, reason = _em_method_available(m)
         if ok:
-            return m, 'auto'
+            if requested is None:
+                return m, 'auto'
+            warnings.warn("EM forward method %r (from %s) is not available (%s); "
+                          "falling back to %r"
+                          % (requested, source, reasons[0].split(': ', 1)[1], m),
+                          RuntimeWarning, stacklevel=3)
+            return m, 'fallback'
         reasons.append("  %s: %s" % (m, reason))
     raise ImportError("no EM forward backend is available (tried %s):\n%s"
                       % (', '.join(_EM_METHOD_PRIORITY), '\n'.join(reasons)))
@@ -1102,8 +1117,11 @@ def _em_method(method=None):
     used (e.g. ``EM_FORWARD_METHOD=anemone``); if that is unset or empty, the
     first installed backend in the order anemone, ga-aem, simpeg is used.
 
-    Raises ``ValueError`` for an unknown method, and ``ImportError`` if the
-    requested backend is not installed or no backend is installed at all.
+    If the requested backend is not installed, a ``RuntimeWarning`` is issued
+    and the first installed backend in that order is used instead.
+
+    Raises ``ValueError`` for an unknown method, and ``ImportError`` if no
+    backend is installed at all.
     """
     return _em_method_resolve(method)[0]
 
@@ -1180,9 +1198,10 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
     Raises
     ------
     ImportError
-        If the requested backend (``method`` or ``EM_FORWARD_METHOD``) is not
-        installed, or if no method is requested and none of anemone, ga-aem
-        and simpeg is installed (the error lists the install hints).
+        If none of anemone, ga-aem and simpeg is installed (the error lists
+        the install hints). If only the requested backend (``method`` or
+        ``EM_FORWARD_METHOD``) is missing, a ``RuntimeWarning`` is issued and
+        the first installed backend in the order above is used instead.
     """
     import numpy as np
     method = _em_method(method)
@@ -1239,9 +1258,10 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
     Raises
     ------
     ImportError
-        If the requested backend (``method`` or ``EM_FORWARD_METHOD``) is not
-        installed, or if no method is requested and none of anemone, ga-aem
-        and simpeg is installed (the error lists the install hints).
+        If none of anemone, ga-aem and simpeg is installed (the error lists
+        the install hints). If only the requested backend (``method`` or
+        ``EM_FORWARD_METHOD``) is missing, a ``RuntimeWarning`` is issued and
+        the first installed backend in the order above is used instead.
 
     Examples
     --------
@@ -1252,7 +1272,8 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
     """
     showInfo = kwargs.get('showInfo', 0)
     method, source = _em_method_resolve(method)
-    auto = ' (auto-selected)' if source == 'auto' else ''
+    auto = {'auto': ' (auto-selected)',
+            'fallback': ' (fallback, requested method not available)'}.get(source, '')
     if method == 'ga-aem':
         from integrate.gaaem_forward import prior_data_gaaem
         if showInfo>0:
