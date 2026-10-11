@@ -1,17 +1,15 @@
-"""
-Getting started with INTEGRATE
-==============================
-
-This notebook contains a simple example for getting started with INTEGRATE.
-
-The workflow follows these main steps:
-
-0. Load electromagnetic data (DAUGAARD.h5)
-1a. Set up a prior model, creating the file PRIOR.h5
-1b. Update the prior model with forward-modeled data in PRIOR.h5
-2. Perform probabilistic inversion using integrate_rejection, creating POST.h5
-3. Plot and analyze the results
-"""
+# %% [markdown]
+# # Getting started with INTEGRATE
+#
+# This notebook contains a simple example for getting started with INTEGRATE.
+#
+# The workflow follows these main steps:
+#
+# 0. Load electromagnetic data (DAUGAARD.h5)
+# 1a. Set up a prior model, creating the file PRIOR.h5
+# 1b. Update the prior model with forward-modeled data in PRIOR.h5
+# 2. Perform probabilistic inversion using integrate_rejection, creating POST.h5
+# 3. Plot and analyze the results
 
 # %% Check if we are on google colab and install integrate if needed
 try:
@@ -27,8 +25,8 @@ if IN_COLAB:
     
 # %%
 import os
-os.environ["EM_FORWARD_METHOD"] = "gaaem"
-#os.environ["EM_FORWARD_METHOD"] = "simpeg"
+#os.environ["EM_FORWARD_METHOD"] = "gaaem"
+os.environ["EM_FORWARD_METHOD"] = "simpeg"
 #os.environ["EM_FORWARD_METHOD"] = "anemone"
 #os.environ["EM_FORWARD_DEVICE"] = "cuda"
 os.environ["REJECTION_BACKEND"] = "jax"
