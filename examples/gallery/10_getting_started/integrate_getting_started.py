@@ -1,15 +1,17 @@
-# %% [markdown]
-# # Getting started with INTEGRATE
-#
-# This notebook contains a simple example for getting started with INTEGRATE.
-#
-# The workflow follows these main steps:
-#
-# 0. Load electromagnetic data (DAUGAARD.h5)
-# 1a. Set up a prior model, creating the file PRIOR.h5
-# 1b. Update the prior model with forward-modeled data in PRIOR.h5
-# 2. Perform probabilistic inversion using integrate_rejection, creating POST.h5
-# 3. Plot and analyze the results
+"""
+Getting started with INTEGRATE
+==============================
+
+This notebook contains a simple example for getting started with INTEGRATE.
+
+The workflow follows these main steps:
+
+0. Load electromagnetic data (DAUGAARD.h5)
+1a. Set up a prior model, creating the file PRIOR.h5
+1b. Update the prior model with forward-modeled data in PRIOR.h5
+2. Perform probabilistic inversion using integrate_rejection, creating POST.h5
+3. Plot and analyze the results
+"""
 
 # %% Check if we are on google colab and install integrate if needed
 try:
@@ -116,6 +118,12 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 # 1\. Set up the prior model ($\rho(\mathbf{m},\mathbf{d})$)
 # ----------------------------------------------------------
 #
+# The prior is a joint distribution over model parameters $\mathbf{m}$ and data $\mathbf{d}$:
+# $\rho(\mathbf{m},\mathbf{d}) = \rho(\mathbf{d}|\mathbf{m})\,\rho(\mathbf{m})$.
+# It is represented by samples $(\mathbf{m}_i, \mathbf{d}_i)$, generated in two steps:
+# first sample $\rho(\mathbf{m})$ (1a), then, for each sampled model, sample
+# $\rho(\mathbf{d}|\mathbf{m})$ (1b).
+#
 # In this example, a simple layered prior model will be considered.
 # The prior represents our initial beliefs about subsurface resistivity structure.
 #
@@ -155,10 +163,15 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 # %% [markdown]
 # **1b. Generate corresponding prior data**
 #
-# Next, we generate a corresponding sample of $\rho(\mathbf{d})$ (prior data distribution).
+# Next, for each prior model realization $\mathbf{m}_i$ from step 1a we sample the data
+# from $\rho(\mathbf{d}|\mathbf{m}_i)$. Together with the models, this gives a joint sample
+# $(\mathbf{m}_i, \mathbf{d}_i)$ of $\rho(\mathbf{m},\mathbf{d})$, and, ignoring $\mathbf{m}$,
+# a sample of the prior data distribution $\rho(\mathbf{d})$.
 #
-# The prior data, corresponding to the prior model parameters, are computed using
-# the GA-AEM electromagnetic forward modeling code and the GEX system configuration file.
+# Here $\rho(\mathbf{d}|\mathbf{m})$ is given by the electromagnetic forward model
+# (selected by ``EM_FORWARD_METHOD``) and the GEX system configuration file, i.e.
+# $\mathbf{d}_i = g(\mathbf{m}_i)$. Measurement noise is not added here; it enters
+# later through the likelihood in the inversion step.
 
 # %%
 # Option 1: Update the existing PRIOR.h5 file with forward-modeled data
