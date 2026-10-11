@@ -27,6 +27,8 @@ if IN_COLAB:
     
 # %%
 import os
+os.environ["EM_FORWARD_METHOD"] = "gaaem"
+#os.environ["EM_FORWARD_METHOD"] = "simpeg"
 #os.environ["EM_FORWARD_METHOD"] = "anemone"
 #os.environ["EM_FORWARD_DEVICE"] = "cuda"
 os.environ["REJECTION_BACKEND"] = "jax"
@@ -141,7 +143,10 @@ N=2_000_000
 N=1_000_000
 N=100_000
 
-f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
+#f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
+#                                    showInfo=1)
+f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='uniform', NLAY_min=1, NLAY_max=5, 
+                                    RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
                                     showInfo=1)
 #print(f'{f_prior_h5} is used to hold prior realizations')
 
