@@ -2,7 +2,7 @@
 # %%
 # # Daugaard Case Study with three lithology-resistivity prior models.
 #
-# This notebook contains an example of inverison of the DAUGAARD tTEM data using three different lithology-resistivity prior models
+# This notebook contains an example of inversion of the DAUGAARD tTEM data using three different lithology-resistivity prior models
 
 # %%
 try:
@@ -70,7 +70,7 @@ ig.get_case_data(case='DAUGAARD', filelist=[f_valley_xls])
 
 
 if doSamplePrior is False:
-    # Load prior data, allready incuding prior model and data realizations
+    # Load prior data, already incuding prior model and data realizations
     files = ig.get_case_data(case='DAUGAARD', loadType='prior_data') # Load data and prior+data realizations
 
 f_data_h5 = 'DAUGAARD_AVG.h5'

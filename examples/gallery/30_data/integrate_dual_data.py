@@ -1,5 +1,5 @@
 """
-Dual data types (low and high moment seperately)
+Dual data types (low and high moment separately)
 ================================================
 """
 # %%

@@ -2,14 +2,14 @@
 Merging multiple data files from the same survey (ESBJERG)
 ==========================================================
 
-Data from Esbjerg was recorded in 8 individual surveys, using 4 different calibations (leading to 4 different system GEX files)
+Data from Esbjerg was recorded in 8 individual surveys, using 4 different calibrations (leading to 4 different system GEX files)
 
 ”TX07_20230906_2x4_RC20-33.gex”: 20230921, 20230922, 20230925, 20230926
 “TX07_20231016_2x4_RC20-33.gex”: 20231026, 20231027
 “TX07_20231127_2x4x1_RC20_33.gex”: 20240109
 “TX07_20240125_2x4_RC20-33.gex”: 20240313
 
-For the first 3 surveys the same number of gates were used, but it differedin the lasy (TX07_20240125_2x4_RC20-33.gex)
+For the first 3 surveys the same number of gates were used, but it differed in the last (TX07_20240125_2x4_RC20-33.gex)
 
 Below is an example of how to
 
@@ -100,7 +100,7 @@ ig.plot_geometry(f_data_merged1, pl='LINE')
 N=100000
 f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=4, RHO_min=1, RHO_max=3000)
 
-# Go through each of the 4 areas and invert the data seperately, using the same prior model, but different GEX files and hence prior data
+# Go through each of the 4 areas and invert the data separately, using the same prior model, but different GEX files and hence prior data
 f_data_all = [f_data_merged1, f_data_merged2, f_data_merged3, f_data_merged4]
 f_prior_data_all=[]
 f_post_all=[]

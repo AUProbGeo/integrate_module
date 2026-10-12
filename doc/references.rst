@@ -22,5 +22,4 @@ References
 
 .. [SimPEG] Cockett, Rowan, Seogi Kang, Lindsey J. Heagy, Adam Pidlisecky, and Douglas W. Oldenburg. "SimPEG: An open source framework for simulation and gradient based parameter estimation in geophysical applications." Computers & Geosciences 85 (2015): 142-154. [https://simpeg.xyz/]
 
-.. [AarhusInv] Kirkegaard, Casper, Kristoffer Andersen, Tue Boesen, Anders V. Christiansen, Esben Auken, and Gianluca Fiandaca. "Utilizing massively parallel co-processors in the AarhusInv 1D forward and inverse AEM modelling code." ASEG Extended Abstracts 2015, no. 1 (2015): 1-3.
 

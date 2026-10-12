@@ -31,12 +31,14 @@ try:
 except:
     pass
 
+import time
+
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+
 import integrate as ig
 
-import numpy as np
-import time
-import matplotlib.pyplot as plt
-import h5py
 hardcopy = True
 
 

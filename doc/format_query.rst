@@ -25,7 +25,7 @@ Two query types are supported:
 
 Both query types can be written by hand as Python dicts / JSON files, or
 translated automatically from plain English using an LLM via
-:func:`ig.query_from_text`.
+:func:`integrate.integrate_query.query_from_text`.
 
 
 Core Functions
@@ -114,22 +114,22 @@ Constraint Fields
      - float
      - optional
      - any float
-     - Upper boundary of depth interval [m]
+     - Minimum depth of the interval [m] (shallow end)
    * - ``depth_max``
      - float
      - optional
      - any float
-     - Lower boundary of depth interval [m]
+     - Maximum depth of the interval [m] (deep end)
    * - ``depth_max_im``
      - int
      - optional
      - SCALAR model ``im``
-     - Per-realization ``depth_max`` from a scalar model
+     - Per-realization maximum depth, from a scalar model
    * - ``depth_min_im``
      - int
      - optional
      - SCALAR model ``im``
-     - Per-realization ``depth_min`` from a scalar model
+     - Per-realization minimum depth, from a scalar model
    * - ``negate``
      - bool
      - optional
@@ -166,7 +166,7 @@ SCALAR models  *(depth range = 0)*
 Cross-model depth bounds
     ``depth_max_im`` and ``depth_min_im`` accept the ``im`` index of a SCALAR
     model.  For each realization, the value of that scalar model is used as
-    the upper / lower depth boundary.  This enables constraints like "Sand
+    the maximum / minimum depth of the interval.  This enables constraints like "Sand
     above the water table" where the depth cutoff varies per realization.
     These may be combined with fixed ``depth_min`` / ``depth_max``.
 
@@ -192,9 +192,9 @@ realization — the same fields as a constraint, minus the comparison fields
         "percentiles": [5, 50, 95]    # optional; default [5, 50, 95]
     }
 
-:func:`ig.query()` auto-detects the query type: dicts with ``"metric"`` are
-routed to :func:`ig.query_percentile`; dicts with ``"constraints"`` are routed
-to :func:`ig.query_probability`.
+:func:`integrate.integrate_query.query` auto-detects the query type: dicts with ``"metric"`` are
+routed to :func:`integrate.integrate_query.query_percentile`; dicts with ``"constraints"`` are routed
+to :func:`integrate.integrate_query.query_probability`.
 
 **Metric fields** (same as constraint fields minus comparisons):
 
@@ -249,7 +249,11 @@ class IDs:
         im   = int(key[1:])
         info = ig.get_prior_model_info(f_prior_h5, im)
         z    = info['z']
-        kind = 'DISCRETE' if info['is_discrete'] else 'CONTINUOUS'
+        is_scalar = (z[-1] - z[0]) == 0 or len(z) == 1
+        if is_scalar:
+            kind = 'SCALAR'
+        else:
+            kind = 'DISCRETE' if info['is_discrete'] else 'CONTINUOUS'
         print(f"  im={im}: {info['name']}  ({kind})  depth {z[0]:.1f}–{z[-1]:.1f} m")
         if info['is_discrete'] and info['class_id'] is not None:
             for cid, cname in zip(info['class_id'].flatten(), info['class_name'].flatten()):
@@ -264,7 +268,7 @@ Example output::
         class 3 = Moræneler
         class 4 = Miocene sand
         class 5 = Miocene clay
-    im=3: Waterlevel   (CONTINUOUS)  depth 0.0–0.0 m
+    im=3: Waterlevel   SCALAR
 
 
 Executing a Probability Query
@@ -427,7 +431,7 @@ Example 3: Multi-Constraint AND
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 *Probability that Sand and Grus together exceed 20 m within 0–30 m depth
-AND the first non-sand/gravel layer at the top is less than 3 m thick.*
+AND the first Sand/Grus layer at the top is at least 3 m thick.*
 
 Both constraints must hold simultaneously.
 
@@ -446,7 +450,7 @@ Both constraints must hold simultaneously.
             },
             {
                 "im": 2,
-                "classes": [1, 2],          # Sand or Grus — negated = "not sand/grus"
+                "classes": [1, 2],          # Sand or Grus; negate flips the test below
                 "thickness_mode": "first_occurrence",
                 "thickness_comparison": "<",
                 "thickness_threshold": 3.0,
@@ -493,7 +497,7 @@ Example 5: Cross-Model Depth Bound
 in the zone above the water table.*
 
 ``depth_max_im: 3`` instructs the query engine to use the Waterlevel value
-(im=3) of each realization as the upper depth cutoff for that realization.
+(im=3) of each realization as the maximum depth for that realization.
 
 .. code-block:: python
 
@@ -515,7 +519,7 @@ in the zone above the water table.*
     P, meta = ig.query(f_post_h5, query)
     ig.query_plot(P, meta)
 
-Use ``depth_min_im`` symmetrically to set a lower bound from a scalar model
+Use ``depth_min_im`` symmetrically to set a minimum depth from a scalar model
 (e.g. "below the water table").
 
 
@@ -560,7 +564,7 @@ Example 7: Percentile Query — Cross-Model Depth Bound
             "classes": [1, 2],
             "thickness_mode": "cumulative",
             "depth_min": 0.0,
-            "depth_max_im": 3           # per-realization upper bound = Waterlevel
+            "depth_max_im": 3           # per-realization maximum depth = Waterlevel
         },
         "percentiles": [5, 50, 95]
     }
@@ -577,7 +581,7 @@ LLM-Powered Query Tools
 Generating a Description from an Existing Query
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:func:`ig.title_from_json` uses an LLM to produce a short plain-English
+:func:`integrate.integrate_query.title_from_json` uses an LLM to produce a short plain-English
 sentence describing what an existing query dict computes.  This is useful for
 automatically labelling figures or log output without writing titles by hand.
 
@@ -600,7 +604,7 @@ automatically labelling figures or log output without writing titles by hand.
 
 ``file_json``
     Path to a JSON file **or** a query dict directly (e.g. from
-    :func:`ig.load_query`).
+    :func:`integrate.integrate_query.load_query`).
 
 ``f_prior_h5`` *(optional)*
     Path to the prior HDF5 file.  When supplied, real model names, depth
@@ -608,13 +612,13 @@ automatically labelling figures or log output without writing titles by hand.
     uses geological names (e.g. "clay") rather than numeric IDs (e.g. "class 3").
 
 ``model``, ``api_key``
-    Same as :func:`ig.query_from_text`.
+    Same as :func:`integrate.integrate_query.query_from_text`.
 
 ``showInfo`` *(int, default 1)*
     Controls feedback when the LLM cannot be reached:
 
     * ``0`` — silent; empty string returned with no output.
-    * ``1`` — one-line message including a hint to run :func:`ig.query_test_llm` *(default)*.
+    * ``1`` — one-line message including a hint to run :func:`integrate.integrate_query.query_test_llm` *(default)*.
     * ``2`` — message plus full exception detail.
 
 If the LLM is unavailable for any reason (missing ``litellm`` package, no API
@@ -625,7 +629,7 @@ raises — so it is safe to use in a pipeline without extra error handling.
 Translating Plain English to a Query Dict
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:func:`ig.query_from_text` uses `LiteLLM <https://docs.litellm.ai>`_ to
+:func:`integrate.integrate_query.query_from_text` uses `LiteLLM <https://docs.litellm.ai>`_ to
 translate a plain-English geological question into a valid query dict.  The
 LLM receives a structured system prompt that describes:
 
@@ -640,7 +644,7 @@ The LLM **auto-detects** the query type from the text:
 * "What is the probability that …" → probability query (returns ``"constraints"``)
 * "What are the p5/p50/p95 of …" → percentile query (returns ``"metric"`` + ``"percentiles"``)
 
-The returned ``query_dict`` is ready to pass directly to :func:`ig.query`,
+The returned ``query_dict`` is ready to pass directly to :func:`integrate.integrate_query.query`,
 which dispatches to the correct function automatically.
 
 Any LiteLLM-supported model works: Claude, GPT-4, or a locally running Ollama
@@ -666,6 +670,7 @@ Before running queries, verify that the chosen model and key are working:
 
 .. code-block:: python
 
+    import os
     import integrate as ig
 
     # Claude
@@ -675,7 +680,7 @@ Before running queries, verify that the chosen model and key are working:
     # Local Ollama
     ig.query_test_llm(model='ollama_chat/qwen3:latest')
 
-A successful test prints ``OK``.  A failed test prints the error message.
+A successful test prints a line ending in ``OK`` (``[query_test_llm] OK — model '...' responded with valid JSON.``). A failed test prints the error message.
 
 
 Translating a Query
@@ -705,7 +710,7 @@ Translating a Query
 **Return values:**
 
 ``query_dict``
-    A valid query dict ready to pass directly to :func:`ig.query`.
+    A valid query dict ready to pass directly to :func:`integrate.integrate_query.query`.
 
 ``interpretation``
     A 1–2 sentence plain-English confirmation of what the LLM understood the
@@ -755,7 +760,7 @@ Full Workflow
     # 5. Save the query for reuse (no LLM call needed next time)
     ig.save_query(query_dict, 'sand_above_wl.json')
 
-Pass ``verbose=True`` to :func:`ig.query_from_text` to print the full system
+Pass ``verbose=True`` to :func:`integrate.integrate_query.query_from_text` to print the full system
 prompt and raw LLM response — useful for debugging unexpected translations.
 
 
@@ -785,7 +790,7 @@ Unsupported Queries
 
 If the query cannot be expressed with the available constraint schema (for
 example, "What is the spatial correlation length of resistivity?"), the LLM
-responds with ``UNSUPPORTED: <reason>`` and :func:`ig.query_from_text` raises
+responds with ``UNSUPPORTED: <reason>`` and :func:`integrate.integrate_query.query_from_text` raises
 a ``ValueError``:
 
 .. code-block:: python
@@ -886,3 +891,11 @@ See Also
 * :doc:`format_wells` — Borehole data format and integration workflow
 * :doc:`workflow` — Complete inversion workflow
 * :doc:`auto_examples/index` — worked examples
+
+Examples
+--------
+
+Runnable query examples:
+
+* :doc:`Query tool in use <auto_examples/60_query/integrate_query>`
+* :doc:`Competing priors, compared with the same data <auto_examples/50_hypothesis/integrate_daugaard_multi_prior>`

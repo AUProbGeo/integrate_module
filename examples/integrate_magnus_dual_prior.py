@@ -31,7 +31,7 @@ import copy
 N = 2000 # Number of prior model realizations to generate (this is just for testing, use a larger number for better results)
 
 # %% [markdown]
-# ## GETTING THE DATA AND GEX FILE for gthe chosen area
+# ## GETTING THE DATA AND GEX FILE for the chosen area
 
 # %%
 case = 'DAUGAARD'
@@ -53,7 +53,7 @@ ig.copy_hdf5_file(f_data_old_h5, f_data_h5)
 # %% [markdown]
 # ## the PRIOR model(s) :
 # simulate prior model realizations using geoprior1d # https://github.com/GEUSjesper/geoprior1d
-# We are using two prior models representing expected variability outstide and inside a buried valley system.
+# We are using two prior models representing expected variability outside and inside a buried valley system.
 
 # %%
 f_prior_h5_list = []

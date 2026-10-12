@@ -79,7 +79,7 @@ ig.plot_data(f_data_h5, hardcopy=hardcopy)
 # 1. Setup the prior model ($\rho(\mathbf{m},\mathbf{d}))
 # -------------------------------------------------------
 #
-# In this case prior data and models are allready available in the HDF% in 'f_prior_h5'.
+# In this case prior data and models are already available in the HDF5 in 'f_prior_h5'.
 
 # %%
 # Plot some summary statistics of the prior model, to QC the prior choice
@@ -96,7 +96,7 @@ ig.plot_data_prior(f_prior_h5,f_data_h5,nr=1000,hardcopy=hardcopy)
 # 2. Sample the posterior $\sigma(\mathbf{m})$
 # --------------------------------------------
 #
-# The posterior distribution has allready been sampled using the extended rejection sampler.
+# The posterior distribution has already been sampled using the extended rejection sampler.
 
 # %%
 # 3. Plot some statistics from $\sigma(\mathbf{m})$

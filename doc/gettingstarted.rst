@@ -12,6 +12,8 @@ Getting started
 0. Get some TTEM data
 =====================
 
+The full, runnable version of the steps on this page is the :doc:`getting started example <auto_examples/10_getting_started/integrate_getting_started>`.
+
 A number of test cases are available in the INTEGRATE package.
 To see which cases are available, check the `get_case_data` function.
 
@@ -81,14 +83,14 @@ This will create N realizations of 3 types of model parameters:
 1b. Compute prior data (the forward response of the prior realizations)
 ------------------------------------------------------------------------
 
-Then the prior data, corresponding to the prior model parameters, are computed, using the GA-AEM code and the GEX file (from the DATA).
+Then the prior data, corresponding to the prior model parameters, are computed with :func:`integrate.integrate.prior_data_em`, using the GA-AEM code and the GEX file (from the DATA). ``method='ga-aem'`` selects GA-AEM explicitly. Without it, the first installed backend is used (see :doc:`prior_data`).
 
 :: 
 
     # To update the PRIOR.h5
-    f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex, doMakePriorCopy=False)
+    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, method='ga-aem', doMakePriorCopy=False)
     # To create a COPY of PRIOR.h5 and update that
-    # f_prior_data_h5 = ig.prior_data_gaaem(f_prior_h5, file_gex)
+    # f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex, method='ga-aem')
 
     print('Updated %s to hold prior DATA' % (f_prior_data_h5))
 
@@ -214,3 +216,15 @@ Export to CSV format
     import pandas as pd
     df = pd.read_csv(f_point_csv)
     df.head()
+
+Examples
+--------
+
+Run the runnable versions of this page in the example gallery:
+
+* :doc:`Full chain, from data to posterior <auto_examples/10_getting_started/integrate_getting_started>`
+* :doc:`Same analysis without forward modelling <auto_examples/10_getting_started/integrate_getting_started_no_forward>`
+* :doc:`Analysis of an existing posterior <auto_examples/10_getting_started/integrate_getting_started_posterior_only>`
+* :doc:`Complete workflow in one script <auto_examples/20_workflow/integrate_workflow>`
+* :doc:`Profile plots in detail <auto_examples/80_plotting/integrate_profiles>`
+* :doc:`All getting-started examples <auto_examples/10_getting_started/index>`

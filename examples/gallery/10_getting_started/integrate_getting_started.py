@@ -27,6 +27,8 @@ if IN_COLAB:
     
 # %%
 import os
+#os.environ["EM_FORWARD_METHOD"] = "gaaem"
+os.environ["EM_FORWARD_METHOD"] = "simpeg"
 #os.environ["EM_FORWARD_METHOD"] = "anemone"
 #os.environ["EM_FORWARD_DEVICE"] = "cuda"
 os.environ["REJECTION_BACKEND"] = "jax"
@@ -38,7 +40,7 @@ import numpy as np
 
 # %% [markdown]
 # 0\. Get TTEM data
-# ----------------
+# -----------------
 #
 # Several test cases are available in the INTEGRATE package.
 # To see which cases are available, check the ``get_case_data`` function.
@@ -114,7 +116,13 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 
 # %% [markdown]
 # 1\. Set up the prior model ($\rho(\mathbf{m},\mathbf{d})$)
-# ---------------------------------------------------------
+# ----------------------------------------------------------
+#
+# The prior is a joint distribution over model parameters $\mathbf{m}$ and data $\mathbf{d}$:
+# $\rho(\mathbf{m},\mathbf{d}) = \rho(\mathbf{d}|\mathbf{m})\,\rho(\mathbf{m})$.
+# It is represented by samples $(\mathbf{m}_i, \mathbf{d}_i)$, generated in two steps:
+# first sample $\rho(\mathbf{m})$ (1a), then, for each sampled model, sample
+# $\rho(\mathbf{d}|\mathbf{m})$ (1b).
 #
 # In this example, a simple layered prior model will be considered.
 # The prior represents our initial beliefs about subsurface resistivity structure.
@@ -141,7 +149,10 @@ N=2_000_000
 N=1_000_000
 N=100_000
 
-f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
+#f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
+#                                    showInfo=1)
+f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='uniform', NLAY_min=1, NLAY_max=5, 
+                                    RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
                                     showInfo=1)
 #print(f'{f_prior_h5} is used to hold prior realizations')
 
@@ -152,10 +163,15 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 # %% [markdown]
 # **1b. Generate corresponding prior data**
 #
-# Next, we generate a corresponding sample of $\rho(\mathbf{d})$ (prior data distribution).
+# Next, for each prior model realization $\mathbf{m}_i$ from step 1a we sample the data
+# from $\rho(\mathbf{d}|\mathbf{m}_i)$. Together with the models, this gives a joint sample
+# $(\mathbf{m}_i, \mathbf{d}_i)$ of $\rho(\mathbf{m},\mathbf{d})$, and, ignoring $\mathbf{m}$,
+# a sample of the prior data distribution $\rho(\mathbf{d})$.
 #
-# The prior data, corresponding to the prior model parameters, are computed using
-# the GA-AEM electromagnetic forward modeling code and the GEX system configuration file.
+# Here $\rho(\mathbf{d}|\mathbf{m})$ is given by the electromagnetic forward model
+# (selected by ``EM_FORWARD_METHOD``) and the GEX system configuration file, i.e.
+# $\mathbf{d}_i = g(\mathbf{m}_i)$. Measurement noise is not added here; it enters
+# later through the likelihood in the inversion step.
 
 # %%
 # Option 1: Update the existing PRIOR.h5 file with forward-modeled data
@@ -190,7 +206,7 @@ ig.plot_data_prior(f_prior_data_h5,f_data_h5,nr=1000,hardcopy=hardcopy)
 
 # %% [markdown]
 # 2\. Sample the posterior distribution $\sigma(\mathbf{m})$
-# ---------------------------------------------------------
+# ----------------------------------------------------------
 #
 # The posterior distribution is sampled using the extended rejection sampler.
 # Rejection sampling of the posterior can be done with default settings using
@@ -221,7 +237,7 @@ f_post_h5 = ig.integrate_rejection(f_prior_data_h5, # type: ignore
 
 # %% [markdown]
 # 3\. Plot statistics from the posterior $\sigma(\mathbf{m})$
-# ----------------------------------------------------------
+# -----------------------------------------------------------
 #
 # **Compare prior and posterior data**
 #
@@ -361,8 +377,10 @@ f_csv, f_point_csv = ig.post_to_csv(f_post_h5)
 
 # %%
 # Read the exported CSV file for inspection
-# Example filename (actual filename will be generated automatically):
-#f_point_csv = 'POST_DAUGAARD_AVG_PRIOR_CHI2_NF_3_log-uniform_N100000_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu100000_aT1_M1_point.csv'
+#
+# Example filename (the actual name is generated automatically)::
+#
+#     f_point_csv = 'POST_DAUGAARD_AVG_PRIOR_CHI2_NF_3_log-uniform_N100000_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nu100000_aT1_M1_point.csv'
 import pandas as pd
 df = pd.read_csv(f_point_csv)
 df.head()

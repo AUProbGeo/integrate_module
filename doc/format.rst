@@ -15,8 +15,6 @@ The following HDF files are used for any INTEGRATE project
 
 **PRIOR.h5**: Stores realizations of the prior model, and corresponding forward response
 
-**FORWARD.h5**: Stores information needed to solve the forward problem, and/or needed to describe the observed data in DATA.h5
-
 **POST.h5**: stores index of posterior realizations, as well as posterior statistics 
 
 
@@ -26,7 +24,7 @@ DATA.h5 contains observed data, and its associated geometry.
 The observed data can be of many types, such as TEM data and well-log data
 
 A DATA.h5 file can be created from an AarhusInv-style XYZ data file and its
-corresponding GEX system file using :func:`integrate.xyz_to_h5`, which reads
+corresponding GEX system file using :func:`integrate.integrate_io.xyz_to_h5`, which reads
 both formats with the ``libaarhusxyz`` library [libaarhusxyz]_.
 
 
@@ -44,11 +42,11 @@ For example, setting ``/D1/id_prior=2`` will compare observed ``/D1`` with prior
    pass an explicit ``id=`` (e.g. ``id=100``), which has no such limit.
 
 
-  ``Np``: Number of data locations (typically one set data per unique X-Y location)
-  
-  ``Ndi``: Number of data points ``Nd`` per data type ``i`` per location.
-  
-  ``Nclass``: Number of classes
+Dimensions used in the tables below:
+
+- ``Np``: number of data locations (typically one set of data per unique X-Y location)
+- ``Ndi``: number of data points ``Nd`` per data type ``i`` per location
+- ``Nclass``: number of classes
 
 The datasets ``UTMX``, ``UTMY``, ``ELEVATION``, and ``LINE`` are mandatory for most plotting routines in INTEGRATE, 
 but are not used in the inversion itself.
@@ -118,14 +116,14 @@ If none of them are set, axes are labelled with the name of the group: ``M1`` fo
      - *
      -
      - Optional name of this dataset (e.g. ``'dBdT'``), used in titles (e.g. ``"D1: dBdT"``).
-       See :ref:`name_label_unit`.
+       See :ref:`name, label and unit <name_label_unit>`.
    * - /D1/label
      - [string]
      - *
      -
      - Optional axis/colorbar label of the data (e.g. ``'dB/dt'``). Defaults to ``name``.
-       Used by :func:`integrate.plot_data`, :func:`integrate.plot_data_prior` and
-       :func:`integrate.plot_data_prior_post`.
+       Used by :func:`integrate.integrate_plot.plot_data`, :func:`integrate.integrate_plot.plot_data_prior` and
+       :func:`integrate.integrate_plot.plot_data_prior_post`.
    * - /D1/unit
      - [string]
      - *
@@ -140,7 +138,7 @@ If none of them are set, axes are labelled with the name of the group: ``M1`` fo
 
 The format of the observed data, and the associate uncertainty, depends on the type of data, and the choice of noise model.
 
-See the function :func:`integrate.load_data()` for an example on how read DATA.h5 files.
+See the function :func:`integrate.integrate_io.load_data` for an example of how to read DATA.h5 files.
 
 """""""""""""""""""""""""""""""""
 Gaussian noise  - continuous data
@@ -173,30 +171,25 @@ For continuous data and the multivariate Gaussian noise model can be chosen by s
      - *
      - Standard deviation of observed data (db/dT). Is the size is [1,Nd], the same ``d_std`` is used for all data.
    * - /D1/Cd
-     - [Nd1,Nd1]
+     - [Nd1,Nd1] or [Np,Nd1,Nd1]
      - 
      - 
-     - Correlated noise matrix. ``Cd`` is the same for all data
-   * - /D1/Cd
-     - [Np,Nd1,Nd1]
-     - 
-     - 
-     - Correlated noise matrix; each data observation has its own correlated noise matrix 
-   * - /gatetimes
-     - [Ndata,1]
-     - 
-     - 
-     - Gate times (in seconds) for each data point
-   * - /i_lm
+     - Correlated noise matrix. Shared by all data when [Nd1,Nd1]; each data observation has its own when [Np,Nd1,Nd1].
+   * - /D1/i_lm
      - [Nlm,1]
      - 
      - 
-     - Index (rel to /gatetimes) of Nlm gates for the low moment. 
-   * - /i_hm
+     - 0-indexed gate numbers used for the low moment (written by ``xyz_to_h5``).
+   * - /D1/i_hm
      - [Nhm,1]
      - 
      - 
-     - Index (rel to /gatetimes) of Nhm gates for the high moment. 
+     - 0-indexed gate numbers used for the high moment (written by ``xyz_to_h5``).
+   * - /D1 attribute ``gex``
+     - string
+     - 
+     - 
+     - Path of the GEX system file that was used to read the data.
    * - --
      - 
      - 
@@ -264,7 +257,7 @@ PRIOR.h5 contains ``N`` realizations of a prior model (represented as potentiall
      - 
      - *
      - N realizations of model parameter 1, 
-       each consisting of Nm1 model param1eters
+       each consisting of Nm1 model parameters
    * - /M1/x
      - [nm]
      - *
@@ -344,12 +337,12 @@ PRIOR.h5 contains ``N`` realizations of a prior model (represented as potentiall
      - [string]
      - *
      - 
-     - Optional, as for DATA.h5 (see :ref:`name_label_unit`).
+     - Optional, as for DATA.h5 (see :ref:`name, label and unit <name_label_unit>`).
    * - /D1/f5_forward
      - [string]
      - *
      - 
-     - HDF file describing the forward model used to compute prior data.
+     - Set to ``'none'`` by ``prior_data_identity``. The EM backends do not write it; see the attributes listed below.
    * - /D1/with_noise
      - [1]
      - *
@@ -368,76 +361,55 @@ PRIOR.h5 contains ``N`` realizations of a prior model (represented as potentiall
 All the mandatory attributes specified for ``/M1`` are also mandatory for other attributes, i.e.  ``/M1``,  ``/M2``, ... . 
 
 
-f_forward_h5 [string]: Defines the name of the HDF5 file that contains information need to solved the forward problem...
+"""""""""""""""""""""""""""""""""""""""
+Forward model attributes on ``/D<id>``
+"""""""""""""""""""""""""""""""""""""""
 
+The EM forward backends (see :func:`integrate.integrate.prior_data_em`) record
+how the data were computed as attributes of each ``/D<id>`` dataset:
 
-
-FORWARD.h5
-==========
-The FORWARD.h5 needs to hold as much information as needed to define the use of a specific forward model.
-
-The attribute ``/method`` refer to a specific choice of forward method.
-
-
-.. list-table:: posterior data realizations in PRIOR.h5
-   :widths: 10 10 5 5 70 
+.. list-table:: Attributes of ``/D<id>`` written by the EM backends
+   :widths: 20 15 65
    :header-rows: 1
 
-   * - Dataset
-     - Format
-     - attribute
-     - Mandatory
-     - Description
-   * - /method
-     - [string]
-     - *
-     - 
-     - Defines the type of forward model def:'TDEM'.
-   * - /type
-     - [string]
-     - *
-     - 
-     - Define the algorithm used to solve the forward model. def:'GA-AEM'.
-     
+   * - Attribute
+     - Value
+     - Meaning
+   * - ``type``
+     - ``'TDEM'``
+     - Time-domain EM data.
+   * - ``method``
+     - ``'ga-aem'``, ``'anemone'``, ``'simpeg'``
+     - Forward backend that computed the data (see :doc:`prior_data`).
+   * - ``im``, ``id``
+     - integer
+     - Model and data index.
+   * - ``is_log``
+     - bool
+     - Whether the data are stored as log10 values.
+   * - ``device`` (anemone), ``batch_size`` (anemone)
+     - string, integer
+     - Torch device and batch size used.
+   * - ``Nhank``, ``Nfreq`` (ga-aem)
+     - integer
+     - Hankel and frequency sampling of the GA-AEM run.
 
-``/method`` can, for example, be ``TDEM`` for Time Domain EM (The default in INTEGRATE),
-or can be ``identity`` for an identity mapping (useful to represent log data).
+Identity data written by :func:`integrate.integrate.prior_data_identity` have
+no ``method`` attribute. Their ``/D<id>`` carries ``f5_forward='none'`` and
+``with_noise=0`` instead.
 
-"""""""""""""""""""""""""""""""""""""
-TDEM: Time domain EM, method='tdem'.
-"""""""""""""""""""""""""""""""""""""
+.. note::
 
-``/method='TDEM'`` make use of time-domain EM forward modeling. 
-The following three types of forward models will (eventually) be available:
+   The ``method`` values ``'tdem'`` and ``'log'`` that appeared in earlier
+   versions of this page do not exist. The forward model is selected by the
+   ``method=`` keyword of ``prior_data_em``, not read from a FORWARD.h5 file.
 
-
-``/type='GA-AEM'`` [DEFAULT].
-[GA-AEM]_. Available for both Linux and Windows, Matlab and Python.
-
-
-``/type='AarhusInv'``.
-[AarhusInv]_. Windows only.
-Not yet implemented
-
-
-``/type='SimPEG'``.
-[SimPEG]_. Python only. Implemented as ``ig.prior_data_simpeg`` /
-``ig.prior_data_em(..., method='simpeg')`` (writes ``/D<id>`` with
-``attrs['method']='simpeg'``); see ``SIMPEG_VS_GAAEM.md`` for validation
-against GA-AEM and AarhusInv.
-
-""""""""""""""""""""""""""""""""""""""""
-LOG: Well log conditioning, method='log'
-""""""""""""""""""""""""""""""""""""""""
-
-``/method='identity'`` maps attributes of a specific model (realizations of the prior) directly into data. 
-  
 
 POST.h5
 =======
 
 At the very minimum POST.h5 needs to contain the index (in PRIOR.h5) of realizations from the posterior.
-Statistics are written by :func:`integrate.integrate_posterior_stats`.
+Statistics are written by :func:`integrate.integrate.integrate_posterior_stats`.
 
 ``Np``: Number of data locations.
 
@@ -471,26 +443,26 @@ Statistics are written by :func:`integrate.integrate_posterior_stats`.
      -
      - *
      - Log-evidence at each data location.
-   * - /f5_data
-     - string
-     - *
-     - *
-     - Filename of the DATA HDF5 file.
-   * - /f5_prior
-     - string
-     - *
-     - *
-     - Filename of the PRIOR HDF5 file.
+   * - /EV_post
+     - [Np, Nr]
+     -
+     -
+     - Log-evidence of each posterior realization (written by ``integrate_rejection``).
+   * - /EV_post_mean
+     - [Np, 1]
+     -
+     -
+     - Mean of ``EV_post`` over the posterior realizations.
    * - /CHI2
      - [Np, Nd]
-     - float
+     -
      -
      - Reduced chi-squared (χ²/ν) goodness-of-fit metric per data type. Values near 1 indicate good fit; >1 underfit; <1 overfit.
    * - /N_UNIQUE
      - [Np]
      -
      -
-     - Number of unique prior realizations used at each data location. Written by :func:`integrate.integrate_posterior_stats`.
+     - Number of unique prior realizations used at each data location. Written by :func:`integrate.integrate.integrate_posterior_stats`.
    * - /UTMX
      - [Np]
      -
@@ -513,12 +485,29 @@ Statistics are written by :func:`integrate.integrate_posterior_stats`.
      - Line number, copied from DATA.h5.
 
 
+The file-level attributes of POST.h5 record the inputs of the run:
+
+.. list-table:: Attributes of POST.h5
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Attribute
+     - Meaning
+   * - ``f5_prior``
+     - Path of the PRIOR HDF5 file used.
+   * - ``f5_data``
+     - Path of the DATA HDF5 file used.
+   * - ``N_use``
+     - Number of prior realizations used.
+   * - ``date_start``, ``date_end``, ``inv_time``
+     - Start and end time, and elapsed time of the rejection run.
+
 """""""""""""""""""""
 Continuous parameters
 """""""""""""""""""""
 
 Written for each continuous model parameter ``/Mx`` (``is_discrete=0``) by
-:func:`integrate.integrate_posterior_stats`.
+:func:`integrate.integrate.integrate_posterior_stats`.
 
 .. list-table:: Statistics for continuous model parameters in POST.h5
    :widths: 15 10 10 65
@@ -563,7 +552,7 @@ Discrete parameters
 """""""""""""""""""
 
 Written for each discrete model parameter ``/Mx`` (``is_discrete=1``) by
-:func:`integrate.integrate_posterior_stats`.
+:func:`integrate.integrate.integrate_posterior_stats`.
 
 .. list-table:: Statistics for discrete model parameters in POST.h5
    :widths: 15 10 10 65
@@ -594,11 +583,12 @@ Written for each discrete model parameter ``/Mx`` (``is_discrete=1``) by
 Compression in HDF5 files
 =========================
  
-All HDF5 files created by INTEGRATE use compression by default to reduce file sizes while maintaining reasonable I/O performance. The default compression settings are optimized based on extensive benchmarking:
+HDF5 files written by INTEGRATE are compressed by default to reduce file sizes while keeping I/O reasonable. The default is ``gzip`` level 1:
 
-- **Default**: ``gzip`` level 1 (provides 3.5× file size reduction, 78% faster than level 9)
-- **Performance**: Write overhead of ~3× compared to no compression, but results in significantly smaller files
-- **Customizable**: Compression can be configured per-function call or globally
+- **Default**: ``gzip`` level 1 (about 3.5× file size reduction, about 78% faster than level 9)
+- **Performance**: Write overhead of about 3× compared to no compression, but much smaller files
+- **Customizable**: Set ``compression`` and ``compression_opts`` per call. The
+  defaults differ by function, see below.
 
 """""""""""""""""""""""""""
 Per-function Configuration
@@ -623,20 +613,28 @@ Example usage::
     # Same parameters work for data functions
     ig.save_data_gaussian(D_obs, compression='gzip', compression_opts=9)
 
+The prior-file writers ``save_prior_model`` and ``save_prior_data`` default to
+``gzip`` level 1. ``prior_model_layered`` passes ``compression`` on only when
+you give it. To compress prior files differently, pass the setting explicitly.
+
 """""""""""""""""""""""""""""
 Global Default Configuration
 """""""""""""""""""""""""""""
 
-You can modify the module-wide compression defaults in ``integrate_io.py``::
+The module-wide defaults in ``integrate_io.py`` are used only by the data
+writers ``save_data_gaussian`` and ``save_data_multinomial`` when no
+``compression`` argument is given::
 
     import integrate.integrate_io as io
 
-    # Change global defaults (affects all subsequent saves)
     io.DEFAULT_COMPRESSION = 'lzf'        # Options: 'gzip', 'lzf', or None
     io.DEFAULT_COMPRESSION_OPTS = 4       # For gzip: 1-9 (1=fastest, 9=smallest)
 
-    # Now all functions use the new defaults
-    ig.prior_model_layered(N=50000)  # Will use lzf compression
+    # Uses lzf from now on
+    ig.save_data_gaussian(D_obs)
+
+    # Prior files are not affected; they still default to gzip level 1
+    ig.prior_model_layered(N=50000)
 
 """""""""""""""""""""""""""""""""""
 Compression Performance Comparison
@@ -670,33 +668,21 @@ Functions Supporting Compression
 
 All HDF5 write functions accept ``compression`` and ``compression_opts`` parameters:
 
-- ``save_prior_model()`` - Model parameter arrays
-- ``save_prior_data()`` - Forward-modeled data
-- ``save_data_gaussian()`` - Observed data with Gaussian noise model
-- ``save_data_multinomial()`` - Observed data with multinomial noise model
-- ``prior_model_layered()`` - Passes compression settings to internal saves
+- ``save_prior_model()`` - Model parameter arrays (default gzip level 1)
+- ``save_prior_data()`` - Forward-modeled data (default gzip level 1)
+- ``save_data_gaussian()`` - Observed data with Gaussian noise model (module default)
+- ``save_data_multinomial()`` - Observed data with multinomial noise model (module default)
+- ``prior_model_layered()`` - Passes ``compression`` and ``compression_opts`` to its internal saves when given
 
 
 
-A typical workflow
-==================
+Examples
+========
 
-1. Setup DATA.h5
-   
-   * Store the observed data and its associated uncertainty in DATA.h5
+Examples that write and read these files:
 
-2. Setup FORWARD.h5
-
-   * Define the forward problem for data type A in FORWARD_A.h5.
-   * Define the forward problem for data type B in FORWARD_B.h5.
-
-3. Setup PRIOR.h5
-
-   * Generate prior model realizations of model parameter 1 in in /M1
-   * Generate prior model realizations of model parameter 2 in in /M2
-   * Use FORWARD_A.h5 to compute prior data of the prior realizations for data type A
-   * Use FORWARD_A.h5 to compute prior data of the prior realizations for data type B
-  
-4. Sample the posterior and output POST.h5
-
-5. Update POST.h5 with some statistics computed from the posterior.
+* :doc:`Getting started (DATA.h5, PRIOR.h5, POST.h5 in practice) <auto_examples/10_getting_started/integrate_getting_started>`
+* :doc:`Noise models and their storage in DATA.h5 <auto_examples/40_noise/integrate_gaussian_noise>`
+* :doc:`Data in linear or log space <auto_examples/90_other/integrate_linear_logspace>`
+* :doc:`Several data types in one file (/D1, /D2) <auto_examples/30_data/integrate_dual_data>`
+* :doc:`Merging data files from one survey <auto_examples/90_other/integrate_merge_data>`

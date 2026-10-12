@@ -399,7 +399,7 @@ def gex_to_anemone_system(gex, showInfo=0, file_sr2=None, sr_filters=False,
         ``1/(1 + 2 zeta s + s^2)`` (see ``ISSUE_rx_coil_filter.md``):
 
         * ``'two_pole'`` (default): two first-order poles at ``fcut/zeta``
-          (:func:`integrate.em_system.rx_coil_lowpass`), the same filters
+          (``rx_coil_lowpass`` in ``integrate.em_system``), the same filters
           GA-AEM and SimPEG use;
         * ``'damped2'``: the exact second-order response;
         * ``'cascade'``: the earlier reading, every entry as a Butterworth
@@ -677,7 +677,7 @@ def _compress_batch(M, thickness):
     return M_c, T_c
 
 
-def _run_batched(fwr, M_t, T_t, batch_size, torch):
+def _run_batched(fwr, M_t, T_t, batch_size, torch, progress=None):
     """Run ``fwr`` over the model axis of ``M_t``/``T_t`` in chunks.
 
     anemone's intermediates scale linearly with the number of models
@@ -688,6 +688,8 @@ def _run_batched(fwr, M_t, T_t, batch_size, torch):
 
     M_t: (nd, K) resistivity, T_t: (nd, K-1) thicknesses (both torch tensors
     already on the target device). Returns raw as an (nd, n_gates) ndarray.
+    ``progress(n)``, if given, is called with the number of models finished
+    after each batch (one call per batch, so it adds no per-model cost).
     """
     nd = M_t.shape[0]
     if not batch_size or batch_size <= 0 or batch_size >= nd:
@@ -699,6 +701,8 @@ def _run_batched(fwr, M_t, T_t, batch_size, torch):
             raw = fwr(M_t[i0:i1].T, T_t[i0:i1].T).detach().cpu().numpy()
             blocks.append(np.atleast_2d(raw))  # anemone squeezes for n_models==1
             del raw
+            if progress is not None:
+                progress(i1 - i0)
     return np.concatenate(blocks, axis=0) if len(blocks) > 1 else blocks[0]
 
 
@@ -871,12 +875,16 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         M_c = M
         T_c = np.tile(np.asarray(thickness, dtype=float), (nd, 1))
 
+    # progress bar, same convention as ga-aem/simpeg (disabled when showInfo < 0);
+    # advanced once per anemone batch, so the forward itself is unchanged
+    from tqdm import tqdm
+    pbar = tqdm(total=nd, mininterval=1, disable=(showInfo < 0), desc='anemone', leave=False)
     t0 = time.time()
     if varying:
         D = _forward_varying_height(system, M_c, T_c, tx_height,
                                     altitude_bin_width, scale, device,
                                     progress_callback, showInfo,
-                                    batch_size)  # Task 6
+                                    batch_size, progress=pbar.update)  # Task 6
     else:
         tx_z = None
         if tx_height.size >= 1:
@@ -887,12 +895,14 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         dev = torch.device(device)
         M_t = torch.as_tensor(M_c, dtype=torch.float64).to(dev)
         T_t = torch.as_tensor(T_c, dtype=torch.float64).to(dev)
-        raw = np.asarray(_run_batched(fwr, M_t, T_t, batch_size, torch),
+        raw = np.asarray(_run_batched(fwr, M_t, T_t, batch_size, torch,
+                                      progress=pbar.update),
                          dtype=float)
         cols = []
         for s, sc in zip(slices, scale):
             cols.append(sc * raw[:, s])
         D = np.concatenate(cols, axis=1)
+    pbar.close()
 
     if showtime:
         print("forward_anemone: %.1f ms/model (%d models)"
@@ -909,7 +919,7 @@ forward_anemone.last_sr2 = None
 
 def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
                             device, progress_callback, showInfo,
-                            batch_size=1000):
+                            batch_size=1000, progress=None):
     """M_c (nd, K) resistivity, T_c (nd, K-1) per-sounding thicknesses
     (already layer-compressed by the caller)."""
     anemone, torch = _require_anemone()
@@ -935,7 +945,7 @@ def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
     for b in np.unique(bin_id):
         rows = np.where(bin_id == b)[0]
         fwr, slices = _build_forward(system, z_of(b), device)
-        raw = _run_batched(fwr, M_t[rows], T_t[rows], batch_size, torch)
+        raw = _run_batched(fwr, M_t[rows], T_t[rows], batch_size, torch, progress=progress)
         cols = [(sc * raw[:, s]) for s, sc in zip(slices, scale)]
         block = np.concatenate(cols, axis=1)
         if D is None:
@@ -961,7 +971,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        tolerance=1e-6, **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
-    Mirrors :func:`integrate.prior_data_gaaem` but loads ``M{im}`` **as
+    Mirrors :func:`integrate.gaaem_forward.prior_data_gaaem` but loads ``M{im}`` **as
     resistivity** (no ``1/``) and forwards it through :func:`forward_anemone`.
     ``batch_size`` soundings are forwarded per anemone call (bounds peak GPU
     memory; ``0`` forwards all ``N`` at once). ``randomize`` controls whether a

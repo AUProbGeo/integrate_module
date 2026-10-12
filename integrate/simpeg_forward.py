@@ -282,7 +282,8 @@ def _forward_simpeg_chunk(M_chunk, txh_chunk, thickness, system, opts, doCompres
     for h in np.unique(txh_chunk):
         rows = np.where(txh_chunk == h)[0]
         sim, slices, Ps = _build_simulation(system, h, opts, thickness, coeff_cache=coeff_cache)
-        d = _forward_rows(sim, M_chunk[rows], thickness, doCompress, slices, Ps, area)
+        d = _forward_rows(sim, M_chunk[rows], thickness, doCompress, slices, Ps, area,
+                          progress=_tick_pool)
         if out is None:
             n_used = d.shape[1]
             out = np.empty((M_chunk.shape[0], n_used))
@@ -293,6 +294,23 @@ def _forward_simpeg_chunk(M_chunk, txh_chunk, thickness, system, opts, doCompres
 # --------------------------------------------------------------------------- #
 # public forward
 # --------------------------------------------------------------------------- #
+# Shared counter of finished soundings, set in each pool worker by ``_pool_init``
+# (passed at process start, so it is inherited rather than pickled per task).
+_POOL_COUNTER = None
+
+
+def _pool_init(counter):
+    global _POOL_COUNTER
+    _POOL_COUNTER = counter
+
+
+def _tick_pool(_k):
+    """Count one finished sounding in the worker (cheap: one lock per sounding)."""
+    if _POOL_COUNTER is not None:
+        with _POOL_COUNTER.get_lock():
+            _POOL_COUNTER.value += 1
+
+
 def forward_simpeg(M=np.array(()), thickness=np.array(()), file_gex=None, GEX=None,
                    tx_height=np.array(()), altitude_bin_width=1.0, is_log=False,
                    doCompress=True, gate_integration="bfield", gate_quad=5,
@@ -399,44 +417,65 @@ def forward_simpeg(M=np.array(()), thickness=np.array(()), file_gex=None, GEX=No
 
     _report_progress(progress_callback, 0, nd, "computing", "SimPEG forward")
     D = np.empty((nd, n_used))
-    if not use_pool:
-        # sequential: reuse sim0 for its bin, build others from the cache
-        done = [0]
+    # progress bar, same convention as ga-aem (disabled when showInfo < 0)
+    from tqdm import tqdm
+    pbar = tqdm(total=nd, mininterval=1, disable=(showInfo < 0), desc='simpeg', leave=False)
+    try:
+        if not use_pool:
+            # sequential: reuse sim0 for its bin, build others from the cache
+            done = [0]
 
-        def _prog(k):
-            done[0] += 1
-            if progress_callback is not None and (done[0] % 50 == 0 or done[0] == nd):
-                _report_progress(progress_callback, done[0], nd, "computing", "SimPEG forward")
+            def _prog(k):
+                done[0] += 1
+                pbar.update(1)
+                if progress_callback is not None and (done[0] % 50 == 0 or done[0] == nd):
+                    _report_progress(progress_callback, done[0], nd, "computing", "SimPEG forward")
 
-        for h in np.unique(tx_binned):
-            rows = np.where(tx_binned == h)[0]
-            if h == tx_binned[0]:
-                sim = sim0
-            else:
-                sim, slices, Ps = _build_simulation(system, h, opts, thickness, coeff_cache=coeff_cache)
-            D[rows] = _forward_rows(sim, M[rows], thickness, doCompress, slices, Ps, area,
-                                    progress=_prog)
-    else:
-        n_chunks = Ncpu * 4 if progress_callback is not None else Ncpu
-        n_chunks = min(n_chunks, nd)
-        # sort by height so chunks contain few distinct geometries
-        order = np.argsort(tx_binned, kind="stable")
-        idx_chunks = np.array_split(order, n_chunks)
-        ctx = multiprocessing.get_context("fork" if os.name == "posix" else "spawn")
-        if showInfo:
-            print(f"forward_simpeg: {Ncpu} processes, {n_chunks} chunks")
-        with ctx.Pool(processes=Ncpu) as pool:
-            jobs = [
-                pool.apply_async(_forward_simpeg_chunk,
-                                 (M[idx], tx_binned[idx], thickness, system, opts, doCompress,
-                                  area, coeff_cache))
-                for idx in idx_chunks
-            ]
-            done = 0
-            for idx, job in zip(idx_chunks, jobs):
-                D[idx] = job.get()
-                done += idx.size
-                _report_progress(progress_callback, done, nd, "computing", "SimPEG forward")
+            for h in np.unique(tx_binned):
+                rows = np.where(tx_binned == h)[0]
+                if h == tx_binned[0]:
+                    sim = sim0
+                else:
+                    sim, slices, Ps = _build_simulation(system, h, opts, thickness, coeff_cache=coeff_cache)
+                D[rows] = _forward_rows(sim, M[rows], thickness, doCompress, slices, Ps, area,
+                                        progress=_prog)
+        else:
+            # few large chunks keep the per-chunk geometry setup cheap; progress comes
+            # from the shared counter the workers increment per sounding
+            n_chunks = min(Ncpu * 4, nd)
+            # sort by height so chunks contain few distinct geometries
+            order = np.argsort(tx_binned, kind="stable")
+            idx_chunks = np.array_split(order, n_chunks)
+            ctx = multiprocessing.get_context("fork" if os.name == "posix" else "spawn")
+            if showInfo:
+                print(f"forward_simpeg: {Ncpu} processes, {n_chunks} chunks")
+            counter = ctx.Value("l", 0)
+            with ctx.Pool(processes=Ncpu, initializer=_pool_init, initargs=(counter,)) as pool:
+                jobs = []
+                for idx in idx_chunks:
+                    jobs.append(pool.apply_async(_forward_simpeg_chunk,
+                                                 (M[idx], tx_binned[idx], thickness, system, opts,
+                                                  doCompress, area, coeff_cache)))
+                last = 0
+                while True:
+                    with counter.get_lock():
+                        finished = counter.value
+                    if finished > last:
+                        pbar.update(finished - last)
+                        last = finished
+                        _report_progress(progress_callback, finished, nd, "computing",
+                                         "SimPEG forward")
+                    n_ready = 0
+                    for job in jobs:
+                        if job.ready():
+                            n_ready += 1
+                    if n_ready == len(jobs):
+                        break
+                    time.sleep(0.2)
+                for idx, job in zip(idx_chunks, jobs):
+                    D[idx] = job.get()
+    finally:
+        pbar.close()
 
     if is_log:
         D = np.log10(D)

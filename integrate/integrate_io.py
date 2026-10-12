@@ -203,18 +203,23 @@ def save_prior_model(f_prior_h5, M_new,
         caution as this removes all existing data (default is False).
     compression : str or None, optional
         Compression filter to use. Options: 'gzip', 'lzf', or None.
+
         - 'gzip': Good compression ratio, moderate speed (default)
         - 'lzf': Faster but lower compression ratio
         - None: No compression, fastest read/write
+
         Default is 'gzip'. Set to None for temporary files or fast iteration.
     compression_opts : int, optional
         Compression level for gzip (1-9). Higher = better compression but slower.
+
         - 1: Fast compression, excellent balance (NEW DEFAULT, changed from 9)
         - 4: Good compression, moderate speed
         - 9: Maximum compression, very slow (OLD DEFAULT)
+
         Only used when compression='gzip'. Default is 1.
     **kwargs : dict
         Additional arguments:
+
         - showInfo : int, verbosity level (0=silent, >0=verbose)
         - name, label, unit : str, optional attributes. ``name`` is used in titles;
           ``label`` (default ``name``) and ``unit`` give axis labels 'LABEL (UNIT)'.
@@ -488,11 +493,12 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
         Default is 'gzip' for good compression with reasonable speed.
         Set to None to disable compression (fastest I/O, largest files).
     compression_opts : int, optional
-        Compression level (0-9 for gzip). Default is 1 (optimal balance).
-        Level 1 provides 78% faster writes than level 9 with only 2% larger files.
+        Compression level (0-9 for gzip). Default is 1 (optimal balance:
+        about 78% faster writes than level 9, with only about 2% larger files).
         Only used when compression='gzip'. Ignored if compression is None.
     **kwargs : dict
         Additional arguments:
+
         - showInfo : int, verbosity level (0=silent, >0=verbose)
         - name, label, unit : str, optional attributes. ``name`` is used in titles;
           ``label`` (default ``name``) and ``unit`` give axis labels 'LABEL (UNIT)'.
@@ -616,6 +622,7 @@ def load_data(f_data_h5, id_arr=[], ii=None, **kwargs):
         using these indices (default is None).
     **kwargs : dict
         Additional arguments:
+
         - showInfo : int, verbosity level (0=silent, 1=normal, >1=verbose)
 
     Returns
@@ -2174,7 +2181,7 @@ def post_to_csv(f_post_h5='', Mstr='/M1'):
 
 
 '''
-HDF% related functions
+HDF5 related functions
 '''
 def copy_hdf5_file(input_filename, output_filename, N=None, loadToMemory=True, compress=True, randomize=True, **kwargs):
     """
@@ -3684,7 +3691,7 @@ def save_data_multinomial(D_obs, i_use=None, id=[],  id_prior=None, f_data_h5='d
             print("Assuming input has shape (ns, nclass) and setting nm=1")
         D_obs = D_obs[:, :, np.newaxis]
 
-    # f_data_h5 is a HDF% file grousp "/D1/", "/D2".
+    # f_data_h5 is a HDF5 file group "/D1/", "/D2".
     # FInd the is with for the maximum '/D*' group
     if not id:
         with h5py.File(f_data_h5, 'a') as f:

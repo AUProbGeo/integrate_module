@@ -30,6 +30,7 @@ Borehole handling is implemented in the ``integrate_borehole`` module with the f
 * ``rescale_P_obs_temperature()``: Apply temperature annealing for distance-based weighting
 * ``Pobs_to_datagrid()``: Extrapolate point observations to survey grid with distance weighting
 * ``get_weight_from_position()``: Calculate spatial and data-similarity weights
+* ``welllog_compute_P_obs_class_mode()``: Observation probabilities from a well log, using mode class extraction
 
 Borehole Data Structure
 -----------------------
@@ -69,7 +70,7 @@ Boreholes are represented as Python dictionaries containing lithology observatio
 
     * Scalar: applies same confidence to all intervals
     * Array: per-interval confidence specification
-    * Default: 0.9 (high confidence)
+    * Default: 0.8 (used when ``class_prob`` is not given)
 
 ``X``, ``Y``
     Spatial coordinates in UTM projection (meters). Used for distance-based weighting.
@@ -82,22 +83,22 @@ Boreholes are represented as Python dictionaries containing lithology observatio
 
 ``elevation``
     **Optional.** Ground-surface elevation of the borehole in metres above sea level (m a.s.l.).
-    When set to a non-zero value, :func:`plot_boreholes` switches to elevation mode: the shared
+    When set to a non-zero value, :func:`integrate.integrate_plot.plot_boreholes` switches to elevation mode: the shared
     Y-axis shows absolute elevation instead of depth, and each borehole is vertically positioned
     at its surface elevation.  Boreholes without this key (or with ``elevation=0``) are placed at
     elevation 0 m a.s.l. in the plot.  This field has **no effect on inversion**.
 
 ``range_data``
     **Optional.** Data-space similarity radius used when calling
-    :func:`save_borehole_data` without an explicit ``range_data`` argument.
+    :func:`integrate.integrate_borehole.save_borehole_data` without an explicit ``range_data`` argument.
     Survey points whose EM data response is similar to the borehole location
     receive higher weight; more dissimilar points are down-weighted.
     Only used if present and non-negative; a negative value is treated as unset.
     Default: 1,000,000 (effectively no data-similarity cutoff).
 
 ``range_xyz``
-    **Optional.** Geographic XY fade-out distance [m] used when calling
-    :func:`save_borehole_data` without an explicit ``range_xyz`` argument.
+    **Optional.** Distance scale [m] used when calling
+    :func:`integrate.integrate_borehole.save_borehole_data` without an explicit ``range_xyz`` argument.
     Survey points further than this distance from the borehole location
     are effectively unaffected by the borehole observation.
     Only used if present and non-negative; a negative value is treated as unset.
@@ -105,7 +106,7 @@ Boreholes are represented as Python dictionaries containing lithology observatio
 
 ``range_data_nan_freq``
     **Optional.** NaN-frequency threshold (0–1) for automatic data-gate selection
-    when computing data-space similarity inside :func:`get_weight_from_position`.
+    when computing data-space similarity inside :func:`integrate.integrate_borehole.get_weight_from_position`.
     Gates where fewer than this fraction of soundings have non-NaN values are
     excluded from the data-distance computation.
     Default: 0.8. Ignored when ``range_data_i_use`` is also set.
@@ -304,6 +305,14 @@ Complete Workflow Example
 The recommended workflow uses ``ig.save_borehole_data()`` to handle all borehole
 processing in a single call per borehole:
 
+.. note::
+
+   ``save_borehole_data`` writes the borehole data into the prior file you pass
+   to it. Pass the same file that ``integrate_rejection`` will use. If
+   ``prior_data_em`` made a copy of the prior file (its default), pass the copy
+   (``f_prior_data_h5``) here too, or call ``prior_data_em`` with
+   ``doMakePriorCopy=False``.
+
 .. code-block:: python
 
     import integrate as ig
@@ -333,13 +342,13 @@ processing in a single call per borehole:
 
     # 2. Process all boreholes — one call per borehole
     im_prior   = 2     # index of lithology model parameter (M2)
-    range_data = 2     # full-strength radius (m)
-    range_xyz  = 300   # fade-out radius (m)
+    range_data = 2     # data-misfit scale (dimensionless)
+    range_xyz  = 300   # distance scale (m)
 
     id_borehole_list = []
     for BH in BHOLES:
         id_prior, id_out = ig.save_borehole_data(
-            f_prior_h5, f_data_h5, BH,
+            f_prior_data_h5, f_data_h5, BH,
             im_prior=im_prior, range_data=range_data, range_xyz=range_xyz,
             parallel=False, showInfo=1)
         id_borehole_list.append(id_out)
@@ -376,13 +385,13 @@ the same as the key being absent, and the default is used instead.
 .. code-block:: python
 
     id_prior, id_out = ig.save_borehole_data(
-        f_prior_h5,          # Path to prior HDF5 file
+        f_prior_data_h5,     # Prior HDF5 file with /M2 (the file used for inversion)
         f_data_h5,           # Path to observed-data HDF5 file
         BH,                  # Borehole dictionary (may include range_data / range_xyz)
         im_prior=2,          # Model parameter index (e.g. 2 → /M2)
         parallel=False,      # Parallel mode extraction
-        range_data=2,        # Data-space similarity radius (overrides BH['range_data'])
-        range_xyz=300,       # Geographic XY fade-out distance [m] (overrides BH['range_xyz'])
+        range_data=2,        # Data-misfit scale, dimensionless (overrides BH['range_data'])
+        range_xyz=300,       # Distance scale [m] (overrides BH['range_xyz'])
         range_data_nan_freq=0.8, # NaN-freq threshold for gate selection (overrides BH['range_data_nan_freq'])
         range_data_i_use=None,   # Explicit gate indices (overrides range_data_nan_freq and BH['range_data_i_use'])
         doPlot=False,        # Plot distance-weight maps
@@ -458,25 +467,40 @@ Distance converts to temperature for probability scaling:
 * T > 1.0: Flattens distribution (less confident)
 * T >> 1.0: Approaches uniform distribution (observation ignored)
 
-**Behavior by Distance:**
+**Weighting:**
 
-* d < range_data: T ≈ 1, full observation strength
-* range_data < d < range_xyz: T increases gradually
-* d > range_xyz: T >> 1, observation effectively ignored
-
-**Distance Weighting Function:**
-
-The weight decreases with distance using a Gaussian-like function:
+Two Gaussian weights are multiplied, and the product sets the temperature:
 
 .. math::
 
-    w_{dis}(d) = \exp\left(-\frac{1}{2}\left(\frac{d - range_{data}}{range_{xyz} - range_{data}}\right)^2\right)
-
-This weight is converted to temperature for probability scaling:
+    w_{data} = \exp\left(-\frac{\sum_g |\Delta d_g|^2}{range_{data}^2}\right),
+    \qquad
+    w_{dis} = \exp\left(-\frac{d^2}{range_{xyz}^2}\right)
 
 .. math::
 
-    T = \frac{1}{w_{dis}}
+    T = \frac{1}{w_{data}\, w_{dis}}
+
+- ``w_dis`` is 1 at the borehole and falls off with distance ``d`` (metres).
+  ``range_xyz`` is the distance scale.
+- ``w_data`` compares the EM data at each survey point with the data at the
+  borehole, summed over the selected gates (``range_data_nan_freq`` or
+  ``range_data_i_use``). ``range_data`` is a dimensionless misfit scale.
+- ``T`` is capped at 100. Points with ``T >= 100`` are not used
+  (``i_use = 0``, data set to NaN).
+
+**Behavior:**
+
+* Close to the borehole, and similar in data, ``T`` is about 1 and the full
+  observation is used.
+* As the distance or data misfit grows, ``T`` increases and the observation is
+  flattened towards uniform.
+* At ``T >= 100`` the observation is dropped.
+
+The defaults of :func:`integrate.integrate_borehole.get_weight_from_position` are
+``range_xyz=400`` and ``range_data=2``. The defaults of
+:func:`integrate.integrate_borehole.save_borehole_data` are ``range_xyz=300``
+and ``range_data=1e6``. Set both explicitly if you need a specific value.
 
 Visualization
 ~~~~~~~~~~~~~
@@ -510,7 +534,7 @@ Use ``save_borehole_data()`` in a loop — one call per borehole:
 
     for BH in BHOLES:
         id_prior, id_out = ig.save_borehole_data(
-            f_prior_h5, f_data_h5, BH,
+            f_prior_data_h5, f_data_h5, BH,
             im_prior=2, range_data=2, range_xyz=300,
             showInfo=1)
         id_borehole_list.append(id_out)
@@ -539,7 +563,7 @@ For large prior ensembles (N > 100,000), enable parallel processing in ``save_bo
 .. code-block:: python
 
     id_prior, id_out = ig.save_borehole_data(
-        f_prior_h5, f_data_h5, BH,
+        f_prior_data_h5, f_data_h5, BH,
         parallel=True   # Parallel mode class extraction
     )
 
@@ -568,7 +592,7 @@ Examples
 Complete Example: Workflow Script
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the complete working example in ``examples/integrate_workflow.py``, which demonstrates:
+See the complete working example in ``examples/gallery/20_workflow/integrate_workflow.py``, which demonstrates:
 
 * Defining borehole dictionaries
 * Processing boreholes with ``ig.save_borehole_data()``
@@ -580,13 +604,13 @@ Key code section:
 .. code-block:: python
 
     im_prior   = 2     # lithology model index (M2)
-    range_data = 2     # full-strength radius (m)
-    range_xyz  = 300   # fade-out radius (m)
+    range_data = 2     # data-misfit scale (dimensionless)
+    range_xyz  = 300   # distance scale (m)
 
     id_borehole_list = []
     for BH in BHOLES:
         id_prior, id_out = ig.save_borehole_data(
-            f_prior_h5, f_data_h5, BH,
+            f_prior_data_h5, f_data_h5, BH,
             im_prior=im_prior, range_data=range_data, range_xyz=range_xyz,
             parallel=parallel, showInfo=1)
         id_borehole_list.append(id_out)
@@ -641,5 +665,14 @@ References
 
 For more information on the theoretical background:
 
-* Hansen et al. (2021): Localized rejection sampling for Bayesian inversion
-* Madsen et al. (2023): Probabilistic lithology modeling
+* [HANSEN2021]_: Localized rejection sampling for Bayesian inversion
+* [MADSEN2023]_: Probabilistic lithology modeling
+
+Examples
+--------
+
+Runnable examples using borehole data:
+
+* :doc:`Borehole data representation and integration <auto_examples/30_data/integrate_boreholes>`
+* :doc:`Complete workflow with boreholes <auto_examples/20_workflow/integrate_workflow>`
+* :doc:`Raw-material assessment with borehole data (Daugaard) <auto_examples/85_rawmaterial/integrate_rawmaterial_daugaard>`

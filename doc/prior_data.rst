@@ -12,18 +12,24 @@ in a prior HDF5 file (``/M<im>`` -- see :doc:`format`) needs a matching
 against which the *actually observed* data (in a data HDF5 file) is later
 compared. Three functions cover the ways ``/D<id>`` gets created:
 
-* :func:`ig.prior_data_em` -- forward-model EM (TDEM) data from a resistivity
+* :func:`integrate.integrate.prior_data_em` -- forward-model EM (TDEM) data from a resistivity
   model, e.g. ``/M1`` (resistivity) -> ``/D<id>``.
-* :func:`ig.prior_data_borehole` -- turn a borehole log into class-probability
+* :func:`integrate.integrate_borehole.prior_data_borehole` -- turn a borehole log into class-probability
   prior data conditioned on a discrete model, e.g. ``/M2`` (lithology) ->
   ``/D<id>``.
-* :func:`ig.prior_data_identity` -- copy a model parameter directly into
+* :func:`integrate.integrate.prior_data_identity` -- copy a model parameter directly into
   ``/D<id>`` unchanged (identity mapping), used e.g. to compare/condition
   directly on model values rather than forward-modelled data.
 
-All three add a new ``/D<id>`` dataset to the prior HDF5 file and return the
-id(s) used, which then feed into ``id_use``/``id_prior`` of
-:func:`ig.integrate_rejection`.
+All three add a new ``/D<id>`` dataset to the prior HDF5 file. What they return:
+
+* :func:`integrate.integrate.prior_data_em` returns the path of the prior-data HDF5 file
+  (``f_prior_data_h5``). The id is the ``id`` you passed.
+* :func:`integrate.integrate.prior_data_identity` returns ``(f_prior_data_h5, id)``.
+* :func:`integrate.integrate_borehole.prior_data_borehole` returns ``(P_obs, id_prior)``.
+
+The ids then feed into ``id_use``/``id_prior`` of
+:func:`integrate.integrate_rejection.integrate_rejection`.
 
 ``prior_data_em`` -- EM forward modelling
 -------------------------------------------
@@ -36,19 +42,19 @@ id(s) used, which then feed into ``id_use``/``id_prior`` of
 
 ``prior_data_em`` is a thin dispatcher: it forward-models ``/M<im>`` through
 one of the supported EM backends and writes the result as ``/D<id>``.
-:func:`ig.forward_em` (forward response for a resistivity array, without
+:func:`integrate.integrate.forward_em` (forward response for a resistivity array, without
 writing a file) uses exactly the same backend and device selection.
 
 Backends
 ^^^^^^^^
 
-* ``'ga-aem'`` -- GA-AEM (``gatdaem1d``), see :mod:`integrate.gaaem_forward`.
+* ``'ga-aem'`` -- GA-AEM [GA-AEM]_ (``gatdaem1d``), see :mod:`integrate.gaaem_forward`.
   **The only fully supported, production backend.**
 * ``'anemone'`` -- PyTorch-based forward model with optional GPU support, see
   :mod:`integrate.anemone_forward`.
-* ``'simpeg'`` -- SimPEG's ``Simulation1DLayered``, see
-  :mod:`integrate.simpeg_forward`, :doc:`format` and ``SIMPEG_VS_GAAEM.md``
-  for its validation against GA-AEM/AarhusInv.
+* ``'simpeg'`` -- SimPEG [SimPEG]_ ``Simulation1DLayered``, see
+  :mod:`integrate.simpeg_forward`. Its validation against GA-AEM/AarhusInv is
+  described in ``SIMPEG_VS_GAAEM.md`` in the repository root.
 
 .. important::
 
@@ -80,6 +86,11 @@ auto-selected one is reported as e.g.
 Because auto-selection prefers ``anemone`` whenever it is installed, pass
 ``method='ga-aem'`` (or set ``EM_FORWARD_METHOD=ga-aem``) when you need the
 production backend.
+
+If the requested backend is not installed, the call does **not** stop. It
+issues a ``RuntimeWarning`` and uses the first installed backend in the
+auto-selection order (see Errors below). Check the warning, or call with
+``showInfo=1``, to confirm which backend ran.
 
 .. code-block:: python
 
@@ -133,16 +144,19 @@ An explicitly requested device is used as given, without any check: e.g.
 while MPS lacks float64, fails with the corresponding Torch error rather than
 falling back to CPU.
 
-Errors
-^^^^^^
+Errors and fallback
+^^^^^^^^^^^^^^^^^^^
 
 * An unknown ``method`` (keyword or ``EM_FORWARD_METHOD``) raises
   ``ValueError``.
-* If the requested backend is not installed, ``ImportError`` is raised
-  immediately, naming the required install command; there is **no silent
-  fallback** to another backend.
-* If no backend is requested and none of the three is installed, the
-  ``ImportError`` lists the install hint for each.
+* If the requested backend is not installed, a ``RuntimeWarning`` is issued
+  and the first installed backend (anemone, then ga-aem, then simpeg) is used.
+  The fallback is reported in the ``showInfo=1`` output.
+* If no backend is installed at all, ``ImportError`` is raised and lists the
+  reason each backend is unavailable.
+
+A fallback changes which forward model produces your data. For production
+results, check that the warning does not appear, or set ``method`` explicitly.
 
 ``prior_data_borehole`` -- well-log conditioning
 ----------------------------------------------------
@@ -155,10 +169,10 @@ Errors
 ``'mode_probability'``):
 
 * ``'mode_probability'`` (recommended -- fast and robust) ->
-  :func:`ig.prior_data_borehole_class_mode`: extracts the most frequent
+  :func:`integrate.integrate_borehole.prior_data_borehole_class_mode`: extracts the most frequent
   lithology class per observed depth interval, across all prior realizations.
-* ``'layer_probability'`` -> :func:`ig.prior_data_borehole_class_layer`: a
-  direct layer-probability approach using :func:`ig.prior_data_identity`
+* ``'layer_probability'`` -> :func:`integrate.integrate_borehole.prior_data_borehole_class_layer`: a
+  direct layer-probability approach using :func:`integrate.integrate.prior_data_identity`
   internally (no per-realization mode extraction).
 * ``'class_exact'`` / ``'layer_probability_independent'`` -- not yet
   implemented; raises ``NotImplementedError``.
@@ -166,8 +180,8 @@ Errors
 The full ``BH`` borehole dictionary format (``depth_top``, ``depth_bottom``,
 ``class_obs``, ``class_prob``, ``X``, ``Y``, ``name``, ``method``, ...), the
 distance-weighted extrapolation to the survey grid
-(:func:`ig.Pobs_to_datagrid`), and the one-call
-:func:`ig.save_borehole_data` wrapper are documented in full in
+(:func:`integrate.integrate_borehole.Pobs_to_datagrid`), and the one-call
+:func:`integrate.integrate_borehole.save_borehole_data` wrapper are documented in full in
 :doc:`format_wells` -- this section only covers the ``prior_data_borehole``
 entry point itself.
 
@@ -180,7 +194,7 @@ entry point itself.
 
 Copies ``/M<im>`` directly into a new ``/D<id>`` dataset, unchanged -- no
 forward modelling. Used internally by
-:func:`ig.prior_data_borehole_class_layer`, and directly whenever you need to
+:func:`integrate.integrate_borehole.prior_data_borehole_class_layer`, and directly whenever you need to
 condition on/compare against a model parameter's own values (e.g. a resistivity
 or class-id log) rather than simulated data.
 
@@ -197,6 +211,18 @@ Key behaviour:
 
 Returns ``(f_prior_data_h5, id)`` -- the (possibly copied) file path and the
 data id actually used.
+
+Examples
+--------
+
+Runnable examples of these backends and functions:
+
+* :doc:`Run time of the EM forward backends <auto_examples/45_forward/integrate_forward_backends_runtime>`
+* :doc:`Accuracy against the HGG Workbench (AarhusInv) <auto_examples/45_forward/integrate_forward_accuracy_workbench>`
+* :doc:`Effect of the forward model on the posterior <auto_examples/45_forward/integrate_forward_effect_on_posterior>`
+* :doc:`Borehole data with prior conditioning <auto_examples/30_data/integrate_boreholes>`
+* :doc:`Generic prior model generation <auto_examples/90_other/integrate_priors>`
+* :doc:`Merging priors <auto_examples/90_other/integrate_merge_prior>`
 
 See also
 --------

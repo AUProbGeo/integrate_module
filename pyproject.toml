@@ -58,12 +58,8 @@ examples = [
 docs = [
     "sphinx",
     "sphinx-gallery",
-    "pandoc",
-    "myst-parser",
-    "sphinx-rtd-theme",
     "furo",
     "ghp-import",
-    "tomli; python_version < '3.11'",
 ]
 jax-cuda = [
     "jax[cuda13]",
