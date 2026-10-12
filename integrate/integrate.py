@@ -3598,7 +3598,7 @@ def timing_plot(f_timing='', fontsize=16):
     plt.figure(figsize=(6,6)) 
     plt.loglog(N_arr, T_total, 'o-', label=[f'{int(x)}' for x in Nproc_arr])
     plt.ylabel(r'Total time - $[s]$')
-    plt.xlabel('N-prior')
+    plt.xlabel('N')
     plt.grid()
     plt.tight_layout()
     plt.plot([N_arr[0], N_arr[-1]], [nobs*t_lsq, nobs*t_lsq], 'k--', label='LSQ')
@@ -3609,6 +3609,23 @@ def timing_plot(f_timing='', fontsize=16):
     #plt.xlim(np.min([1000,np.min(N_arr)]),np.max([1e+6,np.max(N_arr)]))
     plt.xlim(xlim_N)
     plt.savefig('%s_total_sec_N' % file_out)
+    safe_show()
+    plt.close()
+
+    # Total time in minutes, without LSQ and MCMC reference lines
+    plt.figure(figsize=(6,6))
+    plt.loglog(N_arr, T_total/60.0, 'o-', label=[f'{int(x)}' for x in Nproc_arr])
+    plt.ylabel(r'Total time - $[m]$')
+    plt.xlabel('N')
+    plt.grid()
+    plt.tight_layout()
+    plt.legend(loc='upper left')
+    # Y-limits: min/max total time rounded down/up to the nearest power of 10
+    T_total_min_min = np.nanmin(T_total)/60.0
+    T_total_min_max = np.nanmax(T_total)/60.0
+    plt.ylim(10**np.floor(np.log10(T_total_min_min)), 10**np.ceil(np.log10(T_total_min_max)))
+    plt.xlim(xlim_N)
+    plt.savefig('%s_total_min_N' % file_out)
     safe_show()
     plt.close()
 
@@ -3664,7 +3681,7 @@ def timing_plot(f_timing='', fontsize=16):
         except:
             pass
     plt.ylabel(r'Forward time - $[s]$')
-    plt.xlabel('Number of models')
+    plt.xlabel('N')
     #plt.title('Forward calculation')
     plt.grid()
     plt.legend(Nproc_arr, loc='upper left')
@@ -3789,7 +3806,7 @@ def timing_plot(f_timing='', fontsize=16):
         except:
             pass
     plt.ylabel('Rejection sampling - time $[s]$')
-    plt.xlabel('Lookup table size')
+    plt.xlabel('N')
     plt.grid()
     plt.legend(Nproc_arr)
     plt.ylim(1e-1, 2e+3)
@@ -3856,7 +3873,7 @@ def timing_plot(f_timing='', fontsize=16):
     plt.loglog(N_arr, T_rejection_sounding_per_sec, 'o-')
     #plt.ylim(0, 8000)
     plt.ylabel('Rejection sampling - Soundings per second')
-    plt.xlabel('Lookup table size')
+    plt.xlabel('N')
     plt.grid()
     plt.legend(Nproc_arr)
     plt.xlim(xlim_N)
@@ -3886,7 +3903,7 @@ def timing_plot(f_timing='', fontsize=16):
     plt.xlim(90, 5000000*1.1)
     #plt.ylim(0, 8000)
     plt.ylabel('Rejection sampling - Soundings per second per cpu')
-    plt.xlabel('Lookup table size')
+    plt.xlabel('N')
     plt.grid()
     plt.legend(Nproc_arr)
     plt.xlim(xlim_N)
@@ -3962,7 +3979,7 @@ def timing_plot(f_timing='', fontsize=16):
         plt.plot(N_arr, T_total[:, i_proc], 'k--')
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('$N_{lookup}$')
+        plt.xlabel('N')
         plt.ylabel('Time [$s$]')
         plt.title('Cumulative time, using %d processors' % Nproc_arr[i_proc])
         plt.legend(loc='upper left')
@@ -3976,7 +3993,7 @@ def timing_plot(f_timing='', fontsize=16):
         plt.figure(figsize=(6,6))
         plt.stackplot(N_arr, T/np.sum(T, axis=0), labels=['Prior', 'Forward', 'Rejection', 'PostStat'])
         plt.xscale('log')
-        plt.xlabel('$N_{lookup}$')
+        plt.xlabel('N')
         plt.ylabel('Normalized time')
         plt.legend(loc='upper left')
         plt.grid(True, which="both", ls="--")
