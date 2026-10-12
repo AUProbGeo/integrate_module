@@ -649,7 +649,7 @@ if doPlotAll:
             f.write("%s\n" % item)
 
 # %%
-doReadList = False
+doReadList = True
 if doReadList:
     #f_txt = 'f_post_h5_all_list_%s_Nuse%d_inflateNoise%d.txt' % (fileparts[0], N_use,inflateNoise)
 
@@ -663,7 +663,9 @@ if doReadList:
 #    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise2.txt'
 #    f_txt = 'f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise4.txt'
 
-    f_txt_list.append('N1.txt')
+    f_txt_list.append('f_post_h5_all_list_PRIOR_TX07_20231016_2x4_RC20-33_Nh280_Nf12_Nuse1000000_inflateNoise1.txt')
+
+    #f_txt_list.append('N1.txt')
     #f_txt_list.append('N2.txt')
     #f_txt_list.append('N4.txt')
 

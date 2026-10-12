@@ -3879,9 +3879,9 @@ def plot_data_prior_post(f_post_h5, i_plot=-1, nr=200, id=0, ylim=None, Dkey=[],
                         if len(CHI2.shape) == 2:
                             CHI2_total = np.nansum(CHI2[i_plot, :])
                             n_types = np.sum(~np.isnan(CHI2[i_plot, :]))
-                            ax.text(0.1, 0.3, f'χ² = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes, **fs_kw)
+                            ax.text(0.1, 0.3, rf'$\chi^2_{{\nu}}$ = {CHI2_total:.2f} ({n_types} data types)', transform=ax.transAxes, **fs_kw)
                         else:
-                            ax.text(0.1, 0.3, f'χ² = {CHI2[i_plot]:.2f}', transform=ax.transAxes, **fs_kw)
+                            ax.text(0.1, 0.3, rf'$\chi^2_{{\nu}}$ = {CHI2[i_plot]:.2f}', transform=ax.transAxes, **fs_kw)
                 except:
                     pass
                 if 'title' in kwargs:
