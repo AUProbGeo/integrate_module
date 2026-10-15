@@ -1219,6 +1219,12 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
     """
     showInfo = kwargs.get('showInfo', 0)
     method, source = _em_method_resolve(method)
+    if method in ('ga-aem', 'simpeg') and kwargs.get('file_sr2'):
+        # these backends cannot read an SR2: fold it into a combined GEX
+        from integrate.sr2_gex import gex_apply_sr2
+        file_gex = gex_apply_sr2(file_gex, kwargs.pop('file_sr2'), showInfo=showInfo)
+    elif method in ('ga-aem', 'simpeg'):
+        kwargs.pop('file_sr2', None)
     auto = {'auto': ' (auto-selected)',
             'fallback': ' (fallback, requested method not available)'}.get(source, '')
     if method == 'ga-aem':

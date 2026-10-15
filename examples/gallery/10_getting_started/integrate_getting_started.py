@@ -143,7 +143,7 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
 #   depths to the base of each layer
 # - ``PRIOR:/M3``: The number of layers in each model realization
 
-# %%
+    # %%
 # Select how many prior model realizations (N) should be generated
 N=2_000_000
 N=1_000_000
