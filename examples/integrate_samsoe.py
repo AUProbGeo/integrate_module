@@ -77,7 +77,7 @@ ig.plot_data(f_data_h5, hardcopy=hardcopy)
 
 # %%
 N = 2_000_000
-N = 10_000
+N = 500_000
 f_prior_h5 = ig.prior_model_layered(N=N, lay_dist='uniform', NLAY_min=1, NLAY_max=5,
                                     RHO_min=1, RHO_max=3000, dz=1, z_max=149,
                                     f_prior_h5='PRIOR.h5', showInfo=1)
@@ -201,7 +201,7 @@ D_obs = ig.load_data(f_data_h5)
 alt_obs = D_obs['d_obs'][1].flatten()
 
 # %%
-N_sub = 4
+N_sub = 10
 # fine the threshold that divides the flight heoight data into N_sub subsets.
 # use np.percentile to find the thresholds that divide the data into N_sub equal parts
 thresholds = np.percentile(alt_obs, np.linspace(0, 100, N_sub + 1))
