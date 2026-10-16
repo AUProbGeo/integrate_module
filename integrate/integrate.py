@@ -773,7 +773,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         if dset not in f_post:
                             if (showInfo>0):
                                 print('Creating %s in %s' % (dset,f_post_h5 ))
-                            f_post.create_dataset(dset, (nsounding,nm))
+                            f_post.create_dataset(dset, (nsounding,nm), dtype='f4')
 
                 f_post['/%s/%s' % (name,'LogMean')][:] = M_logmean
                 f_post['/%s/%s' % (name,'Mean')][:] = M_mean
@@ -784,7 +784,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 if computeKL_continuous:
                     dset = '/%s/KL' % name
                     if dset not in f_post:
-                        f_post.create_dataset(dset, (nsounding, nm))
+                        f_post.create_dataset(dset, (nsounding, nm), dtype='f4')
                     f_post[dset][:] = M_KL
 
             elif name.upper().startswith('M') and 'is_discrete' in dataset.attrs and dataset.attrs['is_discrete'] == 1:
@@ -820,14 +820,14 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         if dset not in f_post:
                             if (showInfo>0):
                                 print('Creating %s in %s' % (dset,f_post_h5 ))
-                            f_post.create_dataset(dset, (nsounding,nm))
+                            f_post.create_dataset(dset, (nsounding,nm), dtype='f4')
                 for stat in ['P']:
                     if stat not in f_post:
                         dset = '/%s/%s' % (name,stat)
                         if dset not in f_post:
                             if (showInfo>0):
                                 print('Creating %s' % dset)
-                            f_post.create_dataset(dset, (nsounding,n_classes,nm))
+                            f_post.create_dataset(dset, (nsounding,n_classes,nm), dtype='f4')
 
                 # Load all prior data into memory
                 M_all = dataset[:]
@@ -862,7 +862,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 if computeKL_discrete:
                     dset = '/%s/KL' % name
                     if dset not in f_post:
-                        f_post.create_dataset(dset, (nsounding, nm))
+                        f_post.create_dataset(dset, (nsounding, nm), dtype='f4')
                     f_post[dset][:] = M_KL
 
 

@@ -4023,7 +4023,8 @@ def merge_data(f_data, f_gex='', delta_line=0, f_data_merged_h5='', **kwargs):
 
 ## 
 
-def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showInfo=0):
+def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showInfo=0,
+                    ip_range_list=None, f_prior_merged_h5=''):
     """
     Merge multiple posterior sampling results into unified datasets.
 
@@ -4031,17 +4032,30 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
     time periods into single merged files for comprehensive regional analysis.
     Handles both model parameter statistics and observational data consolidation.
 
+    With ``ip_range_list``, merges posteriors that share ONE data file but
+    each inverted a different subset of soundings (``ip_range``), possibly
+    with a different prior per subset (e.g. one prior per flight-height
+    interval). See Notes.
+
     Parameters
     ----------
     f_post_h5_files : list of str
         List of paths to posterior HDF5 files containing sampling results
         from different survey areas or processing runs.
-    f_data_h5_files : list of str
+    f_data_h5_files : list of str or str
         List of paths to corresponding observational data HDF5 files.
         Must have same length as f_post_h5_files with matching order.
+        With ``ip_range_list``, a single path (or a list of the same path).
     f_post_merged_h5 : str, optional
         Output path for merged posterior file. If empty, generates default
         name based on input files (default is '').
+    ip_range_list : list of array-like, optional
+        One array of sounding indices per posterior file: the soundings that
+        posterior was inverted for (the ``ip_range`` given to
+        :func:`integrate_rejection`). Default None (merge separate data files).
+    f_prior_merged_h5 : str, optional
+        Only with ``ip_range_list``, when the posteriors use different priors:
+        output path for the merged prior. Default ``'PRIOR_merged_N{N}.h5'``.
 
     Returns
     -------
@@ -4072,9 +4086,29 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
     If f_post_merged_h5 is not provided, the output uses the format
     ``'POST_merged_N{N}.h5'`` and the data file uses ``'DATA_merged_N{N}.h5'``.
     Posterior files must have compatible structure for merging.
+
+    With ``ip_range_list`` the data file is not merged (it is returned as
+    is). Sounding ``ip_range_list[k]`` of the merged posterior is taken from
+    posterior ``k``. If the posteriors use different priors, they are merged
+    in order (``merge_prior(..., shuffle=False)``, which adds a source-file
+    model parameter) and the posterior sample indices are offset to point into
+    the merged prior. Posterior statistics are computed for the merged file.
+
+    Examples
+    --------
+    >>> # one data file, one prior and one posterior per flight-height subset
+    >>> f_post, f_data = ig.merge_posterior(
+    ...     ['POST_subset_1.h5', 'POST_subset_2.h5'], 'DATA.h5',
+    ...     f_post_merged_h5='POST_merged.h5', ip_range_list=[ii_1, ii_2])
     """
     import h5py
     import integrate as ig
+
+    if ip_range_list is not None:
+        return _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
+                                         f_post_merged_h5=f_post_merged_h5,
+                                         f_prior_merged_h5=f_prior_merged_h5,
+                                         showInfo=showInfo)
 
     nf = len(f_post_h5_files)
     # Check that legth of f_data_h5_files is the same as f_post_h5_files
@@ -4123,6 +4157,86 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
 
 
     return f_post_merged_h5, f_data_merged_h5
+
+
+def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
+                              f_post_merged_h5='', f_prior_merged_h5='', showInfo=0):
+    """
+    Merge posteriors that share one data file and each cover a sounding subset.
+
+    See :func:`merge_posterior` (``ip_range_list``). Returns
+    ``(f_post_merged_h5, f_data_h5)``.
+    """
+    import h5py
+    import integrate as ig
+
+    nf = len(f_post_h5_files)
+    if len(ip_range_list) != nf:
+        raise ValueError('Length of ip_range_list must be the same as f_post_h5_files')
+    if isinstance(f_data_h5_files, str):
+        f_data_h5_files = [f_data_h5_files] * nf
+    if len(set(f_data_h5_files)) != 1:
+        raise ValueError('With ip_range_list all posteriors must use the same data file')
+    f_data_h5 = f_data_h5_files[0]
+
+    if len(f_post_merged_h5) == 0:
+        f_post_merged_h5 = 'POST_merged_N%d.h5' % nf
+
+    # per-sounding datasets written by integrate_rejection
+    keys = ['i_use', 'T', 'EV', 'EV_post', 'EV_post_mean', 'CHI2', 'N_UNIQUE']
+    f_prior_h5_files = []
+    for f_post_h5 in f_post_h5_files:
+        with h5py.File(f_post_h5, 'r') as f:
+            f_prior_h5_files.append(f.attrs['f5_prior'])
+            f_data_post = f.attrs['f5_data']
+            if os.path.abspath(f_data_post) != os.path.abspath(f_data_h5):
+                raise ValueError('%s was inverted with %s, not %s' % (f_post_h5, f_data_post, f_data_h5))
+
+    # offset of each posterior's sample indices into the (merged) prior
+    if len(set(f_prior_h5_files)) == 1:
+        f_prior_h5 = f_prior_h5_files[0]
+        offsets = np.zeros(nf, dtype=np.int64)
+    else:
+        if len(f_prior_merged_h5) == 0:
+            f_prior_merged_h5 = 'PRIOR_merged_N%d.h5' % nf
+        f_prior_h5 = ig.merge_prior(f_prior_h5_files, f_prior_merged_h5=f_prior_merged_h5,
+                                    shuffle=False, showInfo=showInfo)
+        n_samples = []
+        for f_prior_h5_i in f_prior_h5_files:
+            with h5py.File(f_prior_h5_i, 'r') as f:
+                n_samples.append(f['M1'].shape[0])
+        offsets = np.concatenate(([0], np.cumsum(n_samples)[:-1])).astype(np.int64)
+
+    if showInfo > 0:
+        print('Merging %d posterior files to %s' % (nf, f_post_merged_h5))
+
+    merged = {}
+    for k, f_post_h5 in enumerate(f_post_h5_files):
+        ip = np.asarray(ip_range_list[k], dtype=np.int64)
+        with h5py.File(f_post_h5, 'r') as f:
+            for key in keys:
+                if key not in f:
+                    continue
+                data = f[key][:]
+                if key == 'i_use':
+                    data = data.astype(np.int64) + offsets[k]
+                if key not in merged:
+                    # soundings not in any ip_range keep the first file's values
+                    merged[key] = data.copy()
+                merged[key][ip] = data[ip]
+            if showInfo > 1:
+                print('.. %s: %d soundings, prior %s' % (f_post_h5, len(ip), f_prior_h5_files[k]))
+
+    with h5py.File(f_post_merged_h5, 'w') as f:
+        for key, data in merged.items():
+            f.create_dataset(key, data=data)
+        f.attrs['f5_prior'] = f_prior_h5
+        f.attrs['f5_data'] = f_data_h5
+
+    ip_all = np.unique(np.concatenate([np.asarray(ip, dtype=np.int64) for ip in ip_range_list]))
+    ig.integrate_posterior_stats(f_post_merged_h5, ip_range=ip_all, showInfo=showInfo)
+
+    return f_post_merged_h5, f_data_h5
 
 
 def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0):
