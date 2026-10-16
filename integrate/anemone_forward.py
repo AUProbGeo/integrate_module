@@ -310,7 +310,7 @@ def _build_forward(system, tx_z, device):
             "anemone backend: only 1 or 2 moments supported")
 
     tx_z_key = "src" if tx_z is None else round(float(tx_z), 3)
-    key = (system["gex_signature"], tx_z_key, str(device))
+    key = (system["gex_signature"], tx_z_key, str(device), system.get("tolerance"))
     if key in _FORWARD_CACHE:
         return _FORWARD_CACHE[key]
 
@@ -792,9 +792,21 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
                     showInfo=0, progress_callback=None, batch_size=1000,
                     file_sr2=None, sr_filters=False, n_previous_pulses=0,
                     rx_coil_filter="two_pole", gate_integration="centre",
-                    tolerance=1e-6, **kwargs):
+                    tolerance=1e-6, rescale_height=False, **kwargs):
     """Forward TDEM data for one or more resistivity models with anemone.
 
+    rescale_height : bool, optional
+        Only used when ``tx_height`` varies between soundings (default False).
+        anemone bakes the flight height into its setup, which takes about 1 s per
+        distinct height, so the default (one setup per ``altitude_bin_width``
+        bin) is slow for a wide height range.  With ``rescale_height=True`` one
+        setup is made at the lowest height and the kernel is rescaled to each
+        model's exact height (``exp(-2*dh*lmb)``), so ``altitude_bin_width`` is
+        ignored.  This is an approximation whose error grows with the height
+        spread: small for a spread of a few metres, a few percent of the peak
+        signal at 45 m; a ``UserWarning`` is given above 30 m.  The reference
+        setup uses ``tolerance / 10`` (about 20% more kernel terms) to keep the
+        rescaling accurate.  Has no effect for a fixed height.
     batch_size : int, optional
         Number of soundings sent through anemone per call (default 1000).
         Bounds peak (GPU) memory; ``0``/``None`` forwards everything at once.
@@ -880,7 +892,11 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     from tqdm import tqdm
     pbar = tqdm(total=nd, mininterval=1, disable=(showInfo < 0), desc='anemone', leave=False)
     t0 = time.time()
-    if varying:
+    if varying and rescale_height:
+        D = _forward_rescaled_height(system, M_c, T_c, tx_height, scale, device,
+                                     tolerance, progress_callback, showInfo,
+                                     batch_size, progress=pbar.update)
+    elif varying:
         D = _forward_varying_height(system, M_c, T_c, tx_height,
                                     altitude_bin_width, scale, device,
                                     progress_callback, showInfo,
@@ -959,6 +975,97 @@ def _forward_varying_height(system, M_c, T_c, tx_height, bin_width, scale,
     return D
 
 
+_RESCALE_MAX_SPREAD = 30.0  # m; above this rescale_height warns about accuracy
+
+
+def _rescaled_batch(fwr, M_b, T_b, dh_b, torch):
+    """Response of one batch with a per-model height offset ``dh_b`` [m].
+
+    Same evaluation as ``Forward.__call__`` (reflection coefficient, then the
+    ``H2t`` matrix), except that each model's reflection coefficient is first
+    multiplied by ``exp(-2*dh*lmb)``: Tx and Rx both move by ``dh``, so
+    ``sfield_dz`` grows by ``2*dh``.  Returns an (n_models, n_gates) tensor.
+    """
+    from anemone.physics import rte_raiche1999 as rte
+    from anemone import constants as c, cdtype
+
+    rho = ((M_b.T + 0j)[..., None, None]).to(cdtype)
+    thick = ((T_b.T + 0j)[..., None, None]).to(cdtype)
+    cRTE = rte(1. / rho, thick, fwr.omega, fwr.lmb).reshape(M_b.shape[0], -1)
+    cRTE = cRTE * torch.exp(-2. * dh_b[:, None] * fwr.lmb.real[None, :])
+    return torch.einsum('ik,nk->ni', fwr.H2t, cRTE).real * c.mu0
+
+
+def _forward_rescaled_height(system, M_c, T_c, tx_height, scale, device,
+                             tolerance, progress_callback, showInfo,
+                             batch_size=1000, progress=None):
+    """Varying height from ONE anemone setup, rescaled to each model's height.
+
+    The setup (about 1 s) is made at the lowest height, so every height offset
+    ``dh`` is >= 0 and only attenuates the kernel.  The kept kernel terms are
+    chosen at the reference height, hence the reference uses ``tolerance / 10``.
+    M_c (nd, K) resistivity, T_c (nd, K-1) thicknesses (already compressed).
+    """
+    import warnings
+    anemone, torch = _require_anemone()
+    from integrate.integrate import _report_progress
+
+    tx_height = np.asarray(tx_height, dtype=float).ravel()
+    nd = M_c.shape[0]
+    z_ref = float(tx_height.min())
+    spread = float(tx_height.max()) - z_ref
+    if spread > _RESCALE_MAX_SPREAD:
+        warnings.warn(
+            "rescale_height: flight height spread is %.1f m (> %.0f m); the "
+            "rescaling error grows with the spread (a few percent of the peak "
+            "signal at 45 m). Consider rescale_height=False."
+            % (spread, _RESCALE_MAX_SPREAD), UserWarning, stacklevel=3)
+
+    ref_system = system
+    if tolerance is not None:
+        ref_system = dict(system)
+        ref_system["tolerance"] = tolerance / 10.
+    fwr, slices = _build_forward(ref_system, z_ref, device)
+
+    dev = torch.device(device)
+    M_t = torch.as_tensor(M_c, dtype=torch.float64).to(dev)
+    T_t = torch.as_tensor(T_c, dtype=torch.float64).to(dev)
+    dh_t = torch.as_tensor(tx_height - z_ref, dtype=torch.float64).to(dev)
+    if batch_size is None or batch_size <= 0 or batch_size >= nd:
+        batch_size = nd
+
+    with torch.no_grad():
+        # guard against anemone internals changing: at dh=0 this path must
+        # reproduce the Forward itself
+        mine = _rescaled_batch(fwr, M_t[:1], T_t[:1], dh_t[:1] * 0., torch)
+        mine = mine.detach().cpu().numpy()
+        ref = np.atleast_2d(fwr(M_t[:1].T, T_t[:1].T).detach().cpu().numpy())
+        err = np.max(np.abs(mine - ref)) / np.max(np.abs(ref))
+        if not err < 1e-8:
+            raise RuntimeError(
+                "rescale_height: rescaled evaluation differs from anemone's "
+                "Forward at dh=0 (relative error %.2e); the anemone internals "
+                "have probably changed. Use rescale_height=False." % err)
+
+        blocks = []
+        done = 0
+        for i0 in range(0, nd, batch_size):
+            i1 = min(i0 + batch_size, nd)
+            raw = _rescaled_batch(fwr, M_t[i0:i1], T_t[i0:i1], dh_t[i0:i1], torch)
+            blocks.append(raw.detach().cpu().numpy())
+            done += i1 - i0
+            if progress is not None:
+                progress(i1 - i0)
+            if progress_callback is not None:
+                _report_progress(progress_callback, done, nd, "computing",
+                                 "Forward modeling (%d/%d soundings)" % (done, nd))
+    raw = np.concatenate(blocks, axis=0) if len(blocks) > 1 else blocks[0]
+    cols = []
+    for s, sc in zip(slices, scale):
+        cols.append(sc * raw[:, s])
+    return np.concatenate(cols, axis=1)
+
+
 def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        im=1, id=1, im_height=0, is_log=False,
                        altitude_bin_width=1.0, device="cpu",
@@ -968,7 +1075,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                        batch_size=1000, randomize=True, file_sr2=None,
                        sr_filters=False, n_previous_pulses=0,
                        rx_coil_filter="two_pole", gate_integration="centre",
-                       tolerance=1e-6, **kwargs):
+                       tolerance=1e-6, rescale_height=False, **kwargs):
     """Generate prior data ``/D{id}`` for the anemone TDEM forward backend.
 
     Mirrors :func:`integrate.gaaem_forward.prior_data_gaaem` but loads ``M{im}`` **as
@@ -978,6 +1085,10 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
     copy with ``N < N_in`` draws ``N`` random realizations (default) or the
     first ``N`` sequentially.  ``rx_coil_filter``, ``gate_integration`` and
     ``tolerance`` are passed to :func:`forward_anemone`.
+    ``rescale_height=True`` (varying ``M{im_height}`` only) does one anemone
+    setup and rescales it to each model's height instead of one setup per
+    ``altitude_bin_width`` bin; much faster for varying flight height, see
+    :func:`forward_anemone`.
     Returns the path to the prior-data h5 (always the return value).
     """
     import multiprocessing
@@ -1037,7 +1148,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
                         n_previous_pulses=n_previous_pulses,
                         rx_coil_filter=rx_coil_filter,
                         gate_integration=gate_integration,
-                        tolerance=tolerance)
+                        tolerance=tolerance, rescale_height=rescale_height)
     if showInfo > -1:
         dt = time.time() - t1
         n_sound = M.shape[0]
@@ -1066,6 +1177,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
         a["id"] = id
         a["is_log"] = bool(is_log)
         a["altitude_bin_width"] = float(altitude_bin_width)
+        a["rescale_height"] = bool(rescale_height)
         a["device"] = str(device)
         a["batch_size"] = int(batch_size or 0)
         a["calibration"] = str(cal.get("mode") or "gex")

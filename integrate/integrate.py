@@ -1135,7 +1135,11 @@ def forward_em(M, thickness, file_gex=None, method=None, **kwargs):
         the first installed backend in the order ``'anemone'``, ``'ga-aem'``,
         ``'simpeg'`` is used. Raises ``ValueError`` for anything else.
     **kwargs
-        Passed through to the selected backend.
+        Passed through to the selected backend. For ``method='anemone'`` with a
+        varying flight height, ``rescale_height=True`` does one anemone setup
+        and rescales it to each model's height (much faster; see
+        :func:`integrate.anemone_forward.forward_anemone`). Ignored by the
+        other backends.
 
     Returns
     -------
@@ -1195,7 +1199,11 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
         ``'cpu'``, whichever is first usable. Ignored for
         ``'ga-aem'`` and ``'simpeg'``.
     **kwargs
-        Passed through to the selected backend.
+        Passed through to the selected backend. For ``method='anemone'`` with a
+        varying flight height, ``rescale_height=True`` does one anemone setup
+        and rescales it to each model's height (much faster; see
+        :func:`integrate.anemone_forward.forward_anemone`). Ignored by the
+        other backends.
 
     Returns
     -------
