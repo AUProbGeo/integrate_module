@@ -1,259 +1,170 @@
-# %% [markdown]
-# # Ex for Daniel
-#
-# Needed packages:
-# pip install scikit-learn, tensorflow, keras_tuner, mlmapping, libaarhusxyz
-#
+"""
+Samsø SkyTEM data with INTEGRATE
+================================
+
+Short workflow for the Samsø SkyTEM survey:
+
+0. Convert the XYZ file to DATA.h5
+1. Set up a generic layered prior (PRIOR.h5)
+2. Forward-model the prior data with anemone, using GEX + SR2 (PRIOR_DATA_anemone.h5)
+3. Run rejection sampling on the whole data set (POST.h5)
+4. Plot a WE and a NS resistivity profile
+"""
 
 # %%
-try:
-    # Check if the code is running in an IPython kernel (which includes Jupyter notebooks)
-    get_ipython()
-    # If the above line doesn't raise an error, it means we are in a Jupyter environment
-    # Execute the magic commands using IPython's run_line_magic function
-    get_ipython().run_line_magic('load_ext', 'autoreload')
-    get_ipython().run_line_magic('autoreload', '2')
-except:
-    # If get_ipython() raises an error, we are not in a Jupyter environment
-    # # # # # # # #%load_ext autoreload
-    # # # # # # # #%autoreload 2
-    pass
+import os
 
+os.environ["REJECTION_BACKEND"] = "jax"
 
-# %%
+import matplotlib.pyplot as plt  # type: ignore
+import numpy as np  # type: ignore
+
 import integrate as ig
-import numpy as np
-from integrate import mlmapping as mm
-import time
-import libaarhusxyz
-# Check if parallel computations can be performed
-parallel = ig.use_parallel(showInfo=1)
-hardcopy = True 
-import matplotlib.pyplot as plt
-doPlot = 0
 
-
-# %% [markdown]
-# # Load data
-#
-# Load the SkyTEM XYZ survey data and convert it to the `f_data_h5` format used
-# by the integrate module, either automatically via `ig.xyz_to_h5()` or manually.
-
-
-# %% 
-
-
-doLoadFull = False
-
-if not doLoadFull:
-    # We load only data from Samsø Nord
-    file_xyz = 'SamsoeNord_v1_20260227_AVG_export.xyz'
-    file_gex = '20251114_DEN_Diamond_Samsoe_PROTECT_SR.gex'
-    f_data_h5 = ig.xyz_to_h5(file_xyz=file_xyz, file_gex = file_gex, 
-                            rx_altitude='tx_altitude', rx_altitude_std='tx_altitude_std',
-                            tx_altitude='rx_altitude', tx_altitude_std='rx_altitude_std')
-
-else:
-    # We load ALL Samsø data, but right now there is a problem with the scaling of the input data.
-    doLoadAutomatic = True
-    if doLoadAutomatic: 
-            
-        # AUTOMATIC Load XYZ data and convert to f_data_h5 format for integrate module
-        import integrate as ig
-        loadXYZ = True
-
-        file_xyz  = '20260501_PROTECT_Samsoe_SkyTEM_2Hz.XYZ'
-        file_gex = '20251114_DEN_Diamond_Samsoe_PROTECT_SR.gex'
-        # altitude std = 2
-        #f_data_h5 = ig.xyz_to_h5(file_xyz=file_xyz, file_gex = file_gex, altitude='Alt', altitude_std=2.0)
-        # altitude std = 5%
-        f_data_h5 = ig.xyz_to_h5(file_xyz=file_xyz, file_gex = file_gex, altitude='Alt', altitude_std=0.05)
-
-    else: 
-        #% MANUAL Alternate method to load XYZ data and convert to f_data_h5 format for integrate module
-        model = libaarhusxyz.XYZ(file_xyz)
-        gex = libaarhusxyz.GEX(file_gex)
-
-        fl = model.flightlines
-        ld = model.layer_data
-
-        # --- gate selection (single-channel SkyTEM system) ---
-        i_start = int(gex.remove_initial_gates(1))
-        i_end = int(gex.no_gates(1))
-
-        # --- replace the XYZ dummy/missing value with NaN ---
-        nan_value = model.model_info.get('dummy', 9999)
-        dbdt = ld['z_dbdt'].replace(nan_value, np.nan).values[:, i_start:i_end].astype(float)
-        dbdt_relstd = ld['relunc_z_dbdt'].replace(nan_value, np.nan).values[:, i_start:i_end].astype(float)
-        dbdt_std = ld['STD_Z_dBdt'.lower()].replace(nan_value, np.nan).values[:, i_start:i_end].astype(float)
-
-        # --- construct DATA and DATA_std (relative std in the XYZ file -> absolute) ---
-        DATA = dbdt
-        #DATA_std = dbdt_relstd * np.abs(DATA)
-        DATA_std = dbdt_std
-
-        # --- geometry and flight altitude (SkyTEM column names: e/n/line/dem/alt) ---
-        UTMX = fl['e'].values.astype(float)
-        UTMY = fl['n'].values.astype(float)
-        LINE = fl['line'].values.astype(float)
-        ELEVATION = fl['dem'].values.astype(float)
-        ALT = fl['alt'].values.reshape(-1, 1).astype(float)
-        ALT_std = 0.05 * np.abs(ALT)
-
-        # --- drop soundings that are all-NaN ---
-        keep = ~np.all(np.isnan(DATA), axis=1)
-        DATA, DATA_std = DATA[keep], DATA_std[keep]
-        UTMX, UTMY, LINE, ELEVATION = UTMX[keep], UTMY[keep], LINE[keep], ELEVATION[keep]
-        ALT, ALT_std = ALT[keep], ALT_std[keep]
-
-        # --- save to HDF5 (mirrors what ig.xyz_to_h5() does internally) ---
-        f_data_h5 = 'DATA_samsoe_manual.h5'
-        ig.save_data_gaussian(
-            DATA, D_std=DATA_std, f_data_h5=f_data_h5,
-            UTMX=UTMX, UTMY=UTMY, LINE=LINE, ELEVATION=ELEVATION,
-            delete_if_exist=True, f_gex=file_gex, showInfo=1,
-        )
-        ig.save_data_gaussian(
-            ALT, D_std=ALT_std, f_data_h5=f_data_h5,
-            id=2, name='Tx Altitude', delete_if_exist=False, showInfo=1,
-        )
-        ig.save_data_gaussian(
-            ALT, D_std=ALT_std, f_data_h5=f_data_h5,
-            id=3, name='Rx Altitude', delete_if_exist=False, showInfo=1,
-        )
-
-# %% Plot the geometry of the data in f_data_h5
-ig.plot_geometry(f_data_h5, pl='ELEVATION')
-ig.plot_geometry(f_data_h5, pl='id')
-ig.plot_geometry(f_data_h5, pl='NDATA')
-
-# %% Plot the actual data in f_data_h5
-#ig.plot_data(f_data_h5, id=1)
-ig.plot_data(f_data_h5)
-
-# %% Load data!
-D_obs = ig.load_data(f_data_h5)
-
-# %% [markdown]
-# # Setup the prior
-#
-
-
-# %% 
-
-N=4_000_000
-f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, 
-                                    f_prior_h5='PRIOR_N%d.h5' % N, 
-                                    dz = 1, 
-                                    z_max = 149,
-                                    showInfo=1)
-
-# simulate Tx/Rx altitude and save to f_prior_h5:/M2 and /M3
-alt_min = np.percentile(D_obs['d_obs'][1].flatten(),2.5)
-alt_max = np.percentile(D_obs['d_obs'][1].flatten(),100-2.5)
-tx_rx = np.mean(D_obs['d_obs'][1]-D_obs['d_obs'][2])
-
-Tx_sim = np.random.uniform(alt_min, alt_max, N)
-Rx_sim = Tx_sim + tx_rx 
-# write Tx_sim to f_prior_h5:/M2
-ig.save_prior_model(f_prior_h5, Tx_sim, im=2, name='Tx_altitude', showInfo=1, force_replace=True)
-# write Rx_sim to f_prior_h5:/M3
-ig.save_prior_model(f_prior_h5, Rx_sim, im=3, name='Rx_altitude', showInfo=1, force_replace=True)
-
-ig.plot_prior_stats(f_prior_h5)
-
-# %% FORWARD MODELING
-
-# %% Load MM model and predict forward response
-nn_model_file = 'resistivity_forward_model_HL4_UN160_chi2_log-uniform_N1000000_zmax150_abslog_gates5-41_NoNegatives_Samsoe251114'
-mm.get_model_info(nn_model_file)
-
-# Load prior data
-M, ind = ig.load_prior_model(f_prior_h5)
-
-
-t0 = time.time()    
-D1_pred_ml = mm.predict([np.log10(M[0]), np.log10(M[1]), np.log10(M[2])], nn_model_file, batch_size=10000)
-#D1_ml = 10 **(D1_pred_ml[0][:,use_gates])
-D1_ml = 10 **(D1_pred_ml[0])
-t1= time.time()
-print(f"Time taken for ML prediction: {t1-t0:.2f} seconds")
-
-
-# Now update the prior file with the forward-modeled data
-ig.save_prior_data(f_prior_h5, D1_ml, id=1, name='dB/dT', showInfo=1, force_delete=True)
-# D2 = M2 (identity mapping): M[1] is already loaded in memory, so just re-save it as data
-ig.save_prior_data(f_prior_h5, M[1], id=2, name='Tx_altitude', showInfo=1, force_delete=True)
-# D3 = M3 (identity mapping): M[2] is already loaded in memory, so just re-save it as data
-ig.save_prior_data(f_prior_h5, M[2], id=3, name='Rx_altitude', showInfo=1, force_delete=True)
-
-
-# %%
-ig.plot_data_prior(f_prior_h5, f_data_h5)
-
-# %% 
-backend = 'jax'
-#backend = 'numpy'
-autoT = True
-N_use = N
-f_post_h5 = 'POST_N%d.h5' % N_use
-
-f_post_h5 = ig.integrate_rejection(f_prior_h5,
-                                f_data_h5,
-                                f_post_h5,
-                                N_use = N_use,
-                                autoT=autoT,
-                                T_base = 9,
-                                showInfo=1,
-                                parallel=True,
-                                updatePostStat=True,
-                                backend=backend)
-
-# %% 
-ig.plot_data_prior_post(f_post_h5, id=1)
-ig.plot_data_prior_post(f_post_h5, i_plot=100)
-
-# %%
-cmap, clim = ig.get_colormap_and_limits('resistivity')
 hardcopy = True
 
-ig.plot_profile(f_post_h5, im1=1, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
-ig.plot_profile(f_post_h5, im1=2, i1=0, i2=1000, clim=clim, cmap=cmap, hardcopy=hardcopy)
+F_XYZ = '20260501_PROTECT_Samsoe_SkyTEM_2Hz.XYZ'
+F_GEX = '20251114_DEN_Diamond_Samsoe_PROTECT_SR.gex'  # 2-point dummy waveform
+F_SR2 = '20251114_DEN_Diamond_Samsoe_PROTECT_SR.sr2'  # system response
+# Forward method: only 'anemone' reads the GEX + SR2 pair (gaaem and simpeg do not)
+METHOD = 'anemone'
+#METHOD = 'ga-aem'
+#METHOD = 'simpeg'
 
-ig.plot_T_EV(f_post_h5, pl='N_UNIQUE', hardcopy=hardcopy, N_UNIQUE_min=1,plotPoints=True)
-
-ig.plot_feature_2d(f_post_h5,im=1,iz=15, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean) iz = 15')
-ig.plot_feature_2d(f_post_h5,im=1,iz=45, key='LogMean', uselog=1, hardcopy=hardcopy, clim=clim, cmap=cmap, title = 'log(Mean), iz = 45')
-
-# Harmonic mean resistivity at elevation -10 m depth.
-ig.plot_feature_2d(f_post_h5, im=1, elevation=10, key='HarmonicMean')
-
-ig.plot_feature_2d(f_post_h5,im=2,iz=0, key='HarmonicMean', uselog=0, hardcopy=hardcopy, 
-                   title = 'Posterior Tx',  cmap='jet_r', clim=[0,50], ) 
-
-
-# %% Plot profile using coordinates
-X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
-# Find points within buffer distance
-Xl = np.array([595000, 598500])
-Yl = np.array([6204000, 6203500])
-buffer = 40.0
-indices, distances, segment_ids = ig.find_points_along_line_segments(
-    X, Y, Xl, Yl, tolerance=buffer
-)
-id_line = indices
-
-plt.figure()
-plt.plot(X,Y,'k.',markersize=1)
-plt.plot(Xl,Yl,'r-')
-plt.plot(X[id_line],Y[id_line],'r*',markersize=11)
-plt.axis('equal')
-plt.xlabel('X [m]')
-plt.ylabel('Y [m]')
-plt.grid()
-
-ig.plot_profile(f_post_h5, ii=id_line ,  im=1, gap_threshold=150, xaxis='x', clim=clim, cmap=cmap, hardcopy=hardcopy)
-
-
+# %% [markdown]
+# 0\. Load the XYZ data into DATA.h5
+# ----------------------------------
+#
+# The GEX file only sets which gates are used (gates 5-41); it does not
+# affect the observed data.
 
 # %%
+# flight altitude ('Alt') is stored as D2, with 5% relative std
+# UNITS: the Z_dBdt[xx] / STD_Z_dBdt[xx] columns of this XYZ are in pV/(A m^4), not
+# V/(A m^4).  Where to find this for your own data:
+#   * the survey report, section "Normalisation" (05_Report/*.pdf): the signal is
+#     normalised by Rx area, Tx area, turns and current to V/(A m^4), then given the
+#     metric prefix "pico" -> pV/(A m^4);  the channel table lists Z_dBdt[xx] as pV/(Am4);
+#   * a quick sanity check: the forward models (anemone, GA-AEM, SimPEG) return
+#     V/(A m^4), typically ~1e-6 .. 1e-14 for SkyTEM.  If the observed values are of
+#     order 1e6 .. 1e0 (as here, ~1e12 larger), the data are in pV/(A m^4).
+#     ig.plot_data_prior() then shows prior and observed 12 decades apart.
+# The data must be in the same unit as the forward response, so convert pV -> V:
+# data_scale = 1e-12 (it scales both d_obs and d_std).  tTEM XYZ files are already in
+# V/(A m^4), so they need no scaling.
+f_data_h5 = ig.xyz_to_h5(file_xyz=F_XYZ, file_gex=F_GEX, f_data_h5='DATA.h5',
+                         altitude='Alt', altitude_std=0.05, data_scale=1e-12, showInfo=1)
+ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
+ig.data_set(f_data_h5, id=2, name='Altitude', label='Flight altitude', unit='m')
+
+# The RelUnc in the XYZ is the measured noise only (median ~0.0015).  Workbench adds a
+# 3% uniform STD on top (GEX: UniformDataSTD=0.03), which xyz_to_h5 does not apply.
+# Add it here, in quadrature, to d_std of D1.
+rel_err = 2*0.03
+D = ig.load_data(f_data_h5)
+d_obs, d_std = D['d_obs'][0], D['d_std'][0]
+d_std = np.where(np.isfinite(d_obs), np.sqrt(d_std**2 + (rel_err * np.abs(d_obs))**2), d_std)
+ig.save_data_gaussian(d_obs, D_std=d_std, f_data_h5=f_data_h5, id=1,
+                      name='dBdT', label='dB/dt', unit='V/Am^4', f_gex=F_GEX)
+
+# %%
+ig.plot_geometry(f_data_h5, pl='ELEVATION')
+ig.plot_data(f_data_h5, hardcopy=hardcopy)
+
+# %% [markdown]
+# 1\. Set up a generic prior (PRIOR.h5)
+# -------------------------------------
+
+# %%
+N = 2_000_000
+f_prior_h5 = ig.prior_model_layered(N=N, lay_dist='uniform', NLAY_min=1, NLAY_max=5,
+                                    RHO_min=1, RHO_max=3000, dz=1, z_max=149,
+                                    f_prior_h5='PRIOR.h5', showInfo=1)
+
+
+# %% [markdown]
+# 1b. Simulate the flight altitude (M4 = Tx height)
+# -------------------------------------------------
+#
+# M2 and M3 are used by the layered prior, so the Tx height goes into M4.
+# The Rx height follows from the GEX offset, so only the Tx height is needed.
+
+# %%
+D_obs = ig.load_data(f_data_h5)
+alt_obs = D_obs['d_obs'][1].flatten()
+alt_min, alt_max = np.percentile(alt_obs, [2.5, 97.5])
+Tx_sim = np.random.uniform(alt_min, alt_max, N)
+ig.save_prior_model(f_prior_h5, Tx_sim, im=4, name='Tx_altitude', showInfo=1, force_replace=True)
+
+ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
+
+# %% [markdown]
+# 2\. Forward-model the prior data (PRIOR_DATA.h5)
+# ------------------------------------------------
+#
+# anemone is the only forward model that reads the GEX + SR2 pair.
+# ``im_height=4`` tells anemone to use M4 as the flight height.
+
+# %%
+f_prior_data_h5 = f'PRIOR_DATA_{METHOD}_N{N}.h5'
+
+# Prior EM DATA
+ForceForward = True
+rescale_height = True  # rescale the anemone setup to each model's height instead of one setup per altitude_bin_width bin; much faster for varying flight height, see forward_anemone
+rescale_height = False  #
+if (ForceForward) or (not os.path.exists(f_prior_data_h5)):
+    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex=F_GEX, file_sr2=F_SR2,
+                                       method=METHOD, 
+                                       im_height=4, 
+                                       rescale_height=rescale_height, 
+                                       doMakePriorCopy=True, f_prior_data_h5=f_prior_data_h5)
+else:
+    print(f'Using existing prior data file: {f_prior_data_h5}')
+
+# Prior flight altitude (M4) is stored as D2.
+# D2 = identity of M4 (simulated flight altitude), matching the altitude block in DATA.h5
+ig.prior_data_identity(f_prior_data_h5, id=2, im=4, showInfo=1)
+
+# %%
+ig.plot_data_prior(f_prior_data_h5, f_data_h5, nr=1000, hardcopy=hardcopy)
+
+# %% [markdown]
+# 3\. Posterior for the whole data set (POST.h5)
+# ----------------------------------------------
+
+# %%
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+buffer = 100.0
+i_we = np.where(np.abs(Y - np.median(Y)) <= buffer)[0]
+i_ns = np.where(np.abs(X - np.median(X)) <= buffer)[0]
+ii=np.concatenate((i_we,i_ns))
+
+
+f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5, # type: ignore
+                                   f_post_h5='POST.h5',
+                                   id_use=[1],
+                                   #ip_range = ii,
+                                   N_use=N, autoT=1, T_base=1, showInfo=0)
+
+# %% [markdown]
+# 4\. Profiles: WE and NS
+# -----------------------
+#
+# The WE profile is the soundings within ``buffer`` metres of the median Y,
+# and the NS profile those within ``buffer`` metres of the median X.
+
+# %%
+X, Y, LINE, ELEVATION = ig.get_geometry(f_data_h5)
+buffer = 100.0
+i_we = np.where(np.abs(Y - np.median(Y)) <= buffer)[0]
+i_ns = np.where(np.abs(X - np.median(X)) <= buffer)[0]
+
+ig.plot_profile(f_post_h5, ii=i_we, im=1, xaxis='x', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+#ig.plot_profile(f_post_h5, ii=i_we, im=4, xaxis='x', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+ig.plot_profile(f_post_h5, ii=i_ns, im=1, xaxis='y', gap_threshold=150, hardcopy=hardcopy, title='NS profile')
+plt.show()
+
+# %%
+ig.plot_data_prior_post(f_post_h5, i_plot=100)
+# %% Flight Height (M4) profile
+ig.plot_profile(f_post_h5, ii=i_we, im=4, xaxis='id', gap_threshold=150, hardcopy=hardcopy, title='WE profile')

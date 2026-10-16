@@ -106,6 +106,7 @@ def forward_gaaem(C=np.array(()),
         stmfiles = []
     if file_gex is None:
         file_gex = ''
+    tx_height = np.asarray(tx_height, dtype=float).ravel()
 
     #print(stmfiles)
     #print(file_gex)
@@ -542,7 +543,7 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         if im_height>0:
             if (showInfo>1):
                 print('Using M%d for height' % im_height)
-            tx_height = f_prior_r[Mheight][:]
+            tx_height = np.asarray(f_prior_r[Mheight][:], dtype=float).ravel()
 
         # Get thickness
         if 'x' in f_prior_r[Mname].attrs:

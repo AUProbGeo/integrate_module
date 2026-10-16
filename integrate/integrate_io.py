@@ -1345,12 +1345,42 @@ def gex_to_stm(file_gex, **kwargs):
                 print(f"Legacy read_gex() failed ({type(e).__name__}), trying read_gex_workbench()...")
             GEX = read_gex_workbench(file_gex, showInfo=showInfo)
 
-        stm_files = write_stm_files(GEX, file_gex=file_gex, **kwargs)
+        stm_files = _write_stm_files_any_moment(GEX, file_gex=file_gex, **kwargs)
     else:
         GEX = file_gex
-        stm_files = write_stm_files(GEX, file_gex=GEX['filename'], **kwargs)
+        stm_files = _write_stm_files_any_moment(GEX, file_gex=GEX['filename'], **kwargs)
 
     return stm_files, GEX
+
+
+def _write_stm_files_any_moment(GEX, **kwargs):
+    """``write_stm_files`` that also accepts single-moment GEX files.
+
+    ``write_stm_files`` needs a ``[Channel2]``.  For a single-moment system (e.g.
+    SkyTEM Diamond, LM only) Channel1 is duplicated as a dummy second moment, the
+    waveform is padded with zero current to a full half repetition period (GA-AEM
+    wants a complete half cycle) and only the first (real) STM file is returned.
+    """
+    if 'Channel2' in GEX:
+        return write_stm_files(GEX, **kwargs)
+
+    g = {}
+    for k in GEX:
+        if isinstance(GEX[k], dict):
+            g[k] = dict(GEX[k])
+        else:
+            g[k] = GEX[k]
+    g['Channel2'] = dict(g['Channel1'])
+    wf = np.asarray(g['General']['WaveformLM'], dtype=float)
+    rep = float(np.atleast_1d(g['Channel1']['RepFreq'])[0])
+    t_half = wf[0, 0] + 0.5 / rep + 1e-6   # margin: the STM has 7 digits
+    if wf[-1, 0] < t_half:
+        wf = np.vstack([wf, [t_half, 0.0]])
+    g['General']['WaveformLM'] = wf
+    g['General']['WaveformHM'] = wf
+    stm_files = write_stm_files(g, **kwargs)
+    os.remove(stm_files[1])
+    return [stm_files[0]]
 
 
 def get_gex_file_from_data(f_data_h5, id=1):
@@ -3293,7 +3323,7 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     return f_data_h5
 
 
-def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None):
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None, data_scale=1.0):
     """
     Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
 
@@ -3384,6 +3414,11 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         Axis label of the dB/dt data in ``/D1``. Default ``'dB/dt'``.
     unit : str, optional
         Unit of the dB/dt data in ``/D1``. Default ``'V/(Am^4)'``.
+    data_scale : float, optional
+        Factor applied to the dB/dt data and its std before writing ``/D1``
+        (default 1). Use it when the XYZ file is not in V/(Am^4): e.g. Workbench
+        SkyTEM exports store ``Z_dBdt[xx]`` in pV/(Am^4), so ``data_scale=1e-12``
+        gives V/(Am^4), the unit returned by the forward models.
 
     Returns
     -------
@@ -3562,8 +3597,8 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
         n_removed = np.sum(~keep)
         if n_removed > 0:
             print('Removed %d all-NaN soundings (%d remaining)' % (n_removed, np.sum(keep)))
-    d_obs     = d_obs[keep]
-    d_std     = d_std[keep]
+    d_obs     = d_obs[keep] * data_scale
+    d_std     = d_std[keep] * data_scale
     UTMX      = UTMX[keep]
     UTMY      = UTMY[keep]
     LINE      = LINE[keep]

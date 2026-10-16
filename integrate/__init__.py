@@ -36,6 +36,8 @@ from integrate.anemone_forward import gex_to_anemone_system
 from integrate.simpeg_forward import forward_simpeg
 from integrate.simpeg_forward import prior_data_simpeg
 from integrate.em_system import gex_to_em_system
+from integrate.sr2_gex import gex_apply_sr2
+from integrate.sr2_gex import sr2_effective_current
 from integrate.integrate import synthetic_case
 from integrate.integrate import prior_model_layered
 from integrate.integrate import prior_model_workbench
