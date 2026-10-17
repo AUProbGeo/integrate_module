@@ -77,7 +77,7 @@ ig.plot_data(f_data_h5, hardcopy=hardcopy)
 
 # %%
 N = 2_000_000
-N = 500_000
+N = 1_000_000
 f_prior_h5 = ig.prior_model_layered(N=N, lay_dist='uniform', NLAY_min=1, NLAY_max=5,
                                     RHO_min=1, RHO_max=3000, dz=1, z_max=149,
                                     f_prior_h5='PRIOR.h5', showInfo=1)
