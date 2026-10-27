@@ -31,7 +31,7 @@ METHOD = 'anemone'
 #METHOD = 'ga-aem'
 #METHOD = 'simpeg'
 
-# %% [markdown]
+    # %% [markdown]
 # 0\. Load the XYZ data into DATA.h5
 # ----------------------------------
 #
@@ -77,6 +77,7 @@ ig.plot_data(f_data_h5, hardcopy=hardcopy)
 
 # %%
 N = 2_000_000
+N = 1_000_000
 f_prior_h5 = ig.prior_model_layered(N=N, lay_dist='uniform', NLAY_min=1, NLAY_max=5,
                                     RHO_min=1, RHO_max=3000, dz=1, z_max=149,
                                     f_prior_h5='PRIOR.h5', showInfo=1)
@@ -111,7 +112,7 @@ f_prior_data_h5 = f'PRIOR_DATA_{METHOD}_N{N}.h5'
 # Prior EM DATA
 ForceForward = True
 rescale_height = True  # rescale the anemone setup to each model's height instead of one setup per altitude_bin_width bin; much faster for varying flight height, see forward_anemone
-rescale_height = False  #
+#rescale_height = False  #
 if (ForceForward) or (not os.path.exists(f_prior_data_h5)):
     f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex=F_GEX, file_sr2=F_SR2,
                                        method=METHOD, 
@@ -143,8 +144,9 @@ ii=np.concatenate((i_we,i_ns))
 f_post_h5 = ig.integrate_rejection(f_prior_data_h5, f_data_h5, # type: ignore
                                    f_post_h5='POST.h5',
                                    id_use=[1],
-                                   #ip_range = ii,
-                                   N_use=N, autoT=1, T_base=1, showInfo=0)
+                                   ip_range = ii,
+                                   N_use=N, autoT=1, T_base=1, showInfo=0,
+                                   backend='jax')  # 'jax' or 'numpy'
 
 # %% [markdown]
 # 4\. Profiles: WE and NS
@@ -168,3 +170,140 @@ plt.show()
 ig.plot_data_prior_post(f_post_h5, i_plot=100)
 # %% Flight Height (M4) profile
 ig.plot_profile(f_post_h5, ii=i_we, im=4, xaxis='id', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+
+# %% 
+ig.plot_T_EV(f_post_h5, hardcopy=hardcopy)
+
+# %% MAP
+ig.plot_feature_2d(f_post_h5,im=1,iz=5, key='HarmonicMean', uselog=1, cmap='jet', s=2, hardcopy=hardcopy)
+plt.show()
+
+# %% 
+try:
+    for ele in np.arange(50,-71,-20):
+        plt.figure()
+        ig.plot_feature_2d(f_post_h5,im=1,elevation=ele, 
+                           key='HarmonicMean', 
+                           uselog=1, clim=[1,2000],s=2,
+                           plotPoints = True, 
+                           hardcopy=hardcopy)
+        plt.show()
+except:
+    pass
+
+# %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+# %% Inversion in natches on subset of the data, based on flight height intervals
+
+# Load flight height from data
+D_obs = ig.load_data(f_data_h5)
+alt_obs = D_obs['d_obs'][1].flatten()
+
+# %%
+N_sub = 10
+# fine the threshold that divides the flight heoight data into N_sub subsets.
+# use np.percentile to find the thresholds that divide the data into N_sub equal parts
+thresholds = np.percentile(alt_obs, np.linspace(0, 100, N_sub + 1))
+print(f'Flight height thresholds for {N_sub} subsets: {thresholds}')
+
+ii_subset = []
+for i in range(N_sub):
+    if i == 0:
+        ii = np.where(alt_obs <= thresholds[i + 1])[0]
+    elif i == N_sub - 1:
+        ii = np.where(alt_obs > thresholds[i])[0]
+    else:
+        ii = np.where((alt_obs > thresholds[i]) & (alt_obs <= thresholds[i + 1]))[0]
+    ii_subset.append(ii)
+    print(f'Subset {i + 1}: {len(ii)} soundings, flight height range: {thresholds[i]} - {thresholds[i + 1]} m')
+
+# %% Prior data subsets: which subsets need to be (re)computed
+# Each subset gets its own prior data file, PRIOR_DATA_subset_{i+1}.h5
+f_prior_data_subset_h5_list = [f'PRIOR_DATA_subset_{i + 1}.h5' for i in range(N_sub)]
+i_compute = [i for i in range(N_sub)
+             if ForceForward or not os.path.exists(f_prior_data_subset_h5_list[i])]
+for i in range(N_sub):
+    if i not in i_compute:
+        print(f'Using existing prior data file: {f_prior_data_subset_h5_list[i]}')
+
+# %% Copy the prior models, and simulate the flight height (M4) for each subset
+# The flight height is uniform within the subset's threshold limits (+- 4 m)
+for i in i_compute:
+    f_prior_data_subset_h5 = f_prior_data_subset_h5_list[i]
+    ig.copy_prior(f_prior_h5, f_prior_data_subset_h5, showInfo=1)
+    alt_min = thresholds[i] - 4
+    alt_max = thresholds[i + 1] + 4
+    Tx_sim = np.random.uniform(alt_min, alt_max, N)
+    ig.save_prior_model(f_prior_data_subset_h5, Tx_sim, im=4, name='Tx_altitude', showInfo=1, force_replace=True)
+
+# %% Compute the prior EM data (D1) for each subset
+for i in i_compute:
+    f_prior_data_subset_h5 = f_prior_data_subset_h5_list[i]
+    ig.prior_data_em(f_prior_data_subset_h5, file_gex=F_GEX, file_sr2=F_SR2,
+                     method=METHOD,
+                     im_height=4,
+                     rescale_height=rescale_height,
+                     doMakePriorCopy=False, f_prior_data_h5=f_prior_data_subset_h5)
+
+# %% Prior flight height data (D2 = identity of M4) for each subset
+for i in i_compute:
+    ig.prior_data_identity(f_prior_data_subset_h5_list[i], id=2, im=4, showInfo=1)
+
+
+# %% Run rejection sampling on each subset
+for i in range(N_sub):
+    f_prior_data_subset_h5 = f'PRIOR_DATA_subset_{i + 1}.h5'
+    f_post_subset_h5 = f'POST_subset_{i + 1}.h5'
+    f_post_subset_h5 = ig.integrate_rejection(f_prior_data_subset_h5, f_data_h5,
+                                              f_post_h5=f_post_subset_h5,
+                                              id_use=[1],
+                                              ip_range=ii_subset[i],
+                                              N_use=N, autoT=1, T_base=1, showInfo=0,
+                                              backend='jax')  # 'jax' or 'numpy'
+
+# %% Merge the N_sub posteriors into a single posterior file
+# All subsets use DATA.h5, but each has its own prior (PRIOR_DATA_subset_{i+1}.h5),
+# so the subset priors are merged too (PRIOR_DATA_merged.h5).
+f_post_merged_h5 = 'POST_merged.h5'
+f_post_merged_h5, _ = ig.merge_posterior([f'POST_subset_{i + 1}.h5' for i in range(N_sub)], f_data_h5,
+                                         f_post_merged_h5=f_post_merged_h5,
+                                         ip_range_list=ii_subset,
+                                         f_prior_merged_h5='PRIOR_DATA_merged.h5', showInfo=1)
+
+
+
+# %%
+
+ig.plot_profile(f_post_merged_h5, ii=i_we, im=1, xaxis='x', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+#ig.plot_profile(f_post_merged_h5, ii=i_we, im=4, xaxis='x', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+#ig.plot_profile(f_post_merged_h5, ii=i_we, im=4, xaxis='x', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+ig.plot_profile(f_post_merged_h5, ii=i_ns, im=1, xaxis='y', gap_threshold=150, hardcopy=hardcopy, title='NS profile')
+plt.show()
+
+# %%
+ig.plot_data_prior_post(f_post_merged_h5, i_plot=100)
+# %% Flight Height (M4) profile
+ig.plot_profile(f_post_merged_h5, ii=i_we, im=4, xaxis='id', gap_threshold=150, hardcopy=hardcopy, title='WE profile')
+
+# MAP
+ig.plot_feature_2d(f_post_merged_h5,im=1,iz=5, key='HarmonicMean', uselog=1, cmap='jet', s=2, hardcopy=hardcopy)
+plt.show()
+
+
+# %% 
+try:
+    for ele in np.arange(50,-71,-20):
+        plt.figure()
+        ig.plot_feature_2d(f_post_merged_h5,im=1,elevation=ele, 
+                           key='HarmonicMean', 
+                           uselog=1, clim=[1,2000],s=2,
+                           plotPoints = True, 
+                           hardcopy=hardcopy)
+        plt.show()
+except:
+    pass
+
+
+# %%
+ig.plot_T_EV(f_post_merged_h5, hardcopy=hardcopy)
