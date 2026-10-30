@@ -23,10 +23,10 @@ deterministic inversion relate to each other -- it is not used for the
 raw-material estimate.
 
 **Part B -- The full INTEGRATE workflow.**
-Build an *informed* prior from two geological scenarios
-(``daugaard_standard.xlsx`` + ``daugaard_valley.xlsx``, built with ``geoprior1d``,
-merged 50/50), forward-model the prior tTEM data, load and add the borehole
-data, run the joint (tTEM + borehole) rejection inversion, demonstrate the
+Build an *informed* prior from a single geological specification
+(``daugaard_rostof.xlsx``, built with ``geoprior1d``), forward-model the prior
+tTEM data, load and add the borehole data
+(``Daugaard_boringer_rostof.json``), run the joint (tTEM + borehole) rejection inversion, demonstrate the
 ``ig.query`` tool, grow a data-driven raw-material region from the posterior
 probability map (B8), and turn it into a low / median / high volume
 estimate (B9), built from per-sounding thickness percentiles times the
@@ -54,7 +54,7 @@ INTEGRATE examples) so that the case data downloads and the
 """
 # %%
 try:
-    get_*ipython()
+    get_ipython()
     get_ipython().run_line_magic('load_ext', 'autoreload')
     get_ipython().run_line_magic('autoreload', '2')
 except Exception:
@@ -112,11 +112,10 @@ t_start = time.time()
 # --- run-size settings -------------------------------------------------
 N = 1_000_001   # production-scale
 #N = 10_000      # demo-scale; increase for a production-quality run
-N = 10_005
-N = 100_006+1
-# Prior size used everywhere: the generic prior (Part A) and each of the two
-# geological-scenario priors merged into the informed prior (Part B, N // 2
-# realizations each).
+#N = 10_005
+#N = 100_006+1
+# Prior size used everywhere: the generic prior (Part A) and the informed
+# ROSTOF prior (Part B).
 
 inflateNoise = 2        # multiply the tTEM data std by this (0 = use as-is)
 
@@ -135,16 +134,16 @@ f_prior_generic_h5      = '%sDAUGAARD_PRIOR_GENERIC%s.h5'       % (PREFIX, SUFFI
 f_prior_generic_data_h5 = '%sDAUGAARD_PRIOR_GENERIC_DATA%s.h5'  % (PREFIX, SUFFIX)
 f_post_generic_h5       = '%sDAUGAARD_POSTERIOR_GENERIC%s.h5'   % (PREFIX, SUFFIX)
 
-# Part B -- informed prior + boreholes
-f_prior_scenario_h5_map = {
-    'daugaard_standard': '%sDAUGAARD_PRIOR_STANDARD%s.h5' % (PREFIX, SUFFIX),
-    'daugaard_valley':   '%sDAUGAARD_PRIOR_VALLEY%s.h5'   % (PREFIX, SUFFIX),
-}
-f_prior_merged_h5  = '%sDAUGAARD_PRIOR_MERGED%s.h5'          % (PREFIX, SUFFIX)
-f_prior_data_h5    = '%sDAUGAARD_PRIOR_MERGED_DATA%s.h5'     % (PREFIX, SUFFIX)
-f_prior_data_bh_h5 = '%sDAUGAARD_PRIOR_MERGED_DATA_BH%s.h5'  % (PREFIX, SUFFIX)
-f_post_h5          = '%sDAUGAARD_POSTERIOR%s.h5'             % (PREFIX, SUFFIX)
-f_post_jax_h5          = '%sDAUGAARD_POSTERIOR%s_jax.h5'             % (PREFIX, SUFFIX)
+# Part B -- informed prior + boreholes. PRIOR_TAG keeps these files (and the
+# Part B/C figures) apart from those of the other Daugaard prior variant.
+PRIOR_TAG = 'ROSTOF'
+SUFFIX_B = '_%s%s' % (PRIOR_TAG, SUFFIX)
+f_prior_h5         = '%sDAUGAARD_PRIOR_ROSTOF%s.h5'          % (PREFIX, SUFFIX)
+f_prior_data_h5    = '%sDAUGAARD_PRIOR_ROSTOF_DATA%s.h5'     % (PREFIX, SUFFIX)
+f_prior_data_bh_h5 = '%sDAUGAARD_PRIOR_ROSTOF_DATA_BH%s.h5'  % (PREFIX, SUFFIX)
+f_post_h5          = '%sDAUGAARD_POSTERIOR_ROSTOF%s.h5'      % (PREFIX, SUFFIX)
+f_post_jax_h5      = '%sDAUGAARD_POSTERIOR_ROSTOF%s_jax.h5'  % (PREFIX, SUFFIX)
+f_post_bhonly_h5   = '%sDAUGAARD_POSTERIOR_ROSTOF_BHONLY%s.h5' % (PREFIX, SUFFIX)   # boreholes only, no tTEM
 
 # %%
 # 1. Load the data
@@ -184,7 +183,25 @@ ig.plot_data(f_data_h5, useLog=0, hardcopy=hardcopy)
 plt.show()
 
 # %%
-# 1b. Target-area polygons and the west-to-east profile line
+# 1b. Boreholes
+# ^^^^^^^^^^^^^
+#
+# The raw-material boreholes are loaded here (rather than in Part B) so their
+# collar positions can be used to define the west-to-east profile line below.
+# They are plotted against the informed prior in B2 and used as data in B4.
+
+# %%
+f_boreholes = ig.get_case_data(case=case, filelist=['rawmaterial/Downloads/Daugaard_boringer_rostof.json'])[0]
+
+BHOLES = ig.read_borehole(f_boreholes, showInfo=1)
+# plot boreholes, max 5 per figure. The class colours/names come from the
+# informed prior (built in B1), so they are only used if it already exists.
+ig.plot_boreholes(BHOLES, f_prior_h5 if os.path.exists(f_prior_h5) else None,
+                  fontsize=17, n_per_figure=8, hardcopy=hardcopy)
+plt.show()
+
+# %%
+# 1c. Target-area polygons and the west-to-east profile line
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # The Daugaard focus-area shapefile (the areas Mette selected from the
@@ -192,8 +209,9 @@ plt.show()
 # Delområder are matched to their names by polygon area, which is reported
 # (and matches exactly) in the old-approach PowerPoint. The polygons are
 # loaded here because the profile line used for the resistivity sections in
-# Parts A and B runs through their centroids; the polygons themselves are
-# used for the volume analysis in Part C.
+# Parts A and B can optionally run through their centroids (see
+# ``profile_from`` below); the polygons themselves are used for the volume
+# analysis in Part C.
 
 # %%
 DAUGAARD_AREA_ID_MAP = {
@@ -201,34 +219,53 @@ DAUGAARD_AREA_ID_MAP = {
     106727.7: 'Delområde 2',   # DAU_07
     196598.0: 'Delområde 3',   # DAU_05, DAU_03
 }
-f_shp_daugaard = os.path.join('ReferenceProjects', 'Fokusområder_Daugaard', 'Fokusområder_polygon.shp')
+f_shp_daugaard = 'Fokusområder_polygon_daugaard.shp'
 polygons = rmu.load_target_polygons(f_shp_daugaard, area_id_map=DAUGAARD_AREA_ID_MAP)
 
 # %%
-# Build a profile line through the centroid of each target polygon, ordered
-# from west (smallest X) to east (largest X), and find the sounding indices
-# along that line with ``ig.find_points_along_line_segments`` -- the same
-# function used for profile selection in ``integrate_workflow.py`` and
-# ``integrate_profiles.py``. These indices (``id_line``) are reused in Parts A
-# and B to plot resistivity/lithology sections along this single line.
+# Build a west-to-east profile line and find the sounding indices along it
+# with ``ig.find_points_along_line_segments`` -- the same function used for
+# profile selection in ``integrate_workflow.py`` and ``integrate_profiles.py``.
+# These indices (``id_line``) are reused in Parts A and B to plot
+# resistivity/lithology sections along this single line.
+#
+# ``profile_from`` selects the waypoints:
+#
+# - ``'boreholes'``: the collars of the boreholes in ``BH_PROFILE_NAMES``
+#   (a roughly W-E band through the middle of the survey), ordered by X.
+# - ``'polygons'``: the centroids of the target polygons (Delområder).
 
 # %%
-centroids = {name: (geom.centroid.x, geom.centroid.y) for name, geom in polygons.items()}
-centroids_sorted = sorted(centroids.items(), key=lambda kv: kv[1][0])  # west (small X) -> east (large X)
-for name, (cx, cy) in centroids_sorted:
-    print("  %-15s centroid = (%9.1f, %9.1f)" % (name, cx, cy))
+profile_from = 'boreholes'   # 'boreholes' or 'polygons'
+BH_PROFILE_NAMES = ['Dau02', 'Dau04', '116. 1602', '116. 1867',
+                    'Dau07', '116.  535', 'Dau05', 'Dau03']
 
-Xl = np.array([cx for _, (cx, cy) in centroids_sorted])
-Yl = np.array([cy for _, (cx, cy) in centroids_sorted])
-Yl[0]=Yl[0]-200
+if profile_from == 'boreholes':
+    bh_profile = sorted([bh for bh in BHOLES if bh['name'] in BH_PROFILE_NAMES],
+                        key=lambda bh: bh['X'])   # west (small X) -> east (large X)
+    missing = set(BH_PROFILE_NAMES) - {bh['name'] for bh in bh_profile}
+    if missing:
+        print("WARNING: boreholes not found in BHOLES: %s" % sorted(missing))
+    for bh in bh_profile:
+        print("  %-15s collar = (%9.1f, %9.1f)" % (bh['name'], bh['X'], bh['Y']))
+    Xl = np.array([bh['X'] for bh in bh_profile])
+    Yl = np.array([bh['Y'] for bh in bh_profile])
+else:
+    centroids = {name: (geom.centroid.x, geom.centroid.y) for name, geom in polygons.items()}
+    centroids_sorted = sorted(centroids.items(), key=lambda kv: kv[1][0])  # west (small X) -> east (large X)
+    for name, (cx, cy) in centroids_sorted:
+        print("  %-15s centroid = (%9.1f, %9.1f)" % (name, cx, cy))
+    Xl = np.array([cx for _, (cx, cy) in centroids_sorted])
+    Yl = np.array([cy for _, (cx, cy) in centroids_sorted])
+    Yl[0]=Yl[0]-200
 
 buffer = 10.0
 
 # Widen the profile at both ends so it also picks up every sounding
-# strictly west of the westernmost Delområde center and strictly east of
-# the easternmost one, not just soundings near the 3 centroids themselves:
+# strictly west of the westernmost waypoint and strictly east of
+# the easternmost one, not just soundings near the waypoints themselves:
 # extend the line with one extra waypoint beyond each end of the data's
-# X-range (at the Y of the nearest centroid), then re-search along the
+# X-range (at the Y of the nearest waypoint), then re-search along the
 # now-longer line.
 pad = buffer
 Xl_wide = np.concatenate(([X.min() - pad], Xl, [X.max() + pad]))
@@ -260,6 +297,12 @@ for i in pl_data:
     ax.plot(X[i], Y[i], 'wo', ms=16)
     ax.plot(X[i], Y[i], 'k*', ms=6+j*5, label='example data location %d (id=%d)' % (j,i))
     ax.text(X[i] + 25, Y[i] + 25, 'd%d (%d)' % (j, i), color='k', fontsize=18)
+ax.plot([bh['X'] for bh in BHOLES], [bh['Y'] for bh in BHOLES], 'rx', ms=8, mew=1.5, label='boreholes')
+if profile_from == 'boreholes':
+    ax.plot(Xl, Yl, 'r^', ms=10, mfc='none', mew=1.5, label='profile boreholes')
+    for bh in bh_profile:
+        ax.annotate(bh['name'], (bh['X'], bh['Y']), xytext=(4, 4),
+                    textcoords='offset points', fontsize=8, color='r')
 ax.legend(loc='best')
 if hardcopy:
     fig.savefig(PREFIX + 'daugaard_data_locations_profile' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
@@ -425,50 +468,29 @@ ig.plot_profile(f_post_generic_h5, ii=id_line, im=1, panels=['harmonicmean', 'st
 t_full_start = time.time()
 
 # %%
-# B1. Informed prior from two geological scenarios
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# B1. Informed prior (daugaard_rostof.xlsx)
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # The prior for the real workflow is built with ``geoprior1d``
 # (https://github.com/GEUSjesper/geoprior1d) from Excel specifications of the
 # expected layer sequences, thicknesses, and resistivities for the Daugaard
 # geology -- this is the step GEUS owns for a new target area.
 #
-# Two scenarios are available: ``daugaard_standard.xlsx`` (background/regional
-# geology) and ``daugaard_valley.xlsx`` (geology inside a buried meltwater
-# valley). Since it is not known in advance whether a given sounding sits
-# inside or outside a buried valley, ``N // 2`` realizations are generated
-# independently from *each* Excel specification and combined into a single
-# prior with ``ig.merge_prior`` (50% from each scenario), letting the data
-# indicate, location by location, which scenario it is more consistent with
-# -- the same construction used in ``integrate_workflow.py`` and
-# ``integrate_daugaard_multi_prior.py``.
+# Here a single specification, ``daugaard_rostof.xlsx``, is used to generate
+# all ``N`` prior realizations. (See ``integrate_rawmaterial_daugaard_dual_prior.py``
+# for the variant that merges a standard and a buried-valley scenario.)
 
 # %%
 t_full_start_prior = time.time()
 
 from geoprior1d import geoprior1d
 
-ig.get_case_data(case=case, filelist=['daugaard_standard.xlsx', 'daugaard_valley.xlsx'])
 
-# N_prior_each realizations per geological scenario; the merged prior has 2x this.
-N_prior_each = N // 2
-f_xlsx_files = ['daugaard_standard.xlsx', 'daugaard_valley.xlsx']
-
-f_prior_h5_list = []
-for file_xlsx in f_xlsx_files:
-    fname = file_xlsx.split('.')[0]
-    f_scen_h5 = f_prior_scenario_h5_map[fname]
-    if not os.path.exists(f_scen_h5):
-        geoprior1d(file_xlsx, Nreals=N_prior_each, dz=1, dmax=90, output_file=f_scen_h5)
-    else:
-        print("Using existing prior realizations: %s" % f_scen_h5)
-    f_prior_h5_list.append(f_scen_h5)
-
-if not os.path.exists(f_prior_merged_h5):
-    ig.merge_prior(f_prior_h5_list, f_prior_merged_h5=f_prior_merged_h5)
+f_xlsx_files = ig.get_case_data(case=case, filelist=['daugaard_rostof.xlsx'])
+if not os.path.exists(f_prior_h5):
+    geoprior1d(f_xlsx_files[0], Nreals=N, dz=1, dmax=90, output_file=f_prior_h5)
 else:
-    print("Using existing merged prior: %s" % f_prior_merged_h5)
-f_prior_h5 = f_prior_merged_h5
+    print("Using existing prior realizations: %s" % f_prior_h5)
 
 t_full_end_prior = time.time()
 
@@ -478,16 +500,20 @@ ig.prior_describe(f_prior_h5)
 # %%
 # B2. Boreholes
 # ^^^^^^^^^^^^^
+#
+# ``BHOLES`` was loaded in section 1b; here it is plotted against the
+# informed prior.
+
 # %%
-BHOLES = ig.read_borehole('daugaard_12boreholes.json', showInfo=1)
-ig.plot_boreholes(BHOLES, f_prior_h5, fontsize=17, hardcopy=hardcopy);
+ig.plot_boreholes(BHOLES, f_prior_h5, fontsize=17, n_per_figure=5, hardcopy=hardcopy)
+plt.show()
 
 
 # %%
 # B3. Prior tTEM data
 # ^^^^^^^^^^^^^^^^^^^
 #
-# Forward-model the merged prior once (this is the expensive step; the result
+# Forward-model the prior once (this is the expensive step; the result
 # is reused for the borehole prior data below).
 
 # %%
@@ -547,7 +573,7 @@ for bh in BHOLES:
                 xytext=(4, 4), textcoords='offset points', fontsize=7)
 ax.legend(loc='best')
 
-fig.savefig('DAUGAARD_entropy_with_boreholes_N%d.png' % (N), dpi=150, bbox_inches='tight')
+fig.savefig(PREFIX + 'DAUGAARD_entropy_with_boreholes' + SUFFIX_B + '.png', dpi=150, bbox_inches='tight')
 
 # %%
 # B5. Joint (tTEM + borehole) rejection inversion
@@ -556,7 +582,7 @@ fig.savefig('DAUGAARD_entropy_with_boreholes_N%d.png' % (N), dpi=150, bbox_inche
 # %%
 t_full_start_rejection = time.time()
 
-N_use = N   # subset of the merged prior used in the rejection sampler
+N_use = N   # subset of the prior used in the rejection sampler
 
 if not os.path.exists(f_post_h5):
     id_use = [1] + id_borehole_list   # tTEM (id 1) jointly with all borehole logs
@@ -582,32 +608,64 @@ t_full_end_rejection = time.time()
 ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
 
 # %%
+# B5b. Borehole-only rejection inversion
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# Same prior and prior data, but conditioned ONLY on the borehole logs
+# (``id_use = id_borehole_list``, no tTEM). This shows what the boreholes
+# alone constrain; away from the boreholes the posterior falls back to the
+# prior.
+
+# %%
+if not os.path.exists(f_post_bhonly_h5):
+    ig.integrate_rejection(
+        f_prior_data_bh_h5, f_data_h5, f_post_h5=f_post_bhonly_h5,
+        N_use=N_use, id_use=id_borehole_list, nr=1000, T_N_above=50, T_P_acc_level=0.2,
+        autoT=1, showInfo=1, updatePostStat=True,
+        backend='numpy')
+else:
+    print("Using existing posterior: %s" % f_post_bhonly_h5)
+
+# %%
+ig.plot_profile(f_post_bhonly_h5, im=2, ii=id_line, gap_threshold=100,
+                xaxis='x', txt='_bhonly', hardcopy=hardcopy,
+                BHOLES=BHOLES, bhole_im=2, bhole_max_dist=100,
+                bhole_width=10, bhole_label=True)
+
+# %%
 # B6. Inspect the posterior
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # Resistivity (harmonic mean, ``im=1``) and mode lithology (``im=2``) along the
 # west-to-east profile, then depth-slice maps.
+#
+# The boreholes are overlaid as lithology columns (colored by the prior
+# lithology model ``/M2``, ``bhole_im=2``) at the profile location nearest to
+# each borehole; only boreholes within ``bhole_max_dist`` metres are shown.
 
 # %%
+bhole_kw = dict(BHOLES=BHOLES, bhole_im=2, bhole_max_dist=100,
+                bhole_width=10, bhole_label=True)
+
 ig.plot_profile(f_post_h5, im=1, ii=id_line, key='HarmonicMean', gap_threshold=100,
-                xaxis='x', hardcopy=hardcopy)
+                xaxis='x', hardcopy=hardcopy, **bhole_kw)
 
 ig.plot_profile(f_post_h5, ii=id_line, im=1,
                 xaxis='x', gap_threshold=100, hardcopy=hardcopy, alpha=.95,
                 logstd_min=0.1, logstd_max=1.0,
-                txt='_alpha'
+                txt='_alpha', **bhole_kw
                 )
 
-# %% 
+# %%
 ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100,
-                xaxis='x', 
-                hardcopy=hardcopy)
+                xaxis='x',
+                hardcopy=hardcopy, **bhole_kw)
 
 ig.plot_profile(f_post_h5, im=2, ii=id_line, gap_threshold=100,
-                xaxis='x', 
+                xaxis='x',
                 alpha=0.95, entropy_min=0.1, entropy_max=1.0,
                 txt='_alpha',
-                hardcopy=hardcopy)
+                hardcopy=hardcopy, **bhole_kw)
 
 
 
@@ -694,7 +752,7 @@ P_raw, meta_raw = ig.query(f_post_h5, query_raw)
 ig.query_plot(P_raw, meta_raw,
               query_text="P(raw material)",
               text_panel=True,
-              hardcopy=PREFIX + 'daugaard_P_raw' + SUFFIX if hardcopy else False)
+              hardcopy=PREFIX + 'daugaard_P_raw' + SUFFIX_B if hardcopy else False)
 
 t_query1_end = time.time()
 
@@ -858,7 +916,7 @@ for iarea, AREA in enumerate(AREA_LIST):
     fig.colorbar(mappable, ax=ax, label='P_raw')
     ax.legend(fontsize=8)
     if hardcopy:
-        fig.savefig('%sdaugaard_voronoi_cells_area%d%s.png' % (PREFIX, iarea, SUFFIX), dpi=200, bbox_inches='tight')
+        fig.savefig('%sdaugaard_voronoi_cells_area%d%s.png' % (PREFIX, iarea, SUFFIX_B), dpi=200, bbox_inches='tight')
     plt.show()
 
 # ---- C. raw-material volume, one bar per grown area ----------------------------
@@ -873,7 +931,7 @@ ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume per grown area  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig(PREFIX + 'daugaard_rawmat_volume_B' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_rawmat_volume_B' + SUFFIX_B + '.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 
@@ -922,7 +980,7 @@ ax.set_ylabel('Raw-material volume (m$^3$)')
 ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 if hardcopy:
-    fig.savefig(PREFIX + 'daugaard_rawmat_volume_C' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_rawmat_volume_C' + SUFFIX_B + '.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -956,7 +1014,7 @@ ax.set_title("Voronoi cells (P_raw) -- Mette's polygons vs. the grown areas")
 fig.colorbar(mappable, ax=ax, label='P_raw')
 ax.legend(fontsize=8, loc='best')
 if hardcopy:
-    fig.savefig(PREFIX + 'daugaard_voronoi_areas_vs_mette' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
+    fig.savefig(PREFIX + 'daugaard_voronoi_areas_vs_mette' + SUFFIX_B + '.png', dpi=200, bbox_inches='tight')
 plt.show()
 
 DAUGAARD_REFERENCE = {
@@ -969,7 +1027,7 @@ DAUGAARD_REFERENCE = {
 }
 
 rmu.compare_to_reference(prob_results, DAUGAARD_REFERENCE, quantities=('overburden', 'raw_material'),
-                         hardcopy=hardcopy, f_name=PREFIX + 'daugaard_rawmaterial_comparison' + SUFFIX)
+                         hardcopy=hardcopy, f_name=PREFIX + 'daugaard_rawmaterial_comparison' + SUFFIX_B)
 
 # %%
 # Discussion

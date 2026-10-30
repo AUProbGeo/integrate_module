@@ -5336,16 +5336,27 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             label, tick labels, legend); the overall ``title`` is drawn two
             points larger. If None, the module's default sizes are used
             (default None).
+        n_per_figure : int, optional
+            Maximum number of boreholes per figure. If there are more
+            boreholes than this, they are split over several figures (in
+            input order) that share the same y-axis range. Default None
+            (all boreholes in one figure).
+        i_start : int, optional
+            Index of the first borehole, used only in the auto-generated
+            PNG name ``boreholes_<i_start>_<i_end>``. Default 0.
 
     Returns
     -------
-    fig : matplotlib.figure.Figure
+    fig : matplotlib.figure.Figure or list of matplotlib.figure.Figure
+        A list of figures when ``n_per_figure`` splits the boreholes over
+        more than one figure.
 
     Examples
     --------
     >>> ig.plot_boreholes(BHOLES)
     >>> ig.plot_boreholes(BHOLES, f_prior_h5='PRIOR.h5')
     >>> ig.plot_boreholes('all_boreholes.json', f_prior_h5='PRIOR.h5')
+    >>> figs = ig.plot_boreholes(BHOLES, f_prior_h5='PRIOR.h5', n_per_figure=5)
     """
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
@@ -5356,6 +5367,8 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     _fname_kw = kwargs.get('name', None)
     depth_max = kwargs.get('depth_max', None)
     title     = kwargs.get('title', None)
+    n_per_figure = kwargs.get('n_per_figure', None)
+    _y_range  = kwargs.get('_y_range', None)   # internal: shared (y_min, y_max) across split figures
 
     # Font sizes: a single ``fontsize`` kwarg overrides every text element,
     # matching the convention used by the other plot_* functions in this
@@ -5371,6 +5384,33 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     W = _normalize_boreholes(W)
 
     n_wells = len(W)
+
+    # --- split over several figures, sharing one y-axis range ---
+    if n_per_figure is not None and n_wells > n_per_figure:
+        elevations = [float(bh.get('elevation', 0)) for bh in W]
+        if any(e != 0.0 for e in elevations):
+            y_range = (min(e - max(bh.get('depth_bottom', [0]))
+                           for e, bh in zip(elevations, W)),
+                       max(elevations))
+        else:
+            if depth_max is None:
+                depth_max = max(
+                    (max(bh['depth_bottom']) for bh in W if bh.get('depth_bottom')),
+                    default=50.0
+                )
+            y_range = (0, depth_max)
+        i_offset = kwargs.get('i_start', 0)
+        figs = []
+        for i0 in range(0, n_wells, n_per_figure):
+            W_chunk = W[i0:i0 + n_per_figure]
+            kw = dict(kwargs, n_per_figure=None, _y_range=y_range,
+                      i_start=i_offset + i0)
+            if _fname_kw is not None:
+                kw['name'] = '%s_%d_%d' % (_fname_kw, i_offset + i0,
+                                           i_offset + i0 + len(W_chunk) - 1)
+            figs.append(plot_boreholes(W_chunk, f_prior_h5=f_prior_h5, Mstr=Mstr,
+                                       hardcopy=hardcopy, **kw))
+        return figs
 
     # Build filename: use caller-supplied name, or auto-generate
     if _fname_kw is not None:
@@ -5406,6 +5446,8 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             )
         y_max_global = depth_max
         y_min_global = 0
+    if _y_range is not None:
+        y_min_global, y_max_global = _y_range
 
     # --- figure layout: one column per well ---
     fig_w = figsize_w[0] * n_wells

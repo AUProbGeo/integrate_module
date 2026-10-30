@@ -1076,6 +1076,28 @@ def _em_method(method=None):
 _EM_DEVICE_ENV = 'EM_FORWARD_DEVICE'
 
 
+def _em_device_usable(device):
+    """
+    True if torch can use ``device`` ('cuda', 'cuda:N', 'mps'; anything else,
+    e.g. 'cpu', is assumed usable). Raises ImportError if torch is missing.
+    """
+    import torch
+    kind, _, idx = str(device).partition(':')
+    if kind == 'cuda':
+        if not torch.cuda.is_available():
+            return False
+        return not idx or int(idx) < torch.cuda.device_count()
+    if kind == 'mps':
+        if not torch.backends.mps.is_available():
+            return False
+        try:
+            torch.zeros(1, dtype=torch.float64, device='mps')
+            return True
+        except (TypeError, RuntimeError):
+            return False  # MPS lacks float64
+    return True
+
+
 def _em_device(device=None):
     """
     Resolve the ``device`` kwarg used by the anemone EM forward backend.
@@ -1090,24 +1112,31 @@ def _em_device(device=None):
        *and* the device accepts float64 tensors -- anemone computes in
        float64, which MPS has not supported so far;
     3. ``'cpu'`` otherwise.
+
+    If a requested device (argument or ``EM_FORWARD_DEVICE``) is not usable,
+    e.g. ``'cuda'`` on a machine without a working GPU, a ``RuntimeWarning``
+    is issued and ``'cpu'`` is used instead.
     """
     import os
+    import warnings
+    source = 'argument'
     if device is None:
         device = os.environ.get(_EM_DEVICE_ENV, '').strip() or None
-    if device is None:
-        device = 'cpu'
-        try:
-            import torch
-            if torch.cuda.is_available():
-                device = 'cuda'
-            elif torch.backends.mps.is_available():
-                try:
-                    torch.zeros(1, dtype=torch.float64, device='mps')
-                    device = 'mps'
-                except (TypeError, RuntimeError):
-                    pass  # MPS lacks float64 -> stay on cpu
-        except ImportError:
-            pass
+        source = _EM_DEVICE_ENV
+    try:
+        if device is None:
+            device = 'cpu'
+            for d in ('cuda', 'mps'):
+                if _em_device_usable(d):
+                    device = d
+                    break
+        elif not _em_device_usable(device):
+            warnings.warn("EM forward device %r (from %s) is not available; "
+                          "falling back to 'cpu'" % (device, source),
+                          RuntimeWarning, stacklevel=3)
+            device = 'cpu'
+    except ImportError:
+        device = device or 'cpu'
     return device
 
 
@@ -1196,8 +1225,9 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
         ``method='anemone'``. If not given, the environment variable
         ``EM_FORWARD_DEVICE`` is used, falling back to ``'cuda'``, then
         ``'mps'`` (Apple Silicon, only if it supports float64), then
-        ``'cpu'``, whichever is first usable. Ignored for
-        ``'ga-aem'`` and ``'simpeg'``.
+        ``'cpu'``, whichever is first usable. A requested device that is not
+        usable (e.g. ``'cuda'`` without a working GPU) falls back to ``'cpu'``
+        with a ``RuntimeWarning``. Ignored for ``'ga-aem'`` and ``'simpeg'``.
     **kwargs
         Passed through to the selected backend. For ``method='anemone'`` with a
         varying flight height, ``rescale_height=True`` does one anemone setup
