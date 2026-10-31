@@ -80,7 +80,8 @@ _TIER_CHEAP = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
 # Also self-contained, but slow: N up to 2e6, or a full timing sweep.
 _TIER_ALL = (r'integrate_(getting_started.*|synthetic_case|linear_logspace'
              r'|dual_data|priors|merge_prior|query|gaussian_noise|esbjerg'
-             r'|merge_data|timing_example|forward_.*)\.py')
+             r'|merge_data|timing_example|forward_.*)\.py'
+             r'|em_forward_validation\.py')
 
 if _GALLERY_FILE:
     _filename_pattern = re.escape(_GALLERY_FILE) + r'$'

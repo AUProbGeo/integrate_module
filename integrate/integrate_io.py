@@ -3323,7 +3323,89 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     return f_data_h5
 
 
-def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None, data_scale=1.0):
+def _xyz_node_to_gates(xyz_list, fl, ld, file_gex, gate_rtol=3e-3, showInfo=0):
+    """
+    Map a Workbench inversion-node export onto the used GEX gates.
+
+    An inversion-node export (``*_dat.xyz``, ``*_syn.xyz``) has one row per
+    sounding and moment (``SEGMENTS`` 1 = LM, 2 = HM), with the gates of all
+    moments in one merged block (``DATA_i``, ``DATASTD_i``) on the
+    ``GATE TIMES`` of the file header. Each gate is matched to the nearest
+    gate centre of its moment in the GEX (relative tolerance ``gate_rtol``);
+    gates that do not match are dropped (and reported). A sounding processed
+    with another GEX (other gate time shift) is set to NaN: that is, one with
+    no gate that matches unambiguously (late gates of different GEX files can
+    be closer than the 4 digits of the header gate times).
+
+    ``DATASTD`` is a std factor (1.03 = 3 %). Without it (``*_syn.xyz``), the
+    std is 3 %.
+
+    Returns
+    -------
+    i_row : ndarray
+        Row in ``fl`` of the first row of each sounding.
+    d_obs, d_std : ndarray
+        Data and absolute std, shape (n_sounding, n_used_gates), [LM | HM].
+    """
+    import pandas as pd
+    from integrate.em_system import gex_to_em_system
+
+    t_gex = [m['gate_centre'] for m in gex_to_em_system(file_gex)['moments']]
+    i0 = np.r_[0, np.cumsum([len(t) for t in t_gex])]
+
+    data = ld['data'].values.astype(float)  # dummy already NaN
+    if 'datastd' in ld:
+        std_fac = ld['datastd'].values.astype(float)
+    else:
+        std_fac = np.full_like(data, 1.03)
+    seg = fl['segments'].values.astype(int)
+    i_file = np.repeat(np.arange(len(xyz_list)), [len(xyz.flightlines) for xyz in xyz_list])
+
+    # A sounding is one (file, line, record), in order of first appearance
+    codes, _ = pd.factorize(pd.MultiIndex.from_arrays(
+        [i_file, fl['line_no'].values, fl['record'].values]))
+    n_snd = codes.max() + 1
+    i_row = np.unique(codes, return_index=True)[1]
+
+    d_obs = np.full((n_snd, i0[-1]), np.nan)
+    d_std = np.full((n_snd, i0[-1]), np.nan)
+    unique_hit = np.zeros(n_snd, dtype=bool)
+    snd_dropped, t_dropped = [], []  # sounding and gate time of each dropped gate
+    for i_f, xyz in enumerate(xyz_list):
+        t_xyz = np.asarray(xyz.model_info['gate times (s)'], dtype=float)
+        for i_mom, t_mom in enumerate(t_gex):
+            # nearest GEX gate of this moment, for every merged gate
+            k = np.abs(np.log(t_xyz[:, None] / t_mom[None, :])).argmin(axis=1)
+            match = np.abs(t_xyz / t_mom[k] - 1) < gate_rtol
+            # ambiguous: another merged gate matches the same GEX gate
+            n_hit = np.bincount(k[match], minlength=len(t_mom))
+            unique = match & (n_hit[k] == 1)
+            rows = np.where((i_file == i_f) & (seg == i_mom + 1))[0]
+            has = ~np.isnan(data[rows])
+            unique_hit[codes[rows[(has & unique).any(axis=1)]]] = True
+            r, c = np.nonzero(has & match)
+            d_obs[codes[rows[r]], i0[i_mom] + k[c]] = data[rows[r], c]
+            d_std[codes[rows[r]], i0[i_mom] + k[c]] = (std_fac[rows[r], c] - 1) * np.abs(data[rows[r], c])
+            r, c = np.nonzero(has & ~match)
+            snd_dropped.append(codes[rows[r]])
+            t_dropped.append(t_xyz[c])
+    reject = ~unique_hit
+    d_obs[reject] = np.nan
+    d_std[reject] = np.nan
+
+    if showInfo > -1:
+        print('Inversion-node XYZ: %d soundings, %d with gate times not matching the GEX (set to NaN)'
+              % (n_snd, reject.sum()))
+        snd_dropped, t_dropped = np.concatenate(snd_dropped), np.concatenate(t_dropped)
+        kept = ~reject[snd_dropped]
+        if np.any(kept):
+            print('  %d kept soundings have gates not matching the GEX; dropped gate times [s]: %s'
+                  % (np.unique(snd_dropped[kept]).size,
+                     ' '.join('%.4e' % t for t in np.unique(t_dropped[kept]))))
+    return i_row, d_obs, d_std
+
+
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None,i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None, data_scale=1.0):
     """
     Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
 
@@ -3332,6 +3414,12 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     ``integrate_rejection()``.  The GEX file is used to determine which initial
     gates to skip per channel (``RemoveInitialGates``) and the total gate count
     (``NoGates``).
+
+    Workbench inversion-node exports (``*_dat.xyz`` with the data used in an
+    inversion, ``*_syn.xyz`` with the forward response of the inversion
+    models) are also read. Their merged gates are mapped onto the used GEX
+    gates by gate time; soundings whose gate times do not match the GEX are
+    NaN (and dropped with ``disregardFullNan=True``).
 
     Parameters
     ----------
@@ -3530,16 +3618,46 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     for k in ld:
         ld[k] = ld[k].replace(nan_value, np.nan)
 
-    # --- pair ch1 / ch2 rows (mirrors MATLAB logic) ---
-    # Every ch1 row becomes a sounding.  HM data is filled where the
-    # immediately following row is ch2; otherwise those columns stay NaN.
-    # Single-channel systems (e.g. SkyTEM) have no 'channel_no' column at
-    # all: every row is its own (channel-1) sounding.
-    if 'channel_no' in fl.columns:
-        channel_arr = fl['channel_no'].values
+    # --- Workbench inversion-node export (*_dat.xyz, *_syn.xyz) ---
+    # One row per sounding and moment, all gates in one merged block.
+    # ch1_pos is then the first row of each sounding.
+    is_node = 'dbdt_ch1gt' not in ld and 'data' in ld and 'segments' in fl.columns
+    if is_node:
+        ch1_pos, d_obs, d_std = _xyz_node_to_gates(xyz_list, fl, ld, file_gex, showInfo=showInfo)
     else:
-        channel_arr = np.ones(len(fl))
-    ch1_pos = np.where(channel_arr == 1)[0]
+        # --- pair ch1 / ch2 rows (mirrors MATLAB logic) ---
+        # Every ch1 row becomes a sounding.  HM data is filled where the
+        # immediately following row is ch2; otherwise those columns stay NaN.
+        # Single-channel systems (e.g. SkyTEM) have no 'channel_no' column at
+        # all: every row is its own (channel-1) sounding.
+        if 'channel_no' in fl.columns:
+            channel_arr = fl['channel_no'].values
+        else:
+            channel_arr = np.ones(len(fl))
+        ch1_pos = np.where(channel_arr == 1)[0]
+
+        # --- LM data (channel 1) ---
+        lm_obs = ld['dbdt_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
+        lm_rel = ld['dbdt_std_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
+        lm_std = lm_rel * lm_obs  # relative → absolute
+
+        # --- HM data (channel 2, dual-channel systems only) ---
+        if n_channels >= 2:
+            n_hm = i_hm_end - i_hm_start
+            hm_obs = np.full((len(ch1_pos), n_hm), np.nan)
+            hm_std = np.full((len(ch1_pos), n_hm), np.nan)
+            ch2_pos = ch1_pos + 1  # candidate ch2 row index for each ch1 sounding
+            has_ch2 = channel_arr[np.minimum(ch2_pos, len(channel_arr) - 1)] == 2
+            ch2_valid = ch2_pos[has_ch2]
+            raw_obs = ld['dbdt_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
+            raw_rel = ld['dbdt_std_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
+            hm_obs[has_ch2] = raw_obs[ch2_valid]
+            hm_std[has_ch2] = raw_rel[ch2_valid] * raw_obs[ch2_valid]
+            d_obs = np.hstack([lm_obs, hm_obs])
+            d_std = np.hstack([lm_std, hm_std])
+        else:
+            d_obs = lm_obs
+            d_std = lm_std
 
     # geometry from channel-1 rows (all of them)
     UTMX      = fl['utmx'].values[ch1_pos].astype(float)
@@ -3547,30 +3665,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     LINE      = fl['line_no'].values[ch1_pos].astype(float)
     ELEVATION = fl['elevation'].values[ch1_pos].astype(float)
 
-    # --- LM data (channel 1) ---
-    lm_obs = ld['dbdt_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
-    lm_rel = ld['dbdt_std_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
-    lm_std = lm_rel * lm_obs  # relative → absolute
-
-    # --- HM data (channel 2, dual-channel systems only) ---
-    if n_channels >= 2:
-        n_hm = i_hm_end - i_hm_start
-        hm_obs = np.full((len(ch1_pos), n_hm), np.nan)
-        hm_std = np.full((len(ch1_pos), n_hm), np.nan)
-        ch2_pos = ch1_pos + 1  # candidate ch2 row index for each ch1 sounding
-        has_ch2 = channel_arr[np.minimum(ch2_pos, len(channel_arr) - 1)] == 2
-        ch2_valid = ch2_pos[has_ch2]
-        raw_obs = ld['dbdt_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
-        raw_rel = ld['dbdt_std_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
-        hm_obs[has_ch2] = raw_obs[ch2_valid]
-        hm_std[has_ch2] = raw_rel[ch2_valid] * raw_obs[ch2_valid]
-        d_obs = np.hstack([lm_obs, hm_obs])
-        d_std = np.hstack([lm_std, hm_std])
-    else:
-        d_obs = lm_obs
-        d_std = lm_std
-
-    n_lm = lm_obs.shape[1]
+    n_lm = i_lm_end - i_lm_start
 
     # --- apply gate skipping using Workbench gate numbers (mirrors MATLAB) ---
     # Workbench gate number → column index in d_obs:

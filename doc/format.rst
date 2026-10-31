@@ -27,6 +27,13 @@ A DATA.h5 file can be created from an AarhusInv-style XYZ data file and its
 corresponding GEX system file using :func:`integrate.integrate_io.xyz_to_h5`, which reads
 both formats with the ``libaarhusxyz`` library [libaarhusxyz]_.
 
+``xyz_to_h5`` also reads the data of a Workbench inversion node, i.e. the
+``*_dat.xyz`` (observed data used in the inversion) and ``*_syn.xyz`` (forward
+response of the inverted models) exports. These hold the gates of all moments
+in one merged block; the gates are mapped onto the used gates of the GEX file by
+gate time, and soundings processed with another GEX file are dropped. See
+:doc:`auto_examples/45_forward/em_forward_validation`.
+
 
 By default, observed data in ``/D1`` is compared with prior data in ``/D1``, ``/D2`` with ``/D2``, etc.
 To compare observed data with a different prior dataset, set the ``/D1/id_prior`` field.

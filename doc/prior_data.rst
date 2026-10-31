@@ -219,6 +219,7 @@ Runnable examples of these backends and functions:
 
 * :doc:`Run time of the EM forward backends <auto_examples/45_forward/integrate_forward_backends_runtime>`
 * :doc:`Accuracy against the HGG Workbench (AarhusInv) <auto_examples/45_forward/integrate_forward_accuracy_workbench>`
+* :doc:`Validation against Aarhus Workbench for tTEM: accuracy and run time <auto_examples/45_forward/em_forward_validation>`
 * :doc:`Effect of the forward model on the posterior <auto_examples/45_forward/integrate_forward_effect_on_posterior>`
 * :doc:`Borehole data with prior conditioning <auto_examples/30_data/integrate_boreholes>`
 * :doc:`Generic prior model generation <auto_examples/90_other/integrate_priors>`
