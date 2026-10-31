@@ -57,6 +57,11 @@ os.environ["EM_FORWARD_DEVICE"] = "cuda"
 #os.environ["EM_FORWARD_DEVICE"] = "cpu"
 #os.environ["EM_FORWARD_METHOD"] = "ga-aem"
 
+# Rejection-sampling backend used by ig.integrate_rejection: 'jax' or 'numpy'
+#os.environ["REJECTION_BACKEND"] = "numpy"
+os.environ["REJECTION_BACKEND"] = "jax"
+
+
 import time
 import h5py
 import numpy as np
@@ -70,8 +75,7 @@ N = 4_000_000 +2
 #N = 10_001
 #N = 1_000_001        # number of prior realizations (use e.g. 10_000 for a quick demo)
 inflateNoise = 2     # multiply the tTEM data std by this (0 = use as-is)
-backend = 'jax'      # rejection-sampling backend: 'jax' or 'numpy'
-reuse_h5 = False      # True: reuse existing HDF5 files; False: delete them and recompute everything
+reuse_h5 = True      # True: reuse existing HDF5 files; False: delete them and recompute everything
 
 # Appended to every generated file name, so a different N / inflateNoise
 # writes to its own set of files.
@@ -299,7 +303,7 @@ for label, f_prior_data_h5, id_use in inversions:
         t0 = time.time()
         ig.integrate_rejection(f_prior_data_h5, f_data_h5, f_post_h5=f_post_h5,
                                N_use=N, id_use=id_use, nr=1000, T_N_above=50, T_P_acc_level=0.2,
-                               autoT=1, showInfo=1, updatePostStat=True, backend=backend)
+                               autoT=1, showInfo=1, updatePostStat=True)
         t_inversion[label] = time.time() - t0
     f_post_h5_list.append(f_post_h5)
 
@@ -307,6 +311,18 @@ f_post = dict(zip([inv[0] for inv in inversions], f_post_h5_list))
 
 for f_post_h5 in f_post_h5_list:
     ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
+
+# %%
+# 7b. tTEM data fit
+# -----------------
+#
+# Prior, posterior and observed tTEM data at the example soundings, for all
+# four posteriors.
+
+# %%
+for i_plot in pl_data:
+    for f_post_h5 in f_post_h5_list:
+        ig.plot_data_prior_post(f_post_h5, i_plot=i_plot, id=1, hardcopy=hardcopy)
 
 # %%
 # 8. Posterior profiles
