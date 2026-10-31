@@ -5705,9 +5705,47 @@ def read_borehole(filename, **kwargs) -> Any:
     with open(filename, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
+    for W in (data if isinstance(data, list) else [data]):
+        _borehole_drop_invalid_class(W)
+
     if showInfo > 0:
         n = len(data) if isinstance(data, list) else 1
         print(f'read_borehole: read {n} borehole(s) from {filename}')
 
     return data
+
+
+def _borehole_drop_invalid_class(W):
+    """
+    Remove layers whose ``class_obs`` is not an integer (e.g. ``null``) from
+    borehole dict ``W`` in place, with a warning per removed layer.
+
+    Every list in ``W`` with one entry per layer (same length as
+    ``class_obs``, e.g. ``depth_top``, ``depth_bottom``, ``class_prob``) is
+    trimmed, so the lists stay aligned. Integer-valued floats (``3.0``) are
+    kept and converted to ``int``.
+    """
+    import warnings
+    class_obs = W.get('class_obs')
+    if not isinstance(class_obs, list):
+        return
+    n = len(class_obs)
+    keep = []
+    for i, c in enumerate(class_obs):
+        ok = (isinstance(c, int) and not isinstance(c, bool)) or \
+             (isinstance(c, float) and c.is_integer())
+        if ok:
+            keep.append(i)
+            continue
+        top, bot = (W[k][i] if len(W.get(k, [])) == n else None
+                    for k in ('depth_top', 'depth_bottom'))
+        warnings.warn(f"read_borehole: borehole {W.get('name', '?')!r}: layer {i} "
+                      f"({top}-{bot} m) has class_obs={c!r}, which is not an "
+                      f"integer; layer removed", RuntimeWarning, stacklevel=3)
+    if len(keep) == n:
+        return
+    for k, v in W.items():
+        if isinstance(v, list) and len(v) == n:
+            W[k] = [v[i] for i in keep]
+    W['class_obs'] = [int(c) for c in W['class_obs']]
 

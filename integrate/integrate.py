@@ -509,6 +509,25 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
             Compute KL divergence D_KL(posterior || prior) for discrete model
             parameters. Normalised to [0, 1] using log_base = number of classes
             (0 = posterior equals prior, 1 = completely certain). Default is False.
+        Ncpu : int, optional
+            Number of threads used to compute the statistics. Default is the
+            number of CPU cores (os.cpu_count()); 1 runs without threads.
+        Nbatch : int, optional
+            Number of data locations processed together in one vectorized
+            batch. Default is 64. Peak memory is roughly
+            Ncpu * Nbatch * nr * nm * 4 bytes * 4 (nr posterior samples,
+            nm model parameters).
+
+    Notes
+    -----
+    The statistics are computed for batches of Nbatch data locations at a
+    time, vectorized over the batch, and the batches run in Ncpu threads.
+    Threads (not processes) are used, so this works the same way in scripts
+    and notebooks on Windows, macOS and Linux, with no
+    ``if __name__ == '__main__':`` guard; numpy releases the GIL in the
+    sorting, logs and reductions, so the threads run in parallel. Each
+    continuous parameter is sorted once per batch (used for both Median and
+    HarmonicMean) and its log taken once (used for LogMean and LogStd).
 
     Writes to POST.h5
     -----------------
@@ -542,10 +561,10 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     -------
     None
     """
+    import os
     import h5py
     import numpy as np
-    import integrate
-    import scipy as sp
+    from concurrent.futures import ThreadPoolExecutor
     from tqdm import tqdm
 
     showInfo = kwargs.get('showInfo', 0)
@@ -553,6 +572,10 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
         disableTqdm=True
     else:
         disableTqdm=False
+    Ncpu = kwargs.get('Ncpu', os.cpu_count() or 1)
+    if Ncpu is None or Ncpu < 1:
+        Ncpu = os.cpu_count() or 1
+    Nbatch = max(1, int(kwargs.get('Nbatch', 64)))
     usePrior = kwargs.get('usePrior', False)
     updateGeometryFromData = kwargs.get('updateGeometryFromData', True)
     computeKL = kwargs.get('computeKL', False)
@@ -628,8 +651,9 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
         print('Computing number of unique realizations (N_UNIQUE)')
 
     N_UNIQUE = np.full(nsounding, np.nan)
-    for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='N_UNIQUE', leave=False):
-        N_UNIQUE[iid] = len(np.unique(i_use[iid, :]))
+    i_use_sorted = np.sort(i_use[ip_range, :], axis=1)
+    N_UNIQUE[ip_range] = 1 + np.sum(np.diff(i_use_sorted, axis=1) != 0, axis=1)
+    del i_use_sorted
 
     # Save N_UNIQUE to the HDF5 file
     with h5py.File(f_post_h5, 'a') as f_post:
@@ -642,19 +666,36 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 print('Updating /N_UNIQUE in %s' % f_post_h5)
             f_post['/N_UNIQUE'][:] = N_UNIQUE
 
+    # The statistics are computed for batches of Nbatch soundings at a time,
+    # vectorized over the batch, and the batches are run in Ncpu threads.
+    # Threads (not processes) need no 'if __name__ == "__main__"' guard on
+    # Windows/macOS and share all arrays; numpy releases the GIL in sort, log
+    # and reductions, so the threads run in parallel. Each batch writes only
+    # its own rows of the output arrays.
+    ip_batches = [ip_range[i:i + Nbatch] for i in range(0, len(ip_range), Nbatch)]
+
+    def run_batches(compute_batch, desc):
+        if Ncpu <= 1 or len(ip_batches) <= 1:
+            for ip_batch in tqdm(ip_batches, mininterval=1, disable=disableTqdm, desc=desc, leave=False):
+                compute_batch(ip_batch)
+        else:
+            with ThreadPoolExecutor(max_workers=Ncpu) as executor:
+                for _ in tqdm(executor.map(compute_batch, ip_batches), total=len(ip_batches),
+                              mininterval=1, disable=disableTqdm, desc=desc, leave=False):
+                    pass
+
     # Process each dataset in f_prior_h5
     with h5py.File(f_prior_h5, 'r') as f_prior, h5py.File(f_post_h5, 'a') as f_post:
         for name, dataset in f_prior.items():
-            
+
             if name.upper().startswith('M') and 'is_discrete' in dataset.attrs and dataset.attrs['is_discrete'] == 0:
                 if showInfo>2:
                     print('%s: CONTINUOUS' % name)
 
                 nm = dataset.shape[1]
                 nsounding, nr = i_use.shape
-                m_post = np.zeros((nm, nr))
 
-                # Initialize with NaN for all data points
+                # Initialize arrays with NaN (for unprocessed locations)
                 M_logmean = np.full((nsounding, nm), np.nan)
                 M_mean = np.full((nsounding, nm), np.nan)
                 M_std = np.full((nsounding, nm), np.nan)
@@ -664,109 +705,66 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 if computeKL_continuous:
                     M_KL = np.full((nsounding, nm), np.nan)
 
-                # Load all prior data into memory
+                # Load all prior realizations into memory
                 M_all = dataset[:]
 
-                useSequential = True
-                if useSequential:
+                # Prior histograms for KL divergence (log10 space, 50 bins)
+                if computeKL_continuous:
+                    n_bins_kl = 50
+                    idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
+                    M_prior_kl = np.log10(np.maximum(M_all[idx_kl, :], 1e-10))
+                    kl_bins = []
+                    kl_prior_hist = []
+                    for _i in range(nm):
+                        col = M_prior_kl[:, _i]
+                        bins = np.linspace(col.min(), col.max(), n_bins_kl + 1)
+                        h, _ = np.histogram(col, bins=bins)
+                        h = (h + 1e-10) / (h.sum() + n_bins_kl * 1e-10)
+                        kl_bins.append(bins)
+                        kl_prior_hist.append(h)
 
-                    # Precompute log10 prior histograms once — prior is fixed across all soundings.
-                    # Using histograms (O(n)) instead of KDE (O(n²)) for speed.
-                    # Log10 bins are appropriate for log-normally distributed continuous parameters.
+                # Trimmed harmonic mean: 10% of the samples cut from each tail
+                k_trim = int(np.floor(0.10 * nr))
+                i_mid = nr // 2
+
+                def compute_continuous(ip_batch):
+                    m_post = M_all[i_use[ip_batch, :]]                   # (B, nr, nm)
+                    # One sort serves both the median and the trimmed harmonic
+                    # mean. 1/m is decreasing, so trimming the sorted m
+                    # symmetrically trims the same samples as sorting 1/m.
+                    m_sorted = np.sort(np.maximum(m_post, 1e-10), axis=1)
+                    log_m = np.log(m_sorted)                              # one log for LogMean and LogStd
+                    M_mean[ip_batch, :] = np.mean(m_post, axis=1)
+                    M_std[ip_batch, :] = np.std(m_post, axis=1)
+                    if nr % 2 == 1:
+                        M_median[ip_batch, :] = m_sorted[:, i_mid, :]
+                    else:
+                        M_median[ip_batch, :] = 0.5 * (m_sorted[:, i_mid - 1, :] + m_sorted[:, i_mid, :])
+                    # float64 accumulation: float32 sums of logs lose ~1e-5 relative accuracy
+                    M_logmean[ip_batch, :] = np.exp(np.mean(log_m, axis=1, dtype=np.float64))
+                    M_logstd[ip_batch, :] = np.std(log_m, axis=1, dtype=np.float64) / np.log(10.0)
+                    M_harmonicmean[ip_batch, :] = 1.0 / np.mean(1.0 / m_sorted[:, k_trim:nr - k_trim, :], axis=1, dtype=np.float64)
                     if computeKL_continuous:
-                        n_bins_kl = 50
-                        idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
-                        M_prior_kl = np.log10(np.maximum(M_all[idx_kl, :], 1e-10))
-                        kl_bins = []
-                        kl_prior_hist = []
+                        # Posterior histograms for all soundings in the batch at
+                        # once, with the same bins as np.histogram: [b_i, b_i+1),
+                        # last bin closed, values outside the bins ignored.
+                        m_post_log = np.log10(m_sorted)                   # (B, nr, nm)
+                        nb = len(ip_batch)
+                        rows = np.broadcast_to(np.arange(nb)[:, None], (nb, nr))
                         for _i in range(nm):
-                            col = M_prior_kl[:, _i]
-                            bins = np.linspace(col.min(), col.max(), n_bins_kl + 1)
-                            h, _ = np.histogram(col, bins=bins)
-                            h = (h + 1e-10) / (h.sum() + n_bins_kl * 1e-10)
-                            kl_bins.append(bins)
-                            kl_prior_hist.append(h)
+                            bins = kl_bins[_i]
+                            v = m_post_log[:, :, _i]
+                            j = np.searchsorted(bins, v, side='right') - 1
+                            j[v == bins[-1]] = n_bins_kl - 1
+                            ok = (j >= 0) & (j < n_bins_kl)
+                            h_q = np.bincount(rows[ok] * n_bins_kl + j[ok],
+                                              minlength=nb * n_bins_kl).reshape(nb, n_bins_kl)
+                            h_q = (h_q + 1e-10) / (h_q.sum(axis=1, keepdims=True) + n_bins_kl * 1e-10)
+                            M_KL[ip_batch, _i] = np.sum(h_q * np.log2(h_q / kl_prior_hist[_i]), axis=1)
 
-                    # Sequential processing - simple, fast, memory-efficient
-                    for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='%s-continuous' % name, leave=False):
-                        ir = np.int64(i_use[iid,:])
-                        m_post = M_all[ir,:]
+                run_batches(compute_continuous, '%s-continuous' % name)
 
-                        M_logmean[iid,:] = np.exp(np.mean(np.log(m_post), axis=0))
-                        M_mean[iid,:] = np.mean(m_post, axis=0)
-                        M_median[iid,:] = np.median(m_post, axis=0)
-                        with np.errstate(invalid='ignore', divide='ignore'):
-                            M_logstd[iid,:] = np.std(np.log10(np.maximum(m_post, 1e-10)), axis=0)
-                        M_std[iid,:] = np.std(m_post, axis=0)
-                        _c = 1.0 / np.maximum(m_post, 1e-10)
-                        _k = int(np.floor(0.10 * _c.shape[0]))
-                        _cs = np.sort(_c, axis=0)
-                        M_harmonicmean[iid, :] = 1.0 / np.mean(_cs[_k:_c.shape[0]-_k, :], axis=0)
-                        if computeKL_continuous:
-                            m_post_log = np.log10(np.maximum(m_post, 1e-10))
-                            for _i in range(nm):
-                                h_q, _ = np.histogram(m_post_log[:, _i], bins=kl_bins[_i])
-                                h_q = (h_q + 1e-10) / (h_q.sum() + n_bins_kl * 1e-10)
-                                M_KL[iid, _i] = np.sum(h_q * np.log2(h_q / kl_prior_hist[_i]))
-                elif a==1:
-
-                    # NEW Experimental METHOD
-                    # 3. Optimization Constants
-                    BATCH_SIZE = 100  # Process 1000 soundings at a time
-                    INV_LOG_10 = 1.0 / np.log(10.0) # Pre-calculate constant
-
-                    # 4. Batched Processing
-                    # Instead of 40,000 iterations, we do 40.
-                    for start_idx in tqdm(range(0, len(ip_range), BATCH_SIZE), 
-                                        disable=disableTqdm, 
-                                        desc=f'{name}-optimized', 
-                                        leave=False):
-
-                        # A. Define Batch Range
-                        end_idx = min(start_idx + BATCH_SIZE, len(ip_range))
-                        current_iids = ip_range[start_idx:end_idx]
-                        
-                        # B. Vectorized Indexing
-                        # Gather all indices for this batch at once.
-                        # Shape: (Batch_Size, K) where K is number of priors used per sounding
-                        batch_indices = np.int64(i_use[current_iids, :])
-                        
-                        # C. Create 3D Data Cube
-                        # Fetch data for 1000 soundings simultaneously.
-                        # Shape: (Batch_Size, K, nm) -> e.g., (1000, 50, 100)
-                        # This is the biggest speedup: one large memory read instead of 1000 tiny ones.
-                        m_cube = M_all[batch_indices, :]
-
-                        # D. Compute Statistics (Collapsing Axis 1)
-                        
-                        # -- Arithmetic Mean & Median --
-                        M_mean[current_iids, :] = np.mean(m_cube, axis=1)
-                        M_median[current_iids, :] = np.median(m_cube, axis=1)
-                        
-                        # -- Logarithmic Stats (Optimized) --
-                        # Calculate Log ONCE. 
-                        # Use maximum to prevent log(0) errors (NaNs)
-                        # Shape: (Batch_Size, K, nm)
-                        log_cube = np.log(np.maximum(m_cube, 1e-10))
-                        
-                        # Geometric Mean: exp(mean(log(x)))
-                        M_logmean[current_iids, :] = np.exp(np.mean(log_cube, axis=1))
-                        
-                        # LogStd: std(log10(x)) = std(ln(x)) * (1/ln(10)); reuse log_cube for speed
-                        M_logstd[current_iids, :] = np.std(log_cube, axis=1) * INV_LOG_10
-                        M_std[current_iids, :] = np.std(m_cube, axis=1)
-
-                        # Harmonic mean (trimmed 10% each tail in conductivity space)
-                        _c = 1.0 / np.maximum(m_cube, 1e-10)
-                        _nr = _c.shape[1]
-                        _k = int(np.floor(0.10 * _nr))
-                        _cs = np.sort(_c, axis=1)
-                        M_harmonicmean[current_iids, :] = 1.0 / np.mean(_cs[:, _k:_nr-_k, :], axis=1)
-
-
-
-
-                # Create datasets
+                # Create datasets in h5 file
                 for stat in ['Mean', 'Median', 'Std', 'LogStd', 'LogMean', 'HarmonicMean']:
                     if stat not in f_post:
                         dset = '/%s/%s' % (name,stat)
@@ -793,11 +791,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
 
                 nm = dataset.shape[1]
                 nsounding, nr = i_use.shape
-                # Get number of classes for name
+
                 class_id = f_prior[name].attrs['class_id']
                 n_classes = len(class_id)
 
-                # Determine log_base for KL: use n_classes from class_name if available
+                # KL log base: number of class names if available, else number of classes
                 if 'class_name' in f_prior[name].attrs:
                     log_base_kl = len(f_prior[name].attrs['class_name'])
                 else:
@@ -806,7 +804,7 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 if showInfo>1:
                     print('%s: DISCRETE, N_classes =%d' % (name,n_classes))
 
-                # Initialize with NaN for all data points
+                # Initialize arrays with NaN (for unprocessed locations)
                 M_mode = np.full((nsounding, nm), np.nan)
                 M_entropy = np.full((nsounding, nm), np.nan)
                 M_P = np.full((nsounding, n_classes, nm), np.nan)
@@ -829,32 +827,37 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                                 print('Creating %s' % dset)
                             f_post.create_dataset(dset, (nsounding,n_classes,nm), dtype='f4')
 
-                # Load all prior data into memory
+                # Load all prior realizations into memory
                 M_all = dataset[:]
 
-                # Subsample prior once for KL (prior is fixed across soundings)
+                # Prior sample (class counts) for KL divergence
                 if computeKL_discrete:
                     idx_kl = np.random.choice(M_all.shape[0], nr, replace=False)
                     M_prior_kl = M_all[idx_kl, :]
+                    n_prior_kl = np.stack([np.sum(M_prior_kl == c, axis=0) for c in class_id], axis=0)  # (n_classes, nm)
 
-                # Sequential processing - simple, fast, memory-efficient
-                for iid in tqdm(ip_range, mininterval=1, disable=disableTqdm, desc='%s-discrete' % name, leave=False):
-                    ir = np.int64(i_use[iid,:])
-                    m_post = M_all[ir,:]
-
-                    # Compute class probabilities
-                    n_count = np.zeros((n_classes,nm))
-                    for ic in range(n_classes):
-                        n_count[ic,:] = np.sum(class_id[ic]==m_post, axis=0)/nr
-                    M_P[iid,:,:] = n_count
-
-                    # Compute mode
-                    M_mode[iid,:] = class_id[np.argmax(n_count, axis=0)]
-
-                    # Compute entropy
-                    M_entropy[iid,:] = sp.stats.entropy(n_count, base=n_classes)
+                def compute_discrete(ip_batch):
+                    m_post = M_all[i_use[ip_batch, :]]                   # (B, nr, nm)
+                    # Count and probability of each class, (B, n_classes, nm)
+                    n_post = np.stack([np.sum(m_post == c, axis=1) for c in class_id], axis=1)
+                    P = n_post / nr
+                    M_P[ip_batch, :, :] = P
+                    M_mode[ip_batch, :] = class_id[np.argmax(P, axis=1)]
+                    # Entropy normalized by log(n_classes) (0*log(0) = 0), as
+                    # scipy.stats.entropy(P, base=n_classes)
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        M_entropy[ip_batch, :] = -np.sum(np.where(P > 0, P * np.log(P), 0.0), axis=1) / np.log(n_classes)
                     if computeKL_discrete:
-                        M_KL[iid, :] = kl_divergence(m_post, M_prior_kl, is_discrete=True, log_base=log_base_kl)
+                        # D_KL(posterior || prior) as kl_divergence(..., is_discrete=True):
+                        # over the classes present in either sample, counts
+                        # smoothed by 1e-10, normalized by log(log_base_kl)
+                        present = (n_post + n_prior_kl[None, :, :]) > 0
+                        n_present = present.sum(axis=1, keepdims=True)
+                        p = (n_post + 1e-10) / (nr + n_present * 1e-10)
+                        q = (n_prior_kl[None, :, :] + 1e-10) / (nr + n_present * 1e-10)
+                        M_KL[ip_batch, :] = np.sum(np.where(present, p * np.log(p / q), 0.0), axis=1) / np.log(log_base_kl)
+
+                run_batches(compute_discrete, '%s-discrete' % name)
 
                 f_post['/%s/%s' % (name,'Mode')][:] = M_mode
                 f_post['/%s/%s' % (name,'Entropy')][:] = M_entropy
@@ -865,13 +868,9 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                         f_post.create_dataset(dset, (nsounding, nm), dtype='f4')
                     f_post[dset][:] = M_KL
 
-
-            else: 
+            else:
                 if (showInfo>1):
                     print('%s: NOT RECOGNIZED' % name.upper())
-                
-            
-                
 
     return None
 
@@ -1076,6 +1075,28 @@ def _em_method(method=None):
 _EM_DEVICE_ENV = 'EM_FORWARD_DEVICE'
 
 
+def _em_device_usable(device):
+    """
+    True if torch can use ``device`` ('cuda', 'cuda:N', 'mps'; anything else,
+    e.g. 'cpu', is assumed usable). Raises ImportError if torch is missing.
+    """
+    import torch
+    kind, _, idx = str(device).partition(':')
+    if kind == 'cuda':
+        if not torch.cuda.is_available():
+            return False
+        return not idx or int(idx) < torch.cuda.device_count()
+    if kind == 'mps':
+        if not torch.backends.mps.is_available():
+            return False
+        try:
+            torch.zeros(1, dtype=torch.float64, device='mps')
+            return True
+        except (TypeError, RuntimeError):
+            return False  # MPS lacks float64
+    return True
+
+
 def _em_device(device=None):
     """
     Resolve the ``device`` kwarg used by the anemone EM forward backend.
@@ -1090,24 +1111,31 @@ def _em_device(device=None):
        *and* the device accepts float64 tensors -- anemone computes in
        float64, which MPS has not supported so far;
     3. ``'cpu'`` otherwise.
+
+    If a requested device (argument or ``EM_FORWARD_DEVICE``) is not usable,
+    e.g. ``'cuda'`` on a machine without a working GPU, a ``RuntimeWarning``
+    is issued and ``'cpu'`` is used instead.
     """
     import os
+    import warnings
+    source = 'argument'
     if device is None:
         device = os.environ.get(_EM_DEVICE_ENV, '').strip() or None
-    if device is None:
-        device = 'cpu'
-        try:
-            import torch
-            if torch.cuda.is_available():
-                device = 'cuda'
-            elif torch.backends.mps.is_available():
-                try:
-                    torch.zeros(1, dtype=torch.float64, device='mps')
-                    device = 'mps'
-                except (TypeError, RuntimeError):
-                    pass  # MPS lacks float64 -> stay on cpu
-        except ImportError:
-            pass
+        source = _EM_DEVICE_ENV
+    try:
+        if device is None:
+            device = 'cpu'
+            for d in ('cuda', 'mps'):
+                if _em_device_usable(d):
+                    device = d
+                    break
+        elif not _em_device_usable(device):
+            warnings.warn("EM forward device %r (from %s) is not available; "
+                          "falling back to 'cpu'" % (device, source),
+                          RuntimeWarning, stacklevel=3)
+            device = 'cpu'
+    except ImportError:
+        device = device or 'cpu'
     return device
 
 
@@ -1196,8 +1224,9 @@ def prior_data_em(f_prior_h5, file_gex=None, method=None, device=None, **kwargs)
         ``method='anemone'``. If not given, the environment variable
         ``EM_FORWARD_DEVICE`` is used, falling back to ``'cuda'``, then
         ``'mps'`` (Apple Silicon, only if it supports float64), then
-        ``'cpu'``, whichever is first usable. Ignored for
-        ``'ga-aem'`` and ``'simpeg'``.
+        ``'cpu'``, whichever is first usable. A requested device that is not
+        usable (e.g. ``'cuda'`` without a working GPU) falls back to ``'cpu'``
+        with a ``RuntimeWarning``. Ignored for ``'ga-aem'`` and ``'simpeg'``.
     **kwargs
         Passed through to the selected backend. For ``method='anemone'`` with a
         varying flight height, ``rescale_height=True`` does one anemone setup
@@ -3042,6 +3071,10 @@ def class_id_to_idx(D, class_id=None):
             Array with class identifiers converted to indices. Values that are
             NaN or not in `class_id` get index -1 (no valid class), so the
             multinomial likelihood can assign them logL = -inf (issue #47).
+            Stored as int8 (int32 if there are more than 127 classes): the
+            indices need only a few bits, and for large priors (e.g. N=1e6
+            realizations) int8 uses 8x less memory than int64 and makes the
+            index lookup in `likelihood_multinomial` faster.
         class_id : numpy.ndarray
             Array of unique class identifiers.
         class_id_out : numpy.ndarray
@@ -3050,7 +3083,8 @@ def class_id_to_idx(D, class_id=None):
 
     if class_id is None:
         class_id = np.unique(D[~np.isnan(D)])
-    D_idx = np.full(D.shape, -1, dtype=int)
+    dtype = np.int8 if len(class_id) <= 127 else np.int32
+    D_idx = np.full(D.shape, -1, dtype=dtype)
     for i in range(len(class_id)):
         D_idx[D==class_id[i]]=i
     class_id_out = np.unique(D_idx[D_idx >= 0])
