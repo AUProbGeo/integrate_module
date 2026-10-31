@@ -125,7 +125,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
         Computation backend to use.  ``'numpy'`` uses the original
         NumPy/multiprocessing implementation.  ``'jax'`` uses a JIT-compiled,
         vmapped JAX implementation that processes data points in batches; pass
-        ``Nbatch=<int>`` (via ``**kwargs``, default 64) to tune the batch size.
+        ``Nbatch=<int>`` (via ``**kwargs``) to set the batch size; if not set,
+        it is guessed from the free GPU (or CPU) memory, at most 64.
         JAX must be installed separately: ``pip install jax``.
         Default is None, in which case the backend is taken from the
         ``REJECTION_BACKEND`` environment variable if set (e.g.
@@ -134,7 +135,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
         variable.
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
-        Nbatch (batch size for backend='jax'), and normalize_likelihood (bool,
+        Nbatch (batch size for backend='jax'; default None = guessed from
+        free memory), and normalize_likelihood (bool,
         default True; if True, Gaussian likelihoods include the full
         normalization constant, giving a properly comparable EV/entropy across
         data points and hypotheses, without changing P_acc/T/CHI2).
@@ -363,7 +365,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
 
     if backend == 'jax':
         from integrate.integrate_rejection_jax import integrate_rejection_range_jax
-        Nbatch = kwargs.pop('Nbatch', 64)
+        Nbatch = kwargs.pop('Nbatch', None)
         i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range_jax(
             D=D,
             DATA=DATA,

@@ -242,6 +242,40 @@ def _get_postprocess_kernel(nr):
     return jax.jit(_postprocess_single)
 
 
+def _auto_Nbatch(N, Ndt, D_jax, Nbatch_max=64):
+    """
+    Guess the number of data points per batch from the free device memory.
+
+    Per batch, the loop holds a few (Nbatch, N) float32 arrays (the combined
+    likelihood and its temporaries) plus one per active data type, so the
+    memory per data point is taken as (Ndt + 4) * N * 4 bytes, using all Ndt
+    types as an upper bound on the active ones. Free memory is the JAX
+    allocator limit minus what is in use (on CPU: the available RAM). Twice
+    the size of the largest prior data array is reserved for the likelihood
+    kernel, and only 80% of the rest is used.
+
+    Only memory used by this process is known on the GPU, so if another
+    process (e.g. a crashed notebook kernel) holds GPU memory, set Nbatch
+    explicitly.
+
+    Returns an int in [1, Nbatch_max].
+    """
+    free = None
+    try:
+        stats = jax.local_devices()[0].memory_stats()
+        if stats and 'bytes_limit' in stats:
+            free = stats['bytes_limit'] - stats.get('bytes_in_use', 0)
+    except Exception:
+        pass
+    if free is None:
+        import psutil
+        free = psutil.virtual_memory().available
+    nbytes_D = max((d.nbytes for d in D_jax if d is not None), default=0)
+    free = free - 2 * nbytes_D
+    bytes_per_point = (Ndt + 4) * N * 4
+    return int(np.clip(0.8 * free // bytes_per_point, 1, Nbatch_max))
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -259,7 +293,7 @@ def integrate_rejection_range_jax(
     T_N_above=10,
     T_P_acc_level=0.2,
     progress_callback=None,
-    Nbatch=64,
+    Nbatch=None,
     **kwargs,
 ):
     """
@@ -300,7 +334,9 @@ def integrate_rejection_range_jax(
     T_N_above     : int               — passed to logl_T_est (top-k for T est.)
     T_P_acc_level : float             — passed to logl_T_est (target P_acc)
     progress_callback : callable      — optional (current, total) callback
-    Nbatch        : int               — data points per JAX batch (default 64)
+    Nbatch        : int or None       — data points per JAX batch. If None
+                    (default), it is guessed from the free device memory (see
+                    _auto_Nbatch), at most 64. If set, it is used as given.
     **kwargs      : use_N_best, showInfo, console_progress, useRandomData,
                     normalize_likelihood (bool, default True — include the
                     full Gaussian normalization constant; inert for
@@ -387,6 +423,11 @@ def integrate_rejection_range_jax(
         for i in range(Ndt)
     ]
     D_jax = [jnp.asarray(D[i]) if use_jax_diag[i] else None for i in range(Ndt)]
+
+    if Nbatch is None:
+        Nbatch = _auto_Nbatch(N, Ndt, D_jax)
+    if showInfo > 0:
+        print('JAX backend: Nbatch=%d' % Nbatch)
 
     # On CPU, jnp.sort(N=1M) is ~54× slower than np.sort — the JAX on-device
     # post-processing path that is fast on GPU becomes a bottleneck on CPU.
