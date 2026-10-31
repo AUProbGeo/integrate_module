@@ -3072,6 +3072,10 @@ def class_id_to_idx(D, class_id=None):
             Array with class identifiers converted to indices. Values that are
             NaN or not in `class_id` get index -1 (no valid class), so the
             multinomial likelihood can assign them logL = -inf (issue #47).
+            Stored as int8 (int32 if there are more than 127 classes): the
+            indices need only a few bits, and for large priors (e.g. N=1e6
+            realizations) int8 uses 8x less memory than int64 and makes the
+            index lookup in `likelihood_multinomial` faster.
         class_id : numpy.ndarray
             Array of unique class identifiers.
         class_id_out : numpy.ndarray
@@ -3080,7 +3084,8 @@ def class_id_to_idx(D, class_id=None):
 
     if class_id is None:
         class_id = np.unique(D[~np.isnan(D)])
-    D_idx = np.full(D.shape, -1, dtype=int)
+    dtype = np.int8 if len(class_id) <= 127 else np.int32
+    D_idx = np.full(D.shape, -1, dtype=dtype)
     for i in range(len(class_id)):
         D_idx[D==class_id[i]]=i
     class_id_out = np.unique(D_idx[D_idx >= 0])

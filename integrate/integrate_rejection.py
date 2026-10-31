@@ -1512,7 +1512,10 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
     for datasets with many uninformative features.
 
     Performance: This vectorized version is approximately 5-10x faster than the loop-based
-    implementation for large datasets (N > 10,000).
+    implementation for large datasets (N > 10,000). The log is taken of the small
+    (n_classes, n_features) P_obs before the lookup, not of the (N, n_features)
+    extracted probabilities. With class_is_idx=True and integer D (as returned by
+    class_id_to_idx, which uses int8), D is used as index array without a copy.
 
     Examples
     --------
@@ -1552,11 +1555,15 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
 
     # Convert D to integer indices. NaN (and, below, unknown class ids) become
     # -1: no valid class, i.e. probability 0 and logL = -inf (issue #47).
-    nan_D = np.isnan(D) if D.dtype.kind == 'f' else np.zeros(D.shape, dtype=bool)
-    if class_is_idx:
-        # D already contains indices (-1 for no valid class, see class_id_to_idx)
-        indices = np.where(nan_D, -1, D).astype(int)
+    if class_is_idx and D.dtype.kind in 'iu':
+        # Integer indices (int8 from class_id_to_idx, -1 for no valid class):
+        # used as is, no copy
+        indices = D
+    elif class_is_idx:
+        # D already contains indices (-1 for no valid class), but as floats
+        indices = np.where(np.isnan(D), -1, D).astype(int)
     else:
+        nan_D = np.isnan(D) if D.dtype.kind == 'f' else np.zeros(D.shape, dtype=bool)
         # Create vectorized mapping from class_id to indices
         class_id = class_id.astype(int)
 
@@ -1577,21 +1584,24 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
     # Create column indices for advanced indexing
     col_indices = np.arange(nm)
 
-    # Vectorized probability extraction using advanced indexing
+    # Take the log of the small (n_classes, nm) P_obs once, rather than of the
+    # (N, nm) extracted probabilities. Use np.errstate to suppress
+    # divide-by-zero warnings: log(0) = -inf is mathematically correct
+    # (zero probability events)
+    with np.errstate(divide='ignore'):
+        logP_obs = np.log(P_obs)
+
+    # Vectorized log-probability extraction using advanced indexing
     # indices has shape (N, nm), col_indices has shape (nm,)
     # Broadcasting: indices[:, j] selects row, col_indices[j] selects column
     # Samples with no valid class (NaN prior value or a class without a row in
     # P_obs) get probability 0, i.e. logL = -inf.
     invalid = (indices < 0) | (indices >= P_obs.shape[0])
-    probs = P_obs[np.where(invalid, 0, indices), col_indices]
-    probs[invalid] = 0.0
+    logp = logP_obs[np.where(invalid, 0, indices), col_indices]
+    logp[invalid] = -np.inf
 
-    # Vectorized log-likelihood calculation
     # Sum log probabilities along features axis
-    # Use np.errstate to suppress divide-by-zero warnings when probs=0
-    # log(0) = -inf is mathematically correct (zero probability events)
-    with np.errstate(divide='ignore'):
-        logL = np.sum(np.log(probs), axis=1)
+    logL = np.sum(logp, axis=1)
 
     return logL
 
