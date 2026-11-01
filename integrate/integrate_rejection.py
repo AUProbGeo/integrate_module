@@ -1271,8 +1271,9 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0, normalize=False,
     if ok.all():
         dd, s = D - d_obs, d_std
     else:
-        dd, s = D[:, ok], d_std[ok]
-        dd -= d_obs[ok]
+        # not an in-place subtraction: D[:, ok] has D's dtype (float32 on
+        # disk) and would force float32 regardless of d_obs's dtype
+        dd, s = D[:, ok] - d_obs[ok], d_std[ok]
 
     if N_app > 0:
        L = np.ones(D.shape[0])*-1e+15
