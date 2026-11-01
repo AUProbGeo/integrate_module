@@ -91,11 +91,55 @@ def _gex_signature(g):
     return hashlib.md5(repr(sorted(str(d).encode())[:0] or str(d)).encode()).hexdigest()
 
 
-_FORWARD_CACHE = {}
+from collections import OrderedDict
+
+# Cache of anemone setups, one per (GEX, Tx height, device, tolerance), in
+# least-recently-used order.  With a varying flight height there is one setup
+# per height bin (~50 MB of GPU memory each for SkyTEM), so on CUDA the cache
+# is bounded by free GPU memory: the least recently used setups on the device
+# are dropped while less than _CUDA_MIN_FREE_GB (or _CUDA_MIN_FREE_FRAC of
+# the total) is free.
+_FORWARD_CACHE = OrderedDict()
+_CUDA_MIN_FREE_GB = 1.0
+_CUDA_MIN_FREE_FRAC = 0.15
 
 
 def _clear_forward_cache():
     _FORWARD_CACHE.clear()
+
+
+def _evict_cuda_cache(device, torch, all_entries=False):
+    """Drop least recently used CUDA setups on ``device`` until enough GPU
+    memory is free (or all of them with ``all_entries``).  Returns the number
+    of setups dropped."""
+    import gc
+    dev = torch.device(device)
+    if dev.type != "cuda" or not torch.cuda.is_available():
+        return 0
+    idx = dev.index if dev.index is not None else torch.cuda.current_device()
+    dev_keys = lambda: [k for k in _FORWARD_CACHE
+                        if torch.device(k[2]).type == "cuda"
+                        and (torch.device(k[2]).index or 0) == idx]
+
+    def low_memory():
+        free, total = torch.cuda.mem_get_info(idx)
+        return free < max(_CUDA_MIN_FREE_GB * 1024 ** 3, _CUDA_MIN_FREE_FRAC * total)
+
+    n = 0
+    while dev_keys() and (all_entries or low_memory()):
+        # Drop a few at a time; freed memory is only visible after
+        # gc + empty_cache.
+        for k in dev_keys()[:1 if not all_entries else None]:
+            del _FORWARD_CACHE[k]
+            n += 1
+        gc.collect()
+        torch.cuda.empty_cache()
+    return n
+
+
+def _is_cuda_oom(err, torch):
+    oom = getattr(torch, "OutOfMemoryError", None) or getattr(torch.cuda, "OutOfMemoryError", ())
+    return isinstance(err, oom) or "CUDA out of memory" in str(err)
 
 
 def _remake_loop(loop, tx_z, torch):
@@ -312,8 +356,25 @@ def _build_forward(system, tx_z, device):
     tx_z_key = "src" if tx_z is None else round(float(tx_z), 3)
     key = (system["gex_signature"], tx_z_key, str(device), system.get("tolerance"))
     if key in _FORWARD_CACHE:
+        _FORWARD_CACHE.move_to_end(key)
         return _FORWARD_CACHE[key]
 
+    _evict_cuda_cache(device, torch)
+    try:
+        return _build_forward_uncached(system, tx_z, device, key)
+    except RuntimeError as err:
+        # Out of GPU memory: drop all cached setups on the device and retry once
+        if not _is_cuda_oom(err, torch) or _evict_cuda_cache(device, torch, all_entries=True) == 0:
+            raise
+        return _build_forward_uncached(system, tx_z, device, key)
+
+
+def _build_forward_uncached(system, tx_z, device, key):
+    _, torch = _require_anemone()
+    from anemone.forwards import Forward
+    from anemone.system import Receiver
+
+    n_moments = len(system["moments"])
     dev = torch.device(device)
 
     # Hoist and build shared source, receiver, filterfunc from first moment
@@ -807,9 +868,15 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
         signal at 45 m; a ``UserWarning`` is given above 30 m.  The reference
         setup uses ``tolerance / 10`` (about 20% more kernel terms) to keep the
         rescaling accurate.  Has no effect for a fixed height.
+    altitude_bin_width : float, optional
+        Bin width in m (default 1.0) for a varying ``tx_height``: heights are
+        rounded to bins and one anemone setup is made per bin.  ``0``/``None``
+        makes one setup per distinct height.  Ignored with
+        ``rescale_height=True`` and for a fixed height.
     batch_size : int, optional
         Number of soundings sent through anemone per call (default 1000).
         Bounds peak (GPU) memory; ``0``/``None`` forwards everything at once.
+
     file_sr2, sr_filters, n_previous_pulses
         System-response / pulse options, see :func:`gex_to_anemone_system`.
         A GEX with ``SystemResponseConvolution=1`` picks up ``<gex stem>.sr2``
@@ -820,6 +887,37 @@ def forward_anemone(M=np.array(()), thickness=np.array(()), file_gex=None,
     tolerance : float or None
         Kernel pruning tolerance (default ``1e-6``); larger is faster and less
         accurate, see :func:`gex_to_anemone_system`.
+
+    Notes
+    -----
+    **Setup cache and GPU memory.**  Each anemone setup (one per GEX, Tx
+    height, device and tolerance) is kept in a module cache and reused by
+    later calls.  On CUDA a setup takes some tens of MB of GPU memory (about
+    50 MB for a dual-moment SkyTEM system), so with a varying flight height
+    (one setup per height bin, e.g. ~135 bins for 12-148 m) the cache alone
+    can exceed the GPU memory.  The cache is therefore kept in
+    least-recently-used order, and before a new CUDA setup is built the least
+    recently used setups on that device are dropped until at least
+    ``_CUDA_MIN_FREE_GB`` (1 GB) or ``_CUDA_MIN_FREE_FRAC`` (15 %) of the GPU
+    memory, whichever is larger, is free.  If building a setup still runs out
+    of GPU memory, all cached setups on the device are dropped and the build
+    is retried once.  Consequences:
+
+    * A fixed flight height uses one setup and is not affected.
+    * With more height bins than fit in the cache, a repeated call rebuilds
+      (almost) every setup, ~1 s each, because the bins are visited in the
+      same order every call (worst case for LRU).
+    * Free memory is measured on the whole GPU, so memory used by other
+      processes leads to more evictions (slower, not an error).
+    * Memory is only checked before building a setup, not while forwarding
+      the batches; lower ``batch_size`` if the forward itself runs out of
+      GPU memory.
+    * The CPU cache is not bounded.
+
+    The limits are module attributes, e.g.
+    ``integrate.anemone_forward._CUDA_MIN_FREE_GB = 0.5``;
+    ``integrate.anemone_forward._clear_forward_cache()`` empties the cache.
+    ``rescale_height=True`` uses a single setup and avoids the cache churn.
     """
     anemone, torch = _require_anemone()
     import time
@@ -1088,7 +1186,9 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
     ``rescale_height=True`` (varying ``M{im_height}`` only) does one anemone
     setup and rescales it to each model's height instead of one setup per
     ``altitude_bin_width`` bin; much faster for varying flight height, see
-    :func:`forward_anemone`.
+    :func:`forward_anemone`.  Setups are cached between calls; on CUDA the
+    cache is bounded by free GPU memory (least recently used setups are
+    dropped), see the Notes of :func:`forward_anemone`.
     Returns the path to the prior-data h5 (always the return value).
     """
     import multiprocessing

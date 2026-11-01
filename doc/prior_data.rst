@@ -144,6 +144,50 @@ An explicitly requested device is used as given, without any check: e.g.
 while MPS lacks float64, fails with the corresponding Torch error rather than
 falling back to CPU.
 
+Varying flight height and GPU memory (anemone only)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+With a varying flight height (``im_height`` pointing to a height model
+``M<im_height>``), anemone needs one setup per flight height. The heights are
+rounded to bins of ``altitude_bin_width`` (default 1 m) and one setup, about
+1 s each, is made per bin. Setups are cached and reused by later calls.
+
+On a GPU each setup takes some tens of MB (about 50 MB for a dual-moment
+SkyTEM system), so a wide height range (e.g. 12-148 m, ~135 bins) can fill a
+GPU with 8 GB. The cache is therefore bounded by free GPU memory: before a
+new setup is built, the least recently used setups on the device are dropped
+until at least 1 GB, or 15 % of the GPU memory, whichever is larger, is free.
+If building a setup still runs out of GPU memory, all cached setups are
+dropped and the build is retried once.
+
+* A **fixed flight height** uses a single setup and is not affected; the
+  number of models is limited only by ``batch_size``.
+* With more height bins than fit in the cache, **repeated calls rebuild
+  (almost) every setup**, as the bins are visited in the same order every
+  call. Run times of a second call are then close to those of the first.
+* Free memory is measured on the whole GPU, so memory used by other
+  processes leads to more evictions (slower, not an error).
+* Only the setups are bounded: if forwarding a batch runs out of GPU memory,
+  lower ``batch_size``. The cache on CPU is not bounded.
+* ``rescale_height=True`` uses one setup rescaled to each height: much faster
+  and no cache churn, but an approximation whose error grows with the height
+  spread (warning above 30 m), see :func:`integrate.anemone_forward.forward_anemone`.
+
+.. code-block:: python
+
+    # varying flight height in M2, binned to 1 m (one setup per bin)
+    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone',
+                     device='cuda', im_height=2)
+    # one setup, rescaled to each height
+    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone',
+                     device='cuda', im_height=2, rescale_height=True)
+
+    # keep more GPU memory free (module attributes)
+    import integrate.anemone_forward as af
+    af._CUDA_MIN_FREE_GB = 2.0      # default 1.0
+    af._CUDA_MIN_FREE_FRAC = 0.15   # default 0.15
+    af._clear_forward_cache()       # drop all cached setups
+
 Errors and fallback
 ^^^^^^^^^^^^^^^^^^^
 
