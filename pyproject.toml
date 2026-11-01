@@ -110,3 +110,15 @@ ignore = [
     "E722",  # allow bare `except:` (used in the autoreload blocks)
     "S110",  # allow try-except-pass (same blocks)
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "jax: needs jax installed (skipped otherwise)",
+    "gpu: needs a JAX GPU device; run with  JAX_PLATFORMS=cuda pytest -m gpu",
+    "slow: larger cases; deselect with -m 'not slow'",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
