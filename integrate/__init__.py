@@ -3,6 +3,8 @@ multiprocessing.freeze_support()
 
 # Import rejection sampling functions from new module
 from integrate.integrate_rejection import integrate_rejection
+from integrate.integrate_rejection import integrate_rejection_em_height
+from integrate.integrate_rejection import em_height_bins
 from integrate.integrate_rejection import integrate_rejection_range
 from integrate.integrate_rejection import integrate_posterior_chunk
 from integrate.integrate_rejection import integrate_posterior_main

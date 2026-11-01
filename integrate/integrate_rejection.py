@@ -7,6 +7,9 @@ processing support for efficient posterior sampling.
 
 Key Functions:
 - integrate_rejection(): Main rejection sampling function
+- integrate_rejection_em_height(): EM forward modelling and rejection sampling
+  with a varying flight height (one prior per flight-height interval)
+- em_height_bins(): Flight-height intervals with similar numbers of soundings
 - integrate_rejection_range(): Core rejection sampling for data point ranges  
 - likelihood_*(): Various likelihood calculation functions
 - Shared memory functions for parallel processing
@@ -513,8 +516,450 @@ def integrate_rejection(f_prior_h5='prior.h5',
     return f_post_h5
 
 
+def em_height_bins(height, n_bins=10, dh_max=20, dh_round=0.5, n_min_bin=200, showInfo=0):
+    """
+    Split flight heights into intervals with similar numbers of soundings.
 
-def integrate_rejection_range(D, 
+    Used by :func:`integrate_rejection_em_height` to set up one prior per
+    flight-height interval. The intervals are found in three steps:
+
+    1. ``n_bins`` intervals with an equal number of soundings (quantiles of
+       ``height``), with edges rounded to ``dh_round`` (the first edge
+       down, the last edge up).
+    2. Intervals wider than ``dh_max`` (typically the rare high and low
+       flight heights) are split into equal parts at most ``dh_max`` wide.
+    3. Neighbouring intervals are joined until each has at least
+       ``n_min_bin`` soundings. Remaining soundings join the last interval.
+
+    Parameters
+    ----------
+    height : array-like
+        Flight heights [m] of the soundings to split. Must be finite.
+    n_bins : int, optional
+        Number of equal-count (quantile) intervals in step 1. With
+        ``n_bins<=1`` one interval covering all heights is returned. The final
+        number of intervals can differ after steps 2 and 3. Default is 10.
+    dh_max : float, optional
+        Maximum width [m] of an interval (step 2). None or 0 disables the
+        split. Default is 20.
+    dh_round : float, optional
+        Interval edges are rounded to multiples of ``dh_round`` [m].
+        Default is 0.5.
+    n_min_bin : int, optional
+        Minimum number of soundings per interval (step 3). Default is 200.
+    showInfo : int, optional
+        Verbosity level. Default is 0.
+
+    Returns
+    -------
+    edges : numpy.ndarray
+        Interval edges [m], shape (n_bin+1,), increasing.
+    i_bin : numpy.ndarray
+        Interval index of each height, shape (len(height),), in
+        ``range(n_bin)``. Interval k is ``edges[k] <= h < edges[k+1]``; the
+        last interval includes its upper edge.
+
+    Examples
+    --------
+    >>> edges, i_bin = ig.em_height_bins(height, n_bins=10, dh_max=20)
+    >>> ii_bin = [np.where(i_bin == k)[0] for k in range(len(edges) - 1)]
+    """
+    h = np.asarray(height, dtype=float).ravel()
+    if h.size == 0:
+        raise ValueError('em_height_bins: no heights given')
+    if not np.all(np.isfinite(h)):
+        raise ValueError('em_height_bins: heights must be finite (remove NaN first)')
+
+    lo = np.floor(h.min() / dh_round) * dh_round
+    hi = np.ceil(h.max() / dh_round) * dh_round
+    if hi <= lo:
+        hi = lo + dh_round
+
+    if n_bins <= 1:
+        edges = np.array([lo, hi])
+    else:
+        # 1. Equal-count (quantile) edges, rounded to dh_round
+        q = np.quantile(h, np.linspace(0, 1, n_bins + 1))
+        edges_q = np.unique(np.r_[lo, np.round(q[1:-1] / dh_round) * dh_round, hi])
+
+        # 2. Split intervals wider than dh_max
+        if dh_max is not None and dh_max > 0:
+            edges_q = np.unique(np.concatenate(
+                [np.round(np.linspace(a, b, int(np.ceil((b - a) / dh_max)) + 1) / dh_round) * dh_round
+                 for a, b in zip(edges_q[:-1], edges_q[1:])]))
+
+        # 3. Join neighbouring intervals until each has at least n_min_bin soundings
+        counts, _ = np.histogram(h, edges_q)
+        edges = [edges_q[0]]
+        n_acc = 0
+        for i, c in enumerate(counts):
+            n_acc += c
+            if n_acc >= n_min_bin:
+                edges.append(edges_q[i + 1])
+                n_acc = 0
+        if n_acc > 0:
+            # the remaining soundings join the last interval
+            if len(edges) > 1:
+                edges[-1] = edges_q[-1]
+            else:
+                edges.append(edges_q[-1])
+        edges = np.array(edges)
+
+    n_bin = len(edges) - 1
+    i_bin = np.clip(np.searchsorted(edges, h, side='right') - 1, 0, n_bin - 1)
+
+    if showInfo > 0:
+        print('em_height_bins: %d soundings in %d flight-height interval(s)' % (len(h), n_bin))
+        for k in range(n_bin):
+            print('  Interval %2d: %6.1f-%6.1f m, %7d soundings'
+                  % (k + 1, edges[k], edges[k + 1], np.sum(i_bin == k)))
+
+    return edges, i_bin
+
+
+def integrate_rejection_em_height(f_prior_h5='prior.h5',
+                                  f_data_h5='DATA.h5',
+                                  f_post_h5='',
+                                  N_use=100000000000,
+                                  id_use=[],
+                                  ip_range=[],
+                                  nr=1000,
+                                  autoT=1,
+                                  T_base=1,
+                                  Nchunks=0,
+                                  Ncpu=0,
+                                  parallel=True,
+                                  use_N_best=0,
+                                  T_N_above=None,
+                                  T_P_acc_level=None,
+                                  progress_callback=None,
+                                  console_progress=None,
+                                  backend=None,
+                                  forward_kwargs=None,
+                                  prior_data_fn=None,
+                                  id_em=1,
+                                  id_height=None,
+                                  height=None,
+                                  im_height=None,
+                                  Nbins=1,
+                                  dh_max=20,
+                                  dh_round=0.5,
+                                  n_min_bin=200,
+                                  dh_pad=2.5,
+                                  dh_std=2,
+                                  height_min=5,
+                                  seed=1,
+                                  reuse_prior_data=True,
+                                  f_prior_data_base='',
+                                  shared_prior=True,
+                                  f_prior_merged_h5='',
+                                  **kwargs):
+    """
+    EM forward modelling and rejection sampling with a varying flight height.
+
+    An airborne EM specific variant of :func:`integrate_rejection`: it computes
+    the EM prior data with the flight height as a model parameter, and samples
+    the posterior. The flight height is handled automatically:
+
+    - ``Nbins=1``: one prior for all soundings. The flight height of each
+      prior realization is drawn from the observed flight heights, smoothed by
+      ``N(0, dh_std)``.
+    - ``Nbins>1``: the soundings are split into flight-height intervals with
+      similar numbers of soundings (:func:`em_height_bins`). Each interval gets
+      its own prior data, with the flight height uniform within the interval
+      (+- ``dh_pad``), so many more prior realizations are near the flight
+      height of each sounding. The soundings of each interval are inverted
+      with the prior of that interval, and the posteriors are merged
+      (:func:`integrate.merge_posterior`).
+
+    For each interval, the prior ``f_prior_h5`` is copied, the simulated
+    flight height is stored as ``M{im_height}``, the EM data ``D{id_em}`` are
+    computed with that flight height, and (if ``id_height`` is given) the
+    flight-height data ``D{id_height}`` as the identity of ``M{im_height}``.
+
+    Parameters
+    ----------
+    f_prior_h5 : str, optional
+        Path to the prior HDF5 file with the model parameters (e.g. from
+        ``prior_model_layered``), without the flight height. Default is
+        'prior.h5'.
+    f_data_h5 : str, optional
+        Path to the observed data HDF5 file. Default is 'DATA.h5'.
+    f_post_h5 : str, optional
+        Path to the output posterior HDF5 file. If empty, it is
+        ``POST_{prior}_Nu{N_use}_aT{autoT}_EMh{n_bin}.h5`` in ``post_dir``
+        (default the current directory). Default is ''.
+    N_use, id_use, ip_range, nr, autoT, T_base, Nchunks, Ncpu, parallel, use_N_best, T_N_above, T_P_acc_level, progress_callback, console_progress, backend
+        Passed on to :func:`integrate_rejection` for each flight-height
+        interval (see there). ``ip_range`` selects the soundings to invert
+        (default all); within an interval only its soundings are inverted.
+    forward_kwargs : dict, optional
+        EM forward settings passed to :func:`integrate.prior_data_em`, e.g.
+        ``dict(file_gex=file_gex, method='anemone', rescale_height=True)``.
+        ``id``, ``im_height``, ``f_prior_data_h5`` and ``doMakePriorCopy`` are
+        set by this function. Default is None.
+    prior_data_fn : callable, optional
+        Instead of ``forward_kwargs``: a function ``prior_data_fn(f_prior_data_h5)``
+        that computes the EM prior data ``D{id_em}`` in the given prior file,
+        using the flight height in ``M{im_height}``. Use it for special cases,
+        e.g. moving the prior data to other gates. Default is None.
+    id_em : int, optional
+        Id of the EM data, both in ``f_data_h5`` and in the prior data.
+        Default is 1.
+    id_height : int, optional
+        Id of the flight-height data in ``f_data_h5`` (``/D{id_height}/d_obs``).
+        If given, the flight heights are read from it, and the prior data
+        ``D{id_height}`` are computed as the identity of ``M{im_height}``, so
+        the measured flight height is used as data. Default is None.
+    height : array-like, optional
+        Flight heights [m] of all soundings, shape (Ndp,), used instead of
+        ``id_height`` (the flight height is then not used as data, so if
+        ``f_data_h5`` also holds flight-height data, leave it out with
+        ``id_use``, e.g. ``id_use=[1]``). Default is None.
+    im_height : int, optional
+        Model id of the flight height in the prior. None uses the next free
+        model id of ``f_prior_h5``. Default is None.
+    Nbins : int, optional
+        Number of equal-count flight-height intervals (``n_bins`` of
+        :func:`em_height_bins`). 1 uses one prior for all soundings. The final
+        number of intervals can differ (see ``dh_max``, ``n_min_bin``).
+        Default is 1.
+    dh_max, dh_round, n_min_bin : optional
+        Interval options, see :func:`em_height_bins`. Defaults are 20 m,
+        0.5 m and 200.
+    dh_pad : float, optional
+        ``Nbins>1``: the prior flight height of an interval is uniform within
+        the interval extended by ``dh_pad`` [m] on both sides. Default is 2.5.
+    dh_std : float, optional
+        ``Nbins=1``: std [m] of the smoothing added to the flight heights drawn
+        from the observed flight heights. Default is 2.
+    height_min : float, optional
+        Minimum prior flight height [m]. Default is 5.
+    seed : int, optional
+        Seed of the simulated flight heights; interval k uses ``seed + k``.
+        Default is 1.
+    reuse_prior_data : bool, optional
+        Reuse an existing prior data file of an interval if it has ``D{id_em}``,
+        ``M{im_height}`` (and ``D{id_height}``). Delete the files, or set
+        False, after changing the prior or the forward settings. Default is
+        True.
+    f_prior_data_base : str, optional
+        Base path of the prior data files of the intervals:
+        ``{f_prior_data_base}_h{lo}-{hi}.h5``. Default is '', which uses
+        ``PRIOR_DATA_{prior}`` next to ``f_prior_h5``.
+    shared_prior : bool, optional
+        ``Nbins>1``: passed to :func:`integrate.merge_posterior`. True lets the
+        merged posterior refer to the prior data of the first interval instead
+        of a merged prior (all priors share the realizations of
+        ``f_prior_h5``, and differ only in the flight height and the prior
+        data). See Notes. Default is True.
+    f_prior_merged_h5 : str, optional
+        ``Nbins>1`` and ``shared_prior=False``: path to the merged prior, see
+        :func:`integrate.merge_posterior`. Default is ''.
+    **kwargs : dict
+        Passed on to :func:`integrate_rejection` (e.g. showInfo,
+        updatePostStat, post_dir, Nbatch, dtype, normalize_likelihood).
+
+    Returns
+    -------
+    str
+        Path to the posterior HDF5 file.
+
+    Notes
+    -----
+    The prior data of interval k are written to
+    ``PRIOR_DATA_{prior}_h{lo}-{hi}.h5`` next to ``f_prior_h5`` (see
+    ``f_prior_data_base``), and with more
+    than one interval its posterior to ``{f_post_h5 without .h5}_h{lo}-{hi}.h5``.
+    The final posterior has the attributes ``height_edges`` (the lower and
+    upper edge of each interval), ``im_height``, ``id_height`` (0: none),
+    ``id_em``, ``f5_prior_data_bin`` and ``f5_post_bin``.
+
+    With ``shared_prior=True`` the posterior statistics are correct for all
+    soundings, but anything recomputed later from the merged posterior and the
+    prior (e.g. posterior data in ``plot_data_prior_post``) is correct only for
+    the soundings of the first interval. Use the posterior of the interval
+    (``f5_post_bin``) for the others.
+
+    Examples
+    --------
+    >>> # flight height in DATA.h5:/D2, 10 flight-height intervals
+    >>> f_post = ig.integrate_rejection_em_height(
+    ...     f_prior_h5, 'DATA.h5', id_height=2, Nbins=10,
+    ...     forward_kwargs=dict(file_gex=file_gex, method='anemone',
+    ...                         rescale_height=True),
+    ...     backend='jax')
+
+    >>> # one prior for all flight heights, flight heights given as an array
+    >>> f_post = ig.integrate_rejection_em_height(
+    ...     f_prior_h5, 'DATA.h5', height=alt_obs, Nbins=1,
+    ...     forward_kwargs=dict(file_gex=file_gex, method='ga-aem'))
+    """
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
+        return None
+
+    import integrate as ig
+
+    showInfo = kwargs.get('showInfo', 0)
+    posterior_output_path = kwargs.get('post_dir', os.getcwd())
+
+    # Number of soundings, from the EM data
+    Ndp = ig.load_data(f_data_h5, id_arr=[id_em], showInfo=-1)['d_obs'][0].shape[0]
+
+    # Flight height of all soundings: from an array, or from DATA.h5:/D{id_height}
+    if height is not None:
+        h_all = np.asarray(height, dtype=float).ravel()
+        if len(h_all) != Ndp:
+            raise ValueError('height has %d values, but %s has %d soundings'
+                             % (len(h_all), f_data_h5, Ndp))
+    elif id_height is not None:
+        h_all = ig.load_data(f_data_h5, id_arr=[id_height], showInfo=-1)['d_obs'][0][:, 0].astype(float)
+    else:
+        raise ValueError('Give the flight height as id_height (data id in f_data_h5) or as height (array)')
+
+    # Soundings to invert; soundings without a flight height are not inverted
+    if len(ip_range) == 0:
+        ip_range = np.arange(Ndp)
+    ip_range = np.asarray(ip_range, dtype=int)
+    i_nan = ~np.isfinite(h_all[ip_range])
+    if np.any(i_nan):
+        if showInfo > -1:
+            print('integrate_rejection_em_height: %d soundings without flight height are not inverted'
+                  % np.sum(i_nan))
+        ip_range = ip_range[~i_nan]
+    h_use = h_all[ip_range]
+
+    # Prior size, and the model id of the flight height
+    with h5py.File(f_prior_h5, 'r') as f_prior:
+        N = f_prior['/M1'].shape[0]
+        if im_height is None:
+            im_height = sum(1 for key in f_prior.keys() if key[0] == 'M') + 1
+
+    # Flight-height intervals
+    if Nbins <= 1:
+        edges, i_bin = em_height_bins(h_use, n_bins=1, dh_round=dh_round)
+    else:
+        edges, i_bin = em_height_bins(h_use, n_bins=Nbins, dh_max=dh_max, dh_round=dh_round,
+                                      n_min_bin=n_min_bin)
+    n_bin = len(edges) - 1
+    ii_bin = [ip_range[i_bin == k] for k in range(n_bin)]
+    k_use = [k for k in range(n_bin) if len(ii_bin[k]) > 0]
+
+    if showInfo > 0:
+        print('<--INTEGRATE_REJECTION_EM_HEIGHT-->')
+        print('%d soundings, flight height %3.1f-%3.1f m, %d interval(s), N=%d, M%d = flight height'
+              % (len(ip_range), h_use.min(), h_use.max(), n_bin, N, im_height))
+        for k in range(n_bin):
+            print('  Interval %2d: %6.1f-%6.1f m, %7d soundings'
+                  % (k + 1, edges[k], edges[k + 1], len(ii_bin[k])))
+
+    # File names
+    f_prior_dir = os.path.dirname(f_prior_h5)
+    f_prior_base = os.path.splitext(os.path.basename(f_prior_h5))[0]
+    if len(f_post_h5) == 0:
+        f_post_h5 = os.path.join(posterior_output_path, 'POST_%s_Nu%d_aT%d_EMh%d.h5'
+                                 % (f_prior_base, N_use, autoT, n_bin))
+    txt_bin = ['_h%05.1f-%05.1f' % (edges[k], edges[k + 1]) for k in range(n_bin)]
+    if len(f_prior_data_base) == 0:
+        f_prior_data_base = os.path.join(f_prior_dir, 'PRIOR_DATA_%s' % f_prior_base)
+    f_prior_data_bin = ['%s%s.h5' % (f_prior_data_base, txt_bin[k]) for k in range(n_bin)]
+    if len(k_use) == 1:
+        f_post_bin = [f_post_h5] * n_bin
+    else:
+        f_post_bin = ['%s%s.h5' % (os.path.splitext(f_post_h5)[0], txt_bin[k]) for k in range(n_bin)]
+
+    def has_prior_data(f_prior_data_h5):
+        if not os.path.exists(f_prior_data_h5):
+            return False
+        keys = ['/D%d' % id_em, '/M%d' % im_height]
+        if id_height is not None:
+            keys.append('/D%d' % id_height)
+        with h5py.File(f_prior_data_h5, 'r') as f:
+            return all(key in f for key in keys)
+
+    # Prior data and posterior of each interval
+    for k in k_use:
+        if showInfo > 0:
+            print('Interval %d/%d (%6.1f-%6.1f m): %d soundings'
+                  % (k + 1, n_bin, edges[k], edges[k + 1], len(ii_bin[k])))
+
+        if reuse_prior_data and has_prior_data(f_prior_data_bin[k]):
+            if showInfo > 0:
+                print('  Using existing prior data file: %s' % f_prior_data_bin[k])
+        else:
+            if prior_data_fn is None and forward_kwargs is None:
+                raise ValueError('Give forward_kwargs or prior_data_fn to compute the EM prior data')
+            if showInfo > 0:
+                print('  Computing prior data: %s' % f_prior_data_bin[k])
+            ig.copy_prior(f_prior_h5, f_prior_data_bin[k])
+
+            # Simulated flight height
+            rng = np.random.default_rng(seed + k)
+            if n_bin == 1:
+                h_sim = rng.choice(h_use, N) + rng.normal(0, dh_std, N)
+            else:
+                h_sim = rng.uniform(edges[k] - dh_pad, edges[k + 1] + dh_pad, N)
+            h_sim = np.clip(h_sim, height_min, None)
+            ig.save_prior_model(f_prior_data_bin[k], h_sim, im=im_height, name='Tx_altitude',
+                                unit='m', force_replace=True, showInfo=showInfo)
+
+            # EM data D{id_em}, with the flight height in M{im_height}
+            if prior_data_fn is not None:
+                prior_data_fn(f_prior_data_bin[k])
+            else:
+                fk = {'showInfo': showInfo, 'force_replace': True}
+                fk.update(forward_kwargs)
+                fk.update(id=id_em, im_height=im_height, doMakePriorCopy=False,
+                          f_prior_data_h5=f_prior_data_bin[k])
+                ig.prior_data_em(f_prior_data_bin[k], **fk)
+
+            # Flight-height data D{id_height}, the identity of M{im_height}
+            if id_height is not None:
+                ig.prior_data_identity(f_prior_data_bin[k], id=id_height, im=im_height,
+                                       showInfo=showInfo)
+
+        ig.integrate_rejection(f_prior_data_bin[k], f_data_h5,
+                               f_post_h5=f_post_bin[k],
+                               N_use=N_use,
+                               id_use=id_use,
+                               ip_range=ii_bin[k],
+                               nr=nr,
+                               autoT=autoT,
+                               T_base=T_base,
+                               Nchunks=Nchunks,
+                               Ncpu=Ncpu,
+                               parallel=parallel,
+                               use_N_best=use_N_best,
+                               T_N_above=T_N_above,
+                               T_P_acc_level=T_P_acc_level,
+                               progress_callback=progress_callback,
+                               console_progress=console_progress,
+                               backend=backend,
+                               **kwargs)
+
+    # Merge the posteriors of the intervals
+    if len(k_use) > 1:
+        f_post_h5, _ = ig.merge_posterior([f_post_bin[k] for k in k_use], f_data_h5,
+                                          f_post_merged_h5=f_post_h5,
+                                          ip_range_list=[ii_bin[k] for k in k_use],
+                                          f_prior_merged_h5=f_prior_merged_h5,
+                                          shared_prior=shared_prior,
+                                          showInfo=showInfo)
+
+    # Record the flight-height setup in the posterior
+    with h5py.File(f_post_h5, 'a') as f_post:
+        f_post.attrs['height_edges'] = np.array([[edges[k], edges[k + 1]] for k in k_use])
+        f_post.attrs['im_height'] = im_height
+        f_post.attrs['id_height'] = 0 if id_height is None else id_height
+        f_post.attrs['id_em'] = id_em
+        f_post.attrs['f5_prior_data_bin'] = [f_prior_data_bin[k] for k in k_use]
+        f_post.attrs['f5_post_bin'] = [f_post_bin[k] for k in k_use]
+
+    return f_post_h5
+
+
+def integrate_rejection_range(D,
                               DATA, 
                               idx = [],
                               N_use=None, 
