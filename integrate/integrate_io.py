@@ -4656,9 +4656,9 @@ def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0
                     # Special handling for x/z attributes - update to match padded dimensions
                     if attr_name in ['x', 'z'] and key in M_merged:
                         new_dim = M_merged[key].shape[1]
-                        f_out[key].attrs[attr_name] = np.arange(new_dim)
-                    else:
-                        f_out[key].attrs[attr_name] = attr_value
+                        if np.size(attr_value) != new_dim:
+                            attr_value = np.arange(new_dim)
+                    f_out[key].attrs[attr_name] = attr_value
 
         # Add merge-specific attributes
         f_out.attrs['merged_from_files'] = [f.encode('utf-8') for f in f_prior_h5_files]
