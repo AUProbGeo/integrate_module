@@ -72,10 +72,10 @@ import integrate_rawmaterial_utils as rmu
 hardcopy = True
 
 N = 4_000_000 +2
-#N = 10_001
+N = 10_001
 #N = 1_000_001        # number of prior realizations (use e.g. 10_000 for a quick demo)
 inflateNoise = 2     # multiply the tTEM data std by this (0 = use as-is)
-reuse_h5 = True      # True: reuse existing HDF5 files; False: delete them and recompute everything
+reuse_h5 = False      # True: reuse existing HDF5 files; False: delete them and recompute everything
 
 # Appended to every generated file name, so a different N / inflateNoise
 # writes to its own set of files.
@@ -203,7 +203,7 @@ f_prior_generic_h5 = 'DAUGAARD_PRIOR_GENERIC%s.h5' % SUFFIX
 if compute(f_prior_generic_h5):
     ig.prior_model_layered(N=N, lay_dist='uniform', 
                            NLAY_min=2, NLAY_max = 6,
-                           RHO_min=1, RHO_max=3000,
+                           RHO_min=5, RHO_max=1000,
                            f_prior_h5=f_prior_generic_h5, showInfo=1)
 
 f_prior_xls_h5 = 'DAUGAARD_PRIOR_ROSTOF%s.h5' % SUFFIX
