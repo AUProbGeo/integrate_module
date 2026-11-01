@@ -136,10 +136,15 @@ def integrate_rejection(f_prior_h5='prior.h5',
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
         Nbatch (batch size for backend='jax'; default None = guessed from
-        free memory), and normalize_likelihood (bool,
+        free memory), normalize_likelihood (bool,
         default True; if True, Gaussian likelihoods include the full
         normalization constant, giving a properly comparable EV/entropy across
-        data points and hypotheses, without changing P_acc/T/CHI2).
+        data points and hypotheses, without changing P_acc/T/CHI2), and
+        dtype (str or numpy dtype, default 'float64'; floating point precision
+        of the likelihood computation for backend='numpy'. 'float32' is
+        ~1.7x faster and changes EV/T by ~1e-7 relative. Temperature,
+        sampling and EV are always computed in float64. Ignored by
+        backend='jax', whose precision is set by JAX_ENABLE_X64).
 
     Returns
     -------
@@ -188,6 +193,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # integrate_posterior_main. The backend='jax' and non-parallel branches
     # already forward **kwargs and pick this up on their own.
     normalize_likelihood = kwargs.get('normalize_likelihood', True)
+    # Precision of the numpy likelihood computation (same threading as above).
+    dtype = np.dtype(kwargs.get('dtype', 'float64'))
     
     # Setup progress callback functionality
     if console_progress is None:
@@ -425,6 +432,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
             T_N_above=_T_N_above,
             T_P_acc_level=_T_P_acc_level,
             normalize_likelihood=normalize_likelihood,
+            dtype=dtype,
             progress_callback=update_progress if progress_callback else None,
         )
 
@@ -619,6 +627,12 @@ def integrate_rejection_range(D,
     # pure misfit statistic.
     normalize_likelihood = kwargs.get('normalize_likelihood', True)
 
+    # Floating point precision of the likelihood computation. The prior data D
+    # is stored as float32, so casting the observed data to dtype sets the
+    # precision of D - d_obs. 'float32' is ~1.7x faster; temperature, sampling
+    # and EV below are always done in float64.
+    dtype = np.dtype(kwargs.get('dtype', 'float64'))
+
 
     # Get number of data points
     Ndp = DATA['d_obs'][0].shape[0]
@@ -715,7 +729,7 @@ def integrate_rejection_range(D,
         N = D[0].shape[0]
         # Get number of data types used - needed for array initialization
         NDsets = len(id_use)
-        L = np.zeros((NDsets, N))
+        L = np.zeros((NDsets, N), dtype=dtype)
 
         if showInfo>3:
             print('Ndt=%d, ip=%d/%d, N=%d' % (Ndt, ip, nump, N))
@@ -755,7 +769,7 @@ def integrate_rejection_range(D,
                 t0=time.time()
                 #id = id_use[i_prior]
                 if noise_model[i]=='gaussian':
-                    d_obs = DATA['d_obs'][i][ip]
+                    d_obs = DATA['d_obs'][i][ip].astype(dtype, copy=False)
                     n_data_non_nan = np.sum(~np.isnan(d_obs))
                     total_n_data_non_nan += n_data_non_nan
                     n_data_per_type[i] = n_data_non_nan
@@ -772,7 +786,7 @@ def integrate_rejection_range(D,
                             normalize=normalize_likelihood, return_norm_const=True)
 
                     elif DATA['d_std'][i] is not None:
-                        d_std = DATA['d_std'][i][ip]
+                        d_std = DATA['d_std'][i][ip].astype(dtype, copy=False)
                         #print(d_obs)
                         #print(d_std)
                         #print(D[i_prior][0])
@@ -786,7 +800,7 @@ def integrate_rejection_range(D,
                     L[i] = L_single
                     t.append(time.time()-t0)
                 elif noise_model[i]=='multinomial':
-                    d_obs = DATA['d_obs'][i][ip]
+                    d_obs = DATA['d_obs'][i][ip].astype(dtype, copy=False)
                     n_data_non_nan = np.sum(~np.isnan(d_obs))
                     total_n_data_non_nan += n_data_non_nan
                     n_data_per_type[i] = n_data_non_nan
@@ -820,6 +834,9 @@ def integrate_rejection_range(D,
         L_single = L
         if Ndt>1:
             L = np.sum(L_single, axis=0)
+        # Temperature, acceptance probabilities, sampling and EV in float64
+        # (one length-N vector, cheap). L_single keeps dtype, used for CHI2.
+        L = L.astype(np.float64, copy=False)
 
         # Automatic annealing temperature estimation, if autoT=1, else use T=T_base
         # T_base = 1 indicates no annealing
@@ -932,7 +949,7 @@ def integrate_rejection_range(D,
 
 
 
-def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=True, progress_callback=None):
+def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=True, dtype=np.float64, progress_callback=None):
     """
     Coordinate parallel processing of posterior sampling across multiple chunks.
     
@@ -1018,7 +1035,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     try:
         with ctx.Pool(Ncpu) as p:
             # New implementation with shared memory
-            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood) for i in range(len(ip_chunks))]
+            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood, dtype) for i in range(len(ip_chunks))]
             if progress_callback is None:
                 results = p.map(integrate_posterior_chunk, chunk_args)
             else:
@@ -1124,7 +1141,7 @@ def integrate_posterior_chunk(args):
     #import integrate as ig
     
     # New implementation with shared memory
-    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood = args
+    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood, dtype = args
     # Old implementation where D was copied to each process
     #i_chunk, ip_chunks, D, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best = args
     #D=reconstruct_shared_arrays(shared_memory_refs)
@@ -1159,6 +1176,7 @@ def integrate_posterior_chunk(args):
                 T_N_above=T_N_above,
                 T_P_acc_level=T_P_acc_level,
                 normalize_likelihood=normalize_likelihood,
+                dtype=dtype,
             )
 
         return i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range
@@ -1426,6 +1444,9 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
         dd = D - d_obs
         Cd_sub = Cd
         iCd = np.linalg.inv(Cd)
+    # Invert (and slogdet below) in Cd's precision; only the large dd @ iCd
+    # product follows the precision of dd (float32 if d_obs is float32).
+    iCd = iCd.astype(dd.dtype, copy=False)
 
     if normalize:
         if log_det_Cd is None:
