@@ -508,8 +508,12 @@ def integrate_rejection_range_jax(
                         jnp.asarray(d_std_batch),
                     )  # (bsz, N)
                     if normalize_likelihood:
-                        lnc_batch = -0.5 * np.nansum(
-                            np.log(2*np.pi*d_std_batch**2), axis=1
+                        # only the observed channels (same mask as the
+                        # misfit in the kernel), as in likelihood_gaussian_full
+                        valid_b = ~(np.isnan(d_obs_batch) | np.isnan(d_std_batch))
+                        lnc_batch = -0.5 * np.sum(
+                            np.where(valid_b, np.log(2*np.pi*d_std_batch**2), 0.0),
+                            axis=1,
                         ) * active
                         log_norm_const_b[:, i] = lnc_batch
                         L_jax = L_jax + jnp.asarray(lnc_batch)[:, None]

@@ -1252,16 +1252,22 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0, normalize=False,
     inverse variance do not improve performance with modern NumPy.
     """
 
-    if normalize:
-        if log_norm_const is None:
-            log_norm_const = -0.5 * np.nansum(np.log(2*np.pi*d_std**2))
-    else:
-        log_norm_const = 0.0
-
     # Missing observations (NaN in d_obs or d_std) are ignored. NaN in the
     # prior data D, where the observation exists, means an infinitely poor
     # fit: L = 0, i.e. logL = -inf (issue #47).
     ok = ~np.isnan(d_obs) & ~np.isnan(d_std)
+
+    if normalize:
+        if log_norm_const is None:
+            # Only the observed channels: the likelihood of data with missing
+            # channels is the marginal over the valid channels (as in
+            # likelihood_gaussian_full). float64: d_std**2 of tiny EM noise
+            # can underflow in float32.
+            d_std64 = np.asarray(d_std, dtype=np.float64)[ok]
+            log_norm_const = -0.5 * np.sum(np.log(2*np.pi*d_std64**2))
+    else:
+        log_norm_const = 0.0
+
     if ok.all():
         dd, s = D - d_obs, d_std
     else:
