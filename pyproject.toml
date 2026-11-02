@@ -22,7 +22,7 @@ dependencies = [
     "psutil",
     "tqdm",
     "requests",
-    "geoprior1d>=1.0",
+    "geoprior1d>=1.0.1",
     "shapely",
     "ga-aem-forward-win; platform_system == 'Windows'",
     "simpeg>=0.25",
