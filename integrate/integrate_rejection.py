@@ -880,11 +880,13 @@ def integrate_rejection_em_height(f_prior_h5='prior.h5',
 
     # Prior data and posterior of each interval
     for k in k_use:
-        if showInfo > 0:
-            print('Interval %d/%d (%6.1f-%6.1f m): %d soundings'
-                  % (k + 1, n_bin, edges[k], edges[k + 1], len(ii_bin[k])))
+        reuse = reuse_prior_data and has_prior_data(f_prior_data_bin[k])
+        if showInfo > -1:
+            print('integrate_rejection_em_height: interval %d/%d (%6.1f-%6.1f m): %d soundings, %s prior data'
+                  % (k + 1, n_bin, edges[k], edges[k + 1], len(ii_bin[k]),
+                     'existing' if reuse else 'computing'))
 
-        if reuse_prior_data and has_prior_data(f_prior_data_bin[k]):
+        if reuse:
             if showInfo > 0:
                 print('  Using existing prior data file: %s' % f_prior_data_bin[k])
         else:
