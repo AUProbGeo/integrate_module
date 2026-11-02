@@ -132,9 +132,23 @@ def test_samples_identical_x64(case, tkw, tmp_path, jax_x64):
 
 def test_chi2_match(case, tkw, tmp_path):
     a, b = _both(case, tmp_path, **tkw)
-    assert a["CHI2"].shape == b["CHI2"].shape == (cases.NDP, case.n_types)
+    # per data type
+    assert a["CHI2_all"].shape == b["CHI2_all"].shape == (cases.NDP, case.n_types)
+    _assert_same_nan(a["CHI2_all"], b["CHI2_all"], "CHI2_all")
+    np.testing.assert_allclose(b["CHI2_all"], a["CHI2_all"], rtol=1e-5, equal_nan=True)
+    # all data types combined
+    assert a["CHI2"].shape == b["CHI2"].shape == (cases.NDP,)
     _assert_same_nan(a["CHI2"], b["CHI2"], "CHI2")
     np.testing.assert_allclose(b["CHI2"], a["CHI2"], rtol=1e-5, equal_nan=True)
+
+
+def test_per_type_stats_match(case, tkw, tmp_path):
+    """T_all and EV_all (per data type) agree between the backends."""
+    a, b = _both(case, tmp_path, **tkw)
+    for k, tol in (("T_all", T_TOL_F32), ("EV_all", EV_TOL_F32)):
+        assert a[k].shape == b[k].shape == (cases.NDP, case.n_types)
+        _assert_same_nan(a[k], b[k], k)
+        np.testing.assert_allclose(b[k], a[k], equal_nan=True, err_msg=k, **tol)
 
 
 def test_posterior_stats_match(case, tmp_path):
@@ -164,7 +178,7 @@ def test_numpy_float32_matches_float64(case, tkw, tmp_path):
     _assert_ev_t_f32(a, b)
     frac = np.mean(a["i_use"] == b["i_use"])
     assert frac >= 0.999, "only %.4f of i_use identical" % frac
-    np.testing.assert_allclose(b["CHI2"], a["CHI2"], rtol=1e-5, equal_nan=True)
+    np.testing.assert_allclose(b["CHI2_all"], a["CHI2_all"], rtol=1e-5, equal_nan=True)
 
 
 def test_numpy_float32_matches_jax(case, tkw, tmp_path):
@@ -212,7 +226,7 @@ def test_backend_env_var(build_case, tmp_path, monkeypatch):
     ref = run_rejection(case, "jax", tmp_path)
     monkeypatch.setenv("REJECTION_BACKEND", "jax")
     env = run_rejection(case, None, tmp_path, tag="_env")
-    for k in ("i_use", "T", "EV", "CHI2"):
+    for k in ("i_use", "T", "EV", "CHI2", "CHI2_all", "T_all", "EV_all"):
         np.testing.assert_array_equal(env[k], ref[k], err_msg=k)
 
 

@@ -92,12 +92,37 @@ def integrate_rejection(f_prior_h5='prior.h5',
     nr : int, optional
         Number of posterior samples to retain per data point.
         Default is 1000.
-    autoT : int, optional
-        Automatic temperature estimation method (1=enabled, 0=disabled).
-        Default is 1.
-    T_base : float, optional
-        Base temperature for rejection sampling when autoT=0.
-        Default is 1.
+    autoT : int, list or dict, optional
+        Automatic estimation of the annealing temperature (1=enabled,
+        0=disabled, then T=T_base).
+
+        - scalar (legacy): one temperature T for the summed log-likelihood of
+          all data types, P_acc = exp((sum_i L_i - max)/T).
+        - list with one value per data type in ``id_use`` (same order), or
+          dict ``{data_id: 0/1}`` (data ids not listed get 1): one
+          temperature per data type. T_i is estimated from L_i alone
+          (autoT[i]=1) or set to T_base[i] (autoT[i]=0), and
+          P_acc = exp(L_T - max(L_T)) with L_T = sum_i L_i/T_i.
+
+        For example, with ``id_use=[1,2,3]`` (tTEM, borehole 1, borehole 2),
+        ``autoT=[1,0,0], T_base=1`` anneals the tTEM data and uses no
+        annealing (T=1) for the borehole data. Note that ``autoT=[1,1,1]``
+        (one T per data type) differs from ``autoT=1`` (one T for all data
+        types). Default is 1.
+    T_base : float, list or dict, optional
+        Temperature used when autoT=0 (T_base=1 is no annealing), as a scalar
+        or per data type (list in the order of ``id_use``, or dict
+        ``{data_id: T}``; data ids not listed get 1), e.g.
+        ``autoT=0, T_base=[4,1,1]``. If either autoT or T_base is given per
+        data type, the temperature is per data type. Default is 1.
+
+        The posterior file holds, per data point, the combined values
+        ``/T`` (largest T_i in per-type mode), ``/EV`` (log-evidence of all
+        data types) and ``/CHI2`` (reduced chi-squared of all data), and per
+        data type (column k is ``/D{id_use[k]}``, NaN where a data type is
+        not used) ``/T_all``, ``/EV_all`` (log-evidence of each data type
+        alone) and ``/CHI2_all``. The attributes ``id_use``, ``autoT`` and
+        ``T_base`` hold the per-data-type settings.
     Nchunks : int, optional
         Number of chunks for parallel processing. If 0, auto-determined.
         Default is 0.
@@ -242,7 +267,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
         f_prior_basename = os.path.splitext(os.path.basename(f_prior_h5))[0]
         
         # Construct the new filename
-        f_post_h5 = os.path.join(posterior_output_path, "POST_%s_Nu%d_aT%d.h5" % (f_prior_basename, N_use, autoT))
+        f_post_h5 = os.path.join(posterior_output_path, "POST_%s_Nu%d_%s.h5" % (f_prior_basename, N_use, _autoT_tag(autoT)))
 
     # Check that f_post_h5 already exists, and warn the user   
     if os.path.isfile(f_post_h5):
@@ -269,10 +294,15 @@ def integrate_rejection(f_prior_h5='prior.h5',
 
     Ndt = len(id_use) # Number of data types used
 
+    # Check autoT/T_base (scalar, or one value per data type) before loading data
+    per_type_T, autoT_arr, T_base_arr = _resolve_temperature(autoT, T_base, id_use)
+
     if showInfo>1:
         print('-- Number of data types: %d' % Ndt_total)
-        
+
         print('-- Using these data types: %s' % str(id_use))
+        if per_type_T:
+            print('-- Temperature per data type: autoT=%s, T_base=%s' % (autoT_arr, T_base_arr))
 
     
     # Load the observed data from the h5 files
@@ -358,7 +388,12 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # 'posterior' evience - mean posterior likelihood TODO
     EV_post_all  = np.zeros(Ndp)*np.nan
     EV_post_all_mean = np.zeros(Ndp)*np.nan
+    # Per data type: reduced chi-squared, temperature and log-evidence
     CHI2_all = np.zeros((Ndp, Ndt))*np.nan
+    T_types_all = np.zeros((Ndp, Ndt))*np.nan
+    EV_types_all = np.zeros((Ndp, Ndt))*np.nan
+    # Combined reduced chi-squared of all data types
+    CHI2_comb_all = np.zeros(Ndp)*np.nan
 
     date_start = str(datetime.now())
     t_start = datetime.now()
@@ -372,11 +407,23 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # two function are implemented to perform the inversion directly on the loaded data.
     # A third option, backend='jax', uses JAX for likelihood computation.
 
+    def store(ip_range, i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, per_type):
+        ip = np.asarray(ip_range, dtype=np.int64)
+        i_use_all[ip] = i_use
+        T_all[ip] = T
+        EV_all[ip] = EV
+        EV_post_all[ip] = EV_post
+        EV_post_all_mean[ip] = EV_post_mean
+        CHI2_all[ip, :] = CHI2
+        N_UNIQUE_all[ip] = N_UNIQUE
+        T_types_all[ip, :] = per_type['T_types']
+        EV_types_all[ip, :] = per_type['EV_types']
+        CHI2_comb_all[ip] = per_type['CHI2_comb']
 
     if backend == 'jax':
         from integrate.integrate_rejection_jax import integrate_rejection_range_jax
         Nbatch = kwargs.pop('Nbatch', None)
-        i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range_jax(
+        i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range, per_type = integrate_rejection_range_jax(
             D=D,
             DATA=DATA,
             idx=idx,
@@ -390,17 +437,10 @@ def integrate_rejection(f_prior_h5='prior.h5',
             T_P_acc_level=_T_P_acc_level,
             progress_callback=progress_callback,
             Nbatch=Nbatch,
+            return_per_type=True,
             **kwargs,
         )
-        for i in range(len(ip_range)):
-            ip = ip_range[i]
-            i_use_all[ip] = i_use[i]
-            T_all[ip] = T[i]
-            EV_all[ip] = EV[i]
-            EV_post_all[ip] = EV_post[i]
-            EV_post_all_mean[ip] = EV_post_mean[i]
-            CHI2_all[ip, :] = CHI2[i, :]
-            N_UNIQUE_all[ip] = N_UNIQUE[i]
+        store(ip_range, i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, per_type)
 
     elif parallel:
         # Split the ip_range into Nchunks
@@ -420,7 +460,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
         if showInfo>1:
             print('Ncpu = %d\nNchunks=%d' % (Ncpu, Nchunks))
 
-        i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all = integrate_posterior_main(
+        i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, per_type = integrate_posterior_main(
             ip_chunks=ip_chunks,
             D=D,
             DATA = DATA,
@@ -438,11 +478,14 @@ def integrate_rejection(f_prior_h5='prior.h5',
             dtype=dtype,
             progress_callback=update_progress if progress_callback else None,
         )
+        T_types_all = per_type['T_types']
+        EV_types_all = per_type['EV_types']
+        CHI2_comb_all = per_type['CHI2_comb']
 
 
     else:
 
-            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(D=D,
+            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range, per_type = integrate_rejection_range(D=D,
                                         DATA = DATA,
                                         idx = idx,
                                         N_use=N_use,
@@ -456,23 +499,16 @@ def integrate_rejection(f_prior_h5='prior.h5',
                                         T_P_acc_level=_T_P_acc_level,
                                         progress_callback=progress_callback,
                                         console_progress=console_progress,
+                                        return_per_type=True,
                                         **kwargs
                                         )
-        
-            for i in range(len(ip_range)):
-                ip = ip_range[i]
-                #print('ip=%d, i=%d' % (ip,i))
-                i_use_all[ip] = i_use[i]
-                T_all[ip] = T[i]
-                EV_all[ip] = EV[i]
-                EV_post_all[ip] = EV_post[i]
-                EV_post_all_mean[ip] = EV_post_mean[i]
-                CHI2_all[ip, :] = CHI2[i, :]
-                N_UNIQUE_all[ip] = N_UNIQUE[i]
+            store(ip_range, i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, per_type)
 
     # WHere T_all is Inf set it to Nan
     T_all[T_all==np.inf] = np.nan
     EV_all[EV_all==np.inf] = np.nan
+    T_types_all[T_types_all==np.inf] = np.nan
+    EV_types_all[EV_types_all==np.inf] = np.nan
     
     date_end = str(datetime.now())
     t_end = datetime.now()
@@ -481,15 +517,25 @@ def integrate_rejection(f_prior_h5='prior.h5',
     if (showInfo>-1):
         print('integrate_rejection: Time=%5.1fs/%d soundings, %4.1fms/sounding, %3.1fit/s. ' % (t_elapsed,Ndp_invert,t_per_sounding*1000,Ndp_invert/t_elapsed), end='')
         print('T_av=%3.1f, EV_av=%3.1f' % (np.nanmean(T_all), np.nanmean(EV_all)))
+        if per_type_T:
+            T_av_types = [np.nanmean(c) if np.any(~np.isnan(c)) else np.nan for c in T_types_all.T]
+            print('  T_av per data type: %s' % ', '.join(
+                'D%d=%3.1f' % (id_, T_av) for id_, T_av in zip(id_use, T_av_types)))
 
     # SAVE THE RESULTS to f_post_h5
+    #  /T, /EV, /CHI2      : (Ndp,)      all data types combined
+    #  /T_all, /EV_all,
+    #  /CHI2_all           : (Ndp, Ndt)  per data type, column k is data type /D{id_use[k]}
     with h5py.File(f_post_h5, 'w') as f_post:
         f_post.create_dataset('i_use', data=i_use_all)
         f_post.create_dataset('T', data=T_all)
+        f_post.create_dataset('T_all', data=T_types_all)
         f_post.create_dataset('EV', data=EV_all)
+        f_post.create_dataset('EV_all', data=EV_types_all)
         f_post.create_dataset('EV_post', data=EV_post_all)
         f_post.create_dataset('EV_post_mean', data=EV_post_all_mean)
-        f_post.create_dataset('CHI2', data=CHI2_all)
+        f_post.create_dataset('CHI2', data=CHI2_comb_all)
+        f_post.create_dataset('CHI2_all', data=CHI2_all)
         f_post.create_dataset('N_UNIQUE', data=N_UNIQUE_all)
         #f_post.create_dataset('ip_range', data=ip_range)
         f_post.attrs['date_start'] = date_start
@@ -498,6 +544,10 @@ def integrate_rejection(f_prior_h5='prior.h5',
         f_post.attrs['f5_prior'] = f_prior_h5
         f_post.attrs['f5_data'] = f_data_h5
         f_post.attrs['N_use'] = N_use
+        f_post.attrs['id_use'] = np.asarray(id_use, dtype=np.int64)
+        f_post.attrs['autoT'] = autoT_arr
+        f_post.attrs['T_base'] = T_base_arr
+        f_post.attrs['per_type_T'] = int(per_type_T)
     
     # Update progress - saving results
     if progress_callback:
@@ -858,8 +908,8 @@ def integrate_rejection_em_height(f_prior_h5='prior.h5',
     f_prior_dir = os.path.dirname(f_prior_h5)
     f_prior_base = os.path.splitext(os.path.basename(f_prior_h5))[0]
     if len(f_post_h5) == 0:
-        f_post_h5 = os.path.join(posterior_output_path, 'POST_%s_Nu%d_aT%d_EMh%d.h5'
-                                 % (f_prior_base, N_use, autoT, n_bin))
+        f_post_h5 = os.path.join(posterior_output_path, 'POST_%s_Nu%d_%s_EMh%d.h5'
+                                 % (f_prior_base, N_use, _autoT_tag(autoT), n_bin))
     txt_bin = ['_h%05.1f-%05.1f' % (edges[k], edges[k + 1]) for k in range(n_bin)]
     if len(f_prior_data_base) == 0:
         f_prior_data_base = os.path.join(f_prior_dir, 'PRIOR_DATA_%s' % f_prior_base)
@@ -961,8 +1011,217 @@ def integrate_rejection_em_height(f_prior_h5='prior.h5',
     return f_post_h5
 
 
+def _resolve_per_type(value, id_use, name, default=1):
+    """
+    Resolve a per-data-type option (``autoT`` or ``T_base``) to one value per data type.
+
+    Parameters
+    ----------
+    value : scalar, list, tuple, ndarray or dict
+        A scalar applies to all data types (legacy mode). A list/tuple/ndarray
+        gives one value per entry of ``id_use`` (same order). A dict
+        ``{data_id: value}`` sets the value of the listed data ids; the other
+        data types get ``default``.
+    id_use : list
+        Data ids used in the inversion.
+    name : str
+        Name of the option, used in error messages.
+    default : float, optional
+        Value for data ids not given in a dict. Default is 1.
+
+    Returns
+    -------
+    per_type : bool
+        False if ``value`` is a scalar (legacy mode), else True.
+    arr : ndarray of float, shape (len(id_use),)
+        Value per data type.
+    """
+    Ndt = len(id_use)
+    if isinstance(value, dict):
+        ids = [int(i) for i in id_use]
+        unknown = set(int(k) for k in value) - set(ids)
+        if unknown:
+            raise ValueError('%s: data id(s) %s not in id_use=%s' % (name, sorted(unknown), ids))
+        arr = np.array([float(value.get(i, default)) for i in ids])
+        return True, arr
+    if np.ndim(value) == 0:
+        return False, np.full(Ndt, float(value))
+    arr = np.asarray(value, dtype=float).ravel()
+    if arr.size != Ndt:
+        raise ValueError('%s has %d values, but %d data types are used (id_use=%s)'
+                         % (name, arr.size, Ndt, list(id_use)))
+    return True, arr
+
+
+def _resolve_temperature(autoT, T_base, id_use):
+    """
+    Resolve ``autoT`` and ``T_base`` to arrays with one value per data type.
+
+    Returns
+    -------
+    per_type_T : bool
+        True if either ``autoT`` or ``T_base`` is given per data type. Then
+        each data type is tempered with its own temperature. If False, one
+        temperature is used for the summed log-likelihood (legacy mode).
+    autoT_arr : ndarray of float, shape (Ndt,)
+    T_base_arr : ndarray of float, shape (Ndt,)
+    """
+    per_type_a, autoT_arr = _resolve_per_type(autoT, id_use, 'autoT', default=1)
+    per_type_b, T_base_arr = _resolve_per_type(T_base, id_use, 'T_base', default=1)
+    if np.any(~(T_base_arr > 0)):
+        raise ValueError('T_base must be > 0, got %s' % T_base_arr)
+    return (per_type_a or per_type_b), autoT_arr, T_base_arr
+
+
+def _autoT_tag(autoT):
+    """File name tag for autoT: 'aT1' for a scalar, 'aT1-0-0' for a list, 'aTd1-0' for a dict."""
+    if isinstance(autoT, dict):
+        return 'aTd' + '-'.join('%d' % int(autoT[k]) for k in sorted(autoT))
+    if np.ndim(autoT) == 0:
+        return 'aT%d' % int(autoT)
+    return 'aT' + '-'.join('%d' % int(a) for a in np.ravel(autoT))
+
+
+def _logmeanexp(L):
+    """Numerically stable log(mean(exp(L))), ignoring NaN (the evidence)."""
+    max_L = np.nanmax(L)
+    return max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
+
+
+def _combined_chi2(chi2_types, n_types):
+    """
+    Combined reduced chi-squared of all data types: sum_i chi2_i*n_i / sum_i n_i.
+
+    Works on one data point (1-D input) or many (2-D input, data points in rows).
+    Data types without data (n_i=0) or with NaN chi2 are left out. NaN if no
+    data type has data.
+    """
+    chi2_types = np.asarray(chi2_types, dtype=float)
+    n_types = np.asarray(n_types, dtype=float)
+    ok = (n_types > 0) & np.isfinite(chi2_types)
+    num = np.sum(np.where(ok, chi2_types * n_types, 0.0), axis=-1)
+    den = np.sum(np.where(ok, n_types, 0.0), axis=-1)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        return np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
+
+
+def _temper_sample_stats(L_sum, L_types, active, n_per_type, lnc_per_type, L_types_normalized,
+                         autoT_arr, T_base_arr, per_type_T, N_above, P_acc_lev, nr):
+    """
+    Annealing temperature, posterior sampling and statistics for one data point.
+
+    Shared by the numpy backend and the CPU path of the JAX backend.
+
+    Parameters
+    ----------
+    L_sum : ndarray, shape (N,)
+        Summed (untempered) log-likelihood of all data types. Used for EV,
+        and for T in legacy mode.
+    L_types : sequence of length Ndt
+        Log-likelihood (N,) per data type. Entries of inactive types are not
+        used (may be None).
+    active : array of bool, shape (Ndt,)
+        True for the data types used at this data point.
+    n_per_type : array, shape (Ndt,)
+        Number of (non-NaN) data per data type.
+    lnc_per_type : array, shape (Ndt,)
+        Gaussian normalization constant per data type (0 if not normalized).
+    L_types_normalized : bool
+        True if ``L_types`` includes the normalization constant (it is then
+        subtracted for CHI2), False if ``L_types`` is de-normalized (it is then
+        added for EV).
+    autoT_arr, T_base_arr : ndarray, shape (Ndt,)
+        Temperature options per data type (see _resolve_temperature).
+    per_type_T : bool
+        If False (legacy), one temperature T is estimated from (autoT) or set
+        for (T_base) ``L_sum``, and P_acc = exp((L_sum - max)/T). If True,
+        T_i is estimated from (autoT[i]=1) or set to T_base[i] for each data
+        type, and P_acc = exp(L_T - max(L_T)), with L_T = sum_i L_i/T_i.
+    N_above, P_acc_lev : passed to logl_T_est.
+    nr : int
+        Number of posterior samples.
+
+    Returns
+    -------
+    i_use : ndarray (nr,)
+        Index (0..N-1) of the posterior samples in the likelihood arrays.
+    T : float
+        Temperature (per-type mode: the largest T_i).
+    T_types : ndarray (Ndt,)
+        Temperature per data type (NaN for inactive types).
+    EV : float
+        Log-evidence of all data types (from the untempered ``L_sum``).
+    EV_types : ndarray (Ndt,)
+        Log-evidence of each data type alone (NaN for inactive types).
+    CHI2_types : ndarray (Ndt,)
+        Reduced chi-squared of the posterior samples per data type.
+    """
+    import integrate as ig
+
+    Ndt = len(active)
+    N = L_sum.shape[0]
+    T_types = np.full(Ndt, np.nan)
+
+    if per_type_T:
+        L_T = np.zeros(N)
+        for i in range(Ndt):
+            if not active[i]:
+                continue
+            L_i = np.asarray(L_types[i], dtype=np.float64)
+            if autoT_arr[i] == 1:
+                T_i = ig.logl_T_est(L_i, N_above=N_above, P_acc_lev=P_acc_lev)
+            else:
+                T_i = float(T_base_arr[i])
+            T_types[i] = T_i
+            # T_i is inf only if all L_i are NaN: then data type i is left out
+            if np.isfinite(T_i):
+                L_T += L_i / T_i
+        T = np.nanmax(T_types) if np.any(~np.isnan(T_types)) else np.nan
+        P_acc = np.exp(L_T - np.nanmax(L_T))
+    else:
+        if autoT_arr[0] == 1:
+            T = ig.logl_T_est(L_sum, N_above=N_above, P_acc_lev=P_acc_lev)
+        else:
+            T = float(T_base_arr[0])
+        T_types[np.asarray(active, dtype=bool)] = T
+        P_acc = np.exp((1/T) * (L_sum - np.nanmax(L_sum)))
+    P_acc[np.isnan(P_acc)] = 0
+
+    # Draw nr samples with probability proportional to P_acc
+    p_sum = np.sum(P_acc)
+    i_use = None
+    if p_sum > 0 and np.isfinite(p_sum):
+        try:
+            i_use = np.random.choice(N, nr, p=P_acc/p_sum)
+        except ValueError:
+            i_use = None
+    if i_use is None:
+        logger.warning('All acceptance probabilities are zero or NaN: using random prior samples')
+        i_use = np.random.choice(N, nr)
+
+    # Reduced chi-squared per data type: mean(-2*logL) / n_data of the posterior
+    # samples. De-normalized so CHI2 is a pure misfit statistic (~1 for a good fit).
+    CHI2_types = np.full(Ndt, np.nan)
+    EV_types = np.full(Ndt, np.nan)
+    for i in range(Ndt):
+        if not active[i]:
+            continue
+        if n_per_type[i] > 0:
+            if L_types_normalized:
+                L_accepted = L_types[i][i_use] - lnc_per_type[i]
+            else:
+                L_accepted = L_types[i][i_use]
+            CHI2_types[i] = np.nanmean(-2.0 * L_accepted) / n_per_type[i]
+        EV_i = _logmeanexp(np.asarray(L_types[i], dtype=np.float64))
+        EV_types[i] = EV_i if L_types_normalized else EV_i + lnc_per_type[i]
+
+    EV = _logmeanexp(L_sum)
+
+    return i_use, T, T_types, EV, EV_types, CHI2_types
+
+
 def integrate_rejection_range(D,
-                              DATA, 
+                              DATA,
                               idx = [],
                               N_use=None, 
                               id_use=[], 
@@ -973,6 +1232,7 @@ def integrate_rejection_range(D,
                               T_N_above=10,
                               T_P_acc_level=0.2,
                               progress_callback=None,
+                              return_per_type=False,
                               **kwargs):
     """
     Perform rejection sampling for a specific range of data points.
@@ -1003,12 +1263,15 @@ def integrate_rejection_range(D,
     nr : int, optional
         Number of posterior samples to retain per data point.
         Default is 1000.
-    autoT : int, optional
-        Automatic temperature estimation method (1=enabled, 0=disabled).
-        Default is 1.
-    T_base : float, optional
-        Base temperature for rejection sampling when autoT=0.
-        Default is 1.
+    autoT : int, list or dict, optional
+        Automatic temperature estimation (1=enabled, 0=disabled). A scalar
+        gives one temperature for the summed log-likelihood of all data types.
+        A list (one value per data type in ``id_use``) or dict
+        ``{data_id: 0/1}`` gives a temperature per data type, see
+        :func:`integrate_rejection`. Default is 1.
+    T_base : float, list or dict, optional
+        Temperature used when autoT=0, as a scalar or per data type (list or
+        dict). Default is 1.
     T_N_above : int, optional
         Number of top samples used by ``logl_T_est`` to estimate the annealing
         temperature. Passed as ``N_above`` to :func:`logl_T_est`.
@@ -1020,6 +1283,12 @@ def integrate_rejection_range(D,
     progress_callback : callable, optional
         Optional callback function for progress updates. Called with (current, total).
         Default is None (no callbacks).
+    return_per_type : bool, optional
+        If True, a dict with per-data-type results is returned as a 9th
+        element: 'T_types' (nump, Ndt) temperature per data type, 'EV_types'
+        (nump, Ndt) log-evidence of each data type alone and 'CHI2_comb'
+        (nump,) combined reduced chi-squared. Default is False (8 elements,
+        as before).
     **kwargs : dict
         Additional arguments including useRandomData, showInfo, use_N_best, and
         normalize_likelihood (bool, default True; use the full normalized
@@ -1036,11 +1305,15 @@ def integrate_rejection_range(D,
         Evidence values for each data point.
     EV_post_all : ndarray, shape (nump,)
         Posterior evidence values for each data point.
+    CHI2_all : ndarray, shape (nump, Ndt)
+        Reduced chi-squared per data type for each data point.
     N_UNIQUE_all : ndarray, shape (nump,)
         Number of unique samples for each data point.
     ip_range : ndarray
         Range of data point indices that were processed.
-    
+    per_type : dict
+        Only if ``return_per_type=True``, see above.
+
     Notes
     -----
     This function is the computational core of the rejection sampling algorithm.
@@ -1095,7 +1368,10 @@ def integrate_rejection_range(D,
         Ndt=len(DATA['d_obs'])
         id_use = np.arange(Ndt)
     Ndt = len(id_use)
-        
+
+    # Temperature per data type (per_type_T) or for the summed likelihood (legacy)
+    per_type_T, autoT_arr, T_base_arr = _resolve_temperature(autoT, T_base, id_use)
+
     i_use_all = np.zeros((nump, nr), dtype=np.int32)
     T_all = np.zeros(nump)*np.nan
     EV_all = np.zeros(nump)*np.nan
@@ -1103,6 +1379,9 @@ def integrate_rejection_range(D,
     EV_post_all_mean = np.zeros(nump)*np.nan
     CHI2_all = np.zeros((nump, Ndt))*np.nan
     N_UNIQUE_all = np.zeros(nump)*np.nan
+    T_types_all = np.zeros((nump, Ndt))*np.nan
+    EV_types_all = np.zeros((nump, Ndt))*np.nan
+    CHI2_comb_all = np.zeros(nump)*np.nan
     
     
     # Get the lookup sample size
@@ -1185,6 +1464,7 @@ def integrate_rejection_range(D,
         total_n_data_non_nan = 0  # Initialize total count for all data types
         n_data_per_type = np.zeros(Ndt)  # Track data count per data type
         log_norm_const_per_type = np.zeros(Ndt)  # Gaussian normalization constant used per data type (0 unless normalize_likelihood)
+        active = np.zeros(Ndt, dtype=bool)  # data types used at this data point
 
         for i in range(Ndt):
             use_data_point = i_use_data[i][ip]
@@ -1245,6 +1525,7 @@ def integrate_rejection_range(D,
                         raise ValueError('Gaussian data type %d has neither d_std or Cd' % i)
 
                     L[i] = L_single
+                    active[i] = True
                     t.append(time.time()-t0)
                 elif noise_model[i]=='multinomial':
                     d_obs = DATA['d_obs'][i][ip].astype(dtype, copy=False)
@@ -1262,7 +1543,8 @@ def integrate_rejection_range(D,
                         
                         L_single = likelihood_multinomial(D[i_prior],d_obs, np.array(class_id), class_is_idx=class_is_idx)
                         #print(L_single[0])
-                    L[i] = L_single           
+                    L[i] = L_single
+                    active[i] = True
                     t.append(time.time()-t0)
 
                 else: 
@@ -1272,87 +1554,28 @@ def integrate_rejection_range(D,
             else:
                 L[i] = np.zeros(N)
                     
-        t0=time.time()
-
-        # Now we have all the likelihoods for all data types. Combine them into one
-        # L is an array of shape (Ndt,1)
-        # If we have only one data type, then L is already correct, 
-        # and we do not need to sum
+        # Now we have all the likelihoods for all data types, L of shape (Ndt, N).
+        # Sum them (untempered) for EV and, in legacy mode, for the temperature.
         L_single = L
         if Ndt>1:
             L = np.sum(L_single, axis=0)
         # Temperature, acceptance probabilities, sampling and EV in float64
         # (one length-N vector, cheap). L_single keeps dtype, used for CHI2.
-        L = L.astype(np.float64, copy=False)
+        L = L.astype(np.float64, copy=False).reshape(-1)
 
-        # Automatic annealing temperature estimation, if autoT=1, else use T=T_base
-        # T_base = 1 indicates no annealing
+        # Annealing temperature (autoT=1: estimated, else T=T_base; T_base=1 is
+        # no annealing), either one T for the summed likelihood (legacy) or one
+        # T per data type (per_type_T), posterior sampling, EV and CHI2.
         t0=time.time()
-        # Compute the annealing temperature
-        if autoT == 1:
-            T = ig.logl_T_est(L, N_above=T_N_above, P_acc_lev=T_P_acc_level)
-        else:
-            T = T_base        
-        # maxlogL = np.nanmax(logL)
-        t.append(time.time()-t0)
-
-        # Find ns realizations of the posterior, using the log-likelihood values logL, and the annealing tempetrature T 
-        
-        P_acc = np.exp((1/T) * (L - np.nanmax(L)))
-        P_acc[np.isnan(P_acc)] = 0
-
-        # Select the index of P_acc propportion to the probabilituy given by P_acc
-        t0=time.time()
-        try:
-            if P_acc.shape[0] == 1:
-                # This should probably not happen!
-                P_acc = P_acc.flatten()
-            p=P_acc/np.sum(P_acc)
-            i_use = np.random.choice(N, nr, p=p)
-        except:       
-            print('####################################################################')     
-            print('####################################################################')     
-            print('Error in np.random.choice for ip=%d' % ip)   
-            print('####################################################################')     
-            print('####################################################################')     
-            i_use = np.random.choice(N, nr)
-            
-
-        #print(P_acc.shape)
-        #print(p.shape)
-        #print(i_use.shape)
-
-        # Store i_use before reordering (for computing CHI2)
-        #i_use_before_reordering = i_use.copy()
-        # Compute CHI2 (reduced chi-squared) per data type
-        # CHI2 = mean(-2 * log-likelihood) / n_data
-        CHI2_current = np.zeros(Ndt) * np.nan
-        for i in range(Ndt):
-            if n_data_per_type[i] > 0:
-                # Get log-likelihood for accepted samples for this data type
-                # De-normalize (subtract back out the Gaussian normalization constant,
-                # if any) so CHI2 remains a pure misfit statistic (~2 for a good fit).
-                L_accepted = L_single[i, i_use] - log_norm_const_per_type[i]
-
-                # Convert log-likelihood to chi-squared: chi2 = -2 * logL
-                chi2_samples = -2.0 * L_accepted
-
-                # Compute mean chi-squared
-                chi2_mean = np.nanmean(chi2_samples)
-
-                # Normalize by number of data points to get reduced chi-squared
-                CHI2_current[i] = chi2_mean / n_data_per_type[i]
+        i_use, T, T_types, EV, EV_types, CHI2_current = _temper_sample_stats(
+            L, L_single, active, n_data_per_type, log_norm_const_per_type, True,
+            autoT_arr, T_base_arr, per_type_T, T_N_above, T_P_acc_level, nr)
 
         if useRandomData:
             # get the correct index of the subset used
             i_use = idx[i_use]
 
-        t.append(time.time()-t0)        
-
-        # Compute the evidence
-        # Numerically stable log-mean-exp calculation
-        max_L = np.nanmax(L)
-        EV = max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
+        t.append(time.time()-t0)
 
         # BUG !!!
         # Compute log-'posterior evidence' - mean posterior log-likelihood
@@ -1364,16 +1587,6 @@ def integrate_rejection_range(D,
             EV_post_mean = EV_post / total_n_data_non_nan
         else:
             EV_post_mean = np.nan
-        
-        t.append(time.time()-t0)
-
-        pltDegug = 0
-        if pltDegug>0:
-            import matplotlib.pyplot as plt
-            plt.semilogy(d_obs, 'k', linewidth=4)
-            plt.semilogy(D[0][i_use].T, 'r', linewidth=1)
-            plt.show()
-            print(D[0][10])
 
         i_use_all[j] = i_use
         T_all[j] = T
@@ -1381,6 +1594,9 @@ def integrate_rejection_range(D,
         EV_post_all[j] = EV_post
         EV_post_all_mean[j] = EV_post_mean
         CHI2_all[j, :] = CHI2_current
+        T_types_all[j, :] = T_types
+        EV_types_all[j, :] = EV_types
+        CHI2_comb_all[j] = _combined_chi2(CHI2_current, n_data_per_type)
         # find the number of unique indexes
         N_UNIQUE_all[j] = len(np.unique(i_use))
 
@@ -1391,7 +1607,10 @@ def integrate_rejection_range(D,
                 else:
                     print(' Time id%d, sampling: %f' % (i,t[i]))
             print('Time total: %f' % np.sum(t))
-        
+
+    if return_per_type:
+        per_type = {'T_types': T_types_all, 'EV_types': EV_types_all, 'CHI2_comb': CHI2_comb_all}
+        return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, ip_range, per_type
     return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, ip_range
 
 
@@ -1418,10 +1637,10 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         Maximum number of prior samples per chunk.
     id_use : list
         List of data identifiers for likelihood calculation.
-    autoT : int
-        Automatic temperature estimation flag.
-    T_base : float
-        Base temperature for rejection sampling.
+    autoT : int, list or dict
+        Automatic temperature estimation flag (scalar or per data type).
+    T_base : float, list or dict
+        Base temperature for rejection sampling (scalar or per data type).
     nr : int
         Number of posterior samples to retain per data point.
     Ncpu : int
@@ -1443,9 +1662,15 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         Evidence values for all data points.
     EV_post_all : ndarray, shape (Ndp,)
         Posterior evidence values for all data points.
+    EV_post_all_mean : ndarray, shape (Ndp,)
+    CHI2_all : ndarray, shape (Ndp, Ndt)
+        Reduced chi-squared per data type.
     N_UNIQUE_all : ndarray, shape (Ndp,)
         Number of unique samples for all data points.
-    
+    per_type : dict
+        'T_types' and 'EV_types' (Ndp, Ndt) and 'CHI2_comb' (Ndp,), see
+        ``integrate_rejection_range(return_per_type=True)``.
+
     Notes
     -----
     This function uses shared memory to minimize data copying overhead during parallel processing.
@@ -1494,7 +1719,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
                 done_dp = 0
                 for res in p.imap_unordered(integrate_posterior_chunk, chunk_args):
                     results.append(res)
-                    done_dp += len(res[-1])  # last element is the chunk's ip_range
+                    done_dp += len(res[7])  # element 7 is the chunk's ip_range
                     progress_callback(done_dp, total_dp,
                                       {'phase': 'sampling',
                                        'status': 'Rejection sampling (%d/%d data points)' % (done_dp, total_dp)})
@@ -1528,20 +1753,25 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     EV_post_all_mean = np.zeros(Ndp)*np.nan
     CHI2_all = np.zeros((Ndp, Ndt))*np.nan
     N_UNIQUE_all = np.zeros(Ndp)*np.nan
+    T_types_all = np.zeros((Ndp, Ndt))*np.nan
+    EV_types_all = np.zeros((Ndp, Ndt))*np.nan
+    CHI2_comb_all = np.zeros(Ndp)*np.nan
 
-    for i, (i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range) in enumerate(results):
-        for i in range(len(ip_range)):
-                ip = ip_range[i]
-                #print('ip=%d, i=%d' % (ip,i))
-                i_use_all[ip] = i_use[i]
-                T_all[ip] = T[i]
-                EV_all[ip] = EV[i]
-                EV_post_all[ip] = EV_post[i]
-                EV_post_all_mean[ip] = EV_post_mean[i]
-                CHI2_all[ip, :] = CHI2[i, :]
-                N_UNIQUE_all[ip] = N_UNIQUE[i]
+    for (i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range, per_type) in results:
+        ip = np.asarray(ip_range, dtype=np.int64)
+        i_use_all[ip] = i_use
+        T_all[ip] = T
+        EV_all[ip] = EV
+        EV_post_all[ip] = EV_post
+        EV_post_all_mean[ip] = EV_post_mean
+        CHI2_all[ip, :] = CHI2
+        N_UNIQUE_all[ip] = N_UNIQUE
+        T_types_all[ip, :] = per_type['T_types']
+        EV_types_all[ip, :] = per_type['EV_types']
+        CHI2_comb_all[ip] = per_type['CHI2_comb']
 
-    return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all
+    per_type_all = {'T_types': T_types_all, 'EV_types': EV_types_all, 'CHI2_comb': CHI2_comb_all}
+    return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, per_type_all
 
 
 
@@ -1563,18 +1793,10 @@ def integrate_posterior_chunk(args):
 
     Returns
     -------
-    i_use : ndarray, shape (nump, nr)
-        Indices of accepted posterior samples for the chunk.
-    T : ndarray, shape (nump,)
-        Temperature values used for the chunk.
-    EV : ndarray, shape (nump,)
-        Evidence values for the chunk.
-    EV_post : ndarray, shape (nump,)
-        Posterior evidence values for the chunk.
-    N_UNIQUE : ndarray, shape (nump,)
-        Number of unique samples for the chunk.
-    ip_range : ndarray
-        Range of data point indices that were processed.
+    tuple
+        The 9-tuple of ``integrate_rejection_range(..., return_per_type=True)``
+        for the chunk: (i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE,
+        ip_range, per_type).
     
     Notes
     -----
@@ -1609,7 +1831,8 @@ def integrate_posterior_chunk(args):
         # full multithreaded BLAS pool oversubscribe the cores, making the
         # parallel run slower than the serial one (~7x speedup measured).
         with threadpool_limits(limits=1):
-            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(
+            # 9-tuple: (..., N_UNIQUE, ip_range, per_type)
+            return integrate_rejection_range(
                 D,
                 DATA,
                 idx,
@@ -1624,9 +1847,8 @@ def integrate_posterior_chunk(args):
                 T_P_acc_level=T_P_acc_level,
                 normalize_likelihood=normalize_likelihood,
                 dtype=dtype,
+                return_per_type=True,
             )
-
-        return i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range
     
     finally:
         # Clean up worker's shared memory references

@@ -441,15 +441,25 @@ Statistics are written by :func:`integrate.integrate.integrate_posterior_stats`.
      - *
      - Indices (into PRIOR.h5) of posterior realizations for each data location.
    * - /T
-     - [Np, 1]
+     - [Np]
      -
      - *
-     - Annealing temperature used during inversion.
+     - Annealing temperature used during inversion. With per-data-type temperatures (see :ref:`rejection`) this is the largest of the per-type temperatures in ``/T_all``.
+   * - /T_all
+     - [Np, Nd]
+     -
+     -
+     - Annealing temperature used for each data type. Columns follow the ``id_use`` attribute. NaN where a data type has no data at that location. With a single common temperature all columns equal ``/T``.
    * - /EV
-     - [Np, 1]
+     - [Np]
      -
      - *
-     - Log-evidence at each data location.
+     - Log-evidence of all data types combined, at each data location (computed from the untempered likelihood).
+   * - /EV_all
+     - [Np, Nd]
+     -
+     -
+     - Log-evidence of each data type alone. Columns follow ``id_use``; NaN where a data type has no data.
    * - /EV_post
      - [Np, Nr]
      -
@@ -461,10 +471,15 @@ Statistics are written by :func:`integrate.integrate.integrate_posterior_stats`.
      -
      - Mean of ``EV_post`` over the posterior realizations.
    * - /CHI2
+     - [Np]
+     -
+     -
+     - Combined reduced chi-squared (χ²/ν) of all data types: the mean of the per-type values in ``/CHI2_all``, weighted by the number of data in each type. Values near 1 indicate good fit; >1 underfit; <1 overfit. POST files written by older versions store the per-type values here as [Np, Nd] and have no ``/CHI2_all``.
+   * - /CHI2_all
      - [Np, Nd]
      -
      -
-     - Reduced chi-squared (χ²/ν) goodness-of-fit metric per data type. Values near 1 indicate good fit; >1 underfit; <1 overfit.
+     - Reduced chi-squared (χ²/ν) per data type. Columns follow ``id_use``; NaN where a data type has no data.
    * - /N_UNIQUE
      - [Np]
      -
@@ -508,6 +523,12 @@ The file-level attributes of POST.h5 record the inputs of the run:
      - Number of prior realizations used.
    * - ``date_start``, ``date_end``, ``inv_time``
      - Start and end time, and elapsed time of the rejection run.
+   * - ``id_use``
+     - Data ids (``/D<id>``) used in the inversion. This is the column order of ``/T_all``, ``/EV_all`` and ``/CHI2_all``.
+   * - ``autoT``, ``T_base``
+     - Temperature settings, one value per entry of ``id_use`` (a scalar input is repeated).
+   * - ``per_type_T``
+     - 1 if each data type was tempered with its own temperature, 0 if one common temperature was used.
 
 """""""""""""""""""""
 Continuous parameters

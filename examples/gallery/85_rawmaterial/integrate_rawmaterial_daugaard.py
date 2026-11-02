@@ -73,7 +73,7 @@ hardcopy = True
 
 N = 4_000_000 +2
 N = 10_001
-#N = 1_000_001        # number of prior realizations (use e.g. 10_000 for a quick demo)
+N = 1_000_000 + 5        # number of prior realizations (use e.g. 10_000 for a quick demo)
 inflateNoise = 2     # multiply the tTEM data std by this (0 = use as-is)
 reuse_h5 = False      # True: reuse existing HDF5 files; False: delete them and recompute everything
 
@@ -210,7 +210,8 @@ f_prior_xls_h5 = 'DAUGAARD_PRIOR_ROSTOF%s.h5' % SUFFIX
 if compute(f_prior_xls_h5):
     from geoprior1d import geoprior1d
     f_xlsx = ig.get_case_data(case=case, filelist=['daugaard_rostof.xlsx'])[0]
-    geoprior1d(f_xlsx, Nreals=N, dz=1, dmax=90, output_file=f_prior_xls_h5)
+    geoprior1d(f_xlsx, Nreals=N, 
+               dz=1, dmax=90, output_file=f_prior_xls_h5)
 
 f_prior_h5_list = [f_prior_generic_h5, f_prior_xls_h5]
 
@@ -295,15 +296,21 @@ inversions = [  # (label, prior data file, data types to use)
     ('XLS_EM_BH',  f_prior_data_xls_bh_h5,  [1] + id_borehole_list),
 ]
 
+
 f_post_h5_list = []
 t_inversion = {}
 for label, f_prior_data_h5, id_use in inversions:
     f_post_h5 = 'DAUGAARD_POST_%s%s.h5' % (label, SUFFIX)
     if compute(f_post_h5):
         t0 = time.time()
+        # Anneal the tTEM data (autoT=1) but not the borehole data (autoT=0, T=1),
+        # e.g. autoT = [1, 0, 0] for id_use = [1, 2, 3].
+        autoT = [1 if i == 1 else 0 for i in id_use]   # data id 1 is tTEM
         ig.integrate_rejection(f_prior_data_h5, f_data_h5, f_post_h5=f_post_h5,
-                               N_use=N, id_use=id_use, nr=1000, T_N_above=50, T_P_acc_level=0.2,
-                               autoT=1, showInfo=1, updatePostStat=True)
+                               N_use=N, id_use=id_use, nr=1000,
+                               T_N_above=50,
+                               T_P_acc_level=0.2,
+                               autoT=autoT, showInfo=1, updatePostStat=True)
         t_inversion[label] = time.time() - t0
     f_post_h5_list.append(f_post_h5)
 

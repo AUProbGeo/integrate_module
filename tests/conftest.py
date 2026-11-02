@@ -87,7 +87,7 @@ def jax_x64():
     jax.config.update("jax_enable_x64", old)
 
 
-POST_KEYS = ("i_use", "T", "EV", "CHI2", "N_UNIQUE")
+POST_KEYS = ("i_use", "T", "T_all", "EV", "EV_all", "CHI2", "CHI2_all", "N_UNIQUE")
 
 
 def run_rejection(case, backend, out_dir, seed=1, nr=400, tag="", **kwargs):

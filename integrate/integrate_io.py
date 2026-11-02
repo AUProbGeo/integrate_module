@@ -4302,7 +4302,8 @@ def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
         f_post_merged_h5 = 'POST_merged_N%d.h5' % nf
 
     # per-sounding datasets written by integrate_rejection
-    keys = ['i_use', 'T', 'EV', 'EV_post', 'EV_post_mean', 'CHI2', 'N_UNIQUE']
+    keys = ['i_use', 'T', 'T_all', 'EV', 'EV_all', 'EV_post', 'EV_post_mean',
+            'CHI2', 'CHI2_all', 'N_UNIQUE']
     f_prior_h5_files = []
     for f_post_h5 in f_post_h5_files:
         with h5py.File(f_post_h5, 'r') as f:
@@ -4432,6 +4433,11 @@ def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
             f.create_dataset(key, data=data)
         f.attrs['f5_prior'] = f_prior_h5
         f.attrs['f5_data'] = f_data_h5
+        # data types and temperature settings (columns of T_all/EV_all/CHI2_all)
+        with h5py.File(f_post_h5_files[0], 'r') as f0:
+            for name in ('id_use', 'autoT', 'T_base', 'per_type_T'):
+                if name in f0.attrs:
+                    f.attrs[name] = f0.attrs[name]
         if shared_prior and len(set(f_prior_h5_files)) > 1:
             f.attrs['shared_prior'] = 1
             f.attrs['f5_prior_files'] = [str(f_prior) for f_prior in f_prior_h5_files]

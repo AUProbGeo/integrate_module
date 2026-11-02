@@ -237,3 +237,28 @@ def test_prior_data_base_name(syn, tmp_path):
     files = _post(f_post)["attrs"]["f5_prior_data_bin"]
     assert len(files) >= 2
     assert all(f.startswith(base + "_h") and f.endswith(".h5") for f in files)
+
+
+def test_per_type_autoT(syn, tmp_path):
+    """autoT per data type: EM data annealed, flight-height data not (T=1).
+
+    Checks the default file name tag and that the per-type datasets and
+    attributes survive the merge of the interval posteriors.
+    """
+    f_post = ig.integrate_rejection_em_height(
+        syn.f_prior_h5, syn.f_data_h5, post_dir=str(tmp_path),
+        id_height=2, Nbins=3, n_min_bin=30, prior_data_fn=syn.prior_data_fn,
+        autoT=[1, 0], T_base=[1, 1], **RUN)
+    assert "_aT1-0_EMh" in f_post, f_post
+    with h5py.File(f_post, "r") as f:
+        T_all = f["T_all"][:]
+        assert T_all.shape == (NDP, 2)
+        assert f["CHI2"].shape == (NDP,)
+        assert f["CHI2_all"].shape == (NDP, 2)
+        assert f["EV_all"].shape == (NDP, 2)
+        np.testing.assert_array_equal(f.attrs["autoT"], [1, 0])
+        np.testing.assert_array_equal(f.attrs["id_use"], [1, 2])
+        T = f["T"][:]
+    assert np.all(T_all[:, 1] == 1)
+    assert np.all(T_all[:, 0] >= 1)
+    np.testing.assert_array_equal(T, np.nanmax(T_all, axis=1))

@@ -22,6 +22,28 @@ except ImportError:
     print("Error: Could not import integrate module. Please ensure it is properly installed.")
     sys.exit(1)
 
+def parse_per_type(s, cast):
+    """Parse a --auto-temp / --temp-base value.
+
+    '1'         -> 1                (scalar: same for all data types)
+    '1,0,0'     -> [1, 0, 0]        (one value per data type, in id_use order)
+    '2:0,3:0'   -> {2: 0, 3: 0}     (data id -> value; ids not listed default to 1)
+    """
+    items = [x.strip() for x in str(s).split(',') if x.strip()]
+    if not items:
+        raise ValueError("empty value %r" % s)
+    try:
+        if any(':' in x for x in items):
+            if not all(x.count(':') == 1 for x in items):
+                raise ValueError
+            pairs = [x.split(':') for x in items]
+            return {int(k): cast(v) for k, v in pairs}
+        values = [cast(x) for x in items]
+    except ValueError:
+        raise ValueError("invalid value %r: use 1, 1,0,0 or id:value pairs like 2:0,3:0" % s)
+    return values[0] if len(values) == 1 else values
+
+
 def main():
     """Entry point for the integrate_rejection command."""
     
@@ -35,8 +57,14 @@ def main():
         epilog="""
 Examples:
   integrate_rejection --prior prior.h5 --data data.h5 --output post.h5
-  integrate_rejection --prior prior.h5 --data data.h5 --samples 1000000 --parallel
+  integrate_rejection --prior prior.h5 --data data.h5 --samples 1000000 --no-parallel
   integrate_rejection --prior prior.h5 --data data.h5 --auto-temp --cpus 4
+
+  # per data type: automatic T for /D1 (e.g. tTEM), T=1 for boreholes /D2 and /D3
+  integrate_rejection --prior prior.h5 --data data.h5 --id-use 1,2,3 --auto-temp 1,0,0
+  integrate_rejection --prior prior.h5 --data data.h5 --id-use 1,2,3 --auto-temp 2:0,3:0
+  # fixed T=4 for /D1, T=1 for /D2 and /D3
+  integrate_rejection --prior prior.h5 --data data.h5 --id-use 1,2,3 --temp-base 4,1,1
 
 For more information, see the INTEGRATE documentation.
         """
@@ -64,14 +92,25 @@ For more information, see the INTEGRATE documentation.
                        default=100000000,
                        help='Maximum number of prior samples to use for inversion (default: 100000000)')
     
-    parser.add_argument('--auto-temp', '-T', 
-                       action='store_true',
-                       help='Enable automatic temperature estimation (default: disabled)')
-    
-    parser.add_argument('--temp-base', 
-                       type=float, 
-                       default=1.0,
-                       help='Base temperature for sampling (default: 1.0)')
+    parser.add_argument('--auto-temp', '-T',
+                       nargs='?',
+                       const='1',
+                       default='0',
+                       metavar='AUTOT',
+                       help='Automatic temperature estimation. Without a value: on for '
+                            'all data types. Per data type: comma-separated list in '
+                            '--id-use order (e.g. 1,0,0), or id:value pairs '
+                            '(e.g. 2:0,3:0; ids not listed default to 1). '
+                            '(default: disabled)')
+
+    parser.add_argument('--temp-base',
+                       type=str,
+                       default='1',
+                       metavar='T_BASE',
+                       help='Base temperature, used where automatic temperature is off. '
+                            'One value for all data types, a comma-separated list in '
+                            '--id-use order (e.g. 4,1,1), or id:value pairs '
+                            '(e.g. 1:4; ids not listed default to 1). (default: 1)')
     
     parser.add_argument('--nr', 
                        type=int, 
@@ -152,6 +191,13 @@ For more information, see the INTEGRATE documentation.
             print(f"Error: Invalid ID list format: {args.id_use}")
             return 1
     
+    try:
+        autoT = parse_per_type(args.auto_temp, int)
+        T_base = parse_per_type(args.temp_base, float)
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
+
     ip_range = []
     if args.ip_range:
         ip_range = [x.strip() for x in args.ip_range.split(',')]
@@ -169,8 +215,8 @@ For more information, see the INTEGRATE documentation.
         print(f"  Data file: {args.data}")
         print(f"  Output file: {args.output if args.output else 'auto-generated'}")
         print(f"  Max samples: {args.samples}")
-        print(f"  Auto temperature: {args.auto_temp}")
-        print(f"  Base temperature: {args.temp_base}")
+        print(f"  Auto temperature: {autoT}")
+        print(f"  Base temperature: {T_base}")
         print(f"  Parallel processing: {parallel}")
         print(f"  CPU cores: {args.cpus if args.cpus > 0 else 'auto-detect'}")
         if args.backend:
@@ -190,8 +236,8 @@ For more information, see the INTEGRATE documentation.
             id_use=id_use,
             ip_range=ip_range,
             nr=args.nr,
-            autoT=1 if args.auto_temp else 0,
-            T_base=args.temp_base,
+            autoT=autoT,
+            T_base=T_base,
             Nchunks=args.chunks,
             Ncpu=args.cpus,
             parallel=parallel,

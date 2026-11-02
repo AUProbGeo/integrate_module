@@ -171,17 +171,19 @@ def _logl_T_est_jax(L, N_above, P_acc_lev):
 
 
 @functools.lru_cache(maxsize=8)
-def _get_postprocess_kernel(nr):
+def _get_postprocess_kernel(nr, per_type_T=False):
     """
     Build and cache a JIT-compiled post-processing kernel for nr samples.
 
-    Keyed on `nr` because it determines the output shape of the uniform draws.
+    Keyed on `nr` because it determines the output shape of the uniform draws,
+    and on `per_type_T`, which selects one temperature for the summed
+    log-likelihood (False, legacy) or one temperature per data type (True).
     Called once per data point in a Python loop — compiles for (N,) shaped
     tensors rather than (bsz, N), which avoids the minutes-long XLA fusion that
     vmap over large N would trigger.
     """
 
-    def _postprocess_single(key, L, L_per_type_b, n_data_b, idx_jax,
+    def _postprocess_single(key, L, L_per_type_b, n_data_b, lnc_b, active_b, idx_jax,
                             N_above, P_acc_lev, autoT, T_base):
         """
         Full post-processing for one data point.
@@ -190,19 +192,35 @@ def _get_postprocess_kernel(nr):
         ----------
         key            : (2,)      — PRNG key
         L              : (N,)      — combined log-likelihood
-        L_per_type_b   : (Ndt, N)  — per-type log-likelihoods
-        n_data_b       : (Ndt,)    — non-NaN observation count per type
+        L_per_type_b   : (Nact, N) — per-type log-likelihoods (de-normalized)
+        n_data_b       : (Nact,)   — non-NaN observation count per type
+        lnc_b          : (Nact,)   — Gaussian normalization constant per type
+        active_b       : (Nact,)   — True if the type is used at this point
         idx_jax        : (N,)      — maps sample position → original prior idx
+        autoT, T_base  : scalars (legacy) or (Nact,) arrays (per_type_T)
         """
         N = L.shape[0]
 
-        # 1. Temperature estimation
-        T_auto = _logl_T_est_jax(L, N_above, P_acc_lev)
-        T = jnp.where(autoT == 1, T_auto, T_base)
-
-        # 2. Acceptance probabilities (numerically stable)
-        max_L = jnp.nanmax(L)
-        P_acc = jnp.exp((1.0 / T) * (L - max_L))
+        # 1. Temperature estimation and acceptance probabilities
+        if per_type_T:
+            # T_i per data type; tempered log-likelihood L_T = sum_i L_i/T_i.
+            # L_i is de-normalized: a constant shift per type, so P_acc and
+            # T_i are unchanged.
+            T_auto = jax.vmap(lambda l: _logl_T_est_jax(l, N_above, P_acc_lev))(L_per_type_b)
+            T_types = jnp.where(autoT == 1, T_auto, T_base)
+            T_types = jnp.where(active_b, T_types, jnp.nan)
+            use = active_b & jnp.isfinite(T_types)
+            T_safe = jnp.where(use, T_types, 1.0)
+            L_T = jnp.sum(jnp.where(use[:, None], L_per_type_b / T_safe[:, None], 0.0), axis=0)
+            # largest T_i (NaN if no type is used; the appended NaN avoids an empty max)
+            T = jnp.nanmax(jnp.concatenate([T_types, jnp.full((1,), jnp.nan, T_types.dtype)]))
+            P_acc = jnp.exp(L_T - jnp.nanmax(L_T))
+        else:
+            T_auto = _logl_T_est_jax(L, N_above, P_acc_lev)
+            T = jnp.where(autoT == 1, T_auto, T_base)
+            T_types = jnp.where(active_b, T, jnp.nan)
+            max_L = jnp.nanmax(L)
+            P_acc = jnp.exp((1.0 / T) * (L - max_L))
         P_acc = jnp.where(jnp.isnan(P_acc), 0.0, P_acc)
         p_sum = jnp.sum(P_acc)
         # Fall back to uniform when all weights collapse to zero
@@ -220,8 +238,15 @@ def _get_postprocess_kernel(nr):
         i_use_raw = jnp.searchsorted(cdf, u, side='right')    # (nr,) via binary search
         i_use_raw = jnp.clip(i_use_raw, 0, N - 1)
 
-        # 4. Evidence (log-mean-exp trick for numerical stability)
+        # 4. Evidence (log-mean-exp trick for numerical stability), of all
+        # data types and of each data type alone
+        max_L = jnp.nanmax(L)
         EV = max_L + jnp.log(jnp.nansum(jnp.exp(L - max_L)) / N)
+        max_Li = jnp.nanmax(L_per_type_b, axis=1, keepdims=True)          # (Nact, 1)
+        EV_types = (max_Li[:, 0]
+                    + jnp.log(jnp.nansum(jnp.exp(L_per_type_b - max_Li), axis=1) / N)
+                    + lnc_b)
+        EV_types = jnp.where(active_b, EV_types, jnp.nan)
 
         # 5. Reduced chi-squared per data type
         L_accepted = L_per_type_b[:, i_use_raw]           # (Ndt, nr)
@@ -237,7 +262,7 @@ def _get_postprocess_kernel(nr):
         # 7. Remap sample positions to original prior indices
         i_use = idx_jax[i_use_raw]
 
-        return i_use, T, EV, CHI2, N_UNIQUE.astype(jnp.float32)
+        return i_use, T, EV, CHI2, N_UNIQUE.astype(jnp.float32), T_types, EV_types
 
     return jax.jit(_postprocess_single)
 
@@ -294,6 +319,7 @@ def integrate_rejection_range_jax(
     T_P_acc_level=0.2,
     progress_callback=None,
     Nbatch=None,
+    return_per_type=False,
     **kwargs,
 ):
     """
@@ -329,8 +355,11 @@ def integrate_rejection_range_jax(
     id_use        : list              — data-type identifiers to include
     ip_range      : list              — data-point indices to invert
     nr            : int               — posterior samples per data point
-    autoT         : int               — 1 = auto temperature, 0 = use T_base
-    T_base        : float             — base temperature when autoT=0
+    autoT         : int, list, dict   — 1 = auto temperature, 0 = use T_base;
+                    scalar (one T for all types) or per data type, see
+                    integrate_rejection
+    T_base        : float, list, dict — temperature when autoT=0 (scalar or
+                    per data type)
     T_N_above     : int               — passed to logl_T_est (top-k for T est.)
     T_P_acc_level : float             — passed to logl_T_est (target P_acc)
     progress_callback : callable      — optional (current, total) callback
@@ -342,11 +371,14 @@ def integrate_rejection_range_jax(
                     full Gaussian normalization constant; inert for
                     P_acc/T/EV weighting, CHI2 is de-normalized back out), …
 
+    return_per_type : bool            — also return the per-type dict
+
     Returns
     -------
     Same 8-tuple as integrate_rejection_range:
     (i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean,
-     CHI2_all, N_UNIQUE_all, ip_range)
+     CHI2_all, N_UNIQUE_all, ip_range), plus the per-type dict if
+    return_per_type=True.
     """
     _check_jax()
 
@@ -354,10 +386,12 @@ def integrate_rejection_range_jax(
     from integrate.integrate_rejection import (
         likelihood_gaussian_full,
         likelihood_multinomial,
+        _resolve_temperature,
+        _temper_sample_stats,
+        _combined_chi2,
     )
 
     _, likelihood_gauss_diag_batch = _get_jax_kernels()
-    postprocess_single = _get_postprocess_kernel(nr)
 
     # --- Setup (mirrors integrate_rejection_range) --------------------------
 
@@ -381,6 +415,10 @@ def integrate_rejection_range_jax(
         Ndt = len(DATA['d_obs'])
         id_use = np.arange(Ndt)
     Ndt = len(id_use)
+
+    # Temperature per data type (per_type_T) or for the summed likelihood (legacy)
+    per_type_T, autoT_arr, T_base_arr = _resolve_temperature(autoT, T_base, id_use)
+    postprocess_single = _get_postprocess_kernel(nr, per_type_T)
 
     noise_model = DATA['noise_model']
     i_use_data = DATA['i_use']
@@ -414,6 +452,9 @@ def integrate_rejection_range_jax(
     EV_post_all_mean = np.zeros(nump) * np.nan  # not computed (kept for API compat)
     CHI2_all = np.zeros((nump, Ndt)) * np.nan
     N_UNIQUE_all = np.zeros(nump) * np.nan
+    T_types_all = np.zeros((nump, Ndt)) * np.nan
+    EV_types_all = np.zeros((nump, Ndt)) * np.nan
+    CHI2_comb_all = np.zeros(nump) * np.nan
 
     # Transfer D to device once per data type (diagonal-Gaussian only)
     use_jax_diag = [
@@ -439,8 +480,9 @@ def integrate_rejection_range_jax(
         idx_jax = jnp.asarray(idx) if useRandomData else jnp.arange(N, dtype=jnp.int32)
         N_above_jax   = jnp.array(T_N_above,     dtype=jnp.int32)
         P_acc_lev_jax = jnp.array(T_P_acc_level, dtype=jnp.float32)
-        autoT_jax     = jnp.array(autoT,         dtype=jnp.int32)
-        T_base_jax    = jnp.array(float(T_base), dtype=jnp.float32)
+        if not per_type_T:
+            autoT_jax     = jnp.array(int(autoT_arr[0]),   dtype=jnp.int32)
+            T_base_jax    = jnp.array(float(T_base_arr[0]), dtype=jnp.float32)
         rng_key = jax.random.PRNGKey(np.random.randint(0, 2**31))
 
     # --- Batch loop ---------------------------------------------------------
@@ -467,6 +509,7 @@ def integrate_rejection_range_jax(
         L_raw_list = []                                    # Nact × (bsz, N), de-normalized, for CHI2
         i_active_types = []                                # data type index of each L_raw_list entry
         n_data_per_type = np.zeros((bsz, Ndt), dtype=np.float32)
+        active_mat = np.zeros((bsz, Ndt), dtype=bool)  # type used at data point
         # Gaussian normalization constant used per (data point, data type),
         # 0 unless normalize_likelihood — tracked so CHI2 can be de-normalized.
         log_norm_const_b = np.zeros((bsz, Ndt))
@@ -476,6 +519,8 @@ def integrate_rejection_range_jax(
             active = np.array([i_use_data[i][ip] for ip in ip_batch]).ravel()  # (bsz,)
             if not np.any(active):
                 continue
+            if noise_model[i] in ('gaussian', 'multinomial'):
+                active_mat[:, i] = active > 0
 
             if noise_model[i] == 'gaussian':
                 for b, ip in enumerate(ip_batch):
@@ -555,6 +600,12 @@ def integrate_rejection_range_jax(
             rng_key, batch_key = jax.random.split(rng_key)
             keys = jax.random.split(batch_key, bsz)               # (bsz, 2)
             n_data_jax = jnp.asarray(n_data_per_type[:, i_active_types])  # (bsz, Nact)
+            lnc_jax = jnp.asarray(log_norm_const_b[:, i_active_types], dtype=jnp.float32)  # (bsz, Nact)
+            active_jax = jnp.asarray(active_mat[:, i_active_types])        # (bsz, Nact)
+            if per_type_T:
+                # temperature options of the active types in this batch
+                autoT_jax = jnp.asarray(autoT_arr[i_active_types].astype(np.int32))
+                T_base_jax = jnp.asarray(T_base_arr[i_active_types], dtype=jnp.float32)
 
             for b in range(bsz):
                 # (Nact, N) per-type likelihoods for this point; stacked per point
@@ -563,11 +614,13 @@ def integrate_rejection_range_jax(
                     L_raw_b = jnp.stack([L_raw[b] for L_raw in L_raw_list])
                 else:
                     L_raw_b = jnp.zeros((0, N), dtype=jnp.float32)
-                i_use_b, T_b, EV_b, CHI2_b, N_UNIQUE_b = postprocess_single(
+                i_use_b, T_b, EV_b, CHI2_b, N_UNIQUE_b, T_types_b, EV_types_b = postprocess_single(
                     keys[b],
                     L_combined[b],
                     L_raw_b,
                     n_data_jax[b],
+                    lnc_jax[b],
+                    active_jax[b],
                     idx_jax,
                     N_above_jax,
                     P_acc_lev_jax,
@@ -578,56 +631,50 @@ def integrate_rejection_range_jax(
                 i_use_all[j]    = np.asarray(i_use_b)
                 T_all[j]        = float(T_b)
                 EV_all[j]       = float(EV_b)
-                CHI2_all[j, i_active_types] = np.asarray(CHI2_b)  # inactive types stay NaN
+                # inactive types stay NaN
+                CHI2_all[j, i_active_types] = np.asarray(CHI2_b)
+                T_types_all[j, i_active_types] = np.asarray(T_types_b)
+                EV_types_all[j, i_active_types] = np.asarray(EV_types_b)
+                CHI2_comb_all[j] = _combined_chi2(CHI2_all[j], n_data_per_type[b])
                 N_UNIQUE_all[j] = float(N_UNIQUE_b)
         else:
             # CPU path: transfer combined likelihoods to NumPy once per batch,
-            # then post-process with NumPy.  Avoids jnp.sort(N=1M) which is
-            # ~54× slower than np.sort on CPU and dominates wall-clock time.
+            # then post-process with NumPy (shared with the numpy backend).
+            # Avoids jnp.sort(N=1M) which is ~54× slower than np.sort on CPU
+            # and dominates wall-clock time.
             L_combined_np    = np.asarray(L_combined)              # (bsz, N)
             L_per_type_raw_np = [np.asarray(L_raw) for L_raw in L_raw_list]  # Nact × (bsz, N), de-normalized
 
             for b, j in enumerate(batch_js):
-                L = L_combined_np[b]                               # (N,)
-
-                if autoT == 1:
-                    T = ig.logl_T_est(L, N_above=T_N_above, P_acc_lev=T_P_acc_level)
-                else:
-                    T = float(T_base)
-
-                P_acc = np.exp((1.0 / T) * (L - np.nanmax(L)))
-                P_acc[np.isnan(P_acc)] = 0.0
-                p_sum = P_acc.sum()
-                if p_sum > 0:
-                    p = P_acc / p_sum
-                    i_use = np.random.choice(N, nr, p=p)
-                else:
-                    i_use = np.random.choice(N, nr)
-
-                CHI2_current = np.full(Ndt, np.nan)
+                L_types_b = [None] * Ndt
                 for k, i in enumerate(i_active_types):
-                    if n_data_per_type[b, i] > 0:
-                        L_acc = L_per_type_raw_np[k][b, i_use]
-                        CHI2_current[i] = (
-                            np.nanmean(-2.0 * L_acc) / n_data_per_type[b, i]
-                        )
+                    L_types_b[i] = L_per_type_raw_np[k][b]
+
+                i_use, T, T_types, EV, EV_types, CHI2_current = _temper_sample_stats(
+                    L_combined_np[b], L_types_b, active_mat[b], n_data_per_type[b],
+                    log_norm_const_b[b], False,
+                    autoT_arr, T_base_arr, per_type_T, T_N_above, T_P_acc_level, nr)
 
                 if useRandomData:
                     i_use = idx[i_use]
-
-                max_L = np.nanmax(L)
-                EV = max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
 
                 i_use_all[j]    = i_use
                 T_all[j]        = T
                 EV_all[j]       = EV
                 CHI2_all[j]     = CHI2_current
+                T_types_all[j]  = T_types
+                EV_types_all[j] = EV_types
+                CHI2_comb_all[j] = _combined_chi2(CHI2_current, n_data_per_type[b])
                 N_UNIQUE_all[j] = len(np.unique(i_use))
 
         if progress_callback is not None:
             progress_callback(batch_end, nump)
 
-    return (
+    out = (
         i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean,
         CHI2_all, N_UNIQUE_all, ip_range,
     )
+    if return_per_type:
+        out = out + ({'T_types': T_types_all, 'EV_types': EV_types_all,
+                      'CHI2_comb': CHI2_comb_all},)
+    return out
