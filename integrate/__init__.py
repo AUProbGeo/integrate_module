@@ -125,6 +125,11 @@ from integrate.integrate_plot import plot_xy
 from integrate.integrate_plot import find_points_along_line_segments
 from integrate.integrate_plot import plot_boreholes
 from integrate.integrate_plot import plot_voronoi_cells
+from integrate.integrate_plot import post_to_voronoi_columns
+from integrate.integrate_plot import voronoi_columns_to_grid
+from integrate.integrate_plot import post_to_voronoi_grid
+from integrate.integrate_plot import plot_voronoi_3d
+from integrate.integrate_plot import plot_voronoi_slices
 
 # Import from borehole module
 from integrate.integrate_borehole import compute_P_obs_discrete
