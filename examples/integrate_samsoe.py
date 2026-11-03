@@ -31,7 +31,7 @@ METHOD = 'anemone'
 #METHOD = 'ga-aem'
 #METHOD = 'simpeg'
 
-    # %% [markdown]
+# %% [markdown]
 # 0\. Load the XYZ data into DATA.h5
 # ----------------------------------
 #
