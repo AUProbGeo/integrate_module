@@ -2933,18 +2933,20 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     if show_value and nm<=1:
         isp=1
 
-        im3 = ax[1].plot(id[ii],Mean[:,ii].T, 'k', label='Mean')
-        ax[1].plot(id[ii],Mean[:,ii].T+2*Std[:,ii].T, 'k:', label='P97.5')
-        ax[1].plot(id[ii],Mean[:,ii].T-2*Std[:,ii].T, 'k:', label='P2.5')
+        # Dots, not lines, against the same x-axis as the stats panel: neighbours
+        # along the x-axis need not be neighbouring soundings (e.g. across flight lines)
+        im3 = ax[1].plot(x_axis_values,Mean[:,ii].T, 'k.', markersize=2, label='Mean')
+        ax[1].plot(x_axis_values,Mean[:,ii].T+2*Std[:,ii].T, '.', color='0.6', markersize=1, label='P97.5')
+        ax[1].plot(x_axis_values,Mean[:,ii].T-2*Std[:,ii].T, '.', color='0.6', markersize=1, label='P2.5')
 
-        ax[1].plot(id[ii],Median[:,ii].T, 'r', label='Median')
+        ax[1].plot(x_axis_values,Median[:,ii].T, 'r.', markersize=2, label='Median')
         # add legend
-        ax[1].legend(loc='upper right')
+        ax[1].legend(loc='upper right', markerscale=4)
         # add grd on
         ax[1].grid(True)
 
         # set axis limits
-        ax[1].set_xlim(ii.min(),ii.max())
+        ax[1].set_xlim(x_axis_values.min(), x_axis_values.max())
         ax[1].set_title(name)
         ax[1].set_ylabel(name)
         ax[0].axis('off')
@@ -3372,14 +3374,14 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
                 # Set suptitle with optional name attribute
 
                 if cur_plType=='plot':
+                    # plot against the data index, so i_plot subsets keep their x position
                     if uselog:
-                        im1 = ax[0].semilogy(d_obs[i_plot_cur,:], linewidth=.5)
-                        im2 = ax[1].semilogy(d_std[i_plot_cur,:], linewidth=.5)
-                        im3 = ax[2].semilogy((d_obs[i_plot_cur,:]/d_std[i_plot_cur,:]), linewidth=.5)
+                        im1 = ax[0].semilogy(i_plot_cur, d_obs[i_plot_cur,:], linewidth=.5)
+                        im2 = ax[1].semilogy(i_plot_cur, d_std[i_plot_cur,:], linewidth=.5)
                     else:
-                        im1 = ax[0].plot(d_obs[i_plot_cur,:], linewidth=.5)
-                        im2 = ax[1].plot(d_std[i_plot_cur,:], linewidth=.5)
-                        im3 = ax[2].plot(100.0 * d_std[i_plot_cur,:]/d_obs[i_plot_cur,:], linewidth=.5)
+                        im1 = ax[0].plot(i_plot_cur, d_obs[i_plot_cur,:], linewidth=.5)
+                        im2 = ax[1].plot(i_plot_cur, d_std[i_plot_cur,:], linewidth=.5)
+                    im3 = ax[2].plot(i_plot_cur, 100.0 * d_std[i_plot_cur,:]/d_obs[i_plot_cur,:], linewidth=.5)
                     ax[0].set_xlim(xlim)
                     ax[1].set_xlim(xlim)
                     ax[2].set_xlim(xlim)
