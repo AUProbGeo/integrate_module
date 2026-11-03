@@ -904,6 +904,18 @@ def integrate_rejection_em_height(f_prior_h5='prior.h5',
             print('  Interval %2d: %6.1f-%6.1f m, %7d soundings'
                   % (k + 1, edges[k], edges[k + 1], len(ii_bin[k])))
 
+        # Histogram of the flight heights (1 m bins), with the interval edges
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.hist(h_use, bins=np.arange(np.floor(h_use.min()), h_use.max() + 1, 1), color='0.6')
+        for e in edges:
+            ax.axvline(e, color='C3', lw=0.8)
+        ax.set_xlabel('Flight height [m]')
+        ax.set_ylabel('Number of soundings')
+        ax.set_title('%d flight-height interval(s) (red), %d soundings' % (n_bin, len(ip_range)))
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
     # File names
     f_prior_dir = os.path.dirname(f_prior_h5)
     f_prior_base = os.path.splitext(os.path.basename(f_prior_h5))[0]
