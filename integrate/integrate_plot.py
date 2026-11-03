@@ -108,6 +108,7 @@ def setup_matplotlib_backend():
         print("To fix: sudo apt-get install python3-tk")
     matplotlib.use('Agg')
 
+import functools
 import os
 import re
 import numpy as np
@@ -5829,6 +5830,23 @@ def post_to_voronoi_columns(f_post_h5, ii=None, im=1, key=None, r_max=150, iz_st
     }
 
 
+@functools.lru_cache(maxsize=None)
+def _vtk_wedge_top_ccw():
+    """
+    True when a VTK wedge whose first (top) triangle is counter-clockwise seen from above has a positive
+    volume in the installed VTK.
+
+    Recent VTK (e.g. 9.6) follows the documented convention (the normal of the first triangle points away
+    from the second one); older versions computed wedge volumes with the opposite orientation.
+    """
+    import pyvista as pv
+    top = np.array([[0., 0., 1.], [1., 0., 1.], [0., 1., 1.]])
+    pts = np.vstack([top, top - [0., 0., 1.]])
+    cell = pv.UnstructuredGrid({pv.CellType.WEDGE: np.array([[0, 1, 2, 3, 4, 5]])}, pts)
+    vol = cell.compute_cell_sizes(length=False, area=False, volume=True).cell_data['Volume'][0]
+    return bool(vol > 0)
+
+
 def voronoi_columns_to_grid(columns):
     """
     3D grid (pyvista.UnstructuredGrid of VTK wedges) of Voronoi columns from :func:`post_to_voronoi_columns`.
@@ -5850,6 +5868,7 @@ def voronoi_columns_to_grid(columns):
     sid, iz = columns['sounding'], columns['iz']
     nz = len(iz)
     nv = np.diff(off)
+    top_ccw = _vtk_wedge_top_ccw()
 
     points, wedges, values, sounding, depth = [], [], [], [], []
     n_points = 0
@@ -5864,10 +5883,12 @@ def voronoi_columns_to_grid(columns):
         pid = n_points + np.arange(P3[..., 0].size).reshape(m, nz + 1, n + 1)
         j1 = 1 + np.arange(n)
         j2 = 1 + (np.arange(n) + 1) % n
-        # VTK wedge: the normal of the first triangle points to the second one. The top triangle comes
-        # first, so it is clockwise seen from above (the cell has a positive volume)
-        w = np.stack([pid[:, :-1, 0, None].repeat(n, -1), pid[:, :-1][..., j2], pid[:, :-1][..., j1],
-                      pid[:, 1:, 0, None].repeat(n, -1), pid[:, 1:][..., j2], pid[:, 1:][..., j1]],
+        # The top triangle comes first; its winding (seen from above) depends on the VTK wedge
+        # convention of the installed VTK, so that each cell has a positive volume
+        if not top_ccw:
+            j1, j2 = j2, j1
+        w = np.stack([pid[:, :-1, 0, None].repeat(n, -1), pid[:, :-1][..., j1], pid[:, :-1][..., j2],
+                      pid[:, 1:, 0, None].repeat(n, -1), pid[:, 1:][..., j1], pid[:, 1:][..., j2]],
                      axis=-1)  # (m, nz, n, 6)
         points.append(P3.reshape(-1, 3))
         wedges.append(w.reshape(-1, 6))
