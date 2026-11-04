@@ -1400,6 +1400,21 @@ def _report_progress(progress_callback, current, total, phase, status):
         pass
 
 
+def _resistivity_clim_cmap():
+    """Default colour limits and colormap stored on generic resistivity priors.
+
+    Returns
+    -------
+    clim : list
+        [min, max] from ``get_colormap_and_limits('resistivity')``.
+    cmap : numpy.ndarray
+        RGBA colormap of shape (4, 256), the layout ``h5_get_clim_cmap`` expects.
+    """
+    from integrate.integrate_plot import get_colormap_and_limits
+    cmap, clim = get_colormap_and_limits('resistivity')
+    return clim, cmap(np.linspace(0, 1, 256)).T
+
+
 def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
                         NLAY_min=3, NLAY_max=6, NLAY_deg=6,
                         RHO_dist='log-uniform', RHO_min=0.1, RHO_max=5000, RHO_mean=100, RHO_std=80,
@@ -1596,9 +1611,12 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
     if showInfo > 1:
         print("Saving '/M1' prior model  %s" % f_prior_h5)
     im = im + 1
+    rho_clim, rho_cmap = _resistivity_clim_cmap()
     ig.save_prior_model(f_prior_h5, M_rho,
                 im=im,
                 name='Resistivity',
+                clim=rho_clim,
+                cmap=rho_cmap,
                 label='Resistivity',
                 unit='ohmm',
                 is_discrete=0,
@@ -1762,9 +1780,12 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
 
     if (showInfo>1):
         print("Saving '/M1' prior model  %s" % f_prior_h5)
+    rho_clim, rho_cmap = _resistivity_clim_cmap()
     ig.save_prior_model(f_prior_h5,M_rho.astype(np.float32),
                 im=1,
                 name='Resistivity',
+                clim=rho_clim,
+                cmap=rho_cmap,
                 label='Resistivity',
                 unit='ohmm',
                 is_discrete = 0,
@@ -1956,9 +1977,12 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
 
     if (showInfo>1):
         print("Saving '/M1' prior model  %s" % f_prior_h5)
+    rho_clim, rho_cmap = _resistivity_clim_cmap()
     ig.save_prior_model(f_prior_h5,M_rho.astype(np.float32),
                 im=1,
                 name='Resistivity',
+                clim=rho_clim,
+                cmap=rho_cmap,
                 label='Resistivity',
                 unit='ohmm',
                 is_discrete = 0, 
@@ -2257,9 +2281,12 @@ def prior_model_smooth(N=100000, regularization='L2',
 
     if showInfo > 1:
         print("Saving '/M1' prior model  %s" % f_prior_h5)
+    rho_clim, rho_cmap = _resistivity_clim_cmap()
     ig.save_prior_model(f_prior_h5, M_rho.astype(np.float32),
                         im=1,
                         name='Resistivity',
+                        clim=rho_clim,
+                        cmap=rho_cmap,
                         label='Resistivity',
                         unit='ohmm',
                         is_discrete=0,
