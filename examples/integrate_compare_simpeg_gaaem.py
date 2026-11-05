@@ -39,15 +39,13 @@ case = 'DAUGAARD'
 files = ig.get_case_data(case=case, showInfo=1)
 file_gex = ig.get_gex_file_from_data(files[0])
 
+file_xyz_dat =ig.get_case_data(case=case, filelist=['SCI7_40_ml_sharp2_I02_MOD_dat.xyz'])[0]
+file_xyz_inv =ig.get_case_data(case=case, filelist=['SCI7_40_ml_sharp2_I02_MOD_inv.xyz'])[0]
+file_xyz_syn = ig.get_case_data(case=case, filelist=['SCI7_40_ml_sharp2_I02_MOD_syn.xyz'])[0]
 
-def _one(x):
-    return x[0] if isinstance(x, (list, tuple)) else x
-
-
-file_xyz_inv = _one(ig.get_case_data(case=case, filelist=['SCI7_40_ml_sharp2_I02_MOD_inv.xyz']))
-file_xyz_syn = _one(ig.get_case_data(case=case, filelist=['SCI7_40_ml_sharp2_I02_MOD_syn.xyz']))
 print('gex:', file_gex)
-
+print('inv:', file_xyz_inv)
+print('syn:', file_xyz_syn)
 # %% [markdown]
 # ## 1. AarhusInv inversion models: SimPEG vs GA-AEM vs AarhusInv
 
@@ -180,9 +178,7 @@ for label, kw in (('gl K=9', dict(gate_integration='gl', gate_quad=9)),
                   ('no filters', dict(apply_filters=False))):
     D = ig.forward_simpeg(M_s, thickness, GEX=system, parallel=False, **kw)
     r = np.abs((D - D_ref) / D_ref)
-    print('  %-12s LM median %7.4f %%  max %7.3f %% | HM median %7.4f %%  max %7.3f %%'
-          % (label, 100 * np.median(r[:, sl_lm]), 100 * r[:, sl_lm].max(),
-             100 * np.median(r[:, sl_hm]), 100 * r[:, sl_hm].max()))
+    print(f'  {label:<12s} LM median {100 * np.median(r[:, sl_lm]):7.4f} %  max {100 * r[:, sl_lm].max():7.3f} % | HM median {100 * np.median(r[:, sl_hm]):7.4f} %  max {100 * r[:, sl_hm].max():7.3f} %')
 
 # %% [markdown]
 # ## 3. Timing
@@ -207,3 +203,5 @@ for nl in (30, 60, 90):
     ga = (time.time() - t0) / N_TIME
     print('  nl=%2d: simpeg 1 core %6.0f ms | simpeg %d cores %6.0f ms | ga-aem 1 core %5.1f ms'
           % (nl, 1000 * seq, NCPU, 1000 * max(par, 0), 1000 * ga))
+
+# %%

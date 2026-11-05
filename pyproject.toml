@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "integrate_module"
-version = "1.0.0"
+version = "1.0.2"
 description = "Localized probabilistic data integration"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
@@ -22,11 +22,11 @@ dependencies = [
     "psutil",
     "tqdm",
     "requests",
-    "geoprior1d>=0.9",
+    "geoprior1d>=1.0.1",
     "shapely",
     "ga-aem-forward-win; platform_system == 'Windows'",
     "simpeg>=0.25",
-    "jupyter>=1.0.0",
+    "jupyter>=1.0.1",
     "jupytext",
     "ipykernel",
     "pandas",
@@ -45,6 +45,9 @@ dependencies = [
 dev = [
     "pytest",
     "black",
+]
+ui = [
+    "integrate_ui",
 ]
 ml = [
     "tensorflow",
@@ -109,4 +112,16 @@ builtins = ["get_ipython"]   # IPython injects this at runtime
 ignore = [
     "E722",  # allow bare `except:` (used in the autoreload blocks)
     "S110",  # allow try-except-pass (same blocks)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "jax: needs jax installed (skipped otherwise)",
+    "gpu: needs a JAX GPU device; run with  JAX_PLATFORMS=cuda pytest -m gpu",
+    "slow: larger cases; deselect with -m 'not slow'",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]

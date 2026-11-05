@@ -50,6 +50,64 @@ arguments -- including less commonly used ones such as ``id_prior``,
 ``use_N_best``, ``T_N_above``/``T_P_acc_level``, and ``progress_callback``
 for GUI integration.
 
+Annealing temperature per data type
+------------------------------------
+
+By default (scalar ``autoT`` and ``T_base``) one temperature T is used for
+the summed log-likelihood of all data types. With ``autoT=1``, T is
+estimated automatically at each data point; with ``autoT=0``, T is set to
+``T_base``.
+
+``autoT`` and ``T_base`` can also be given per data type, either as a list
+in the order of ``id_use`` or as a dict ``{data_id: value}``. Data ids not
+in the dict get the default value 1. Each data type i is then tempered
+with its own temperature T_i:
+
+* ``autoT[i]=1``: T_i is estimated from the likelihood of data type i alone.
+* ``autoT[i]=0``: T_i is ``T_base[i]``.
+
+The tempered log-likelihood is the sum of L_i / T_i. This makes it
+possible, for example, to anneal EM data but not borehole data. With
+tTEM as ``/D1`` and two boreholes as ``/D2`` and ``/D3``::
+
+    # automatic T for tTEM, no annealing (T=1) for the boreholes
+    f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5, id_use=[1, 2, 3],
+                                       autoT=[1, 0, 0], T_base=[1, 1, 1])
+
+    # the same, as a dict (ids not listed default to autoT=1, T_base=1)
+    f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5, id_use=[1, 2, 3],
+                                       autoT={2: 0, 3: 0})
+
+    # fixed T=4 for tTEM, T=1 for the boreholes
+    f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5, id_use=[1, 2, 3],
+                                       autoT=0, T_base=[4, 1, 1])
+
+The temperature, evidence and reduced χ² are stored both combined and per data
+type (see the POST.h5 section of :doc:`format`):
+
+* ``/T``, ``/EV``, ``/CHI2``: combined values, shape [Np]. ``/T`` is
+  the largest T_i, ``/EV`` the evidence of all data, and ``/CHI2`` the
+  χ²/ν weighted by the number of data in each type.
+* ``/T_all``, ``/EV_all``, ``/CHI2_all``: per data type, shape [Np, Nd],
+  with columns in ``id_use`` order (also stored as a file attribute).
+  NaN marks data types without data at a location.
+
+::
+
+    import h5py
+    with h5py.File(f_post_h5, 'r') as f:
+        T_tTEM = f['T_all'][:, 0]     # temperature used for /D1
+        chi2_bh1 = f['CHI2_all'][:, 1]  # reduced chi2 of /D2
+
+When no output name is given, the default posterior file name carries the
+``autoT`` setting, e.g. ``..._aT1.h5`` or ``..._aT1-0-0.h5``.
+
+The same settings from the command line (see below)::
+
+    integrate_rejection -p prior.h5 -d data.h5 --id-use 1,2,3 --auto-temp 1,0,0
+    integrate_rejection -p prior.h5 -d data.h5 --id-use 1,2,3 --auto-temp 2:0,3:0
+    integrate_rejection -p prior.h5 -d data.h5 --id-use 1,2,3 --temp-base 4,1,1
+
 Running from the command line
 -------------------------------
 
@@ -90,10 +148,15 @@ Common options::
      - Max number of prior samples to use (default 100000000)
    * - ``--auto-temp``
      - ``-T``
-     - Enable automatic temperature estimation
+     - Automatic temperature estimation. Without a value: on for all data
+       types. Per data type: a list in ``--id-use`` order (``1,0,0``) or
+       ``id:value`` pairs (``2:0,3:0``; ids not listed default to 1).
+       Off if not given.
    * - ``--temp-base``
      -
-     - Base temperature when ``--auto-temp`` is not set
+     - Base temperature, used where automatic temperature is off. One value
+       (default 1), a list in ``--id-use`` order (``4,1,1``) or ``id:value``
+       pairs (``1:4``).
    * - ``--nr``
      -
      - Number of resamples used for temperature estimation (default 400)

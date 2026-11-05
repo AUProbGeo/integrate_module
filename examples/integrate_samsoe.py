@@ -31,7 +31,7 @@ METHOD = 'anemone'
 #METHOD = 'ga-aem'
 #METHOD = 'simpeg'
 
-    # %% [markdown]
+# %% [markdown]
 # 0\. Load the XYZ data into DATA.h5
 # ----------------------------------
 #
@@ -39,7 +39,8 @@ METHOD = 'anemone'
 # affect the observed data.
 
 # %%
-# flight altitude ('Alt') is stored as D2, with 5% relative std
+# flight height above ground ('Height') is stored as D2, with 5% relative std.
+# NOT 'Alt': that is the GNSS altitude above sea level (= Height + DEM over land).
 # UNITS: the Z_dBdt[xx] / STD_Z_dBdt[xx] columns of this XYZ are in pV/(A m^4), not
 # V/(A m^4).  Where to find this for your own data:
 #   * the survey report, section "Normalisation" (05_Report/*.pdf): the signal is
@@ -53,9 +54,9 @@ METHOD = 'anemone'
 # data_scale = 1e-12 (it scales both d_obs and d_std).  tTEM XYZ files are already in
 # V/(A m^4), so they need no scaling.
 f_data_h5 = ig.xyz_to_h5(file_xyz=F_XYZ, file_gex=F_GEX, f_data_h5='DATA.h5',
-                         altitude='Alt', altitude_std=0.05, data_scale=1e-12, showInfo=1)
+                         altitude='Height', altitude_std=0.05, data_scale=1e-12, showInfo=1)
 ig.data_set(f_data_h5, id=1, name='dBdT', label='dB/dt', unit='V/Am^4')
-ig.data_set(f_data_h5, id=2, name='Altitude', label='Flight altitude', unit='m')
+ig.data_set(f_data_h5, id=2, name='Altitude', label='Flight height', unit='m')
 
 # The RelUnc in the XYZ is the measured noise only (median ~0.0015).  Workbench adds a
 # 3% uniform STD on top (GEX: UniformDataSTD=0.03), which xyz_to_h5 does not apply.
@@ -107,14 +108,16 @@ ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 # ``im_height=4`` tells anemone to use M4 as the flight height.
 
 # %%
-f_prior_data_h5 = f'PRIOR_DATA_{METHOD}_N{N}.h5'
+# earlier +/- transmitter pulses (375 Hz); without them the last gates are ~5 % too high
+N_PREVIOUS_PULSES = 1
+f_prior_data_h5 = f'PRIOR_DATA_{METHOD}_N{N}_npp{N_PREVIOUS_PULSES}.h5'
 
 # Prior EM DATA
 ForceForward = True
 rescale_height = True  # rescale the anemone setup to each model's height instead of one setup per altitude_bin_width bin; much faster for varying flight height, see forward_anemone
 #rescale_height = False  #
 if (ForceForward) or (not os.path.exists(f_prior_data_h5)):
-    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex=F_GEX, file_sr2=F_SR2,
+    f_prior_data_h5 = ig.prior_data_em(f_prior_h5, file_gex=F_GEX, file_sr2=F_SR2, n_previous_pulses=N_PREVIOUS_PULSES,
                                        method=METHOD, 
                                        im_height=4, 
                                        rescale_height=rescale_height, 
@@ -240,7 +243,7 @@ for i in i_compute:
 # %% Compute the prior EM data (D1) for each subset
 for i in i_compute:
     f_prior_data_subset_h5 = f_prior_data_subset_h5_list[i]
-    ig.prior_data_em(f_prior_data_subset_h5, file_gex=F_GEX, file_sr2=F_SR2,
+    ig.prior_data_em(f_prior_data_subset_h5, file_gex=F_GEX, file_sr2=F_SR2, n_previous_pulses=N_PREVIOUS_PULSES,
                      method=METHOD,
                      im_height=4,
                      rescale_height=rescale_height,

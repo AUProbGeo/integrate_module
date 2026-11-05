@@ -124,186 +124,47 @@ def compute_P_obs_discrete(depth_top=None, depth_bottom=None, lithology_obs=None
 
     return P_obs
 
-def _compute_mode_sequential(M_lithology, z, depth_top, depth_bottom, nl, showInfo=1):
+def _compute_mode(M_lithology, z, depth_top, depth_bottom, nl, showInfo=1):
     """
-    Sequential computation of mode lithology for each realization and depth interval.
+    Compute the mode (most frequent) class for each realization and depth interval.
 
-    This is the original implementation extracted for maintainability.
+    Vectorized over realizations: loops only over the nl depth intervals, and
+    for each interval counts every class across all realizations at once, so
+    the cost is a few array operations per interval, independent of a Python
+    loop over N realizations. Ties are resolved to the smallest class value.
     """
     import numpy as np
-    from tqdm import tqdm
     import time
 
     nreal = len(M_lithology)
     lithology_mode = np.zeros((nreal, nl), dtype=int)
 
-    # Show info based on showInfo level
     if showInfo == 1:
         print(f'compute_P_obs_sparse: Processing {nreal} realizations, {nl} intervals')
 
-    # Start timing
     t_start = time.time()
 
-    # Extract mode lithology for each realization and depth interval
-    iterator = np.arange(nreal)
-    if showInfo > 1:
-        iterator = tqdm(iterator, desc='compute_P_obs_sparse')
+    # Sorted class values, so argmax ties give the smallest class
+    classes = np.unique(M_lithology)
 
-    for im in iterator:
-        M_test = M_lithology[im]
-        for i in range(len(depth_top)):
-            z_top = depth_top[i]
-            z_bottom = depth_bottom[i]
-            id_top = np.argmin(np.abs(z - z_top))
-            id_bottom = np.argmin(np.abs(z - z_bottom))
+    for i in range(nl):
+        id_top = np.argmin(np.abs(z - depth_top[i]))
+        id_bottom = np.argmin(np.abs(z - depth_bottom[i]))
 
-            if id_top == id_bottom:
-                lithology_layer = M_test[id_top]
-                lithology_mode_layer = lithology_layer
-            else:
-                lithology_layer = M_test[id_top:id_bottom]
-                # Find the most frequent lithology in this layer
-                values, counts = np.unique(lithology_layer, return_counts=True)
-                lithology_mode_layer = values[np.argmax(counts)]
+        if id_top == id_bottom:
+            lithology_mode[:, i] = M_lithology[:, id_top]
+        else:
+            lithology_layer = M_lithology[:, id_top:id_bottom]
+            # Number of cells of each class in the interval, shape (nreal, nclass)
+            counts = np.stack([(lithology_layer == c).sum(axis=1) for c in classes], axis=1)
+            lithology_mode[:, i] = classes[np.argmax(counts, axis=1)]
 
-            lithology_mode[im, i] = lithology_mode_layer
-
-    # Show timing information if showInfo > 1
     if showInfo > 1:
         t_elapsed = time.time() - t_start
-        time_per_model = t_elapsed / nreal
         print(f'compute_P_obs_sparse: Total runtime: {t_elapsed:.2f} seconds')
-        print(f'compute_P_obs_sparse: Time per model: {time_per_model*1000:.2f} ms')
+        print(f'compute_P_obs_sparse: Time per model: {t_elapsed/nreal*1000:.4f} ms')
 
     return lithology_mode
-
-def _compute_mode_worker(args):
-    """
-    Worker function for parallel processing of lithology mode computation.
-
-    Processes a chunk of realizations assigned to this worker.
-    """
-    import numpy as np
-    import integrate as ig
-
-    # Unpack arguments
-    chunk_indices, shared_memory_refs, z, depth_top, depth_bottom, nl = args
-
-    # Reconstruct shared array
-    [M_lithology], worker_shm_objects = ig.reconstruct_shared_arrays(shared_memory_refs)
-
-    try:
-        # Initialize output for this chunk
-        lithology_mode_chunk = np.zeros((len(chunk_indices), nl), dtype=int)
-
-        # Process assigned realizations
-        for local_idx, im in enumerate(chunk_indices):
-            M_test = M_lithology[im]
-            for i in range(nl):
-                z_top = depth_top[i]
-                z_bottom = depth_bottom[i]
-                id_top = np.argmin(np.abs(z - z_top))
-                id_bottom = np.argmin(np.abs(z - z_bottom))
-
-                if id_top == id_bottom:
-                    lithology_mode_chunk[local_idx, i] = M_test[id_top]
-                else:
-                    lithology_layer = M_test[id_top:id_bottom]
-                    values, counts = np.unique(lithology_layer, return_counts=True)
-                    lithology_mode_chunk[local_idx, i] = values[np.argmax(counts)]
-
-        return lithology_mode_chunk
-
-    finally:
-        # Close shared memory in worker
-        for shm in worker_shm_objects:
-            shm.close()
-
-def _compute_mode_parallel(M_lithology, z, depth_top, depth_bottom, nl, Ncpu, showInfo=1):
-    """
-    Parallel computation of mode lithology using multiprocessing.
-
-    Splits realizations across worker processes and uses shared memory for efficiency.
-    """
-    import os
-    import numpy as np
-    import multiprocessing
-    import integrate as ig
-    import time
-    from tqdm import tqdm
-
-    # Setup
-    if Ncpu < 1:
-        Ncpu = multiprocessing.cpu_count()
-
-    nreal = len(M_lithology)
-
-    # Show info based on showInfo level
-    if showInfo == 1:
-        print(f'compute_P_obs_sparse: Processing {nreal} realizations, {nl} intervals (parallel, {Ncpu} CPUs)')
-    elif showInfo > 1:
-        print(f'compute_P_obs_sparse: Processing {nreal} realizations, {nl} intervals')
-        print(f'compute_P_obs_sparse: Using {Ncpu} CPU cores in parallel mode')
-
-    # Start timing
-    t_start = time.time()
-
-    # Create shared memory for M_lithology
-    shared_memory_refs, shm_objects = ig.create_shared_memory([M_lithology])
-
-    try:
-        # Split realizations into many small chunks for better progress tracking
-        # More chunks = more frequent progress updates and better load balancing
-        min_chunk_size = 100   # Minimum realizations per chunk
-        max_chunks = 500       # Cap to avoid excessive overhead
-        n_chunks = min(max(nreal // min_chunk_size, Ncpu), max_chunks)
-
-        if showInfo > 1:
-            print(f'compute_P_obs_sparse: Splitting into {n_chunks} chunks for {Ncpu} workers')
-
-        realization_chunks = np.array_split(np.arange(nreal), n_chunks)
-
-        # Create worker arguments (include small arrays directly)
-        worker_args = [
-            (chunk_indices, shared_memory_refs, z, depth_top, depth_bottom, nl)
-            for chunk_indices in realization_chunks
-        ]
-
-        # Execute in parallel.  Linux: 'fork' explicitly, since Python 3.14
-        # defaults to 'forkserver', which re-imports the calling script and
-        # fails without an `if __name__ == "__main__":` guard.  Windows/macOS:
-        # 'spawn', as in gaaem_forward and integrate_rejection.
-        is_spawn = os.name == 'nt' or (os.name == 'posix' and os.uname().sysname == 'Darwin')
-        ctx = multiprocessing.get_context('spawn' if is_spawn else 'fork')
-        with ctx.Pool(processes=Ncpu) as p:
-            if showInfo > 1:
-                # Use imap to get results as they complete and show progress
-                results = list(tqdm(
-                    p.imap(_compute_mode_worker, worker_args),
-                    total=len(worker_args),
-                    desc='compute_P_obs_sparse (parallel chunks)',
-                    unit='chunk'
-                ))
-            else:
-                # Use regular map without progress tracking
-                results = p.map(_compute_mode_worker, worker_args)
-
-        # Concatenate results
-        lithology_mode = np.concatenate(results, axis=0)
-
-        # Show timing information if showInfo > 1
-        if showInfo > 1:
-            t_elapsed = time.time() - t_start
-            time_per_model = t_elapsed / nreal
-            print(f'compute_P_obs_sparse: Total runtime: {t_elapsed:.2f} seconds')
-            print(f'compute_P_obs_sparse: Time per model: {time_per_model*1000:.2f} ms')
-            print(f'compute_P_obs_sparse: Speedup with {Ncpu} cores vs sequential: ~{Ncpu*0.7:.1f}x (estimated)')
-
-        return lithology_mode
-
-    finally:
-        # Cleanup shared memory
-        ig.cleanup_shared_memory(shm_objects)
 
 def welllog_compute_P_obs_class_mode(M_lithology=None, depth_top=None, depth_bottom=None, lithology_obs=None, z=None, class_id=None, lithology_prob=0.8, W=None, parallel=False, Ncpu=-1, showInfo=1):
     """
@@ -350,18 +211,16 @@ def welllog_compute_P_obs_class_mode(M_lithology=None, depth_top=None, depth_bot
         - 'Y': Y coordinate of well location (optional, not used in this function)
         Default is None.
     parallel : bool, optional
-        Enable parallel processing for large ensembles. Default is False.
-        When True and parallel processing is available, distributes realization
-        processing across multiple CPU cores for significant speedup.
-        Recommended for N > 10,000 realizations. Only used when M_lithology is provided.
+        Ignored; kept for backwards compatibility. The mode computation is
+        vectorized over realizations and is faster on a single core than the
+        former multiprocessing implementation. Default is False.
     Ncpu : int, optional
-        Number of CPU cores to use for parallel processing. Default is -1 (auto-detect).
-        Only used when parallel=True and M_lithology is provided.
+        Ignored; kept for backwards compatibility. Default is -1.
     showInfo : int, optional
         Control information output level. Default is 1.
         - 0: No information printed
         - 1: Single line info (number of realizations, intervals)
-        - >1: Progress bar with tqdm, runtime statistics, and time per model
+        - >1: Runtime statistics and time per model
         Only applies when M_lithology is provided.
 
     Returns
@@ -402,15 +261,10 @@ def welllog_compute_P_obs_class_mode(M_lithology=None, depth_top=None, depth_bot
     >>> print(P_obs.shape)  # (3, 3) - 3 classes, 3 observations
     >>> print(class_mode)  # None (no prior models provided)
     >>>
-    >>> # Using parallel processing for large ensembles
-    >>> P_obs, class_mode = welllog_compute_P_obs_class_mode(M_lithology, depth_top, depth_bottom,
-    ...                                                       lithology_obs, z, class_id,
-    ...                                                       parallel=True, Ncpu=8)
-    >>>
     >>> # Control output verbosity
     >>> P_obs, class_mode = welllog_compute_P_obs_class_mode(M_lithology, ..., showInfo=0)  # Silent
     >>> P_obs, class_mode = welllog_compute_P_obs_class_mode(M_lithology, ..., showInfo=1)  # Single line info
-    >>> P_obs, class_mode = welllog_compute_P_obs_class_mode(M_lithology, ..., showInfo=2)  # Progress bar + timing
+    >>> P_obs, class_mode = welllog_compute_P_obs_class_mode(M_lithology, ..., showInfo=2)  # Timing
 
     Notes
     -----
@@ -428,15 +282,11 @@ def welllog_compute_P_obs_class_mode(M_lithology=None, depth_top=None, depth_bot
     from the observed class data. This is useful when you only need the probability
     representation of observations without extracting mode class from prior models.
 
-    Parallel processing uses shared memory for M_lithology array to minimize memory overhead.
-    Expected speedup: 4-8x on 8-core machines for large ensembles (N > 100,000 realizations).
-    The parallel implementation distributes realizations across worker processes while
-    maintaining identical results to the sequential version.
-
-    Both sequential and parallel modes support timing information via showInfo parameter:
-    - showInfo=0: Silent mode
-    - showInfo=1: Single line summary (default)
-    - showInfo>1: Detailed timing (progress bar for sequential, runtime stats for both)
+    The mode computation is vectorized over realizations: it loops only over the
+    depth intervals, and for each interval counts all classes across all
+    realizations at once. Ties are resolved to the smallest class value. For
+    N=1,000,000 realizations this takes well under a second per borehole (the
+    former per-realization loop took ~25 s), so no parallel processing is needed.
     """
     import numpy as np
 
@@ -480,15 +330,8 @@ def welllog_compute_P_obs_class_mode(M_lithology=None, depth_top=None, depth_bot
     # Compute mode lithology only if M_lithology is provided
     lithology_mode = None
     if M_lithology is not None:
-        nreal = len(M_lithology)
-        # Compute mode lithology using sequential or parallel method
-        import integrate as ig
-        if parallel and ig.use_parallel():
-            # Parallel execution path
-            lithology_mode = _compute_mode_parallel(M_lithology, z, depth_top, depth_bottom, nl, Ncpu, showInfo)
-        else:
-            # Sequential execution path (original implementation)
-            lithology_mode = _compute_mode_sequential(M_lithology, z, depth_top, depth_bottom, nl, showInfo)
+        # Vectorized over realizations (parallel/Ncpu are ignored)
+        lithology_mode = _compute_mode(M_lithology, z, depth_top, depth_bottom, nl, showInfo)
 
     # Convert observed lithologies to P_obs probabilities
     P_obs = np.zeros((nclass, n_obs)) * np.nan
@@ -870,7 +713,8 @@ def prior_data_borehole_class_mode(f_prior_h5, im_prior, BH, parallel=False, **k
         Borehole dictionary with keys depth_top, depth_bottom, class_obs,
         class_prob, X, Y, name, method.
     parallel : bool, optional
-        Enable parallel mode computation. Default is False.
+        Ignored; kept for backwards compatibility (the mode computation is
+        vectorized). Default is False.
     **kwargs
         showInfo : int, optional
             Verbosity level. Default is 1.
@@ -970,7 +814,8 @@ def prior_data_borehole(f_prior_h5, im_prior, BH, parallel=False, **kwargs):
         Borehole dictionary. Key ``'method'`` selects the integration approach
         and defaults to ``'mode_probability'`` if absent.
     parallel : bool, optional
-        Enable parallel mode computation for ``'mode_probability'``. Default False.
+        Ignored; kept for backwards compatibility (the ``'mode_probability'``
+        computation is vectorized). Default False.
     **kwargs
         showInfo : int, optional
             Verbosity level. Default is 1.
@@ -984,7 +829,7 @@ def prior_data_borehole(f_prior_h5, im_prior, BH, parallel=False, **kwargs):
 
     Examples
     --------
-    >>> P_obs, id_prior = ig.prior_data_borehole(f_prior_h5, im_prior=2, BH=BH, parallel=True)
+    >>> P_obs, id_prior = ig.prior_data_borehole(f_prior_h5, im_prior=2, BH=BH)
     >>> # Then extrapolate to survey grid:
     >>> d_obs, i_use, T_use = ig.Pobs_to_datagrid(P_obs, BH['X'], BH['Y'], f_data_h5)
     >>> id_out, _ = ig.save_data_multinomial(d_obs, i_use=i_use, id_prior=id_prior, f_data_h5=f_data_h5)
@@ -1060,7 +905,8 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
             Index of the discrete model parameter in f_prior_h5 (e.g. 2 for /M2).
             Default is 2.
         parallel : bool, optional
-            Enable parallel mode computation. Default is False.
+            Ignored; kept for backwards compatibility (the mode computation
+            is vectorized). Default is False.
         range_data : float, optional
             Data-space similarity radius. Overrides ``BH['range_data']`` when
             provided. Resolution order: explicit kwarg > BH['range_data']
@@ -1107,7 +953,7 @@ def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):
     >>> # All boreholes in one call — collect data IDs for joint inversion
     >>> id_prior_list, id_borehole_list = ig.save_borehole_data(
     ...     f_prior_h5, f_data_h5, BHOLES,
-    ...     range_data=2, range_xyz=300, parallel=True)
+    ...     range_data=2, range_xyz=300)
     >>> f_post_h5 = ig.integrate_rejection(f_prior_h5, f_data_h5,
     ...                                    id_use=[1] + id_borehole_list)
     """

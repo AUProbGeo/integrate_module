@@ -3323,7 +3323,89 @@ def save_data_gaussian(D_obs, D_std = [], d_std=[], Cd=[], id=1, id_prior=None, 
     return f_data_h5
 
 
-def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None, data_scale=1.0):
+def _xyz_node_to_gates(xyz_list, fl, ld, file_gex, gate_rtol=3e-3, showInfo=0):
+    """
+    Map a Workbench inversion-node export onto the used GEX gates.
+
+    An inversion-node export (``*_dat.xyz``, ``*_syn.xyz``) has one row per
+    sounding and moment (``SEGMENTS`` 1 = LM, 2 = HM), with the gates of all
+    moments in one merged block (``DATA_i``, ``DATASTD_i``) on the
+    ``GATE TIMES`` of the file header. Each gate is matched to the nearest
+    gate centre of its moment in the GEX (relative tolerance ``gate_rtol``);
+    gates that do not match are dropped (and reported). A sounding processed
+    with another GEX (other gate time shift) is set to NaN: that is, one with
+    no gate that matches unambiguously (late gates of different GEX files can
+    be closer than the 4 digits of the header gate times).
+
+    ``DATASTD`` is a std factor (1.03 = 3 %). Without it (``*_syn.xyz``), the
+    std is 3 %.
+
+    Returns
+    -------
+    i_row : ndarray
+        Row in ``fl`` of the first row of each sounding.
+    d_obs, d_std : ndarray
+        Data and absolute std, shape (n_sounding, n_used_gates), [LM | HM].
+    """
+    import pandas as pd
+    from integrate.em_system import gex_to_em_system
+
+    t_gex = [m['gate_centre'] for m in gex_to_em_system(file_gex)['moments']]
+    i0 = np.r_[0, np.cumsum([len(t) for t in t_gex])]
+
+    data = ld['data'].values.astype(float)  # dummy already NaN
+    if 'datastd' in ld:
+        std_fac = ld['datastd'].values.astype(float)
+    else:
+        std_fac = np.full_like(data, 1.03)
+    seg = fl['segments'].values.astype(int)
+    i_file = np.repeat(np.arange(len(xyz_list)), [len(xyz.flightlines) for xyz in xyz_list])
+
+    # A sounding is one (file, line, record), in order of first appearance
+    codes, _ = pd.factorize(pd.MultiIndex.from_arrays(
+        [i_file, fl['line_no'].values, fl['record'].values]))
+    n_snd = codes.max() + 1
+    i_row = np.unique(codes, return_index=True)[1]
+
+    d_obs = np.full((n_snd, i0[-1]), np.nan)
+    d_std = np.full((n_snd, i0[-1]), np.nan)
+    unique_hit = np.zeros(n_snd, dtype=bool)
+    snd_dropped, t_dropped = [], []  # sounding and gate time of each dropped gate
+    for i_f, xyz in enumerate(xyz_list):
+        t_xyz = np.asarray(xyz.model_info['gate times (s)'], dtype=float)
+        for i_mom, t_mom in enumerate(t_gex):
+            # nearest GEX gate of this moment, for every merged gate
+            k = np.abs(np.log(t_xyz[:, None] / t_mom[None, :])).argmin(axis=1)
+            match = np.abs(t_xyz / t_mom[k] - 1) < gate_rtol
+            # ambiguous: another merged gate matches the same GEX gate
+            n_hit = np.bincount(k[match], minlength=len(t_mom))
+            unique = match & (n_hit[k] == 1)
+            rows = np.where((i_file == i_f) & (seg == i_mom + 1))[0]
+            has = ~np.isnan(data[rows])
+            unique_hit[codes[rows[(has & unique).any(axis=1)]]] = True
+            r, c = np.nonzero(has & match)
+            d_obs[codes[rows[r]], i0[i_mom] + k[c]] = data[rows[r], c]
+            d_std[codes[rows[r]], i0[i_mom] + k[c]] = (std_fac[rows[r], c] - 1) * np.abs(data[rows[r], c])
+            r, c = np.nonzero(has & ~match)
+            snd_dropped.append(codes[rows[r]])
+            t_dropped.append(t_xyz[c])
+    reject = ~unique_hit
+    d_obs[reject] = np.nan
+    d_std[reject] = np.nan
+
+    if showInfo > -1:
+        print('Inversion-node XYZ: %d soundings, %d with gate times not matching the GEX (set to NaN)'
+              % (n_snd, reject.sum()))
+        snd_dropped, t_dropped = np.concatenate(snd_dropped), np.concatenate(t_dropped)
+        kept = ~reject[snd_dropped]
+        if np.any(kept):
+            print('  %d kept soundings have gates not matching the GEX; dropped gate times [s]: %s'
+                  % (np.unique(snd_dropped[kept]).size,
+                     ' '.join('%.4e' % t for t in np.unique(t_dropped[kept]))))
+    return i_row, d_obs, d_std
+
+
+def xyz_to_h5(file_xyz, file_gex, f_data_h5=None,i_lm_skip=None, i_hm_skip=None, nan_value=None, showInfo=0, disregardFullNan=True, data_obs=None, data_std=None, altitude=None, altitude_std=None, tx_altitude=None, tx_altitude_std=None, rx_altitude=None, rx_altitude_std=None, name=None, label=None, unit=None, data_scale=1.0):
     """
     Convert Aarhus Workbench XYZ export file(s) to an INTEGRATE HDF5 data file.
 
@@ -3332,6 +3414,12 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     ``integrate_rejection()``.  The GEX file is used to determine which initial
     gates to skip per channel (``RemoveInitialGates``) and the total gate count
     (``NoGates``).
+
+    Workbench inversion-node exports (``*_dat.xyz`` with the data used in an
+    inversion, ``*_syn.xyz`` with the forward response of the inversion
+    models) are also read. Their merged gates are mapped onto the used GEX
+    gates by gate time; soundings whose gate times do not match the GEX are
+    NaN (and dropped with ``disregardFullNan=True``).
 
     Parameters
     ----------
@@ -3530,16 +3618,46 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     for k in ld:
         ld[k] = ld[k].replace(nan_value, np.nan)
 
-    # --- pair ch1 / ch2 rows (mirrors MATLAB logic) ---
-    # Every ch1 row becomes a sounding.  HM data is filled where the
-    # immediately following row is ch2; otherwise those columns stay NaN.
-    # Single-channel systems (e.g. SkyTEM) have no 'channel_no' column at
-    # all: every row is its own (channel-1) sounding.
-    if 'channel_no' in fl.columns:
-        channel_arr = fl['channel_no'].values
+    # --- Workbench inversion-node export (*_dat.xyz, *_syn.xyz) ---
+    # One row per sounding and moment, all gates in one merged block.
+    # ch1_pos is then the first row of each sounding.
+    is_node = 'dbdt_ch1gt' not in ld and 'data' in ld and 'segments' in fl.columns
+    if is_node:
+        ch1_pos, d_obs, d_std = _xyz_node_to_gates(xyz_list, fl, ld, file_gex, showInfo=showInfo)
     else:
-        channel_arr = np.ones(len(fl))
-    ch1_pos = np.where(channel_arr == 1)[0]
+        # --- pair ch1 / ch2 rows (mirrors MATLAB logic) ---
+        # Every ch1 row becomes a sounding.  HM data is filled where the
+        # immediately following row is ch2; otherwise those columns stay NaN.
+        # Single-channel systems (e.g. SkyTEM) have no 'channel_no' column at
+        # all: every row is its own (channel-1) sounding.
+        if 'channel_no' in fl.columns:
+            channel_arr = fl['channel_no'].values
+        else:
+            channel_arr = np.ones(len(fl))
+        ch1_pos = np.where(channel_arr == 1)[0]
+
+        # --- LM data (channel 1) ---
+        lm_obs = ld['dbdt_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
+        lm_rel = ld['dbdt_std_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
+        lm_std = lm_rel * lm_obs  # relative → absolute
+
+        # --- HM data (channel 2, dual-channel systems only) ---
+        if n_channels >= 2:
+            n_hm = i_hm_end - i_hm_start
+            hm_obs = np.full((len(ch1_pos), n_hm), np.nan)
+            hm_std = np.full((len(ch1_pos), n_hm), np.nan)
+            ch2_pos = ch1_pos + 1  # candidate ch2 row index for each ch1 sounding
+            has_ch2 = channel_arr[np.minimum(ch2_pos, len(channel_arr) - 1)] == 2
+            ch2_valid = ch2_pos[has_ch2]
+            raw_obs = ld['dbdt_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
+            raw_rel = ld['dbdt_std_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
+            hm_obs[has_ch2] = raw_obs[ch2_valid]
+            hm_std[has_ch2] = raw_rel[ch2_valid] * raw_obs[ch2_valid]
+            d_obs = np.hstack([lm_obs, hm_obs])
+            d_std = np.hstack([lm_std, hm_std])
+        else:
+            d_obs = lm_obs
+            d_std = lm_std
 
     # geometry from channel-1 rows (all of them)
     UTMX      = fl['utmx'].values[ch1_pos].astype(float)
@@ -3547,30 +3665,7 @@ def xyz_to_h5(file_xyz, file_gex, f_data_h5=None, i_lm_skip=None, i_hm_skip=None
     LINE      = fl['line_no'].values[ch1_pos].astype(float)
     ELEVATION = fl['elevation'].values[ch1_pos].astype(float)
 
-    # --- LM data (channel 1) ---
-    lm_obs = ld['dbdt_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
-    lm_rel = ld['dbdt_std_ch1gt'].values[ch1_pos, i_lm_start:i_lm_end].astype(float)
-    lm_std = lm_rel * lm_obs  # relative → absolute
-
-    # --- HM data (channel 2, dual-channel systems only) ---
-    if n_channels >= 2:
-        n_hm = i_hm_end - i_hm_start
-        hm_obs = np.full((len(ch1_pos), n_hm), np.nan)
-        hm_std = np.full((len(ch1_pos), n_hm), np.nan)
-        ch2_pos = ch1_pos + 1  # candidate ch2 row index for each ch1 sounding
-        has_ch2 = channel_arr[np.minimum(ch2_pos, len(channel_arr) - 1)] == 2
-        ch2_valid = ch2_pos[has_ch2]
-        raw_obs = ld['dbdt_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
-        raw_rel = ld['dbdt_std_ch2gt'].values[:, i_hm_start:i_hm_end].astype(float)
-        hm_obs[has_ch2] = raw_obs[ch2_valid]
-        hm_std[has_ch2] = raw_rel[ch2_valid] * raw_obs[ch2_valid]
-        d_obs = np.hstack([lm_obs, hm_obs])
-        d_std = np.hstack([lm_std, hm_std])
-    else:
-        d_obs = lm_obs
-        d_std = lm_std
-
-    n_lm = lm_obs.shape[1]
+    n_lm = i_lm_end - i_lm_start
 
     # --- apply gate skipping using Workbench gate numbers (mirrors MATLAB) ---
     # Workbench gate number → column index in d_obs:
@@ -4024,7 +4119,7 @@ def merge_data(f_data, f_gex='', delta_line=0, f_data_merged_h5='', **kwargs):
 ## 
 
 def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showInfo=0,
-                    ip_range_list=None, f_prior_merged_h5=''):
+                    ip_range_list=None, f_prior_merged_h5='', shared_prior=False):
     """
     Merge multiple posterior sampling results into unified datasets.
 
@@ -4056,6 +4151,12 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
     f_prior_merged_h5 : str, optional
         Only with ``ip_range_list``, when the posteriors use different priors:
         output path for the merged prior. Default ``'PRIOR_merged_N{N}.h5'``.
+    shared_prior : bool, optional
+        Only with ``ip_range_list``, when the posteriors use different priors:
+        assume that realization j has the same model in all priors (e.g.
+        copies of one prior that differ only in the simulated flight height),
+        and let the merged posterior refer to the first prior instead of a
+        merged prior. No merged prior is made. Default False. See Notes.
 
     Returns
     -------
@@ -4092,7 +4193,24 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
     posterior ``k``. If the posteriors use different priors, they are merged
     in order (``merge_prior(..., shuffle=False)``, which adds a source-file
     model parameter) and the posterior sample indices are offset to point into
-    the merged prior. Posterior statistics are computed for the merged file.
+    the merged prior. The posterior statistics (``/M1/Median``, ...) of
+    sounding ``ip_range_list[k]`` are copied from posterior ``k``, and those
+    of the source-file parameter are set directly, so the (possibly very
+    large) merged prior is not read. Only if a posterior has no statistics
+    for a model parameter, all statistics are computed from the merged prior.
+
+    With ``shared_prior=True`` the priors are not merged: the merged posterior
+    refers to the first prior, ``f_prior_h5_files[0]``, and the sample indices
+    are not offset. The posterior statistics are still correct for all
+    soundings and all model parameters, as they are copied from each
+    posterior. But anything recomputed later from the sample indices and the
+    prior (e.g. the posterior data in ``plot_data_prior_post``, or
+    ``integrate_posterior_stats``) is only correct for the model parameters
+    that are the same in all priors, and for the data and other model
+    parameters only for the soundings of the first posterior. Model
+    parameters that differ between the priors (checked on a few
+    realizations) are printed. The actual priors are stored in the
+    ``f5_prior_files`` attribute of the merged posterior.
 
     Examples
     --------
@@ -4108,7 +4226,7 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
         return _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
                                          f_post_merged_h5=f_post_merged_h5,
                                          f_prior_merged_h5=f_prior_merged_h5,
-                                         showInfo=showInfo)
+                                         shared_prior=shared_prior, showInfo=showInfo)
 
     nf = len(f_post_h5_files)
     # Check that legth of f_data_h5_files is the same as f_post_h5_files
@@ -4160,7 +4278,8 @@ def merge_posterior(f_post_h5_files, f_data_h5_files, f_post_merged_h5='', showI
 
 
 def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
-                              f_post_merged_h5='', f_prior_merged_h5='', showInfo=0):
+                              f_post_merged_h5='', f_prior_merged_h5='', shared_prior=False,
+                              showInfo=0):
     """
     Merge posteriors that share one data file and each cover a sounding subset.
 
@@ -4183,7 +4302,8 @@ def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
         f_post_merged_h5 = 'POST_merged_N%d.h5' % nf
 
     # per-sounding datasets written by integrate_rejection
-    keys = ['i_use', 'T', 'EV', 'EV_post', 'EV_post_mean', 'CHI2', 'N_UNIQUE']
+    keys = ['i_use', 'T', 'T_all', 'EV', 'EV_all', 'EV_post', 'EV_post_mean',
+            'CHI2', 'CHI2_all', 'N_UNIQUE']
     f_prior_h5_files = []
     for f_post_h5 in f_post_h5_files:
         with h5py.File(f_post_h5, 'r') as f:
@@ -4196,6 +4316,37 @@ def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
     if len(set(f_prior_h5_files)) == 1:
         f_prior_h5 = f_prior_h5_files[0]
         offsets = np.zeros(nf, dtype=np.int64)
+    elif shared_prior:
+        # realization j is assumed to be the same in all priors: use the first prior
+        f_prior_h5 = f_prior_h5_files[0]
+        offsets = np.zeros(nf, dtype=np.int64)
+        if showInfo > 0:
+            print('Using the prior of the first posterior for all posteriors: %s' % f_prior_h5)
+            if len(f_prior_merged_h5) > 0:
+                print('shared_prior=True: no merged prior is made, %s is not used' % f_prior_merged_h5)
+        # Compare the first and last realizations of each model parameter with
+        # the first prior (contiguous rows: scattered rows are slow to read
+        # from compressed datasets chunked by column)
+        def read_check(dset):
+            return np.concatenate((dset[:50], dset[max(50, dset.shape[0] - 50):]))
+
+        with h5py.File(f_prior_h5, 'r') as f:
+            n_real = f['M1'].shape[0]
+            M_check = {name: read_check(dset) for name, dset in f.items()
+                       if name.startswith('M') and isinstance(dset, h5py.Dataset)}
+        im_differ = set()
+        for f_prior_h5_i in f_prior_h5_files[1:]:
+            with h5py.File(f_prior_h5_i, 'r') as f:
+                if f['M1'].shape[0] != n_real:
+                    raise ValueError('shared_prior=True needs the same number of realizations in all priors: '
+                                     '%s has %d, %s has %d' % (f_prior_h5, n_real, f_prior_h5_i, f['M1'].shape[0]))
+                for name, m in M_check.items():
+                    if name not in f or not np.array_equal(m, read_check(f[name]), equal_nan=True):
+                        im_differ.add(name)
+        if len(im_differ) > 0:
+            print('shared_prior=True: %s differ between the priors. Posterior data, and statistics of these, '
+                  'recomputed from the prior %s are only correct for the soundings of the first posterior'
+                  % (', '.join(sorted(im_differ)), f_prior_h5))
     else:
         if len(f_prior_merged_h5) == 0:
             f_prior_merged_h5 = 'PRIOR_merged_N%d.h5' % nf
@@ -4209,6 +4360,30 @@ def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
 
     if showInfo > 0:
         print('Merging %d posterior files to %s' % (nf, f_post_merged_h5))
+
+    # Posterior statistics (/M1/Median, ...) written by integrate_rejection,
+    # present in all posteriors. These are copied, so the merged prior is
+    # not read (a merged prior of many large priors does not fit in memory).
+    stat_paths = None
+    for f_post_h5 in f_post_h5_files:
+        with h5py.File(f_post_h5, 'r') as f:
+            paths = ['%s/%s' % (name, stat) for name, group in f.items()
+                     if name.startswith('M') and isinstance(group, h5py.Group)
+                     for stat, dset in group.items() if isinstance(dset, h5py.Dataset)]
+        stat_paths = paths if stat_paths is None else [p for p in stat_paths if p in paths]
+
+    # Model parameters of the (merged) prior: the source-file parameter added
+    # by merge_prior has no statistics in the posteriors, they are computed
+    # here. Any other parameter without statistics: compute all statistics.
+    with h5py.File(f_prior_h5, 'r') as f:
+        im_prior = [name for name, dset in f.items() if name.startswith('M') and 'is_discrete' in dset.attrs]
+    if offsets.any():
+        with h5py.File(f_prior_h5_files[0], 'r') as f:
+            im_source = [name for name in im_prior if name not in f]
+    else:
+        im_source = []
+    im_stats = set(p.split('/')[0] for p in stat_paths)
+    copy_stats = all(name in im_stats for name in im_prior if name not in im_source)
 
     merged = {}
     for k, f_post_h5 in enumerate(f_post_h5_files):
@@ -4224,22 +4399,68 @@ def _merge_posterior_ip_range(f_post_h5_files, f_data_h5_files, ip_range_list,
                     # soundings not in any ip_range keep the first file's values
                     merged[key] = data.copy()
                 merged[key][ip] = data[ip]
+            if copy_stats:
+                for path in stat_paths:
+                    data = f[path][:]
+                    if path not in merged:
+                        # soundings not in any ip_range are NaN, as in integrate_posterior_stats
+                        merged[path] = np.full(data.shape, np.nan, dtype=data.dtype)
+                    merged[path][ip] = data[ip]
             if showInfo > 1:
                 print('.. %s: %d soundings, prior %s' % (f_post_h5, len(ip), f_prior_h5_files[k]))
+
+    ip_all = np.unique(np.concatenate([np.asarray(ip, dtype=np.int64) for ip in ip_range_list]))
+    if copy_stats:
+        # Source-file parameter: all posterior samples of sounding ip_range_list[k]
+        # are from prior k (class k+1)
+        nsounding = merged['i_use'].shape[0]
+        for name in im_source:
+            mode = np.full((nsounding, 1), np.nan, dtype=np.float32)
+            P = np.full((nsounding, nf, 1), np.nan, dtype=np.float32)
+            P[ip_all] = 0
+            for k in range(nf):
+                ip = np.asarray(ip_range_list[k], dtype=np.int64)
+                mode[ip] = k + 1
+                P[ip, k] = 1
+            entropy = np.full((nsounding, 1), np.nan, dtype=np.float32)
+            entropy[ip_all] = 0
+            merged['%s/Mode' % name] = mode
+            merged['%s/Entropy' % name] = entropy
+            merged['%s/P' % name] = P
 
     with h5py.File(f_post_merged_h5, 'w') as f:
         for key, data in merged.items():
             f.create_dataset(key, data=data)
         f.attrs['f5_prior'] = f_prior_h5
         f.attrs['f5_data'] = f_data_h5
+        # data types and temperature settings (columns of T_all/EV_all/CHI2_all)
+        with h5py.File(f_post_h5_files[0], 'r') as f0:
+            for name in ('id_use', 'autoT', 'T_base', 'per_type_T'):
+                if name in f0.attrs:
+                    f.attrs[name] = f0.attrs[name]
+        if shared_prior and len(set(f_prior_h5_files)) > 1:
+            f.attrs['shared_prior'] = 1
+            f.attrs['f5_prior_files'] = [str(f_prior) for f_prior in f_prior_h5_files]
 
-    ip_all = np.unique(np.concatenate([np.asarray(ip, dtype=np.int64) for ip in ip_range_list]))
-    ig.integrate_posterior_stats(f_post_merged_h5, ip_range=ip_all, showInfo=showInfo)
+    if copy_stats:
+        if showInfo > 0:
+            print('Copied posterior statistics from %d posterior files' % nf)
+        # Geometry, as integrate_posterior_stats
+        with h5py.File(f_data_h5, 'r') as f_data, h5py.File(f_post_merged_h5, 'a') as f_post:
+            for key in ['UTMX', 'UTMY', 'LINE', 'ELEVATION']:
+                if key in f_data and key not in f_post:
+                    f_data.copy(key, f_post)
+    else:
+        if shared_prior and len(set(f_prior_h5_files)) > 1:
+            print('shared_prior=True: the posteriors have no statistics for all model parameters, '
+                  'so they are computed from %s' % f_prior_h5)
+        ig.integrate_posterior_stats(f_post_merged_h5, ip_range=ip_all, showInfo=showInfo)
 
     return f_post_merged_h5, f_data_h5
 
 
-def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0):
+def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0,
+                max_block_mb=256):
     """
     Merge multiple prior model files into a single combined HDF5 file.
 
@@ -4264,6 +4485,10 @@ def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0
     showInfo : int, optional
         Verbosity level for progress information. Higher values provide more
         detailed output (default is 0).
+    max_block_mb : float, optional
+        The files are copied in blocks of rows of at most this size [MB], so
+        the memory use does not depend on the number of samples. Peak memory
+        is a few times this (default is 256).
 
     Returns
     -------
@@ -4336,157 +4561,122 @@ def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0
     """
     import h5py
     import numpy as np
-    
+
     # Input validation
     if not isinstance(f_prior_h5_files, list):
         raise ValueError('f_prior_h5_files must be a list of strings')
-    
+
     if len(f_prior_h5_files) == 0:
         raise ValueError('f_prior_h5_files cannot be empty')
-    
+
     nf = len(f_prior_h5_files)
-    
+
     # Generate output filename if not provided
     if len(f_prior_merged_h5) == 0:
         f_prior_merged_h5 = 'PRIOR_merged_N%d.h5' % nf
-    
+
     if showInfo > 0:
         print('Merging %d prior files to %s' % (nf, f_prior_merged_h5))
-    
-    # Initialize storage for merged data
-    M_merged = {}  # Model parameters
-    D_merged = {}  # Data arrays
-    source_file_values = []  # Source file indices
+
+    # First pass: number of samples, and shape and dtype of each model
+    # parameter (M1, M2, ...) and data array (D1, D2, ...). No data is read.
     sample_counts = []  # Track samples per file
-    
-    # First pass: collect all model parameters and data arrays
+    n_cols_file = {}  # key -> number of columns in each file (None: not in file)
+    dtypes = {}  # key -> dtypes in the files
     for i, f_prior_h5 in enumerate(f_prior_h5_files):
-        if showInfo > 1:
-            print('.. Processing file %d/%d: %s' % (i+1,nf, f_prior_h5))
-        
         with h5py.File(f_prior_h5, 'r') as f:
-            # Count samples in this file (use M1 as reference)
-            if 'M1' in f:
-                n_samples = f['M1'].shape[0]
-                sample_counts.append(n_samples)
-                source_file_values.extend([i + 1] * n_samples)  # Add file index for each sample (1-based for discrete compatibility)
-            else:
+            if 'M1' not in f:
                 raise ValueError(f'File {f_prior_h5} does not contain M1 dataset')
-            
-            # Process model parameters (M1, M2, M3, ...)
-            for key in f.keys():
-                if key.startswith('M'):
-                    if key not in M_merged:
-                        M_merged[key] = []
-                    M_merged[key].append(f[key][:])
-            
-            # Process data arrays (D1, D2, D3, ...)
-            for key in f.keys():
-                if key.startswith('D'):
-                    if key not in D_merged:
-                        D_merged[key] = []
-                    D_merged[key].append(f[key][:])
-    
-    # Concatenate all arrays (handle different dimensions)
-    if showInfo > 1:
-        print('.. Concatenating arrays')
-    
-    # Concatenate model parameters (handle different parameter dimensions)
-    for key in M_merged:
-        arrays = M_merged[key]
-        if len(arrays) == 1:
-            M_merged[key] = arrays[0]
-        else:
-            # Find maximum dimensions across all arrays
-            max_cols = max(arr.shape[1] for arr in arrays)
-            
-            # Pad arrays to match maximum dimensions
-            padded_arrays = []
-            for arr in arrays:
-                if arr.shape[1] < max_cols:
-                    # Pad with NaN values for missing parameters
-                    pad_width = ((0, 0), (0, max_cols - arr.shape[1]))
-                    padded_arr = np.pad(arr, pad_width, mode='constant', constant_values=np.nan)
-                    padded_arrays.append(padded_arr)
-                else:
-                    padded_arrays.append(arr)
-            
-            M_merged[key] = np.vstack(padded_arrays)
-    
-    # Concatenate data arrays (should have same dimensions)
-    for key in D_merged:
-        arrays = D_merged[key]
-        if len(arrays) == 1:
-            D_merged[key] = arrays[0]
-        else:
-            # Check if all data arrays have same dimensions
-            shapes = [arr.shape[1] for arr in arrays]
-            if len(set(shapes)) > 1:
-                if showInfo > 0:
-                    print(f'Warning: Data arrays for {key} have different dimensions: {shapes}')
-                # Pad data arrays to match maximum dimensions
-                max_cols = max(shapes)
-                padded_arrays = []
-                for arr in arrays:
-                    if arr.shape[1] < max_cols:
-                        pad_width = ((0, 0), (0, max_cols - arr.shape[1]))
-                        padded_arr = np.pad(arr, pad_width, mode='constant', constant_values=np.nan)
-                        padded_arrays.append(padded_arr)
-                    else:
-                        padded_arrays.append(arr)
-                D_merged[key] = np.vstack(padded_arrays)
-            else:
-                D_merged[key] = np.vstack(arrays)
-    
+            sample_counts.append(f['M1'].shape[0])
+            for key, dset in f.items():
+                if not (key.startswith('M') or key.startswith('D')) or not isinstance(dset, h5py.Dataset):
+                    continue
+                if key not in n_cols_file:
+                    n_cols_file[key] = [None] * nf
+                    dtypes[key] = []
+                n_cols_file[key][i] = dset.shape[1]
+                dtypes[key].append(dset.dtype)
+    keys = ([key for key in n_cols_file if key.startswith('M')] +
+            [key for key in n_cols_file if key.startswith('D')])
+
+    # Arrays with fewer columns (or missing in a file) are padded with NaN
+    n_cols = {}
+    dtype_out = {}
+    for key in keys:
+        n_cols[key] = max(nc for nc in n_cols_file[key] if nc is not None)
+        dtype_out[key] = np.result_type(*dtypes[key])
+        if any(nc != n_cols[key] for nc in n_cols_file[key]):
+            if showInfo > 0 and key.startswith('D'):
+                print(f'Warning: Data arrays for {key} have different dimensions: {n_cols_file[key]}')
+            if not np.issubdtype(dtype_out[key], np.floating):
+                dtype_out[key] = np.result_type(dtype_out[key], np.float32)
+
     # Determine next available model parameter number
-    existing_m_params = [key for key in M_merged.keys() if key.startswith('M') and key[1:].isdigit()]
+    existing_m_params = [key for key in keys if key.startswith('M') and key[1:].isdigit()]
     if existing_m_params:
         param_numbers = [int(key[1:]) for key in existing_m_params]
         next_param_num = max(param_numbers) + 1
     else:
         next_param_num = 1
-    
+
     next_param_key = f'M{next_param_num}'
-    
-    # Create the new model parameter array (source file indices) - must be shape (Ntotal, 1)
-    M_merged[next_param_key] = np.array(source_file_values).reshape(-1, 1)
 
-    # Apply shuffling if requested
+    total_samples = sum(sample_counts)
+    sample_offsets = np.concatenate(([0], np.cumsum(sample_counts)[:-1])).astype(np.int64)
+
+    # Apply shuffling if requested: row j of the merged file is row
+    # shuffle_indices[j] of the concatenated input, so input row r is
+    # written to row i_dest[r]
     if shuffle:
-        if showInfo > 1:
-            print('.. Shuffling realizations')
-
-        # Get total number of samples
-        total_samples = sum(sample_counts)
-
-        # Create a single random permutation to apply to all arrays
         rng = np.random.RandomState(42)  # Fixed seed for reproducibility
         shuffle_indices = rng.permutation(total_samples)
-
+        i_dest = np.empty(total_samples, dtype=np.int64)
+        i_dest[shuffle_indices] = np.arange(total_samples)
+        del shuffle_indices
         if showInfo > 0:
             print(f'Shuffling {total_samples} realizations (seed=42 for reproducibility)')
 
-        # Apply the same permutation to all M arrays
-        for key in M_merged.keys():
-            M_merged[key] = M_merged[key][shuffle_indices]
+    def write_rows(dset_out, r0, data):
+        """Write rows r0:r0+len(data) of the concatenated input to dset_out."""
+        if shuffle:
+            d = i_dest[r0:r0 + len(data)]
+            order = np.argsort(d)
+            dset_out[d[order]] = data[order]  # h5py needs increasing indices
+        else:
+            dset_out[r0:r0 + len(data)] = data
 
-        # Apply the same permutation to all D arrays
-        for key in D_merged.keys():
-            D_merged[key] = D_merged[key][shuffle_indices]
-
-    # Write merged file
+    # Write merged file, one block of rows at a time, so that the memory use
+    # does not depend on the number of samples
     if showInfo > 1:
         print('.. Writing merged file')
 
     with h5py.File(f_prior_merged_h5, 'w') as f_out:
-        # Write all model parameters including M4
-        for key, data in M_merged.items():
-            f_out.create_dataset(key, data=data)
-        
-        # Write all data arrays
-        for key, data in D_merged.items():
-            f_out.create_dataset(key, data=data)
-        
+        # Write all model parameters and data arrays
+        for key in keys:
+            nc = n_cols[key]
+            dtype = dtype_out[key]
+            dset_out = f_out.create_dataset(key, (total_samples, nc), dtype=dtype)
+            n_block = max(1, int(max_block_mb * 1e6 // (nc * dtype.itemsize)))
+            for i, f_prior_h5 in enumerate(f_prior_h5_files):
+                if showInfo > 1:
+                    print('.. %s: file %d/%d: %s' % (key, i + 1, nf, f_prior_h5))
+                with h5py.File(f_prior_h5, 'r') as f:
+                    for r in range(0, sample_counts[i], n_block):
+                        r1 = min(sample_counts[i], r + n_block)
+                        data = np.full((r1 - r, nc), np.nan, dtype=dtype)
+                        if n_cols_file[key][i] is not None:
+                            data[:, :n_cols_file[key][i]] = f[key][r:r1]
+                        write_rows(dset_out, sample_offsets[i] + r, data)
+
+        # The new model parameter (source file indices, 1-based for discrete
+        # compatibility) - must be shape (Ntotal, 1)
+        dset_out = f_out.create_dataset(next_param_key, (total_samples, 1), dtype=np.int64)
+        n_block = max(1, int(max_block_mb * 1e6 // 8))
+        for i in range(nf):
+            for r in range(0, sample_counts[i], n_block):
+                r1 = min(sample_counts[i], r + n_block)
+                write_rows(dset_out, sample_offsets[i] + r, np.full((r1 - r, 1), i + 1, dtype=np.int64))
+
         # Copy attributes from first file and update
         with h5py.File(f_prior_h5_files[0], 'r') as f_first:
             for attr_name, attr_value in f_first.attrs.items():
@@ -4513,10 +4703,7 @@ def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0
         # First, check which attributes are identical across all files
         common_attrs = {}  # key -> {attr_name: attr_value}
 
-        for key in list(M_merged.keys()) + list(D_merged.keys()):
-            if key == next_param_key:
-                continue  # Skip the new tracking parameter
-
+        for key in keys:
             common_attrs[key] = {}
 
             # Collect attributes from first file
@@ -4559,11 +4746,11 @@ def merge_prior(f_prior_h5_files, f_prior_merged_h5='', shuffle=True, showInfo=0
             if key in f_out:
                 for attr_name, attr_value in attrs.items():
                     # Special handling for x/z attributes - update to match padded dimensions
-                    if attr_name in ['x', 'z'] and key in M_merged:
-                        new_dim = M_merged[key].shape[1]
-                        f_out[key].attrs[attr_name] = np.arange(new_dim)
-                    else:
-                        f_out[key].attrs[attr_name] = attr_value
+                    if attr_name in ['x', 'z'] and key.startswith('M'):
+                        new_dim = n_cols[key]
+                        if np.size(attr_value) != new_dim:
+                            attr_value = np.arange(new_dim)
+                    f_out[key].attrs[attr_name] = attr_value
 
         # Add merge-specific attributes
         f_out.attrs['merged_from_files'] = [f.encode('utf-8') for f in f_prior_h5_files]
@@ -5610,9 +5797,47 @@ def read_borehole(filename, **kwargs) -> Any:
     with open(filename, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
+    for W in (data if isinstance(data, list) else [data]):
+        _borehole_drop_invalid_class(W)
+
     if showInfo > 0:
         n = len(data) if isinstance(data, list) else 1
         print(f'read_borehole: read {n} borehole(s) from {filename}')
 
     return data
+
+
+def _borehole_drop_invalid_class(W):
+    """
+    Remove layers whose ``class_obs`` is not an integer (e.g. ``null``) from
+    borehole dict ``W`` in place, with a warning per removed layer.
+
+    Every list in ``W`` with one entry per layer (same length as
+    ``class_obs``, e.g. ``depth_top``, ``depth_bottom``, ``class_prob``) is
+    trimmed, so the lists stay aligned. Integer-valued floats (``3.0``) are
+    kept and converted to ``int``.
+    """
+    import warnings
+    class_obs = W.get('class_obs')
+    if not isinstance(class_obs, list):
+        return
+    n = len(class_obs)
+    keep = []
+    for i, c in enumerate(class_obs):
+        ok = (isinstance(c, int) and not isinstance(c, bool)) or \
+             (isinstance(c, float) and c.is_integer())
+        if ok:
+            keep.append(i)
+            continue
+        top, bot = (W[k][i] if len(W.get(k, [])) == n else None
+                    for k in ('depth_top', 'depth_bottom'))
+        warnings.warn(f"read_borehole: borehole {W.get('name', '?')!r}: layer {i} "
+                      f"({top}-{bot} m) has class_obs={c!r}, which is not an "
+                      f"integer; layer removed", RuntimeWarning, stacklevel=3)
+    if len(keep) == n:
+        return
+    for k, v in W.items():
+        if isinstance(v, list) and len(v) == n:
+            W[k] = [v[i] for i in keep]
+    W['class_obs'] = [int(c) for c in W['class_obs']]
 

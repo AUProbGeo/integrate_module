@@ -7,6 +7,9 @@ processing support for efficient posterior sampling.
 
 Key Functions:
 - integrate_rejection(): Main rejection sampling function
+- integrate_rejection_em_height(): EM forward modelling and rejection sampling
+  with a varying flight height (one prior per flight-height interval)
+- em_height_bins(): Flight-height intervals with similar numbers of soundings
 - integrate_rejection_range(): Core rejection sampling for data point ranges  
 - likelihood_*(): Various likelihood calculation functions
 - Shared memory functions for parallel processing
@@ -89,12 +92,37 @@ def integrate_rejection(f_prior_h5='prior.h5',
     nr : int, optional
         Number of posterior samples to retain per data point.
         Default is 1000.
-    autoT : int, optional
-        Automatic temperature estimation method (1=enabled, 0=disabled).
-        Default is 1.
-    T_base : float, optional
-        Base temperature for rejection sampling when autoT=0.
-        Default is 1.
+    autoT : int, list or dict, optional
+        Automatic estimation of the annealing temperature (1=enabled,
+        0=disabled, then T=T_base).
+
+        - scalar (legacy): one temperature T for the summed log-likelihood of
+          all data types, P_acc = exp((sum_i L_i - max)/T).
+        - list with one value per data type in ``id_use`` (same order), or
+          dict ``{data_id: 0/1}`` (data ids not listed get 1): one
+          temperature per data type. T_i is estimated from L_i alone
+          (autoT[i]=1) or set to T_base[i] (autoT[i]=0), and
+          P_acc = exp(L_T - max(L_T)) with L_T = sum_i L_i/T_i.
+
+        For example, with ``id_use=[1,2,3]`` (tTEM, borehole 1, borehole 2),
+        ``autoT=[1,0,0], T_base=1`` anneals the tTEM data and uses no
+        annealing (T=1) for the borehole data. Note that ``autoT=[1,1,1]``
+        (one T per data type) differs from ``autoT=1`` (one T for all data
+        types). Default is 1.
+    T_base : float, list or dict, optional
+        Temperature used when autoT=0 (T_base=1 is no annealing), as a scalar
+        or per data type (list in the order of ``id_use``, or dict
+        ``{data_id: T}``; data ids not listed get 1), e.g.
+        ``autoT=0, T_base=[4,1,1]``. If either autoT or T_base is given per
+        data type, the temperature is per data type. Default is 1.
+
+        The posterior file holds, per data point, the combined values
+        ``/T`` (largest T_i in per-type mode), ``/EV`` (log-evidence of all
+        data types) and ``/CHI2`` (reduced chi-squared of all data), and per
+        data type (column k is ``/D{id_use[k]}``, NaN where a data type is
+        not used) ``/T_all``, ``/EV_all`` (log-evidence of each data type
+        alone) and ``/CHI2_all``. The attributes ``id_use``, ``autoT`` and
+        ``T_base`` hold the per-data-type settings.
     Nchunks : int, optional
         Number of chunks for parallel processing. If 0, auto-determined.
         Default is 0.
@@ -125,7 +153,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
         Computation backend to use.  ``'numpy'`` uses the original
         NumPy/multiprocessing implementation.  ``'jax'`` uses a JIT-compiled,
         vmapped JAX implementation that processes data points in batches; pass
-        ``Nbatch=<int>`` (via ``**kwargs``, default 64) to tune the batch size.
+        ``Nbatch=<int>`` (via ``**kwargs``) to set the batch size; if not set,
+        it is guessed from the free GPU (or CPU) memory, at most 64.
         JAX must be installed separately: ``pip install jax``.
         Default is None, in which case the backend is taken from the
         ``REJECTION_BACKEND`` environment variable if set (e.g.
@@ -134,10 +163,16 @@ def integrate_rejection(f_prior_h5='prior.h5',
         variable.
     **kwargs : dict
         Additional keyword arguments including showInfo, updatePostStat, post_dir,
-        Nbatch (batch size for backend='jax'), and normalize_likelihood (bool,
+        Nbatch (batch size for backend='jax'; default None = guessed from
+        free memory), normalize_likelihood (bool,
         default True; if True, Gaussian likelihoods include the full
         normalization constant, giving a properly comparable EV/entropy across
-        data points and hypotheses, without changing P_acc/T/CHI2).
+        data points and hypotheses, without changing P_acc/T/CHI2), and
+        dtype (str or numpy dtype, default 'float64'; floating point precision
+        of the likelihood computation for backend='numpy'. 'float32' is
+        ~1.7x faster and changes EV/T by ~1e-7 relative. Temperature,
+        sampling and EV are always computed in float64. Ignored by
+        backend='jax', whose precision is set by JAX_ENABLE_X64).
 
     Returns
     -------
@@ -186,6 +221,8 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # integrate_posterior_main. The backend='jax' and non-parallel branches
     # already forward **kwargs and pick this up on their own.
     normalize_likelihood = kwargs.get('normalize_likelihood', True)
+    # Precision of the numpy likelihood computation (same threading as above).
+    dtype = np.dtype(kwargs.get('dtype', 'float64'))
     
     # Setup progress callback functionality
     if console_progress is None:
@@ -230,7 +267,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
         f_prior_basename = os.path.splitext(os.path.basename(f_prior_h5))[0]
         
         # Construct the new filename
-        f_post_h5 = os.path.join(posterior_output_path, "POST_%s_Nu%d_aT%d.h5" % (f_prior_basename, N_use, autoT))
+        f_post_h5 = os.path.join(posterior_output_path, "POST_%s_Nu%d_%s.h5" % (f_prior_basename, N_use, _autoT_tag(autoT)))
 
     # Check that f_post_h5 already exists, and warn the user   
     if os.path.isfile(f_post_h5):
@@ -257,10 +294,15 @@ def integrate_rejection(f_prior_h5='prior.h5',
 
     Ndt = len(id_use) # Number of data types used
 
+    # Check autoT/T_base (scalar, or one value per data type) before loading data
+    per_type_T, autoT_arr, T_base_arr = _resolve_temperature(autoT, T_base, id_use)
+
     if showInfo>1:
         print('-- Number of data types: %d' % Ndt_total)
-        
+
         print('-- Using these data types: %s' % str(id_use))
+        if per_type_T:
+            print('-- Temperature per data type: autoT=%s, T_base=%s' % (autoT_arr, T_base_arr))
 
     
     # Load the observed data from the h5 files
@@ -346,7 +388,12 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # 'posterior' evience - mean posterior likelihood TODO
     EV_post_all  = np.zeros(Ndp)*np.nan
     EV_post_all_mean = np.zeros(Ndp)*np.nan
+    # Per data type: reduced chi-squared, temperature and log-evidence
     CHI2_all = np.zeros((Ndp, Ndt))*np.nan
+    T_types_all = np.zeros((Ndp, Ndt))*np.nan
+    EV_types_all = np.zeros((Ndp, Ndt))*np.nan
+    # Combined reduced chi-squared of all data types
+    CHI2_comb_all = np.zeros(Ndp)*np.nan
 
     date_start = str(datetime.now())
     t_start = datetime.now()
@@ -360,11 +407,23 @@ def integrate_rejection(f_prior_h5='prior.h5',
     # two function are implemented to perform the inversion directly on the loaded data.
     # A third option, backend='jax', uses JAX for likelihood computation.
 
+    def store(ip_range, i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, per_type):
+        ip = np.asarray(ip_range, dtype=np.int64)
+        i_use_all[ip] = i_use
+        T_all[ip] = T
+        EV_all[ip] = EV
+        EV_post_all[ip] = EV_post
+        EV_post_all_mean[ip] = EV_post_mean
+        CHI2_all[ip, :] = CHI2
+        N_UNIQUE_all[ip] = N_UNIQUE
+        T_types_all[ip, :] = per_type['T_types']
+        EV_types_all[ip, :] = per_type['EV_types']
+        CHI2_comb_all[ip] = per_type['CHI2_comb']
 
     if backend == 'jax':
         from integrate.integrate_rejection_jax import integrate_rejection_range_jax
-        Nbatch = kwargs.pop('Nbatch', 64)
-        i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range_jax(
+        Nbatch = kwargs.pop('Nbatch', None)
+        i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range, per_type = integrate_rejection_range_jax(
             D=D,
             DATA=DATA,
             idx=idx,
@@ -378,17 +437,10 @@ def integrate_rejection(f_prior_h5='prior.h5',
             T_P_acc_level=_T_P_acc_level,
             progress_callback=progress_callback,
             Nbatch=Nbatch,
+            return_per_type=True,
             **kwargs,
         )
-        for i in range(len(ip_range)):
-            ip = ip_range[i]
-            i_use_all[ip] = i_use[i]
-            T_all[ip] = T[i]
-            EV_all[ip] = EV[i]
-            EV_post_all[ip] = EV_post[i]
-            EV_post_all_mean[ip] = EV_post_mean[i]
-            CHI2_all[ip, :] = CHI2[i, :]
-            N_UNIQUE_all[ip] = N_UNIQUE[i]
+        store(ip_range, i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, per_type)
 
     elif parallel:
         # Split the ip_range into Nchunks
@@ -408,7 +460,7 @@ def integrate_rejection(f_prior_h5='prior.h5',
         if showInfo>1:
             print('Ncpu = %d\nNchunks=%d' % (Ncpu, Nchunks))
 
-        i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all = integrate_posterior_main(
+        i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, per_type = integrate_posterior_main(
             ip_chunks=ip_chunks,
             D=D,
             DATA = DATA,
@@ -423,13 +475,17 @@ def integrate_rejection(f_prior_h5='prior.h5',
             T_N_above=_T_N_above,
             T_P_acc_level=_T_P_acc_level,
             normalize_likelihood=normalize_likelihood,
+            dtype=dtype,
             progress_callback=update_progress if progress_callback else None,
         )
+        T_types_all = per_type['T_types']
+        EV_types_all = per_type['EV_types']
+        CHI2_comb_all = per_type['CHI2_comb']
 
 
     else:
 
-            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(D=D,
+            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range, per_type = integrate_rejection_range(D=D,
                                         DATA = DATA,
                                         idx = idx,
                                         N_use=N_use,
@@ -443,23 +499,16 @@ def integrate_rejection(f_prior_h5='prior.h5',
                                         T_P_acc_level=_T_P_acc_level,
                                         progress_callback=progress_callback,
                                         console_progress=console_progress,
+                                        return_per_type=True,
                                         **kwargs
                                         )
-        
-            for i in range(len(ip_range)):
-                ip = ip_range[i]
-                #print('ip=%d, i=%d' % (ip,i))
-                i_use_all[ip] = i_use[i]
-                T_all[ip] = T[i]
-                EV_all[ip] = EV[i]
-                EV_post_all[ip] = EV_post[i]
-                EV_post_all_mean[ip] = EV_post_mean[i]
-                CHI2_all[ip, :] = CHI2[i, :]
-                N_UNIQUE_all[ip] = N_UNIQUE[i]
+            store(ip_range, i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, per_type)
 
     # WHere T_all is Inf set it to Nan
     T_all[T_all==np.inf] = np.nan
     EV_all[EV_all==np.inf] = np.nan
+    T_types_all[T_types_all==np.inf] = np.nan
+    EV_types_all[EV_types_all==np.inf] = np.nan
     
     date_end = str(datetime.now())
     t_end = datetime.now()
@@ -468,15 +517,25 @@ def integrate_rejection(f_prior_h5='prior.h5',
     if (showInfo>-1):
         print('integrate_rejection: Time=%5.1fs/%d soundings, %4.1fms/sounding, %3.1fit/s. ' % (t_elapsed,Ndp_invert,t_per_sounding*1000,Ndp_invert/t_elapsed), end='')
         print('T_av=%3.1f, EV_av=%3.1f' % (np.nanmean(T_all), np.nanmean(EV_all)))
+        if per_type_T:
+            T_av_types = [np.nanmean(c) if np.any(~np.isnan(c)) else np.nan for c in T_types_all.T]
+            print('  T_av per data type: %s' % ', '.join(
+                'D%d=%3.1f' % (id_, T_av) for id_, T_av in zip(id_use, T_av_types)))
 
     # SAVE THE RESULTS to f_post_h5
+    #  /T, /EV, /CHI2      : (Ndp,)      all data types combined
+    #  /T_all, /EV_all,
+    #  /CHI2_all           : (Ndp, Ndt)  per data type, column k is data type /D{id_use[k]}
     with h5py.File(f_post_h5, 'w') as f_post:
         f_post.create_dataset('i_use', data=i_use_all)
         f_post.create_dataset('T', data=T_all)
+        f_post.create_dataset('T_all', data=T_types_all)
         f_post.create_dataset('EV', data=EV_all)
+        f_post.create_dataset('EV_all', data=EV_types_all)
         f_post.create_dataset('EV_post', data=EV_post_all)
         f_post.create_dataset('EV_post_mean', data=EV_post_all_mean)
-        f_post.create_dataset('CHI2', data=CHI2_all)
+        f_post.create_dataset('CHI2', data=CHI2_comb_all)
+        f_post.create_dataset('CHI2_all', data=CHI2_all)
         f_post.create_dataset('N_UNIQUE', data=N_UNIQUE_all)
         #f_post.create_dataset('ip_range', data=ip_range)
         f_post.attrs['date_start'] = date_start
@@ -485,6 +544,10 @@ def integrate_rejection(f_prior_h5='prior.h5',
         f_post.attrs['f5_prior'] = f_prior_h5
         f_post.attrs['f5_data'] = f_data_h5
         f_post.attrs['N_use'] = N_use
+        f_post.attrs['id_use'] = np.asarray(id_use, dtype=np.int64)
+        f_post.attrs['autoT'] = autoT_arr
+        f_post.attrs['T_base'] = T_base_arr
+        f_post.attrs['per_type_T'] = int(per_type_T)
     
     # Update progress - saving results
     if progress_callback:
@@ -503,9 +566,674 @@ def integrate_rejection(f_prior_h5='prior.h5',
     return f_post_h5
 
 
+def em_height_bins(height, n_bins=10, dh_max=20, dh_round=0.5, n_min_bin=200, showInfo=0):
+    """
+    Split flight heights into intervals with similar numbers of soundings.
 
-def integrate_rejection_range(D, 
-                              DATA, 
+    Used by :func:`integrate_rejection_em_height` to set up one prior per
+    flight-height interval. The intervals are found in three steps:
+
+    1. ``n_bins`` intervals with an equal number of soundings (quantiles of
+       ``height``), with edges rounded to ``dh_round`` (the first edge
+       down, the last edge up).
+    2. Intervals wider than ``dh_max`` (typically the rare high and low
+       flight heights) are split into equal parts at most ``dh_max`` wide.
+    3. Neighbouring intervals are joined until each has at least
+       ``n_min_bin`` soundings. Remaining soundings join the last interval.
+
+    Parameters
+    ----------
+    height : array-like
+        Flight heights [m] of the soundings to split. Must be finite.
+    n_bins : int, optional
+        Number of equal-count (quantile) intervals in step 1. With
+        ``n_bins<=1`` one interval covering all heights is returned. The final
+        number of intervals can differ after steps 2 and 3. Default is 10.
+    dh_max : float, optional
+        Maximum width [m] of an interval (step 2). None or 0 disables the
+        split. Default is 20.
+    dh_round : float, optional
+        Interval edges are rounded to multiples of ``dh_round`` [m].
+        Default is 0.5.
+    n_min_bin : int, optional
+        Minimum number of soundings per interval (step 3). Default is 200.
+    showInfo : int, optional
+        Verbosity level. Default is 0.
+
+    Returns
+    -------
+    edges : numpy.ndarray
+        Interval edges [m], shape (n_bin+1,), increasing.
+    i_bin : numpy.ndarray
+        Interval index of each height, shape (len(height),), in
+        ``range(n_bin)``. Interval k is ``edges[k] <= h < edges[k+1]``; the
+        last interval includes its upper edge.
+
+    Examples
+    --------
+    >>> edges, i_bin = ig.em_height_bins(height, n_bins=10, dh_max=20)
+    >>> ii_bin = [np.where(i_bin == k)[0] for k in range(len(edges) - 1)]
+    """
+    h = np.asarray(height, dtype=float).ravel()
+    if h.size == 0:
+        raise ValueError('em_height_bins: no heights given')
+    if not np.all(np.isfinite(h)):
+        raise ValueError('em_height_bins: heights must be finite (remove NaN first)')
+
+    lo = np.floor(h.min() / dh_round) * dh_round
+    hi = np.ceil(h.max() / dh_round) * dh_round
+    if hi <= lo:
+        hi = lo + dh_round
+
+    if n_bins <= 1:
+        edges = np.array([lo, hi])
+    else:
+        # 1. Equal-count (quantile) edges, rounded to dh_round
+        q = np.quantile(h, np.linspace(0, 1, n_bins + 1))
+        edges_q = np.unique(np.r_[lo, np.round(q[1:-1] / dh_round) * dh_round, hi])
+
+        # 2. Split intervals wider than dh_max
+        if dh_max is not None and dh_max > 0:
+            edges_q = np.unique(np.concatenate(
+                [np.round(np.linspace(a, b, int(np.ceil((b - a) / dh_max)) + 1) / dh_round) * dh_round
+                 for a, b in zip(edges_q[:-1], edges_q[1:])]))
+
+        # 3. Join neighbouring intervals until each has at least n_min_bin soundings
+        counts, _ = np.histogram(h, edges_q)
+        edges = [edges_q[0]]
+        n_acc = 0
+        for i, c in enumerate(counts):
+            n_acc += c
+            if n_acc >= n_min_bin:
+                edges.append(edges_q[i + 1])
+                n_acc = 0
+        if n_acc > 0:
+            # the remaining soundings join the last interval
+            if len(edges) > 1:
+                edges[-1] = edges_q[-1]
+            else:
+                edges.append(edges_q[-1])
+        edges = np.array(edges)
+
+    n_bin = len(edges) - 1
+    i_bin = np.clip(np.searchsorted(edges, h, side='right') - 1, 0, n_bin - 1)
+
+    if showInfo > 0:
+        print('em_height_bins: %d soundings in %d flight-height interval(s)' % (len(h), n_bin))
+        for k in range(n_bin):
+            print('  Interval %2d: %6.1f-%6.1f m, %7d soundings'
+                  % (k + 1, edges[k], edges[k + 1], np.sum(i_bin == k)))
+
+    return edges, i_bin
+
+
+def integrate_rejection_em_height(f_prior_h5='prior.h5',
+                                  f_data_h5='DATA.h5',
+                                  f_post_h5='',
+                                  N_use=100000000000,
+                                  id_use=[],
+                                  ip_range=[],
+                                  nr=1000,
+                                  autoT=1,
+                                  T_base=1,
+                                  Nchunks=0,
+                                  Ncpu=0,
+                                  parallel=True,
+                                  use_N_best=0,
+                                  T_N_above=None,
+                                  T_P_acc_level=None,
+                                  progress_callback=None,
+                                  console_progress=None,
+                                  backend=None,
+                                  forward_kwargs=None,
+                                  prior_data_fn=None,
+                                  id_em=1,
+                                  id_height=None,
+                                  height=None,
+                                  im_height=None,
+                                  Nbins=1,
+                                  dh_max=20,
+                                  dh_round=0.5,
+                                  n_min_bin=200,
+                                  dh_pad=2.5,
+                                  dh_std=2,
+                                  height_min=5,
+                                  seed=1,
+                                  reuse_prior_data=True,
+                                  f_prior_data_base='',
+                                  shared_prior=True,
+                                  f_prior_merged_h5='',
+                                  **kwargs):
+    """
+    EM forward modelling and rejection sampling with a varying flight height.
+
+    An airborne EM specific variant of :func:`integrate_rejection`: it computes
+    the EM prior data with the flight height as a model parameter, and samples
+    the posterior. The flight height is handled automatically:
+
+    - ``Nbins=1``: one prior for all soundings. The flight height of each
+      prior realization is drawn from the observed flight heights, smoothed by
+      ``N(0, dh_std)``.
+    - ``Nbins>1``: the soundings are split into flight-height intervals with
+      similar numbers of soundings (:func:`em_height_bins`). Each interval gets
+      its own prior data, with the flight height uniform within the interval
+      (+- ``dh_pad``), so many more prior realizations are near the flight
+      height of each sounding. The soundings of each interval are inverted
+      with the prior of that interval, and the posteriors are merged
+      (:func:`integrate.merge_posterior`).
+
+    For each interval, the prior ``f_prior_h5`` is copied, the simulated
+    flight height is stored as ``M{im_height}``, the EM data ``D{id_em}`` are
+    computed with that flight height, and (if ``id_height`` is given) the
+    flight-height data ``D{id_height}`` as the identity of ``M{im_height}``.
+
+    Parameters
+    ----------
+    f_prior_h5 : str, optional
+        Path to the prior HDF5 file with the model parameters (e.g. from
+        ``prior_model_layered``), without the flight height. Default is
+        'prior.h5'.
+    f_data_h5 : str, optional
+        Path to the observed data HDF5 file. Default is 'DATA.h5'.
+    f_post_h5 : str, optional
+        Path to the output posterior HDF5 file. If empty, it is
+        ``POST_{prior}_Nu{N_use}_aT{autoT}_EMh{n_bin}.h5`` in ``post_dir``
+        (default the current directory). Default is ''.
+    N_use, id_use, ip_range, nr, autoT, T_base, Nchunks, Ncpu, parallel, use_N_best, T_N_above, T_P_acc_level, progress_callback, console_progress, backend
+        Passed on to :func:`integrate_rejection` for each flight-height
+        interval (see there). ``ip_range`` selects the soundings to invert
+        (default all); within an interval only its soundings are inverted.
+    forward_kwargs : dict, optional
+        EM forward settings passed to :func:`integrate.prior_data_em`, e.g.
+        ``dict(file_gex=file_gex, method='anemone', rescale_height=True)``.
+        ``id``, ``im_height``, ``f_prior_data_h5`` and ``doMakePriorCopy`` are
+        set by this function. Default is None.
+    prior_data_fn : callable, optional
+        Instead of ``forward_kwargs``: a function ``prior_data_fn(f_prior_data_h5)``
+        that computes the EM prior data ``D{id_em}`` in the given prior file,
+        using the flight height in ``M{im_height}``. Use it for special cases,
+        e.g. moving the prior data to other gates. Default is None.
+    id_em : int, optional
+        Id of the EM data, both in ``f_data_h5`` and in the prior data.
+        Default is 1.
+    id_height : int, optional
+        Id of the flight-height data in ``f_data_h5`` (``/D{id_height}/d_obs``).
+        If given, the flight heights are read from it, and the prior data
+        ``D{id_height}`` are computed as the identity of ``M{im_height}``, so
+        the measured flight height is used as data. Default is None.
+    height : array-like, optional
+        Flight heights [m] of all soundings, shape (Ndp,), used instead of
+        ``id_height`` (the flight height is then not used as data, so if
+        ``f_data_h5`` also holds flight-height data, leave it out with
+        ``id_use``, e.g. ``id_use=[1]``). Default is None.
+    im_height : int, optional
+        Model id of the flight height in the prior. None uses the next free
+        model id of ``f_prior_h5``. Default is None.
+    Nbins : int, optional
+        Number of equal-count flight-height intervals (``n_bins`` of
+        :func:`em_height_bins`). 1 uses one prior for all soundings. The final
+        number of intervals can differ (see ``dh_max``, ``n_min_bin``).
+        Default is 1.
+    dh_max, dh_round, n_min_bin : optional
+        Interval options, see :func:`em_height_bins`. Defaults are 20 m,
+        0.5 m and 200.
+    dh_pad : float, optional
+        ``Nbins>1``: the prior flight height of an interval is uniform within
+        the interval extended by ``dh_pad`` [m] on both sides. Default is 2.5.
+    dh_std : float, optional
+        ``Nbins=1``: std [m] of the smoothing added to the flight heights drawn
+        from the observed flight heights. Default is 2.
+    height_min : float, optional
+        Minimum prior flight height [m]. Default is 5.
+    seed : int, optional
+        Seed of the simulated flight heights; interval k uses ``seed + k``.
+        Default is 1.
+    reuse_prior_data : bool, optional
+        Reuse an existing prior data file of an interval if it has ``D{id_em}``,
+        ``M{im_height}`` (and ``D{id_height}``). Delete the files, or set
+        False, after changing the prior or the forward settings. Default is
+        True.
+    f_prior_data_base : str, optional
+        Base path of the prior data files of the intervals:
+        ``{f_prior_data_base}_h{lo}-{hi}.h5``. Default is '', which uses
+        ``PRIOR_DATA_{prior}`` next to ``f_prior_h5``.
+    shared_prior : bool, optional
+        ``Nbins>1``: passed to :func:`integrate.merge_posterior`. True lets the
+        merged posterior refer to the prior data of the first interval instead
+        of a merged prior (all priors share the realizations of
+        ``f_prior_h5``, and differ only in the flight height and the prior
+        data). See Notes. Default is True.
+    f_prior_merged_h5 : str, optional
+        ``Nbins>1`` and ``shared_prior=False``: path to the merged prior, see
+        :func:`integrate.merge_posterior`. Default is ''.
+    **kwargs : dict
+        Passed on to :func:`integrate_rejection` (e.g. showInfo,
+        updatePostStat, post_dir, Nbatch, dtype, normalize_likelihood).
+
+    Returns
+    -------
+    str
+        Path to the posterior HDF5 file.
+
+    Notes
+    -----
+    The prior data of interval k are written to
+    ``PRIOR_DATA_{prior}_h{lo}-{hi}.h5`` next to ``f_prior_h5`` (see
+    ``f_prior_data_base``), and with more
+    than one interval its posterior to ``{f_post_h5 without .h5}_h{lo}-{hi}.h5``.
+    The final posterior has the attributes ``height_edges`` (the lower and
+    upper edge of each interval), ``im_height``, ``id_height`` (0: none),
+    ``id_em``, ``f5_prior_data_bin`` and ``f5_post_bin``.
+
+    With ``shared_prior=True`` the posterior statistics are correct for all
+    soundings, but anything recomputed later from the merged posterior and the
+    prior (e.g. posterior data in ``plot_data_prior_post``) is correct only for
+    the soundings of the first interval. Use the posterior of the interval
+    (``f5_post_bin``) for the others.
+
+    Examples
+    --------
+    >>> # flight height in DATA.h5:/D2, 10 flight-height intervals
+    >>> f_post = ig.integrate_rejection_em_height(
+    ...     f_prior_h5, 'DATA.h5', id_height=2, Nbins=10,
+    ...     forward_kwargs=dict(file_gex=file_gex, method='anemone',
+    ...                         rescale_height=True),
+    ...     backend='jax')
+
+    >>> # one prior for all flight heights, flight heights given as an array
+    >>> f_post = ig.integrate_rejection_em_height(
+    ...     f_prior_h5, 'DATA.h5', height=alt_obs, Nbins=1,
+    ...     forward_kwargs=dict(file_gex=file_gex, method='ga-aem'))
+    """
+    # Safety guard: if somehow called from a worker process, do nothing.
+    if multiprocessing.current_process().name != 'MainProcess':
+        return None
+
+    import integrate as ig
+
+    showInfo = kwargs.get('showInfo', 0)
+    posterior_output_path = kwargs.get('post_dir', os.getcwd())
+
+    # Number of soundings, from the EM data
+    Ndp = ig.load_data(f_data_h5, id_arr=[id_em], showInfo=-1)['d_obs'][0].shape[0]
+
+    # Flight height of all soundings: from an array, or from DATA.h5:/D{id_height}
+    if height is not None:
+        h_all = np.asarray(height, dtype=float).ravel()
+        if len(h_all) != Ndp:
+            raise ValueError('height has %d values, but %s has %d soundings'
+                             % (len(h_all), f_data_h5, Ndp))
+    elif id_height is not None:
+        h_all = ig.load_data(f_data_h5, id_arr=[id_height], showInfo=-1)['d_obs'][0][:, 0].astype(float)
+    else:
+        raise ValueError('Give the flight height as id_height (data id in f_data_h5) or as height (array)')
+
+    # Soundings to invert; soundings without a flight height are not inverted
+    if len(ip_range) == 0:
+        ip_range = np.arange(Ndp)
+    ip_range = np.asarray(ip_range, dtype=int)
+    i_nan = ~np.isfinite(h_all[ip_range])
+    if np.any(i_nan):
+        if showInfo > -1:
+            print('integrate_rejection_em_height: %d soundings without flight height are not inverted'
+                  % np.sum(i_nan))
+        ip_range = ip_range[~i_nan]
+    h_use = h_all[ip_range]
+
+    # Prior size, and the model id of the flight height
+    with h5py.File(f_prior_h5, 'r') as f_prior:
+        N = f_prior['/M1'].shape[0]
+        if im_height is None:
+            im_height = sum(1 for key in f_prior.keys() if key[0] == 'M') + 1
+
+    # Flight-height intervals
+    if Nbins <= 1:
+        edges, i_bin = em_height_bins(h_use, n_bins=1, dh_round=dh_round)
+    else:
+        edges, i_bin = em_height_bins(h_use, n_bins=Nbins, dh_max=dh_max, dh_round=dh_round,
+                                      n_min_bin=n_min_bin)
+    n_bin = len(edges) - 1
+    ii_bin = [ip_range[i_bin == k] for k in range(n_bin)]
+    k_use = [k for k in range(n_bin) if len(ii_bin[k]) > 0]
+
+    if showInfo > 0:
+        print('<--INTEGRATE_REJECTION_EM_HEIGHT-->')
+        print('%d soundings, flight height %3.1f-%3.1f m, %d interval(s), N=%d, M%d = flight height'
+              % (len(ip_range), h_use.min(), h_use.max(), n_bin, N, im_height))
+        for k in range(n_bin):
+            print('  Interval %2d: %6.1f-%6.1f m, %7d soundings'
+                  % (k + 1, edges[k], edges[k + 1], len(ii_bin[k])))
+
+        # Histogram of the flight heights (1 m bins), with the interval edges
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.hist(h_use, bins=np.arange(np.floor(h_use.min()), h_use.max() + 1, 1), color='0.6')
+        for e in edges:
+            ax.axvline(e, color='C3', lw=0.8)
+        ax.set_xlabel('Flight height [m]')
+        ax.set_ylabel('Number of soundings')
+        ax.set_title('%d flight-height interval(s) (red), %d soundings' % (n_bin, len(ip_range)))
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+    # File names
+    f_prior_dir = os.path.dirname(f_prior_h5)
+    f_prior_base = os.path.splitext(os.path.basename(f_prior_h5))[0]
+    if len(f_post_h5) == 0:
+        f_post_h5 = os.path.join(posterior_output_path, 'POST_%s_Nu%d_%s_EMh%d.h5'
+                                 % (f_prior_base, N_use, _autoT_tag(autoT), n_bin))
+    txt_bin = ['_h%05.1f-%05.1f' % (edges[k], edges[k + 1]) for k in range(n_bin)]
+    if len(f_prior_data_base) == 0:
+        f_prior_data_base = os.path.join(f_prior_dir, 'PRIOR_DATA_%s' % f_prior_base)
+    f_prior_data_bin = ['%s%s.h5' % (f_prior_data_base, txt_bin[k]) for k in range(n_bin)]
+    if len(k_use) == 1:
+        f_post_bin = [f_post_h5] * n_bin
+    else:
+        f_post_bin = ['%s%s.h5' % (os.path.splitext(f_post_h5)[0], txt_bin[k]) for k in range(n_bin)]
+
+    def has_prior_data(f_prior_data_h5):
+        if not os.path.exists(f_prior_data_h5):
+            return False
+        keys = ['/D%d' % id_em, '/M%d' % im_height]
+        if id_height is not None:
+            keys.append('/D%d' % id_height)
+        with h5py.File(f_prior_data_h5, 'r') as f:
+            return all(key in f for key in keys)
+
+    # Prior data and posterior of each interval
+    for k in k_use:
+        reuse = reuse_prior_data and has_prior_data(f_prior_data_bin[k])
+        if showInfo > -1:
+            print('integrate_rejection_em_height: interval %d/%d (%6.1f-%6.1f m): %d soundings, %s prior data'
+                  % (k + 1, n_bin, edges[k], edges[k + 1], len(ii_bin[k]),
+                     'existing' if reuse else 'computing'))
+
+        if reuse:
+            if showInfo > 0:
+                print('  Using existing prior data file: %s' % f_prior_data_bin[k])
+        else:
+            if prior_data_fn is None and forward_kwargs is None:
+                raise ValueError('Give forward_kwargs or prior_data_fn to compute the EM prior data')
+            if showInfo > 0:
+                print('  Computing prior data: %s' % f_prior_data_bin[k])
+            ig.copy_prior(f_prior_h5, f_prior_data_bin[k])
+
+            # Simulated flight height
+            rng = np.random.default_rng(seed + k)
+            if n_bin == 1:
+                h_sim = rng.choice(h_use, N) + rng.normal(0, dh_std, N)
+            else:
+                h_sim = rng.uniform(edges[k] - dh_pad, edges[k + 1] + dh_pad, N)
+            h_sim = np.clip(h_sim, height_min, None)
+            ig.save_prior_model(f_prior_data_bin[k], h_sim, im=im_height, name='Tx_altitude',
+                                unit='m', force_replace=True, showInfo=showInfo)
+
+            # EM data D{id_em}, with the flight height in M{im_height}
+            if prior_data_fn is not None:
+                prior_data_fn(f_prior_data_bin[k])
+            else:
+                fk = {'showInfo': showInfo, 'force_replace': True}
+                fk.update(forward_kwargs)
+                fk.update(id=id_em, im_height=im_height, doMakePriorCopy=False,
+                          f_prior_data_h5=f_prior_data_bin[k])
+                ig.prior_data_em(f_prior_data_bin[k], **fk)
+
+            # Flight-height data D{id_height}, the identity of M{im_height}
+            if id_height is not None:
+                ig.prior_data_identity(f_prior_data_bin[k], id=id_height, im=im_height,
+                                       showInfo=showInfo)
+
+        ig.integrate_rejection(f_prior_data_bin[k], f_data_h5,
+                               f_post_h5=f_post_bin[k],
+                               N_use=N_use,
+                               id_use=id_use,
+                               ip_range=ii_bin[k],
+                               nr=nr,
+                               autoT=autoT,
+                               T_base=T_base,
+                               Nchunks=Nchunks,
+                               Ncpu=Ncpu,
+                               parallel=parallel,
+                               use_N_best=use_N_best,
+                               T_N_above=T_N_above,
+                               T_P_acc_level=T_P_acc_level,
+                               progress_callback=progress_callback,
+                               console_progress=console_progress,
+                               backend=backend,
+                               **kwargs)
+
+    # Merge the posteriors of the intervals
+    if len(k_use) > 1:
+        f_post_h5, _ = ig.merge_posterior([f_post_bin[k] for k in k_use], f_data_h5,
+                                          f_post_merged_h5=f_post_h5,
+                                          ip_range_list=[ii_bin[k] for k in k_use],
+                                          f_prior_merged_h5=f_prior_merged_h5,
+                                          shared_prior=shared_prior,
+                                          showInfo=showInfo)
+
+    # Record the flight-height setup in the posterior
+    with h5py.File(f_post_h5, 'a') as f_post:
+        f_post.attrs['height_edges'] = np.array([[edges[k], edges[k + 1]] for k in k_use])
+        f_post.attrs['im_height'] = im_height
+        f_post.attrs['id_height'] = 0 if id_height is None else id_height
+        f_post.attrs['id_em'] = id_em
+        f_post.attrs['f5_prior_data_bin'] = [f_prior_data_bin[k] for k in k_use]
+        f_post.attrs['f5_post_bin'] = [f_post_bin[k] for k in k_use]
+
+    return f_post_h5
+
+
+def _resolve_per_type(value, id_use, name, default=1):
+    """
+    Resolve a per-data-type option (``autoT`` or ``T_base``) to one value per data type.
+
+    Parameters
+    ----------
+    value : scalar, list, tuple, ndarray or dict
+        A scalar applies to all data types (legacy mode). A list/tuple/ndarray
+        gives one value per entry of ``id_use`` (same order). A dict
+        ``{data_id: value}`` sets the value of the listed data ids; the other
+        data types get ``default``.
+    id_use : list
+        Data ids used in the inversion.
+    name : str
+        Name of the option, used in error messages.
+    default : float, optional
+        Value for data ids not given in a dict. Default is 1.
+
+    Returns
+    -------
+    per_type : bool
+        False if ``value`` is a scalar (legacy mode), else True.
+    arr : ndarray of float, shape (len(id_use),)
+        Value per data type.
+    """
+    Ndt = len(id_use)
+    if isinstance(value, dict):
+        ids = [int(i) for i in id_use]
+        unknown = set(int(k) for k in value) - set(ids)
+        if unknown:
+            raise ValueError('%s: data id(s) %s not in id_use=%s' % (name, sorted(unknown), ids))
+        arr = np.array([float(value.get(i, default)) for i in ids])
+        return True, arr
+    if np.ndim(value) == 0:
+        return False, np.full(Ndt, float(value))
+    arr = np.asarray(value, dtype=float).ravel()
+    if arr.size != Ndt:
+        raise ValueError('%s has %d values, but %d data types are used (id_use=%s)'
+                         % (name, arr.size, Ndt, list(id_use)))
+    return True, arr
+
+
+def _resolve_temperature(autoT, T_base, id_use):
+    """
+    Resolve ``autoT`` and ``T_base`` to arrays with one value per data type.
+
+    Returns
+    -------
+    per_type_T : bool
+        True if either ``autoT`` or ``T_base`` is given per data type. Then
+        each data type is tempered with its own temperature. If False, one
+        temperature is used for the summed log-likelihood (legacy mode).
+    autoT_arr : ndarray of float, shape (Ndt,)
+    T_base_arr : ndarray of float, shape (Ndt,)
+    """
+    per_type_a, autoT_arr = _resolve_per_type(autoT, id_use, 'autoT', default=1)
+    per_type_b, T_base_arr = _resolve_per_type(T_base, id_use, 'T_base', default=1)
+    if np.any(~(T_base_arr > 0)):
+        raise ValueError('T_base must be > 0, got %s' % T_base_arr)
+    return (per_type_a or per_type_b), autoT_arr, T_base_arr
+
+
+def _autoT_tag(autoT):
+    """File name tag for autoT: 'aT1' for a scalar, 'aT1-0-0' for a list, 'aTd1-0' for a dict."""
+    if isinstance(autoT, dict):
+        return 'aTd' + '-'.join('%d' % int(autoT[k]) for k in sorted(autoT))
+    if np.ndim(autoT) == 0:
+        return 'aT%d' % int(autoT)
+    return 'aT' + '-'.join('%d' % int(a) for a in np.ravel(autoT))
+
+
+def _logmeanexp(L):
+    """Numerically stable log(mean(exp(L))), ignoring NaN (the evidence)."""
+    max_L = np.nanmax(L)
+    return max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
+
+
+def _combined_chi2(chi2_types, n_types):
+    """
+    Combined reduced chi-squared of all data types: sum_i chi2_i*n_i / sum_i n_i.
+
+    Works on one data point (1-D input) or many (2-D input, data points in rows).
+    Data types without data (n_i=0) or with NaN chi2 are left out. NaN if no
+    data type has data.
+    """
+    chi2_types = np.asarray(chi2_types, dtype=float)
+    n_types = np.asarray(n_types, dtype=float)
+    ok = (n_types > 0) & np.isfinite(chi2_types)
+    num = np.sum(np.where(ok, chi2_types * n_types, 0.0), axis=-1)
+    den = np.sum(np.where(ok, n_types, 0.0), axis=-1)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        return np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
+
+
+def _temper_sample_stats(L_sum, L_types, active, n_per_type, lnc_per_type, L_types_normalized,
+                         autoT_arr, T_base_arr, per_type_T, N_above, P_acc_lev, nr):
+    """
+    Annealing temperature, posterior sampling and statistics for one data point.
+
+    Shared by the numpy backend and the CPU path of the JAX backend.
+
+    Parameters
+    ----------
+    L_sum : ndarray, shape (N,)
+        Summed (untempered) log-likelihood of all data types. Used for EV,
+        and for T in legacy mode.
+    L_types : sequence of length Ndt
+        Log-likelihood (N,) per data type. Entries of inactive types are not
+        used (may be None).
+    active : array of bool, shape (Ndt,)
+        True for the data types used at this data point.
+    n_per_type : array, shape (Ndt,)
+        Number of (non-NaN) data per data type.
+    lnc_per_type : array, shape (Ndt,)
+        Gaussian normalization constant per data type (0 if not normalized).
+    L_types_normalized : bool
+        True if ``L_types`` includes the normalization constant (it is then
+        subtracted for CHI2), False if ``L_types`` is de-normalized (it is then
+        added for EV).
+    autoT_arr, T_base_arr : ndarray, shape (Ndt,)
+        Temperature options per data type (see _resolve_temperature).
+    per_type_T : bool
+        If False (legacy), one temperature T is estimated from (autoT) or set
+        for (T_base) ``L_sum``, and P_acc = exp((L_sum - max)/T). If True,
+        T_i is estimated from (autoT[i]=1) or set to T_base[i] for each data
+        type, and P_acc = exp(L_T - max(L_T)), with L_T = sum_i L_i/T_i.
+    N_above, P_acc_lev : passed to logl_T_est.
+    nr : int
+        Number of posterior samples.
+
+    Returns
+    -------
+    i_use : ndarray (nr,)
+        Index (0..N-1) of the posterior samples in the likelihood arrays.
+    T : float
+        Temperature (per-type mode: the largest T_i).
+    T_types : ndarray (Ndt,)
+        Temperature per data type (NaN for inactive types).
+    EV : float
+        Log-evidence of all data types (from the untempered ``L_sum``).
+    EV_types : ndarray (Ndt,)
+        Log-evidence of each data type alone (NaN for inactive types).
+    CHI2_types : ndarray (Ndt,)
+        Reduced chi-squared of the posterior samples per data type.
+    """
+    import integrate as ig
+
+    Ndt = len(active)
+    N = L_sum.shape[0]
+    T_types = np.full(Ndt, np.nan)
+
+    if per_type_T:
+        L_T = np.zeros(N)
+        for i in range(Ndt):
+            if not active[i]:
+                continue
+            L_i = np.asarray(L_types[i], dtype=np.float64)
+            if autoT_arr[i] == 1:
+                T_i = ig.logl_T_est(L_i, N_above=N_above, P_acc_lev=P_acc_lev)
+            else:
+                T_i = float(T_base_arr[i])
+            T_types[i] = T_i
+            # T_i is inf only if all L_i are NaN: then data type i is left out
+            if np.isfinite(T_i):
+                L_T += L_i / T_i
+        T = np.nanmax(T_types) if np.any(~np.isnan(T_types)) else np.nan
+        P_acc = np.exp(L_T - np.nanmax(L_T))
+    else:
+        if autoT_arr[0] == 1:
+            T = ig.logl_T_est(L_sum, N_above=N_above, P_acc_lev=P_acc_lev)
+        else:
+            T = float(T_base_arr[0])
+        T_types[np.asarray(active, dtype=bool)] = T
+        P_acc = np.exp((1/T) * (L_sum - np.nanmax(L_sum)))
+    P_acc[np.isnan(P_acc)] = 0
+
+    # Draw nr samples with probability proportional to P_acc
+    p_sum = np.sum(P_acc)
+    i_use = None
+    if p_sum > 0 and np.isfinite(p_sum):
+        try:
+            i_use = np.random.choice(N, nr, p=P_acc/p_sum)
+        except ValueError:
+            i_use = None
+    if i_use is None:
+        logger.warning('All acceptance probabilities are zero or NaN: using random prior samples')
+        i_use = np.random.choice(N, nr)
+
+    # Reduced chi-squared per data type: mean(-2*logL) / n_data of the posterior
+    # samples. De-normalized so CHI2 is a pure misfit statistic (~1 for a good fit).
+    CHI2_types = np.full(Ndt, np.nan)
+    EV_types = np.full(Ndt, np.nan)
+    for i in range(Ndt):
+        if not active[i]:
+            continue
+        if n_per_type[i] > 0:
+            if L_types_normalized:
+                L_accepted = L_types[i][i_use] - lnc_per_type[i]
+            else:
+                L_accepted = L_types[i][i_use]
+            CHI2_types[i] = np.nanmean(-2.0 * L_accepted) / n_per_type[i]
+        EV_i = _logmeanexp(np.asarray(L_types[i], dtype=np.float64))
+        EV_types[i] = EV_i if L_types_normalized else EV_i + lnc_per_type[i]
+
+    EV = _logmeanexp(L_sum)
+
+    return i_use, T, T_types, EV, EV_types, CHI2_types
+
+
+def integrate_rejection_range(D,
+                              DATA,
                               idx = [],
                               N_use=None, 
                               id_use=[], 
@@ -516,6 +1244,7 @@ def integrate_rejection_range(D,
                               T_N_above=10,
                               T_P_acc_level=0.2,
                               progress_callback=None,
+                              return_per_type=False,
                               **kwargs):
     """
     Perform rejection sampling for a specific range of data points.
@@ -546,12 +1275,15 @@ def integrate_rejection_range(D,
     nr : int, optional
         Number of posterior samples to retain per data point.
         Default is 1000.
-    autoT : int, optional
-        Automatic temperature estimation method (1=enabled, 0=disabled).
-        Default is 1.
-    T_base : float, optional
-        Base temperature for rejection sampling when autoT=0.
-        Default is 1.
+    autoT : int, list or dict, optional
+        Automatic temperature estimation (1=enabled, 0=disabled). A scalar
+        gives one temperature for the summed log-likelihood of all data types.
+        A list (one value per data type in ``id_use``) or dict
+        ``{data_id: 0/1}`` gives a temperature per data type, see
+        :func:`integrate_rejection`. Default is 1.
+    T_base : float, list or dict, optional
+        Temperature used when autoT=0, as a scalar or per data type (list or
+        dict). Default is 1.
     T_N_above : int, optional
         Number of top samples used by ``logl_T_est`` to estimate the annealing
         temperature. Passed as ``N_above`` to :func:`logl_T_est`.
@@ -563,6 +1295,12 @@ def integrate_rejection_range(D,
     progress_callback : callable, optional
         Optional callback function for progress updates. Called with (current, total).
         Default is None (no callbacks).
+    return_per_type : bool, optional
+        If True, a dict with per-data-type results is returned as a 9th
+        element: 'T_types' (nump, Ndt) temperature per data type, 'EV_types'
+        (nump, Ndt) log-evidence of each data type alone and 'CHI2_comb'
+        (nump,) combined reduced chi-squared. Default is False (8 elements,
+        as before).
     **kwargs : dict
         Additional arguments including useRandomData, showInfo, use_N_best, and
         normalize_likelihood (bool, default True; use the full normalized
@@ -579,11 +1317,15 @@ def integrate_rejection_range(D,
         Evidence values for each data point.
     EV_post_all : ndarray, shape (nump,)
         Posterior evidence values for each data point.
+    CHI2_all : ndarray, shape (nump, Ndt)
+        Reduced chi-squared per data type for each data point.
     N_UNIQUE_all : ndarray, shape (nump,)
         Number of unique samples for each data point.
     ip_range : ndarray
         Range of data point indices that were processed.
-    
+    per_type : dict
+        Only if ``return_per_type=True``, see above.
+
     Notes
     -----
     This function is the computational core of the rejection sampling algorithm.
@@ -617,6 +1359,12 @@ def integrate_rejection_range(D,
     # pure misfit statistic.
     normalize_likelihood = kwargs.get('normalize_likelihood', True)
 
+    # Floating point precision of the likelihood computation. The prior data D
+    # is stored as float32, so casting the observed data to dtype sets the
+    # precision of D - d_obs. 'float32' is ~1.7x faster; temperature, sampling
+    # and EV below are always done in float64.
+    dtype = np.dtype(kwargs.get('dtype', 'float64'))
+
 
     # Get number of data points
     Ndp = DATA['d_obs'][0].shape[0]
@@ -632,7 +1380,10 @@ def integrate_rejection_range(D,
         Ndt=len(DATA['d_obs'])
         id_use = np.arange(Ndt)
     Ndt = len(id_use)
-        
+
+    # Temperature per data type (per_type_T) or for the summed likelihood (legacy)
+    per_type_T, autoT_arr, T_base_arr = _resolve_temperature(autoT, T_base, id_use)
+
     i_use_all = np.zeros((nump, nr), dtype=np.int32)
     T_all = np.zeros(nump)*np.nan
     EV_all = np.zeros(nump)*np.nan
@@ -640,6 +1391,9 @@ def integrate_rejection_range(D,
     EV_post_all_mean = np.zeros(nump)*np.nan
     CHI2_all = np.zeros((nump, Ndt))*np.nan
     N_UNIQUE_all = np.zeros(nump)*np.nan
+    T_types_all = np.zeros((nump, Ndt))*np.nan
+    EV_types_all = np.zeros((nump, Ndt))*np.nan
+    CHI2_comb_all = np.zeros(nump)*np.nan
     
     
     # Get the lookup sample size
@@ -713,7 +1467,7 @@ def integrate_rejection_range(D,
         N = D[0].shape[0]
         # Get number of data types used - needed for array initialization
         NDsets = len(id_use)
-        L = np.zeros((NDsets, N))
+        L = np.zeros((NDsets, N), dtype=dtype)
 
         if showInfo>3:
             print('Ndt=%d, ip=%d/%d, N=%d' % (Ndt, ip, nump, N))
@@ -722,6 +1476,7 @@ def integrate_rejection_range(D,
         total_n_data_non_nan = 0  # Initialize total count for all data types
         n_data_per_type = np.zeros(Ndt)  # Track data count per data type
         log_norm_const_per_type = np.zeros(Ndt)  # Gaussian normalization constant used per data type (0 unless normalize_likelihood)
+        active = np.zeros(Ndt, dtype=bool)  # data types used at this data point
 
         for i in range(Ndt):
             use_data_point = i_use_data[i][ip]
@@ -753,7 +1508,7 @@ def integrate_rejection_range(D,
                 t0=time.time()
                 #id = id_use[i_prior]
                 if noise_model[i]=='gaussian':
-                    d_obs = DATA['d_obs'][i][ip]
+                    d_obs = DATA['d_obs'][i][ip].astype(dtype, copy=False)
                     n_data_non_nan = np.sum(~np.isnan(d_obs))
                     total_n_data_non_nan += n_data_non_nan
                     n_data_per_type[i] = n_data_non_nan
@@ -770,7 +1525,7 @@ def integrate_rejection_range(D,
                             normalize=normalize_likelihood, return_norm_const=True)
 
                     elif DATA['d_std'][i] is not None:
-                        d_std = DATA['d_std'][i][ip]
+                        d_std = DATA['d_std'][i][ip].astype(dtype, copy=False)
                         #print(d_obs)
                         #print(d_std)
                         #print(D[i_prior][0])
@@ -782,9 +1537,10 @@ def integrate_rejection_range(D,
                         raise ValueError('Gaussian data type %d has neither d_std or Cd' % i)
 
                     L[i] = L_single
+                    active[i] = True
                     t.append(time.time()-t0)
                 elif noise_model[i]=='multinomial':
-                    d_obs = DATA['d_obs'][i][ip]
+                    d_obs = DATA['d_obs'][i][ip].astype(dtype, copy=False)
                     n_data_non_nan = np.sum(~np.isnan(d_obs))
                     total_n_data_non_nan += n_data_non_nan
                     n_data_per_type[i] = n_data_non_nan
@@ -799,7 +1555,8 @@ def integrate_rejection_range(D,
                         
                         L_single = likelihood_multinomial(D[i_prior],d_obs, np.array(class_id), class_is_idx=class_is_idx)
                         #print(L_single[0])
-                    L[i] = L_single           
+                    L[i] = L_single
+                    active[i] = True
                     t.append(time.time()-t0)
 
                 else: 
@@ -809,84 +1566,28 @@ def integrate_rejection_range(D,
             else:
                 L[i] = np.zeros(N)
                     
-        t0=time.time()
-
-        # Now we have all the likelihoods for all data types. Combine them into one
-        # L is an array of shape (Ndt,1)
-        # If we have only one data type, then L is already correct, 
-        # and we do not need to sum
+        # Now we have all the likelihoods for all data types, L of shape (Ndt, N).
+        # Sum them (untempered) for EV and, in legacy mode, for the temperature.
         L_single = L
         if Ndt>1:
             L = np.sum(L_single, axis=0)
+        # Temperature, acceptance probabilities, sampling and EV in float64
+        # (one length-N vector, cheap). L_single keeps dtype, used for CHI2.
+        L = L.astype(np.float64, copy=False).reshape(-1)
 
-        # Automatic annealing temperature estimation, if autoT=1, else use T=T_base
-        # T_base = 1 indicates no annealing
+        # Annealing temperature (autoT=1: estimated, else T=T_base; T_base=1 is
+        # no annealing), either one T for the summed likelihood (legacy) or one
+        # T per data type (per_type_T), posterior sampling, EV and CHI2.
         t0=time.time()
-        # Compute the annealing temperature
-        if autoT == 1:
-            T = ig.logl_T_est(L, N_above=T_N_above, P_acc_lev=T_P_acc_level)
-        else:
-            T = T_base        
-        # maxlogL = np.nanmax(logL)
-        t.append(time.time()-t0)
-
-        # Find ns realizations of the posterior, using the log-likelihood values logL, and the annealing tempetrature T 
-        
-        P_acc = np.exp((1/T) * (L - np.nanmax(L)))
-        P_acc[np.isnan(P_acc)] = 0
-
-        # Select the index of P_acc propportion to the probabilituy given by P_acc
-        t0=time.time()
-        try:
-            if P_acc.shape[0] == 1:
-                # This should probably not happen!
-                P_acc = P_acc.flatten()
-            p=P_acc/np.sum(P_acc)
-            i_use = np.random.choice(N, nr, p=p)
-        except:       
-            print('####################################################################')     
-            print('####################################################################')     
-            print('Error in np.random.choice for ip=%d' % ip)   
-            print('####################################################################')     
-            print('####################################################################')     
-            i_use = np.random.choice(N, nr)
-            
-
-        #print(P_acc.shape)
-        #print(p.shape)
-        #print(i_use.shape)
-
-        # Store i_use before reordering (for computing CHI2)
-        #i_use_before_reordering = i_use.copy()
-        # Compute CHI2 (reduced chi-squared) per data type
-        # CHI2 = mean(-2 * log-likelihood) / n_data
-        CHI2_current = np.zeros(Ndt) * np.nan
-        for i in range(Ndt):
-            if n_data_per_type[i] > 0:
-                # Get log-likelihood for accepted samples for this data type
-                # De-normalize (subtract back out the Gaussian normalization constant,
-                # if any) so CHI2 remains a pure misfit statistic (~2 for a good fit).
-                L_accepted = L_single[i, i_use] - log_norm_const_per_type[i]
-
-                # Convert log-likelihood to chi-squared: chi2 = -2 * logL
-                chi2_samples = -2.0 * L_accepted
-
-                # Compute mean chi-squared
-                chi2_mean = np.nanmean(chi2_samples)
-
-                # Normalize by number of data points to get reduced chi-squared
-                CHI2_current[i] = chi2_mean / n_data_per_type[i]
+        i_use, T, T_types, EV, EV_types, CHI2_current = _temper_sample_stats(
+            L, L_single, active, n_data_per_type, log_norm_const_per_type, True,
+            autoT_arr, T_base_arr, per_type_T, T_N_above, T_P_acc_level, nr)
 
         if useRandomData:
             # get the correct index of the subset used
             i_use = idx[i_use]
 
-        t.append(time.time()-t0)        
-
-        # Compute the evidence
-        # Numerically stable log-mean-exp calculation
-        max_L = np.nanmax(L)
-        EV = max_L + np.log(np.nansum(np.exp(L - max_L)) / L.size)
+        t.append(time.time()-t0)
 
         # BUG !!!
         # Compute log-'posterior evidence' - mean posterior log-likelihood
@@ -898,16 +1599,6 @@ def integrate_rejection_range(D,
             EV_post_mean = EV_post / total_n_data_non_nan
         else:
             EV_post_mean = np.nan
-        
-        t.append(time.time()-t0)
-
-        pltDegug = 0
-        if pltDegug>0:
-            import matplotlib.pyplot as plt
-            plt.semilogy(d_obs, 'k', linewidth=4)
-            plt.semilogy(D[0][i_use].T, 'r', linewidth=1)
-            plt.show()
-            print(D[0][10])
 
         i_use_all[j] = i_use
         T_all[j] = T
@@ -915,6 +1606,9 @@ def integrate_rejection_range(D,
         EV_post_all[j] = EV_post
         EV_post_all_mean[j] = EV_post_mean
         CHI2_all[j, :] = CHI2_current
+        T_types_all[j, :] = T_types
+        EV_types_all[j, :] = EV_types
+        CHI2_comb_all[j] = _combined_chi2(CHI2_current, n_data_per_type)
         # find the number of unique indexes
         N_UNIQUE_all[j] = len(np.unique(i_use))
 
@@ -925,12 +1619,15 @@ def integrate_rejection_range(D,
                 else:
                     print(' Time id%d, sampling: %f' % (i,t[i]))
             print('Time total: %f' % np.sum(t))
-        
+
+    if return_per_type:
+        per_type = {'T_types': T_types_all, 'EV_types': EV_types_all, 'CHI2_comb': CHI2_comb_all}
+        return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, ip_range, per_type
     return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, ip_range
 
 
 
-def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=True, progress_callback=None):
+def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_base, nr, Ncpu, use_N_best, T_N_above=10, T_P_acc_level=0.2, normalize_likelihood=True, dtype=np.float64, progress_callback=None):
     """
     Coordinate parallel processing of posterior sampling across multiple chunks.
     
@@ -952,10 +1649,10 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         Maximum number of prior samples per chunk.
     id_use : list
         List of data identifiers for likelihood calculation.
-    autoT : int
-        Automatic temperature estimation flag.
-    T_base : float
-        Base temperature for rejection sampling.
+    autoT : int, list or dict
+        Automatic temperature estimation flag (scalar or per data type).
+    T_base : float, list or dict
+        Base temperature for rejection sampling (scalar or per data type).
     nr : int
         Number of posterior samples to retain per data point.
     Ncpu : int
@@ -977,9 +1674,15 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
         Evidence values for all data points.
     EV_post_all : ndarray, shape (Ndp,)
         Posterior evidence values for all data points.
+    EV_post_all_mean : ndarray, shape (Ndp,)
+    CHI2_all : ndarray, shape (Ndp, Ndt)
+        Reduced chi-squared per data type.
     N_UNIQUE_all : ndarray, shape (Ndp,)
         Number of unique samples for all data points.
-    
+    per_type : dict
+        'T_types' and 'EV_types' (Ndp, Ndt) and 'CHI2_comb' (Ndp,), see
+        ``integrate_rejection_range(return_per_type=True)``.
+
     Notes
     -----
     This function uses shared memory to minimize data copying overhead during parallel processing.
@@ -1016,7 +1719,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     try:
         with ctx.Pool(Ncpu) as p:
             # New implementation with shared memory
-            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood) for i in range(len(ip_chunks))]
+            chunk_args = [(i, ip_chunks, DATA, idx,  N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood, dtype) for i in range(len(ip_chunks))]
             if progress_callback is None:
                 results = p.map(integrate_posterior_chunk, chunk_args)
             else:
@@ -1028,7 +1731,7 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
                 done_dp = 0
                 for res in p.imap_unordered(integrate_posterior_chunk, chunk_args):
                     results.append(res)
-                    done_dp += len(res[-1])  # last element is the chunk's ip_range
+                    done_dp += len(res[7])  # element 7 is the chunk's ip_range
                     progress_callback(done_dp, total_dp,
                                       {'phase': 'sampling',
                                        'status': 'Rejection sampling (%d/%d data points)' % (done_dp, total_dp)})
@@ -1062,20 +1765,25 @@ def integrate_posterior_main(ip_chunks, D, DATA, idx, N_use, id_use, autoT, T_ba
     EV_post_all_mean = np.zeros(Ndp)*np.nan
     CHI2_all = np.zeros((Ndp, Ndt))*np.nan
     N_UNIQUE_all = np.zeros(Ndp)*np.nan
+    T_types_all = np.zeros((Ndp, Ndt))*np.nan
+    EV_types_all = np.zeros((Ndp, Ndt))*np.nan
+    CHI2_comb_all = np.zeros(Ndp)*np.nan
 
-    for i, (i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range) in enumerate(results):
-        for i in range(len(ip_range)):
-                ip = ip_range[i]
-                #print('ip=%d, i=%d' % (ip,i))
-                i_use_all[ip] = i_use[i]
-                T_all[ip] = T[i]
-                EV_all[ip] = EV[i]
-                EV_post_all[ip] = EV_post[i]
-                EV_post_all_mean[ip] = EV_post_mean[i]
-                CHI2_all[ip, :] = CHI2[i, :]
-                N_UNIQUE_all[ip] = N_UNIQUE[i]
+    for (i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range, per_type) in results:
+        ip = np.asarray(ip_range, dtype=np.int64)
+        i_use_all[ip] = i_use
+        T_all[ip] = T
+        EV_all[ip] = EV
+        EV_post_all[ip] = EV_post
+        EV_post_all_mean[ip] = EV_post_mean
+        CHI2_all[ip, :] = CHI2
+        N_UNIQUE_all[ip] = N_UNIQUE
+        T_types_all[ip, :] = per_type['T_types']
+        EV_types_all[ip, :] = per_type['EV_types']
+        CHI2_comb_all[ip] = per_type['CHI2_comb']
 
-    return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all
+    per_type_all = {'T_types': T_types_all, 'EV_types': EV_types_all, 'CHI2_comb': CHI2_comb_all}
+    return i_use_all, T_all, EV_all, EV_post_all, EV_post_all_mean, CHI2_all, N_UNIQUE_all, per_type_all
 
 
 
@@ -1097,18 +1805,10 @@ def integrate_posterior_chunk(args):
 
     Returns
     -------
-    i_use : ndarray, shape (nump, nr)
-        Indices of accepted posterior samples for the chunk.
-    T : ndarray, shape (nump,)
-        Temperature values used for the chunk.
-    EV : ndarray, shape (nump,)
-        Evidence values for the chunk.
-    EV_post : ndarray, shape (nump,)
-        Posterior evidence values for the chunk.
-    N_UNIQUE : ndarray, shape (nump,)
-        Number of unique samples for the chunk.
-    ip_range : ndarray
-        Range of data point indices that were processed.
+    tuple
+        The 9-tuple of ``integrate_rejection_range(..., return_per_type=True)``
+        for the chunk: (i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE,
+        ip_range, per_type).
     
     Notes
     -----
@@ -1122,7 +1822,7 @@ def integrate_posterior_chunk(args):
     #import integrate as ig
     
     # New implementation with shared memory
-    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood = args
+    i_chunk, ip_chunks, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best, T_N_above, T_P_acc_level, normalize_likelihood, dtype = args
     # Old implementation where D was copied to each process
     #i_chunk, ip_chunks, D, DATA, idx, N_use, id_use, shared_memory_refs, autoT, T_base, nr, use_N_best = args
     #D=reconstruct_shared_arrays(shared_memory_refs)
@@ -1143,7 +1843,8 @@ def integrate_posterior_chunk(args):
         # full multithreaded BLAS pool oversubscribe the cores, making the
         # parallel run slower than the serial one (~7x speedup measured).
         with threadpool_limits(limits=1):
-            i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range = integrate_rejection_range(
+            # 9-tuple: (..., N_UNIQUE, ip_range, per_type)
+            return integrate_rejection_range(
                 D,
                 DATA,
                 idx,
@@ -1157,9 +1858,9 @@ def integrate_posterior_chunk(args):
                 T_N_above=T_N_above,
                 T_P_acc_level=T_P_acc_level,
                 normalize_likelihood=normalize_likelihood,
+                dtype=dtype,
+                return_per_type=True,
             )
-
-        return i_use, T, EV, EV_post, EV_post_mean, CHI2, N_UNIQUE, ip_range
     
     finally:
         # Clean up worker's shared memory references
@@ -1250,21 +1951,28 @@ def likelihood_gaussian_diagonal(D, d_obs, d_std, N_app=0, normalize=False,
     inverse variance do not improve performance with modern NumPy.
     """
 
-    if normalize:
-        if log_norm_const is None:
-            log_norm_const = -0.5 * np.nansum(np.log(2*np.pi*d_std**2))
-    else:
-        log_norm_const = 0.0
-
     # Missing observations (NaN in d_obs or d_std) are ignored. NaN in the
     # prior data D, where the observation exists, means an infinitely poor
     # fit: L = 0, i.e. logL = -inf (issue #47).
     ok = ~np.isnan(d_obs) & ~np.isnan(d_std)
+
+    if normalize:
+        if log_norm_const is None:
+            # Only the observed channels: the likelihood of data with missing
+            # channels is the marginal over the valid channels (as in
+            # likelihood_gaussian_full). float64: d_std**2 of tiny EM noise
+            # can underflow in float32.
+            d_std64 = np.asarray(d_std, dtype=np.float64)[ok]
+            log_norm_const = -0.5 * np.sum(np.log(2*np.pi*d_std64**2))
+    else:
+        log_norm_const = 0.0
+
     if ok.all():
         dd, s = D - d_obs, d_std
     else:
-        dd, s = D[:, ok], d_std[ok]
-        dd -= d_obs[ok]
+        # not an in-place subtraction: D[:, ok] has D's dtype (float32 on
+        # disk) and would force float32 regardless of d_obs's dtype
+        dd, s = D[:, ok] - d_obs[ok], d_std[ok]
 
     if N_app > 0:
        L = np.ones(D.shape[0])*-1e+15
@@ -1417,6 +2125,9 @@ def likelihood_gaussian_full(D, d_obs, Cd, N_app=0, checkNaN=True, useVectorized
         dd = D - d_obs
         Cd_sub = Cd
         iCd = np.linalg.inv(Cd)
+    # Invert (and slogdet below) in Cd's precision; only the large dd @ iCd
+    # product follows the precision of dd (float32 if d_obs is float32).
+    iCd = iCd.astype(dd.dtype, copy=False)
 
     if normalize:
         if log_det_Cd is None:
@@ -1512,7 +2223,10 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
     for datasets with many uninformative features.
 
     Performance: This vectorized version is approximately 5-10x faster than the loop-based
-    implementation for large datasets (N > 10,000).
+    implementation for large datasets (N > 10,000). The log is taken of the small
+    (n_classes, n_features) P_obs before the lookup, not of the (N, n_features)
+    extracted probabilities. With class_is_idx=True and integer D (as returned by
+    class_id_to_idx, which uses int8), D is used as index array without a copy.
 
     Examples
     --------
@@ -1552,11 +2266,15 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
 
     # Convert D to integer indices. NaN (and, below, unknown class ids) become
     # -1: no valid class, i.e. probability 0 and logL = -inf (issue #47).
-    nan_D = np.isnan(D) if D.dtype.kind == 'f' else np.zeros(D.shape, dtype=bool)
-    if class_is_idx:
-        # D already contains indices (-1 for no valid class, see class_id_to_idx)
-        indices = np.where(nan_D, -1, D).astype(int)
+    if class_is_idx and D.dtype.kind in 'iu':
+        # Integer indices (int8 from class_id_to_idx, -1 for no valid class):
+        # used as is, no copy
+        indices = D
+    elif class_is_idx:
+        # D already contains indices (-1 for no valid class), but as floats
+        indices = np.where(np.isnan(D), -1, D).astype(int)
     else:
+        nan_D = np.isnan(D) if D.dtype.kind == 'f' else np.zeros(D.shape, dtype=bool)
         # Create vectorized mapping from class_id to indices
         class_id = class_id.astype(int)
 
@@ -1577,21 +2295,24 @@ def likelihood_multinomial(D, P_obs, class_id=None, class_is_idx=False, entropyF
     # Create column indices for advanced indexing
     col_indices = np.arange(nm)
 
-    # Vectorized probability extraction using advanced indexing
+    # Take the log of the small (n_classes, nm) P_obs once, rather than of the
+    # (N, nm) extracted probabilities. Use np.errstate to suppress
+    # divide-by-zero warnings: log(0) = -inf is mathematically correct
+    # (zero probability events)
+    with np.errstate(divide='ignore'):
+        logP_obs = np.log(P_obs)
+
+    # Vectorized log-probability extraction using advanced indexing
     # indices has shape (N, nm), col_indices has shape (nm,)
     # Broadcasting: indices[:, j] selects row, col_indices[j] selects column
     # Samples with no valid class (NaN prior value or a class without a row in
     # P_obs) get probability 0, i.e. logL = -inf.
     invalid = (indices < 0) | (indices >= P_obs.shape[0])
-    probs = P_obs[np.where(invalid, 0, indices), col_indices]
-    probs[invalid] = 0.0
+    logp = logP_obs[np.where(invalid, 0, indices), col_indices]
+    logp[invalid] = -np.inf
 
-    # Vectorized log-likelihood calculation
     # Sum log probabilities along features axis
-    # Use np.errstate to suppress divide-by-zero warnings when probs=0
-    # log(0) = -inf is mathematically correct (zero probability events)
-    with np.errstate(divide='ignore'):
-        logL = np.sum(np.log(probs), axis=1)
+    logL = np.sum(logp, axis=1)
 
     return logL
 

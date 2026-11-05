@@ -150,14 +150,20 @@ def gex_apply_sr2(file_gex, file_sr2, file_out=None, tol=1e-5, disable_filters=T
     file_gex : str
         Workbench GEX (its waveform may be a placeholder when the SR is used).
     file_sr2 : str
-        System-response file; block ``n`` is used for ``[Channel n]``.
+        System-response file; block ``n`` is used for ``[Channel n]``. A channel
+        without a block keeps its GEX waveform and filters, as in anemone (e.g. a
+        SkyTEM SR2 for the LM only).
     file_out : str, optional
         Output path (default ``<gex stem>_sr.gex`` next to ``file_gex``).
     tol : float
         Waveform decimation tolerance on the unit current (default 1e-5).
     disable_filters : bool
-        Set ``TiBLowPassFilter`` and ``RxCoilLPFilter*`` cut-offs to 1 GHz, since the
-        SR already contains that filtering (default True).
+        Switch off the filters of the channels with an SR block, since the SR
+        already contains that filtering (default True): their ``TiBLowPassFilter``
+        cut-off is set to 1 GHz, and so are the ``RxCoilLPFilter*`` cut-offs if
+        every channel has an SR block. Otherwise the receiver-coil filter (shared
+        by the channels) is kept for the channels without SR, and the channels
+        with SR get their own ``RxCoilNumber`` without a filter.
     pad_half_cycle : bool
         Append a zero-current point one half repetition period after the first
         waveform point (GA-AEM wants a complete half cycle; harmless otherwise).
@@ -198,9 +204,12 @@ def gex_apply_sr2(file_gex, file_sr2, file_out=None, tol=1e-5, disable_filters=T
             chan_info[cur_ch][k.strip()] = v.strip()
 
     waveforms = {}
-    for ch in sorted(chan_info):
-        if ch not in blocks:
-            continue
+    sr_channels = [ch for ch in sorted(chan_info) if ch in blocks]
+    all_sr = len(sr_channels) == len(chan_info)
+    # coil number without RxCoilLPFilter entry, for the SR channels when mixed
+    coils = [int(m.group(1)) for m in (re.match(r'^\s*RxCoilLPFilter(\d+)\s*=', ln) for ln in lines) if m]
+    coil_sr = max(coils + [int(float(v.get('RxCoilNumber', '1').split()[0])) for v in chan_info.values()]) + 1
+    for ch in sr_channels:
         mom = chan_info[ch].get('TransmitterMoment', 'LM' if ch == 1 else 'HM').strip().upper()
         mom = 'HM' if mom.startswith('H') else 'LM'
         wf = sr2_effective_current(blocks[ch]['time'], blocks[ch]['dsrdt'], tol=tol)
@@ -217,22 +226,31 @@ def gex_apply_sr2(file_gex, file_sr2, file_out=None, tol=1e-5, disable_filters=T
 
     # --- rewrite the GEX text
     out = []
-    in_channel = False
+    sr_channel = False  # inside the [ChannelN] section of a channel with SR
     inserted = {}
     for ln in lines:
         s = ln.strip()
-        if re.match(r'^Waveform(LM|HM)Point\d+\s*=', s):
+        m = re.match(r'^Waveform(LM|HM)Point\d+\s*=', s)
+        if m and m.group(1) in waveforms:
             continue
         if s.startswith('['):
-            in_channel = re.match(r'^\[Channel\d+\]$', s) is not None
-        if in_channel and re.match(r'^SystemResponseConvolution\s*=', s):
+            m = re.match(r'^\[Channel(\d+)\]$', s)
+            sr_channel = m is not None and int(m.group(1)) in sr_channels
+            out.append(ln)
+            if sr_channel and disable_filters and not all_sr and 'RxCoilNumber' not in chan_info[int(m.group(1))]:
+                out.append('RxCoilNumber=%d' % coil_sr)
+            continue
+        if sr_channel and re.match(r'^SystemResponseConvolution\s*=', s):
             out.append('SystemResponseConvolution=0')
             continue
-        if disable_filters and in_channel and re.match(r'^TiBLowPassFilter\s*=', s):
+        if disable_filters and sr_channel and re.match(r'^TiBLowPassFilter\s*=', s):
             order = s.split('=', 1)[1].split()[0]
             out.append('TiBLowPassFilter=%s %.2E' % (order, _FILTER_OFF_FCUT))
             continue
-        if disable_filters and re.match(r'^RxCoilLPFilter\d*\s*=', s):
+        if disable_filters and sr_channel and not all_sr and re.match(r'^RxCoilNumber\s*=', s):
+            out.append('RxCoilNumber=%d' % coil_sr)
+            continue
+        if disable_filters and all_sr and re.match(r'^RxCoilLPFilter\d*\s*=', s):
             key, val = s.split('=', 1)
             out.append('%s= %s %.2E' % (key.strip(), val.split()[0], _FILTER_OFF_FCUT))
             continue

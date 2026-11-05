@@ -108,6 +108,7 @@ def setup_matplotlib_backend():
         print("To fix: sudo apt-get install python3-tk")
     matplotlib.use('Agg')
 
+import functools
 import os
 import re
 import numpy as np
@@ -2933,18 +2934,20 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     if show_value and nm<=1:
         isp=1
 
-        im3 = ax[1].plot(id[ii],Mean[:,ii].T, 'k', label='Mean')
-        ax[1].plot(id[ii],Mean[:,ii].T+2*Std[:,ii].T, 'k:', label='P97.5')
-        ax[1].plot(id[ii],Mean[:,ii].T-2*Std[:,ii].T, 'k:', label='P2.5')
+        # Dots, not lines, against the same x-axis as the stats panel: neighbours
+        # along the x-axis need not be neighbouring soundings (e.g. across flight lines)
+        im3 = ax[1].plot(x_axis_values,Mean[:,ii].T, 'k.', markersize=2, label='Mean')
+        ax[1].plot(x_axis_values,Mean[:,ii].T+2*Std[:,ii].T, '.', color='0.6', markersize=1, label='P97.5')
+        ax[1].plot(x_axis_values,Mean[:,ii].T-2*Std[:,ii].T, '.', color='0.6', markersize=1, label='P2.5')
 
-        ax[1].plot(id[ii],Median[:,ii].T, 'r', label='Median')
+        ax[1].plot(x_axis_values,Median[:,ii].T, 'r.', markersize=2, label='Median')
         # add legend
-        ax[1].legend(loc='upper right')
+        ax[1].legend(loc='upper right', markerscale=4)
         # add grd on
         ax[1].grid(True)
 
         # set axis limits
-        ax[1].set_xlim(ii.min(),ii.max())
+        ax[1].set_xlim(x_axis_values.min(), x_axis_values.max())
         ax[1].set_title(name)
         ax[1].set_ylabel(name)
         ax[0].axis('off')
@@ -3372,14 +3375,14 @@ def plot_data(f_data_h5, i_plot=[], Dkey=[], id=None, plType='imshow', uselog=Tr
                 # Set suptitle with optional name attribute
 
                 if cur_plType=='plot':
+                    # plot against the data index, so i_plot subsets keep their x position
                     if uselog:
-                        im1 = ax[0].semilogy(d_obs[i_plot_cur,:], linewidth=.5)
-                        im2 = ax[1].semilogy(d_std[i_plot_cur,:], linewidth=.5)
-                        im3 = ax[2].semilogy((d_obs[i_plot_cur,:]/d_std[i_plot_cur,:]), linewidth=.5)
+                        im1 = ax[0].semilogy(i_plot_cur, d_obs[i_plot_cur,:], linewidth=.5)
+                        im2 = ax[1].semilogy(i_plot_cur, d_std[i_plot_cur,:], linewidth=.5)
                     else:
-                        im1 = ax[0].plot(d_obs[i_plot_cur,:], linewidth=.5)
-                        im2 = ax[1].plot(d_std[i_plot_cur,:], linewidth=.5)
-                        im3 = ax[2].plot(100.0 * d_std[i_plot_cur,:]/d_obs[i_plot_cur,:], linewidth=.5)
+                        im1 = ax[0].plot(i_plot_cur, d_obs[i_plot_cur,:], linewidth=.5)
+                        im2 = ax[1].plot(i_plot_cur, d_std[i_plot_cur,:], linewidth=.5)
+                    im3 = ax[2].plot(i_plot_cur, 100.0 * d_std[i_plot_cur,:]/d_obs[i_plot_cur,:], linewidth=.5)
                     ax[0].set_xlim(xlim)
                     ax[1].set_xlim(xlim)
                     ax[2].set_xlim(xlim)
@@ -5336,16 +5339,27 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             label, tick labels, legend); the overall ``title`` is drawn two
             points larger. If None, the module's default sizes are used
             (default None).
+        n_per_figure : int, optional
+            Maximum number of boreholes per figure. If there are more
+            boreholes than this, they are split over several figures (in
+            input order) that share the same y-axis range. Default None
+            (all boreholes in one figure).
+        i_start : int, optional
+            Index of the first borehole, used only in the auto-generated
+            PNG name ``boreholes_<i_start>_<i_end>``. Default 0.
 
     Returns
     -------
-    fig : matplotlib.figure.Figure
+    fig : matplotlib.figure.Figure or list of matplotlib.figure.Figure
+        A list of figures when ``n_per_figure`` splits the boreholes over
+        more than one figure.
 
     Examples
     --------
     >>> ig.plot_boreholes(BHOLES)
     >>> ig.plot_boreholes(BHOLES, f_prior_h5='PRIOR.h5')
     >>> ig.plot_boreholes('all_boreholes.json', f_prior_h5='PRIOR.h5')
+    >>> figs = ig.plot_boreholes(BHOLES, f_prior_h5='PRIOR.h5', n_per_figure=5)
     """
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
@@ -5356,6 +5370,8 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     _fname_kw = kwargs.get('name', None)
     depth_max = kwargs.get('depth_max', None)
     title     = kwargs.get('title', None)
+    n_per_figure = kwargs.get('n_per_figure', None)
+    _y_range  = kwargs.get('_y_range', None)   # internal: shared (y_min, y_max) across split figures
 
     # Font sizes: a single ``fontsize`` kwarg overrides every text element,
     # matching the convention used by the other plot_* functions in this
@@ -5371,6 +5387,33 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
     W = _normalize_boreholes(W)
 
     n_wells = len(W)
+
+    # --- split over several figures, sharing one y-axis range ---
+    if n_per_figure is not None and n_wells > n_per_figure:
+        elevations = [float(bh.get('elevation', 0)) for bh in W]
+        if any(e != 0.0 for e in elevations):
+            y_range = (min(e - max(bh.get('depth_bottom', [0]))
+                           for e, bh in zip(elevations, W)),
+                       max(elevations))
+        else:
+            if depth_max is None:
+                depth_max = max(
+                    (max(bh['depth_bottom']) for bh in W if bh.get('depth_bottom')),
+                    default=50.0
+                )
+            y_range = (0, depth_max)
+        i_offset = kwargs.get('i_start', 0)
+        figs = []
+        for i0 in range(0, n_wells, n_per_figure):
+            W_chunk = W[i0:i0 + n_per_figure]
+            kw = dict(kwargs, n_per_figure=None, _y_range=y_range,
+                      i_start=i_offset + i0)
+            if _fname_kw is not None:
+                kw['name'] = '%s_%d_%d' % (_fname_kw, i_offset + i0,
+                                           i_offset + i0 + len(W_chunk) - 1)
+            figs.append(plot_boreholes(W_chunk, f_prior_h5=f_prior_h5, Mstr=Mstr,
+                                       hardcopy=hardcopy, **kw))
+        return figs
 
     # Build filename: use caller-supplied name, or auto-generate
     if _fname_kw is not None:
@@ -5406,6 +5449,8 @@ def plot_boreholes(W, f_prior_h5=None, Mstr='/M2', hardcopy=False, **kwargs):
             )
         y_max_global = depth_max
         y_min_global = 0
+    if _y_range is not None:
+        y_min_global, y_max_global = _y_range
 
     # --- figure layout: one column per well ---
     fig_w = figsize_w[0] * n_wells
@@ -5599,3 +5644,472 @@ def plot_voronoi_cells(AREA, P=None, ax=None, cmap='hot_r', vmin=None, vmax=None
 
     return fig, ax, mappable
 
+
+
+# ---------------------------------------------------------------------------
+# 3D Voronoi volumes (pyvista)
+# ---------------------------------------------------------------------------
+
+def _voronoi_companion(f_post_h5, name, given):
+    """Path of the DATA / PRIOR file a POST file names in attribute ``name``, unless ``given``.
+
+    A relative name is tried as given (the current directory) and then next to the POST file.
+    """
+    if given is not None:
+        return given
+    with h5py.File(f_post_h5, 'r') as f:
+        value = f.attrs[name]
+    value = value.decode() if isinstance(value, bytes) else str(value)
+    if not os.path.isabs(value) and not os.path.isfile(value):
+        beside = os.path.join(os.path.dirname(os.path.abspath(f_post_h5)), value)
+        if os.path.isfile(beside):
+            return beside
+    return value
+
+
+def _voronoi_cmap_rgb(cmap, n=256):
+    """An (n, 3) float array of RGB colours of a matplotlib colormap (name or object)."""
+    cm = matplotlib.colormaps[cmap] if isinstance(cmap, str) else cmap
+    return np.asarray(cm(np.linspace(0, 1, n)))[:, :3]
+
+
+def post_to_voronoi_columns(f_post_h5, ii=None, im=1, key=None, r_max=150, iz_step=1, z_max=None,
+                            log=None, f_data_h5=None, f_prior_h5=None):
+    """
+    Posterior statistic ``/M{im}/{key}`` of a POST file on Voronoi columns: the compact form of
+    :func:`post_to_voronoi_grid`.
+
+    Each sounding gets the 2D Voronoi cell of its location (shapely), clipped to a square of half-width
+    ``r_max`` around the sounding, so a cell is the area closest to that sounding (nearest-neighbour
+    interpolation in the horizontal). The column below the cell starts at the surface elevation of the
+    sounding and follows the depth grid of the prior (attribute ``x`` of ``/M{im}`` in the PRIOR file),
+    so the model follows the terrain.
+
+    Parameters
+    ----------
+    f_post_h5 : str
+        POST file (attributes ``f5_data`` and ``f5_prior`` name the DATA and PRIOR files; a relative
+        name is also looked for next to the POST file).
+    ii : array_like of int, optional
+        Soundings to use (default all), e.g. ``np.arange(N)[::5]`` for every 5th sounding.
+        Soundings that are NaN in all layers are left out. Of soundings at identical X, Y only the
+        first one in ``ii`` (that is not all NaN) gets a column.
+    im : int, optional
+        Model number (default 1).
+    key : str, optional
+        Posterior statistic, e.g. 'Median', 'Mean', 'HarmonicMean', 'Std', 'Mode', 'Entropy'.
+        Default: 'Median' when it exists, else 'Mode'.
+    r_max : float, optional
+        Maximum half-width [m] of a Voronoi cell (default 150).
+    iz_step : int, optional
+        Use every ``iz_step``'th depth cell (default 1, all). The value of a thicker cell is the value at
+        its top.
+    z_max : float, optional
+        Maximum depth [m] (default: the full depth of the prior).
+    log : bool, optional
+        The values are shown on a log10 scale. Default: True for a continuous model and a positive
+        statistic other than Std, LogStd and Entropy.
+    f_data_h5, f_prior_h5 : str, optional
+        DATA / PRIOR files, overriding the attributes of the POST file.
+
+    Returns
+    -------
+    columns : dict
+        - 'sounding' : (Nc,) int, index of each column's sounding in the DATA file
+        - 'xy' : (Nc, 2) float, sounding location (UTM)
+        - 'elevation' : (Nc,) float, surface elevation of the sounding
+        - 'poly_xy' : (Nv, 2) float, vertices of all Voronoi cells, counter-clockwise seen from above
+        - 'poly_offset' : (Nc + 1,) int, the vertices of column ``c`` are ``poly_xy[poly_offset[c]:poly_offset[c+1]]``
+        - 'z' : (nz + 1,) float, depth [m] of the top of each layer and of the bottom of the last one
+          (as thick as the one above it)
+        - 'iz' : (nz,) int, the depth index in the prior of each layer
+        - 'values' : (Nc, nz) float, the statistic; NaN where not inverted or below the DOI
+        - 'key', 'im', 'log', 'is_discrete'
+        - 'clim' : [min, max] colour limits in value units (the prior's for statistics in model units)
+        - 'cmap_rgb' : (256, 3) float colours of the colormap
+        - 'n_duplicate' : int, number of selected soundings left out because another one has the same X, Y
+
+    Examples
+    --------
+    >>> col = ig.post_to_voronoi_columns('POST.h5', ii=np.arange(N)[::5], iz_step=2)
+    >>> grid = ig.voronoi_columns_to_grid(col)
+    """
+    import shapely
+
+    f_data_h5 = _voronoi_companion(f_post_h5, 'f5_data', f_data_h5)
+    f_prior_h5 = _voronoi_companion(f_post_h5, 'f5_prior', f_prior_h5)
+    with h5py.File(f_post_h5, 'r') as f:
+        if key is None:
+            key = 'Median' if f'/M{im}/Median' in f else 'Mode'
+        M = f[f'/M{im}/{key}'][:]
+    with h5py.File(f_prior_h5, 'r') as f:
+        z = np.asarray(f[f'/M{im}'].attrs['x']).flatten().astype(float)
+        is_discrete = bool(f[f'/M{im}'].attrs.get('is_discrete', 0))
+    with h5py.File(f_data_h5, 'r') as f:
+        X = f['/UTMX'][:].flatten().astype(float)
+        Y = f['/UTMY'][:].flatten().astype(float)
+        ELEVATION = f['/ELEVATION'][:].flatten().astype(float)
+    M = np.asarray(M, dtype=float).reshape(len(X), -1)
+    ii = np.arange(len(X)) if ii is None else np.asarray(ii, dtype=int).flatten()
+    if len(ii) == 0:
+        raise ValueError('post_to_voronoi_columns: no soundings selected (ii is empty)')
+
+    # Layers: tops z[iz]; the last one as thick as the one above it
+    nz_all = min(len(z), M.shape[1])
+    n_use = nz_all if z_max is None else max(1, int(np.searchsorted(z[:nz_all], z_max, side='right')))
+    iz = np.arange(0, n_use, max(1, int(iz_step)))
+    if len(iz) > 1:
+        dz_last = z[iz[-1]] - z[iz[-2]]
+    else:
+        dz_last = z[1] - z[0] if len(z) > 1 else 1.0
+    z_lev = np.r_[z[iz], z[iz[-1]] + dz_last]
+
+    # Soundings with a value in at least one layer; one column per location: of soundings with
+    # identical X, Y (e.g. repeated soundings) only the first in ii is kept
+    values = M[ii][:, iz]
+    finite = np.isfinite(values).any(axis=1)
+    if not finite.any():
+        raise ValueError(f'post_to_voronoi_columns: /M{im}/{key} is NaN for all selected soundings')
+    ii, values = ii[finite], values[finite]
+    _, first_at = np.unique(np.c_[X[ii], Y[ii]], axis=0, return_index=True)
+    first_at = np.sort(first_at)
+    n_duplicate = len(ii) - len(first_at)
+    ii, values = ii[first_at], values[first_at]
+
+    # 2D Voronoi cells, clipped to a square around each sounding, counter-clockwise
+    xy = np.c_[X[ii], Y[ii]]
+    boxes = shapely.box(xy[:, 0] - r_max, xy[:, 1] - r_max, xy[:, 0] + r_max, xy[:, 1] + r_max)
+    if len(ii) > 1:
+        vor = shapely.get_parts(shapely.voronoi_polygons(shapely.MultiPoint(xy), ordered=True))
+        if len(vor) != len(ii):
+            raise ValueError('post_to_voronoi_columns: could not build one Voronoi cell per sounding')
+        cells2d = shapely.intersection(vor, boxes)
+    else:
+        cells2d = boxes
+    cells2d = shapely.orient_polygons(cells2d, exterior_cw=False)
+    nv = shapely.get_num_coordinates(cells2d) - 1  # the ring repeats its first vertex
+
+    keep = nv >= 3
+    if not keep.any():
+        raise ValueError('post_to_voronoi_columns: no Voronoi cell with an area')
+    ring = shapely.get_coordinates(shapely.get_exterior_ring(cells2d[keep]))
+    nk = nv[keep]
+    first = np.r_[0, np.cumsum(nk + 1)[:-1]]               # each ring repeats its first vertex: drop it
+    take = np.concatenate([f + np.arange(n) for f, n in zip(first, nk)])
+    v = values[keep][np.isfinite(values[keep])]
+
+    if log is None:
+        log = (not is_discrete) and key not in ('Std', 'LogStd', 'Entropy') and bool(np.all(v > 0))
+    elif log and np.any(v <= 0):
+        raise ValueError(f'post_to_voronoi_columns: log=True, but /M{im}/{key} has values <= 0')
+
+    # Colour scale: the prior's for statistics in model units, else the value range
+    if key in ('Std', 'LogStd', 'Entropy'):
+        clim = [float(np.min(v)), float(np.max(v))]
+        cmap = 'gray_r' if key == 'Entropy' else 'viridis'
+    else:
+        clim, cmap = h5_get_clim_cmap(f_prior_h5, f'/M{im}')
+        clim = [float(c) for c in np.asarray(clim).flatten()[:2]]
+    if clim[1] <= clim[0]:
+        clim = [clim[0] / 2, clim[0] * 2] if log else [clim[0] - 0.5, clim[0] + 0.5]
+
+    return {
+        'sounding': ii[keep].astype(np.int64),
+        'xy': xy[keep],
+        'elevation': ELEVATION[ii[keep]],
+        'poly_xy': ring[take],
+        'poly_offset': np.r_[0, np.cumsum(nk)].astype(np.int64),
+        'z': z_lev,
+        'iz': iz.astype(np.int64),
+        'values': values[keep],
+        'key': str(key),
+        'im': int(im),
+        'log': bool(log),
+        'is_discrete': is_discrete,
+        'clim': clim,
+        'cmap_rgb': _voronoi_cmap_rgb(cmap),
+        'n_duplicate': int(n_duplicate),
+    }
+
+
+@functools.lru_cache(maxsize=None)
+def _vtk_wedge_top_ccw():
+    """
+    True when a VTK wedge whose first (top) triangle is counter-clockwise seen from above has a positive
+    volume in the installed VTK.
+
+    Recent VTK (e.g. 9.6) follows the documented convention (the normal of the first triangle points away
+    from the second one); older versions computed wedge volumes with the opposite orientation.
+    """
+    import pyvista as pv
+    top = np.array([[0., 0., 1.], [1., 0., 1.], [0., 1., 1.]])
+    pts = np.vstack([top, top - [0., 0., 1.]])
+    cell = pv.UnstructuredGrid({pv.CellType.WEDGE: np.array([[0, 1, 2, 3, 4, 5]])}, pts)
+    vol = cell.compute_cell_sizes(length=False, area=False, volume=True).cell_data['Volume'][0]
+    return bool(vol > 0)
+
+
+def voronoi_columns_to_grid(columns):
+    """
+    3D grid (pyvista.UnstructuredGrid of VTK wedges) of Voronoi columns from :func:`post_to_voronoi_columns`.
+
+    Each layer of a column is a prism, built from wedges fanned from the sounding location, oriented so
+    that each wedge has a positive volume. Layers with a NaN value are left out.
+
+    Returns
+    -------
+    grid : pyvista.UnstructuredGrid
+        Cell data ``value``, ``log10_value`` (when ``columns['log']``), ``sounding`` (index in the DATA
+        file) and ``iz`` (depth index in the prior); field data ``key``, ``im``, ``clim`` (value units),
+        ``log`` (0/1) and ``cmap_rgb``. Save it with ``grid.save('model.vtu')`` to open in ParaView.
+    """
+    import pyvista as pv
+
+    xy, elev, z_lev = columns['xy'], columns['elevation'], columns['z']
+    off, poly, vals = columns['poly_offset'], columns['poly_xy'], columns['values']
+    sid, iz = columns['sounding'], columns['iz']
+    nz = len(iz)
+    nv = np.diff(off)
+    top_ccw = _vtk_wedge_top_ccw()
+
+    points, wedges, values, sounding, depth = [], [], [], [], []
+    n_points = 0
+    for n in np.unique(nv):
+        g = np.where(nv == n)[0]
+        m = len(g)
+        V = poly[off[g][:, None] + np.arange(n)]            # (m, n, 2)
+        P2 = np.concatenate([xy[g, None, :], V], axis=1)    # (m, n+1, 2): centre, vertices
+        P3 = np.empty((m, nz + 1, n + 1, 3))
+        P3[..., :2] = P2[:, None]
+        P3[..., 2] = elev[g, None, None] - z_lev[None, :, None]
+        pid = n_points + np.arange(P3[..., 0].size).reshape(m, nz + 1, n + 1)
+        j1 = 1 + np.arange(n)
+        j2 = 1 + (np.arange(n) + 1) % n
+        # The top triangle comes first; its winding (seen from above) depends on the VTK wedge
+        # convention of the installed VTK, so that each cell has a positive volume
+        if not top_ccw:
+            j1, j2 = j2, j1
+        w = np.stack([pid[:, :-1, 0, None].repeat(n, -1), pid[:, :-1][..., j1], pid[:, :-1][..., j2],
+                      pid[:, 1:, 0, None].repeat(n, -1), pid[:, 1:][..., j1], pid[:, 1:][..., j2]],
+                     axis=-1)  # (m, nz, n, 6)
+        points.append(P3.reshape(-1, 3))
+        wedges.append(w.reshape(-1, 6))
+        values.append(np.repeat(vals[g], n, axis=1).reshape(-1))
+        sounding.append(np.repeat(sid[g], nz * n))
+        depth.append(np.tile(np.repeat(iz, n), m))
+        n_points += P3[..., 0].size
+
+    wedges, values = np.concatenate(wedges), np.concatenate(values)
+    sounding, depth = np.concatenate(sounding), np.concatenate(depth)
+    ok = np.isfinite(values)
+    grid = pv.UnstructuredGrid({pv.CellType.WEDGE: wedges[ok]}, np.concatenate(points))
+    grid.cell_data['value'] = values[ok]
+    if columns['log']:
+        grid.cell_data['log10_value'] = np.log10(values[ok])
+    grid.cell_data['sounding'] = sounding[ok].astype(np.int64)
+    grid.cell_data['iz'] = depth[ok].astype(np.int64)
+    grid = grid.clean()
+    grid.field_data['key'] = [str(columns['key'])]
+    grid.field_data['im'] = np.array([int(columns['im'])])
+    grid.field_data['clim'] = np.array(columns['clim'], dtype=float)
+    grid.field_data['log'] = np.array([int(bool(columns['log']))])
+    grid.field_data['cmap_rgb'] = np.asarray(columns['cmap_rgb'], dtype=float)
+    return grid
+
+
+def post_to_voronoi_grid(f_post_h5, ii=None, im=1, key=None, r_max=150, iz_step=1, z_max=None,
+                         log=None, f_data_h5=None, f_prior_h5=None):
+    """
+    Posterior statistic ``/M{im}/{key}`` of a POST file on 3D Voronoi prisms (a pyvista.UnstructuredGrid).
+
+    Each sounding gets the 2D Voronoi cell of its location, clipped to a square of half-width ``r_max``
+    around the sounding (nearest-neighbour interpolation in the horizontal), extruded below the surface
+    elevation of the sounding along the depth grid of the prior. Each prism is built from VTK wedges
+    fanned from the sounding location. Cells with a NaN value (not inverted, below the depth of
+    investigation) are left out. Same as ``voronoi_columns_to_grid(post_to_voronoi_columns(...))``; the
+    parameters are those of :func:`post_to_voronoi_columns`.
+
+    Returns
+    -------
+    grid : pyvista.UnstructuredGrid
+        Wedge cells with cell data ``value``, ``log10_value`` (when ``log``), ``sounding`` (index in the
+        DATA file) and ``iz`` (depth index in the prior), and field data ``key``, ``im``, ``clim``
+        (in value units), ``log`` (0/1) and ``cmap_rgb`` ((256, 3) colours). Save it with
+        ``grid.save('model.vtu')`` to open in ParaView.
+
+    Examples
+    --------
+    >>> grid = ig.post_to_voronoi_grid('POST.h5', ii=np.arange(N)[::5], iz_step=2)
+    >>> ig.plot_voronoi_3d(grid, threshold=[1, 30])
+    >>> ig.plot_voronoi_slices(grid, z=[300])
+    """
+    return voronoi_columns_to_grid(post_to_voronoi_columns(
+        f_post_h5, ii=ii, im=im, key=key, r_max=r_max, iz_step=iz_step, z_max=z_max, log=log,
+        f_data_h5=f_data_h5, f_prior_h5=f_prior_h5))
+
+
+def _voronoi_style(grid, cmap, clim, scalars):
+    """Scalars name, colormap, colour limits (in scalar units) and colour-bar title of a Voronoi grid."""
+    from matplotlib.colors import ListedColormap
+    log = 'log10_value' in grid.cell_data
+    if scalars is None:
+        scalars = 'log10_value' if log else 'value'
+    if cmap is None:
+        cmap = ListedColormap(np.asarray(grid.field_data['cmap_rgb'])) if 'cmap_rgb' in grid.field_data else 'jet'
+    if clim is None:
+        clim = np.asarray(grid.field_data['clim']) if 'clim' in grid.field_data else grid.get_data_range('value')
+    clim = np.asarray(clim, dtype=float)
+    key = str(grid.field_data['key'][0]) if 'key' in grid.field_data else 'value'
+    if scalars == 'log10_value':
+        clim = np.log10(clim)
+        title = f'log10 {key}'
+    else:
+        title = key
+    return scalars, cmap, clim, title
+
+
+def plot_voronoi_3d(grid, cmap=None, clim=None, threshold=None, opacity_out=0.05, z_scale=10,
+                    scalars=None, title='', sliders=True, plotter=None, show=True, notebook=False):
+    """
+    Interactive 3D plot of a grid from :func:`post_to_voronoi_grid`, thresholded with transparency.
+
+    Cells with a value within ``threshold`` are drawn opaque, the others with opacity ``opacity_out``
+    (0 hides them). Both can be changed with sliders. The vertical axis is exaggerated by ``z_scale``.
+
+    Parameters
+    ----------
+    grid : pyvista.UnstructuredGrid
+        From :func:`post_to_voronoi_grid`.
+    cmap, clim : optional
+        Colormap and colour limits in value units (default: those stored in the grid).
+    threshold : [min, max], optional
+        Value range drawn opaque, in value units (default ``clim``).
+    opacity_out : float, optional
+        Opacity of the cells outside ``threshold`` (default 0.05).
+    z_scale : float, optional
+        Vertical exaggeration (default 10).
+    scalars : str, optional
+        Cell data to show (default 'log10_value' when stored, else 'value').
+    title : str, optional
+    sliders : bool, optional
+        Add sliders for the threshold and the opacity (default True).
+    plotter : pyvista.Plotter, optional
+        Plot into this plotter, e.g. a ``pyvistaqt.BackgroundPlotter``; it is not shown.
+    show : bool, optional
+        Show a new plotter (default True). notebook=True renders in a notebook with trame.
+
+    Returns
+    -------
+    pyvista.Plotter
+    """
+    import pyvista as pv
+    scalars, cmap, clim_s, cbar_title = _voronoi_style(grid, cmap, clim, scalars)
+    to_s = np.log10 if scalars == 'log10_value' else (lambda a: np.asarray(a, dtype=float))
+    lo, hi = to_s(threshold) if threshold is not None else clim_s
+    state = {'lo': float(lo), 'hi': float(hi), 'opacity_out': float(opacity_out)}
+    mesh_kw = dict(scalars=scalars, cmap=cmap, clim=clim_s, scalar_bar_args={'title': cbar_title})
+
+    own = plotter is None
+    pl = pv.Plotter(notebook=notebook) if own else plotter
+    pl.enable_depth_peeling()
+    pl.set_scale(zscale=z_scale)
+
+    def add_or_remove(mesh, name, **kw):
+        if mesh is not None and mesh.n_cells > 0:
+            pl.add_mesh(mesh, name=name, **mesh_kw, **kw)
+        else:
+            pl.remove_actor(name)
+
+    def update(*_):
+        rng = sorted([state['lo'], state['hi']])
+        add_or_remove(grid.threshold(rng, scalars=scalars), 'opaque')
+        outside = (grid.threshold(rng, scalars=scalars, invert=True)
+                   if state['opacity_out'] > 0 else None)
+        add_or_remove(outside, 'transparent', opacity=state['opacity_out'], show_scalar_bar=False)
+
+    if sliders:
+        def slider(name, rng, label, y):
+            def cb(value):
+                state[name] = value
+                update()
+            pl.add_slider_widget(cb, rng, value=state[name], title=label, style='modern',
+                                 pointa=(0.02, y), pointb=(0.3, y), interaction_event='end')
+        slider('lo', clim_s, f'{cbar_title} min (opaque)', 0.9)
+        slider('hi', clim_s, f'{cbar_title} max (opaque)', 0.77)
+        slider('opacity_out', [0, 1], 'Opacity outside range', 0.64)
+    update()
+    pl.add_text(f'{title} (vertical exaggeration {z_scale}x)', position='upper_right', font_size=9)
+    pl.show_grid(xtitle='X [m]', ytitle='Y [m]', ztitle='Elevation [m]')
+    if own and show:
+        pl.show(jupyter_backend='trame' if notebook else None)
+    return pl
+
+
+def plot_voronoi_slices(grid, cmap=None, clim=None, x=None, y=None, z=None, z_scale=10, scalars=None,
+                        title='', interactive=False, normal='x', plotter=None, show=True,
+                        screenshot=None, notebook=False):
+    """
+    Slices through a grid from :func:`post_to_voronoi_grid`.
+
+    ``grid.slice`` cuts the Voronoi prisms with a plane, giving a polygon mesh with the values of the cut
+    cells.
+
+    Parameters
+    ----------
+    grid : pyvista.UnstructuredGrid
+        From :func:`post_to_voronoi_grid`.
+    cmap, clim : optional
+        Colormap and colour limits in value units (default: those stored in the grid).
+    x, y : float or list, optional
+        Eastings / northings [m] of vertical slices.
+    z : float or list, optional
+        Elevations [m] of horizontal slices. All None: one slice of each through the centre of the grid.
+    z_scale : float, optional
+        Vertical exaggeration (default 10).
+    interactive : bool, optional
+        Show one slice, initially with normal ``normal``, that can be moved with the mouse. The widget
+        does not work in a scaled view, so the elevations of the model are multiplied by ``z_scale``.
+    plotter : pyvista.Plotter, optional
+        Plot into this plotter, e.g. a ``pyvistaqt.BackgroundPlotter``; it is not shown.
+    show : bool, optional
+        Show a new plotter (default True). screenshot: save the view as PNG when closed.
+
+    Returns
+    -------
+    pyvista.Plotter
+    """
+    import pyvista as pv
+    scalars, cmap, clim_s, cbar_title = _voronoi_style(grid, cmap, clim, scalars)
+    mesh_kw = dict(scalars=scalars, cmap=cmap, clim=clim_s, scalar_bar_args={'title': cbar_title})
+    own = plotter is None
+    pl = pv.Plotter(notebook=notebook) if own else plotter
+
+    if interactive:
+        grid_s = grid.scale([1, 1, z_scale], inplace=False)
+        pl.add_mesh(grid_s.outline(), color='k')
+        pl.add_mesh_slice(grid_s, normal=normal, **mesh_kw)
+        ztitle = f'Elevation x {z_scale} [m]'
+    else:
+        c = grid.center
+        if x is None and y is None and z is None:
+            x, y, z = [c[0]], [c[1]], [c[2]]
+        planes = ([('x', (v, c[1], c[2])) for v in np.atleast_1d(x if x is not None else [])] +
+                  [('y', (c[0], v, c[2])) for v in np.atleast_1d(y if y is not None else [])] +
+                  [('z', (c[0], c[1], v)) for v in np.atleast_1d(z if z is not None else [])])
+        pl.set_scale(zscale=z_scale)
+        pl.add_mesh(grid.outline(), color='k')
+        shown = 0
+        for nrm, origin in planes:
+            sl = grid.slice(normal=nrm, origin=origin)
+            if sl.n_cells == 0:
+                print(f'Slice {nrm}={origin["xyz".index(nrm)]:.0f} m is outside the model')
+                continue
+            pl.add_mesh(sl, show_scalar_bar=(shown == 0), **mesh_kw)
+            shown += 1
+        ztitle = 'Elevation [m]'
+
+    pl.add_text(f'{title} (vertical exaggeration {z_scale}x)', position='upper_right', font_size=9)
+    pl.show_grid(xtitle='X [m]', ytitle='Y [m]', ztitle=ztitle)
+    if own and show:
+        pl.show(jupyter_backend='trame' if notebook else None, screenshot=screenshot)
+    return pl

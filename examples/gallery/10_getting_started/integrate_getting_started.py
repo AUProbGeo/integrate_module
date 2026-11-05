@@ -28,10 +28,10 @@ if IN_COLAB:
 # %%
 import os
 #os.environ["EM_FORWARD_METHOD"] = "gaaem"
-os.environ["EM_FORWARD_METHOD"] = "simpeg"
+#os.environ["EM_FORWARD_METHOD"] = "simpeg"
 #os.environ["EM_FORWARD_METHOD"] = "anemone"
 #os.environ["EM_FORWARD_DEVICE"] = "cuda"
-os.environ["REJECTION_BACKEND"] = "jax"
+#os.environ["REJECTION_BACKEND"] = "jax"
 
 import integrate as ig
 hardcopy = True
@@ -146,8 +146,8 @@ ig.plot_data_xy(f_data_h5, data_channel=15, cmap='jet');
     # %%
 # Select how many prior model realizations (N) should be generated
 N=2_000_000
-N=1_000_000
-N=100_000
+#N=1_000_000
+#N=100_000
 
 #f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='chi2', NLAY_deg=3, RHO_min=1, RHO_max=3000, f_prior_h5=f'PRIOR_N{N}.h5',
 #                                    showInfo=1)

@@ -117,6 +117,7 @@ The posterior distribution is sampled using the extended rejection sampler.
     N_use = N
     T_base = 1  # The base annealing temperature. 
     autoT = 1   # Automatically set the annealing temperature
+    # autoT and T_base can also be set per data type, e.g. autoT=[1, 0, 0] (see the Rejection Sampling page)
     f_post_h5 = ig.integrate_rejection(f_prior_h5,
                                        f_data_h5,
                                        f_post_h5='POST.h5',
