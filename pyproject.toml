@@ -46,6 +46,9 @@ dev = [
     "pytest",
     "black",
 ]
+ui = [
+    "integrate_ui",
+]
 ml = [
     "tensorflow",
     "scikit-learn",
