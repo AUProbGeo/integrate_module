@@ -462,10 +462,10 @@ if 'ANTHROPIC_API_KEY' in os.environ:
                                          api_key=os.environ.get('ANTHROPIC_API_KEY'))
 else:
     query_raw = {'constraints': [
-        {'im': 2, 'classes': [4, 5, 6], 'thickness_mode': 'cumulative',
+        {'im': 2, 'classes': [5], 'thickness_mode': 'cumulative',
          'thickness_comparison': '>', 'thickness_threshold': 10.0,
          'depth_min': 0.0, 'depth_max': 30.0, 'negate': False},
-        {'im': 2, 'classes': [1, 2, 3, 7, 8], 'thickness_mode': 'first_occurrence',
+        {'im': 2, 'classes': [1, 2, 3, 4, 6, 7, 8], 'thickness_mode': 'first_occurrence',
          'thickness_comparison': '<=', 'thickness_threshold': 3.0,
          'depth_min': 0.0, 'depth_max': 30.0, 'negate': False}]}
 
