@@ -45,7 +45,7 @@ _RHO = [
 _RHO_DIST = ("select", ["log-uniform", "uniform", "normal", "lognormal"])
 # smooth (L2): 'lognormal' keeps the historical correlated-GP-in-log output;
 # 'log-uniform'/'uniform' swap the per-layer marginal via a Gaussian copula.
-_RHO_DIST_L2 = ("select", ["lognormal", "log-uniform", "uniform", "normal"])
+_RHO_DIST_L2 = ("select", ["lognormal", "log-uniform", "uniform"])
 
 
 # --------------------------------------------------------------------------- #

@@ -65,8 +65,10 @@ The number of layers follow a chi-squared distribution with 4 degrees of freedom
 This will create N realizations of 3 types of model parameters: 
 
     PRIOR:/M1: 1D resistivity values in layers of 1m thickness down to 90m depth
-    PRIOR:/M2: 1D resistivity values in discrete sets of [Nlayer,Nlayer-1] parameters where the first Nlayer parameters are resistivities, and the last Nlayer-1 parameters are depths to the base of each layer.
+    PRIOR:/M2: The layered model itself, as Nlayer-1 interface depths followed by Nlayer resistivities (NaN-padded)
     PRIOR:/M3: The number of layers in each model
+
+Other prior types (smooth, blocky and sharp) are described in :doc:`prior`.
 
 ::
 
