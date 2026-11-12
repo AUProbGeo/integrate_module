@@ -1469,7 +1469,7 @@ def get_geometry(f_data_h5):
     return X, Y, LINE, ELEVATION
 
 
-def extract_feature_at_elevation(f_post_h5, elevation, im=1, key='', iz=None, ic=None, iclass=None):
+def extract_feature_at_elevation(f_post_h5, elevation, im=1, key='', iz=None, ic=None, iclass=None, feature_data=None):
     """
     Extract model parameter feature values at a specific elevation for all data points.
 
@@ -1513,6 +1513,12 @@ def extract_feature_at_elevation(f_post_h5, elevation, im=1, key='', iz=None, ic
     iclass : int or None, optional
         Alternative name for ic parameter. Class index for probability extraction
         when key='P' (default is None).
+    feature_data : numpy.ndarray or None, optional
+        Values to extract from, shape (N_points, N_layers), used instead of reading
+        ``/Mx/key`` from f_post_h5 (``key`` is then ignored), e.g. one realization
+        of model ``im``. For a discrete model the value of the layer nearest to
+        the elevation is returned (no interpolation between class ids).
+        Default is None.
 
     Returns
     -------
@@ -1645,52 +1651,58 @@ def extract_feature_at_elevation(f_post_h5, elevation, im=1, key='', iz=None, ic
 
         is_discrete = f_prior[Mstr].attrs['is_discrete']
 
-    # Determine key if not provided
-    if len(key) == 0:
-        with h5py.File(f_post_h5, 'r') as f_post:
-            available_keys = list(f_post[Mstr].keys())
-            if is_discrete:
-                key = 'Mode' if 'Mode' in available_keys else available_keys[0]
-            else:
-                key = 'Median' if 'Median' in available_keys else available_keys[0]
-        print(f"No key provided. Using default key for {'discrete' if is_discrete else 'continuous'} parameter: {key}")
-
-    # Handle class index for probability extraction
-    if key == 'P' or key == 'p':
-        key = 'P'  # Normalize to uppercase
-        # Determine class index - ic takes priority over iclass
-        class_idx = ic if ic is not None else iclass
-        if class_idx is None:
-            class_idx = 0  # Default to first class
-            print(f"No class index provided for key='P'. Using default class index: {class_idx} (first class)")
-        else:
-            print(f"Extracting probability for class index: {class_idx}")
+    if feature_data is not None:
+        # Values given by the caller (e.g. one realization); nothing is read from /Mx/key
+        feature_data = np.asarray(feature_data)
+        nearest = bool(is_discrete)   # class ids: no interpolation between layers
     else:
-        class_idx = None
+        nearest = False
+        # Determine key if not provided
+        if len(key) == 0:
+            with h5py.File(f_post_h5, 'r') as f_post:
+                available_keys = list(f_post[Mstr].keys())
+                if is_discrete:
+                    key = 'Mode' if 'Mode' in available_keys else available_keys[0]
+                else:
+                    key = 'Median' if 'Median' in available_keys else available_keys[0]
+            print(f"No key provided. Using default key for {'discrete' if is_discrete else 'continuous'} parameter: {key}")
 
-    # Load the feature data
-    with h5py.File(f_post_h5, 'r') as f_post:
-        if Mstr not in f_post:
-            raise KeyError(f"Model {Mstr} not found in {f_post_h5}")
-        if key not in f_post[Mstr].keys():
-            raise KeyError(f"Key '{key}' not found in {Mstr} (available: {list(f_post[Mstr].keys())})")
-
-        # Load feature data
-        if key == 'P':
-            # P has shape (nd, n_classes, nz) - extract specific class
-            P_data = f_post[Mstr][key][:]
-            if P_data.ndim != 3:
-                raise ValueError(f"Expected P data to have 3 dimensions (nd, n_classes, nz), got {P_data.ndim}")
-
-            n_classes = P_data.shape[1]
-            if class_idx < 0 or class_idx >= n_classes:
-                raise ValueError(f"Class index {class_idx} out of range. Valid range: 0 to {n_classes-1}")
-
-            # Extract probability for the specified class: shape (nd, nz)
-            feature_data = P_data[:, class_idx, :]
+        # Handle class index for probability extraction
+        if key == 'P' or key == 'p':
+            key = 'P'  # Normalize to uppercase
+            # Determine class index - ic takes priority over iclass
+            class_idx = ic if ic is not None else iclass
+            if class_idx is None:
+                class_idx = 0  # Default to first class
+                print(f"No class index provided for key='P'. Using default class index: {class_idx} (first class)")
+            else:
+                print(f"Extracting probability for class index: {class_idx}")
         else:
-            # Load feature data: shape is (nd, nz) where nd=number of data points, nz=number of depth layers
-            feature_data = f_post[Mstr][key][:]
+            class_idx = None
+
+        # Load the feature data
+        with h5py.File(f_post_h5, 'r') as f_post:
+            if Mstr not in f_post:
+                raise KeyError(f"Model {Mstr} not found in {f_post_h5}")
+            if key not in f_post[Mstr].keys():
+                raise KeyError(f"Key '{key}' not found in {Mstr} (available: {list(f_post[Mstr].keys())})")
+
+            # Load feature data
+            if key == 'P':
+                # P has shape (nd, n_classes, nz) - extract specific class
+                P_data = f_post[Mstr][key][:]
+                if P_data.ndim != 3:
+                    raise ValueError(f"Expected P data to have 3 dimensions (nd, n_classes, nz), got {P_data.ndim}")
+
+                n_classes = P_data.shape[1]
+                if class_idx < 0 or class_idx >= n_classes:
+                    raise ValueError(f"Class index {class_idx} out of range. Valid range: 0 to {n_classes-1}")
+
+                # Extract probability for the specified class: shape (nd, nz)
+                feature_data = P_data[:, class_idx, :]
+            else:
+                # Load feature data: shape is (nd, nz) where nd=number of data points, nz=number of depth layers
+                feature_data = f_post[Mstr][key][:]
 
     # Initialize output array
     values_at_elevation = np.full(nd, np.nan)
@@ -1714,7 +1726,10 @@ def extract_feature_at_elevation(f_post_h5, elevation, im=1, key='', iz=None, ic
         # Interpolate feature value at the requested elevation
         # Note: elevation_abs is in descending order (surface to depth)
         # so we need to be careful with interpolation
-        values_at_elevation[i] = np.interp(elevation, elevation_abs[::-1], feature_data[i, :][::-1])
+        if nearest:
+            values_at_elevation[i] = feature_data[i, np.argmin(np.abs(elevation_abs - elevation))]
+        else:
+            values_at_elevation[i] = np.interp(elevation, elevation_abs[::-1], feature_data[i, :][::-1])
 
     return values_at_elevation
 

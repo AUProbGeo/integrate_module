@@ -473,13 +473,13 @@ def data_set(f_h5, id=1, **kwargs):
                 print('data_set: %s/%s = %r' % (Dstr, _k, kwargs[_k]))
 
 
-def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
+def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, i_use_key='i_use', **kwargs):
     """
     Compute posterior statistics for all model parameters in a POST HDF5 file.
 
-    Reads posterior sample indices (i_use) and the corresponding prior model
-    realizations, then computes per-location statistics and writes them back
-    into the same POST.h5 file.
+    Reads posterior sample indices (the dataset ``i_use_key``, by default
+    ``i_use``) and the corresponding prior model realizations, then computes
+    per-location statistics and writes them back into the same POST.h5 file.
 
     Parameters
     ----------
@@ -488,6 +488,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     ip_range : array-like or None, optional
         Indices of data locations to process. If None, all locations are processed.
         Locations not in ip_range receive NaN values. Default is None.
+    i_use_key : str, optional
+        Name of the dataset in f_post_h5 holding the realization indices,
+        shape (Np, nr), indices into the prior. Default is 'i_use' (the 1D
+        posterior realizations). Use e.g. 'i_use_3d' to compute the statistics
+        from 3D realizations.
     **kwargs : dict
         showInfo : int, optional
             Verbosity level. 0 = silent, 1 = progress bars. Default is 0.
@@ -616,13 +621,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 if '/ELEVATION' not in f_post:
                     f_data.copy('/ELEVATION', f_post)
     
-    # Load 'i_use' data from the HDF5 file
-    try:
-        with h5py.File(f_post_h5, 'r') as f:
-            i_use = f['i_use'][:]
-    except KeyError:
-        print(f"Could not read 'i_use' from {f_post_h5}")
-        #return
+    # Load the realization indices (default: 'i_use') from the HDF5 file
+    with h5py.File(f_post_h5, 'r') as f:
+        if i_use_key not in f:
+            raise KeyError("'%s' not found in %s" % (i_use_key, f_post_h5))
+        i_use = f[i_use_key][:]
 
     if usePrior:
         with h5py.File(f_prior_h5, 'r') as f_prior:
