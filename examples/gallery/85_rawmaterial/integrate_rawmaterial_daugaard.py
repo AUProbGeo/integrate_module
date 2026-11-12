@@ -73,7 +73,7 @@ hardcopy = True
 
 N = 4_000_000 +2
 N = 10_001
-N = 1_000_000 + 5        # number of prior realizations (use e.g. 10_000 for a quick demo)
+N = 3_000_000 + 5        # number of prior realizations (use e.g. 10_000 for a quick demo)
 inflateNoise = 2     # multiply the tTEM data std by this (0 = use as-is)
 reuse_h5 = False      # True: reuse existing HDF5 files; False: delete them and recompute everything
 
