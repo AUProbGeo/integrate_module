@@ -72,8 +72,8 @@ import integrate_rawmaterial_utils as rmu
 hardcopy = True
 
 N = 4_000_000 +2
-N = 10_001
-N = 3_000_000 + 5        # number of prior realizations (use e.g. 10_000 for a quick demo)
+N = 50_001
+#N = 3_000_000 + 5        # number of prior realizations (use e.g. 10_000 for a quick demo)
 inflateNoise = 2     # multiply the tTEM data std by this (0 = use as-is)
 reuse_h5 = False      # True: reuse existing HDF5 files; False: delete them and recompute everything
 
@@ -129,7 +129,7 @@ plt.show()
 # ---------------------
 
 # %%
-f_boreholes = ig.get_case_data(case=case, filelist=['rawmaterial/Downloads/Daugaard_boringer_rostof.json'])[0]
+f_boreholes = ig.get_case_data(case=case, filelist=['rawmaterial/Daugaard_boringer_rostof.json'])[0]
 BHOLES = ig.read_borehole(f_boreholes, showInfo=1)
 
 # Go through all the boreholes, and only retain those that 
@@ -209,7 +209,8 @@ if compute(f_prior_generic_h5):
 f_prior_xls_h5 = 'DAUGAARD_PRIOR_ROSTOF%s.h5' % SUFFIX
 if compute(f_prior_xls_h5):
     from geoprior1d import geoprior1d
-    f_xlsx = ig.get_case_data(case=case, filelist=['daugaard_rostof.xlsx'])[0]
+    f_xlsx = ig.get_case_data(case=case, filelist=['rawmaterial/daugaard_rostof.xlsx'])[0]
+
     geoprior1d(f_xlsx, Nreals=N, 
                dz=1, dmax=90, output_file=f_prior_xls_h5)
 
@@ -618,6 +619,60 @@ ax.legend(fontsize=8)
 if hardcopy:
     fig.savefig('daugaard_rawmat_volume' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
 plt.show()
+
+# %%
+# 11. 1D -> 3D posterior realizations
+# -----------------------------------
+#
+# The posterior realizations in ``/i_use`` are independent from sounding to
+# sounding. ``integrate_jointsim`` (joint sequential simulation, in development
+# in ~/PROGRAMMING/PROJECT_IDEAS/INTEGRATE_POST_3D/code) picks, for each of
+# ``N_SIM`` 3D realizations, one of each sounding's posterior realizations, such
+# that neighbouring soundings are horizontally correlated. The indices are
+# written to ``/i_use_3d``, shape (Nsoundings, N_SIM), and the posterior
+# statistics are then computed from ``/i_use_3d`` instead of ``/i_use``.
+
+# %%
+import sys
+sys.path.append(os.path.expanduser('~/PROGRAMMING/PROJECT_IDEAS/INTEGRATE_POST_3D/code'))
+from jointsim import integrate_jointsim
+
+N_SIM = 50   # number of 3D realizations
+i_use_key='i_use_3d'
+
+f_post_h5_org = f_post['XLS_EM_BH']
+f_post_h5_3D = f_post_h5_org.replace('.h5', 'N%d_3D.h5' % (N_SIM))
+if compute(f_post_h5_3D):
+    # 11a. Copy the joint (tTEM + borehole) posterior file
+    ig.copy_hdf5_file(f_post_h5_org, f_post_h5_3D)
+    # 11b. Simulate N_SIM 3D realizations -> f_post_h5_3D:/i_use_3d
+    integrate_jointsim(f_post_h5_3D, n_sim=N_SIM, range_h=200.0, i_use_key=i_use_key)
+    # 11c. Posterior statistics from /i_use_3d instead of /i_use
+    ig.integrate_posterior_stats(f_post_h5_3D, i_use_key=i_use_key, showInfo=1)
+
+# %%
+# 11d. Posterior statistics from the 1D and the 3D realizations, side by side.
+
+# %%
+for label, f_post_h5 in [('1D', f_post_h5_org), ('3D', f_post_h5_3D)]:
+    ig.plot_profile(f_post_h5, im=1, panels=['harmonicmean', 'std'], txt=label, **profile_kw, **bhole_kw)
+    ig.plot_profile(f_post_h5, im=2, txt=label, **profile_kw, **bhole_kw)
+    ig.plot_feature_2d(f_post_h5, im=2, key='Mode', elevation=20, s=2, hardcopy=hardcopy)
+    plt.show()
+
+# %%
+# 11e. Actual realizations of the lithology. ``/i_use_3d`` and ``/i_use`` have
+# the same format, (Nsoundings, Nrealizations), and are plotted the same way:
+# column ``i_real`` is realization ``i_real``. ``/i_use_3d`` holds the 3D
+# realizations, ``/i_use`` the 1D realizations (no horizontal correlation).
+
+# %%
+for i_real in range(5):
+    for txt, key in [('_3D', i_use_key), ('_1D', 'i_use')]:
+        real_kw = dict(i_use_key=key, i_realization=i_real, txt=txt)   # txt is added to the PNG names
+        ig.plot_profile(f_post_h5_3D, im=2, panels=['realization'], **real_kw, **profile_kw, **bhole_kw)
+        ig.plot_feature_2d(f_post_h5_3D, im=2, key='realization', elevation=40, s=2, hardcopy=hardcopy, **real_kw)
+        plt.show()
 
 # %%
 # Discussion
