@@ -26,6 +26,7 @@ dependencies = [
     "shapely",
     "ga-aem-forward-win; platform_system == 'Windows'",
     "simpeg>=0.25",
+    "anemone-core>=0.1.0",
     "jupyter>=1.0.1",
     "jupytext",
     "ipykernel",
@@ -67,11 +68,6 @@ docs = [
 jax-cuda = [
     "jax[cuda13]",
 ]
-#anemone = [
-#    "torch",
-#    # local path until anemone is published
-#    "anemone @ file:///home/tmeha/PROGRAMMING/anemone",
-#]
 #simpeg = [
 #    # local checkout until pinned to a release (needs simpeg >= 0.22)
 #    "simpeg @ file:///home/tmeha/PROGRAMMING/simpeg",

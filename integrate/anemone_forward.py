@@ -17,7 +17,9 @@ from integrate.em_system import (_butter_rows, _polygon_area,  # shared helpers
 
 _IMPORT_HINT = (
     "anemone backend requires 'anemone' and 'torch': "
-    "pip install torch && pip install -e /home/tmeha/PROGRAMMING/anemone"
+    "pip install anemone-core "
+    "(https://pypi.org/project/anemone-core/, "
+    "https://github.com/hydrogeophysicsgroup/anemone)"
 )
 
 
@@ -178,6 +180,10 @@ class _DampedLowPass:
 
     def omega_filter(self, omega):
         return self(omega / (2.0 * np.pi))
+
+    def poles(self):
+        """Poles in rad/s (used by anemone's FilterChain.stepoff_response)."""
+        return 2.0 * np.pi * self.fcut * np.roots([1.0, 2.0 * self.damping, 1.0])
 
 
 # ---------------------------------------------------------------------------
