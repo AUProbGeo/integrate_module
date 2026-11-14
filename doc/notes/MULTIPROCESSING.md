@@ -167,10 +167,9 @@ Functions that carry this guard:
 
 | Function | File |
 |----------|------|
-| `prior_data_gaaem()` | `integrate/integrate.py` |
+| `prior_data_gaaem()` | `integrate/gaaem_forward.py` |
 | `prior_model_layered()` | `integrate/integrate.py` |
-| `prior_model_workbench()` | `integrate/integrate.py` |
-| `prior_model_workbench_direct()` | `integrate/integrate.py` |
+| `prior_model_smooth()` (also used by `prior_model_blocky()` / `prior_model_sharp()`) | `integrate/integrate.py` |
 | `integrate_rejection()` | `integrate/integrate_rejection.py` |
 
 ---

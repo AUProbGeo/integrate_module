@@ -569,7 +569,7 @@ def plot_posterior_cumulative_thickness(f_post_h5, im=2, icat=[0], property='med
 
     return fig
 
-def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None, ic=None, uselog=1, title=None, hardcopy=False, cmap=None, clim=None, **kwargs):
+def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None, ic=None, uselog=1, title=None, hardcopy=False, cmap=None, clim=None, i_use_key='i_use', i_realization=None, **kwargs):
     """
     Create 2D spatial scatter plot of model parameter features.
 
@@ -591,6 +591,9 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         **Continuous parameters**: 'Mean', 'Median', 'Std'
 
         **Discrete parameters**: 'Mode', 'P' (probability), 'Entropy'
+
+        **Both**: 'realization' plots an actual realization instead of a
+        statistic, see ``i_use_key`` and ``i_realization``.
     i1 : int, optional
         Starting data point index for plotting (1-based indexing, default is 1).
     i2 : float, optional
@@ -616,6 +619,11 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         Custom plot title. If None, auto-generates descriptive title (default is None).
     hardcopy : bool, optional
         Save the plot as a PNG file with auto-generated filename (default is False).
+        The name is built from ``f_post_h5``, the data point range, ``im``,
+        ``key``, the layer or elevation, and ``txt``. With ``key='realization'``
+        the key part is 'realization<i_realization>_<i_use_key>' (or
+        'realization_<i_use_key>' for a random draw), e.g.
+        ``..._realization0_i_use_3d_elev20_feature.png``.
     cmap : str or None, optional
         Colormap specification (e.g., 'viridis', 'magma_r', 'RdYlBu').
         If None, uses colormap from prior file for discrete parameters or
@@ -626,9 +634,22 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         (default is None). For discrete parameters, automatically set to span
         all class IDs unless explicitly provided. When explicitly provided,
         disables discrete colorbar with class labels.
+    i_use_key : str, optional
+        Used with ``key='realization'``. Dataset in f_post_h5 with the prior
+        indices of the realizations, shape (nd, nr). Default is 'i_use' (1D
+        posterior realizations); use e.g. 'i_use_3d' for 3D realizations.
+    i_realization : int or None, optional
+        Used with ``key='realization'``. Column of ``i_use_key`` used for all
+        data points, i.e. one full realization (e.g. 3D realization 0 with
+        ``i_use_key='i_use_3d'``). If None (default), a random column is
+        drawn for each data point.
     **kwargs : dict
         Additional keyword arguments:
 
+        - **seed** (int): Seed for the random draw when ``key='realization'``
+          and ``i_realization`` is None (default is None, non-reproducible).
+        - **txt** (str): Additional text appended to the automatic filename
+          used with ``hardcopy=True``, e.g. ``txt='_3D'`` (default is '').
         - **plotPoints** (bool): If True, overlay small black dots at each
           data point location (default is False). Useful for showing data
           coverage.
@@ -741,6 +762,17 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
         >>> ig.plot_feature_2d('POST.h5', key='Entropy', im=2, elevation=30,
         ...                     clim=[0, 2])
 
+    **Realizations**
+
+    Plot 3D realization 0 (stored in ``/i_use_3d``) of the lithology at 20m elevation::
+
+        >>> ig.plot_feature_2d('POST.h5', key='realization', im=2, elevation=20,
+        ...                     i_use_key='i_use_3d', i_realization=0)
+
+    Plot a random 1D posterior realization (from ``/i_use``) at each data point::
+
+        >>> ig.plot_feature_2d('POST.h5', key='realization', im=1, elevation=20, seed=1)
+
     **Advanced Usage**
 
     Plot subset of data with custom settings::
@@ -758,6 +790,8 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
 
     # Extract parameters that should not be passed to scatter()
     showInfo = kwargs.pop('showInfo', 0)
+    seed = kwargs.pop('seed', None)
+    txt = kwargs.pop('txt', '')
 
     # Track if user provided clim and cmap explicitly
     clim_user_provided = (clim is not None)
@@ -846,10 +880,22 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
                     key = available_keys[0]
         print("No key was given. Using default key for %s parameter: %s" % ('discrete' if is_discrete else 'continuous', key))
 
+    # key='realization': plot an actual realization, M[idx], instead of a statistic.
+    # idx has one prior index per data point, from column i_realization of i_use_key
+    # (or a random column per data point).
+    is_realization = (key.lower() == 'realization')
+    key_txt = key   # used in the title and in the file name
+    D_real = None
+    if is_realization:
+        D_real = _profile_realization(f_post_h5, f_prior_h5, dstr, np.arange(nd), seed=seed,
+                                      i_use_key=i_use_key, i_realization=i_realization).T   # (nd, nz)
+        key_txt = 'realization' if i_realization is None else 'realization%d' % i_realization
+        key_txt += '_%s' % i_use_key
+
     # Determine if this statistic represents discrete data
     # Discrete statistics include: Mode, P (probability), Entropy
     discrete_stats = ['Mode', 'P', 'Entropy']
-    is_discrete_stat = is_discrete and (key in discrete_stats)
+    is_discrete_stat = is_discrete and (key in discrete_stats or is_realization)
 
     # Use discrete colormap and limits if this is discrete data with appropriate statistic
     # Only override if user didn't explicitly provide cmap or clim
@@ -877,14 +923,20 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
                     print("  Using default ic=0 for probability extraction")
             D = extract_feature_at_elevation(f_post_h5, elevation=elevation, im=im, key=key, ic=ic)
         else:
-            D = extract_feature_at_elevation(f_post_h5, elevation=elevation, im=im, key=key)
+            D = extract_feature_at_elevation(f_post_h5, elevation=elevation, im=im, key=key,
+                                             feature_data=D_real)
 
         # Create title that reflects elevation instead of iz
         if title is None:
             if key == 'P' and ic is not None:
                 title = "%s/%s[elev=%.1fm, ic=%d] %s" % (dstr, key, elevation, ic, name)
             else:
-                title = "%s/%s[elev=%.1fm] %s" % (dstr, key, elevation, name)
+                title = "%s/%s[elev=%.1fm] %s" % (dstr, key_txt, elevation, name)
+
+    elif is_realization:
+        D = D_real[:, iz]
+        if title is None:
+            title = "%s/%s[%d,:] %s" % (dstr, key_txt, iz, name)
 
     else:
         # Original behavior: extract from layer iz
@@ -959,14 +1011,14 @@ def plot_feature_2d(f_post_h5, key='', i1=1, i2=1e+9, im=1, iz=0, elevation=None
     if hardcopy:
         if elevation is not None:
             if key == 'P' and ic is not None:
-                f_png = '%s_%d_%d_%d_%s_ic%d_elev%.0f_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, elevation)
+                f_png = '%s_%d_%d_%d_%s_ic%d_elev%.0f_feature%s.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, elevation, txt)
             else:
-                f_png = '%s_%d_%d_%d_%s_elev%.0f_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, elevation)
+                f_png = '%s_%d_%d_%d_%s_elev%.0f_feature%s.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key_txt, elevation, txt)
         else:
             if key == 'P' and ic is not None:
-                f_png = '%s_%d_%d_%d_%s_ic%d_iz%02d_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, iz)
+                f_png = '%s_%d_%d_%d_%s_ic%d_iz%02d_feature%s.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, ic, iz, txt)
             else:
-                f_png = '%s_%d_%d_%d_%s%02d_feature.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key, iz)
+                f_png = '%s_%d_%d_%d_%s%02d_feature%s.png' % (os.path.splitext(f_post_h5)[0], i1, i2, im, key_txt, iz, txt)
         fig.savefig(f_png, bbox_inches='tight')
     return
 
@@ -1386,16 +1438,21 @@ def plot_geometry(f_data_h5, i1=0, i2=0, ii=np.array(()), pl='ELEVATION', hardco
 
 
 def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=None, seed=None,
-                         plot_prior=False):
+                         plot_prior=False, i_use_key='i_use', i_realization=None):
     """
     Return one prior realization per plotted location, as an (nz, len(ii)) array.
 
-    Used by the ``'realization'`` panel of plot_profile_continuous/plot_profile_discrete.
-    If ``i_plot_realization`` is None, a random column of ``/i_use`` (the accepted prior
-    indices per sounding) is drawn for each location in ``ii``. Otherwise
-    ``i_plot_realization`` must be an array of prior row indices, one per location: either
-    of length ``len(ii)`` or of length ``nd`` (all soundings, subset by ``ii``).
-    If ``plot_prior`` is True, ``/i_use`` is replaced by random prior indices of the same
+    Used by the ``'realization'`` panel of plot_profile_continuous/plot_profile_discrete
+    and by ``key='realization'`` of plot_feature_2d.
+    The prior indices are read from the dataset ``i_use_key`` of f_post_h5, shape (nd, nr):
+    ``/i_use`` (default, the accepted prior indices per sounding) or e.g. ``/i_use_3d``.
+    If ``i_realization`` is None, a random column is drawn for each location in ``ii``.
+    If ``i_realization`` is an int, that column is used for all locations, i.e. one
+    full realization (column k of ``/i_use_3d`` is 3D realization k).
+    If ``i_plot_realization`` is given, it is used instead of ``i_use_key``: an array of
+    prior row indices, one per location, either of length ``len(ii)`` or of length ``nd``
+    (all soundings, subset by ``ii``).
+    If ``plot_prior`` is True, the indices are replaced by random prior indices of the same
     shape, so the panel shows prior (not posterior) realizations.
     """
     ii = np.asarray(ii, dtype=int)
@@ -1403,17 +1460,23 @@ def _profile_realization(f_post_h5, f_prior_h5, Mstr, ii, i_plot_realization=Non
 
     if i_plot_realization is None:
         with h5py.File(f_post_h5, 'r') as f_post:
-            if '/i_use' not in f_post:
-                raise KeyError("'%s' has no /i_use dataset; run the posterior sampling first "
-                               "or pass i_plot_realization" % f_post_h5)
-            i_use = f_post['/i_use'][:]
+            if i_use_key not in f_post:
+                raise KeyError("'%s' has no /%s dataset; run the posterior sampling first "
+                               "or pass i_plot_realization" % (f_post_h5, i_use_key))
+            i_use = f_post[i_use_key][:]
         nd, nr = i_use.shape
         rng = np.random.default_rng(seed)
         if plot_prior:
             with h5py.File(f_prior_h5, 'r') as f_prior:
                 N = f_prior[Mstr].shape[0]
             i_use = rng.integers(0, N, size=(nd, nr))
-        r = rng.integers(0, nr, size=n_loc)
+        if i_realization is None:
+            r = rng.integers(0, nr, size=n_loc)      # a random column per location
+        elif 0 <= i_realization < nr:
+            r = i_realization                        # the same column for all locations
+        else:
+            raise IndexError("i_realization=%d, but /%s in '%s' has %d realizations (0..%d)"
+                             % (i_realization, i_use_key, f_post_h5, nr, nr - 1))
         idx = i_use[ii, r].astype(int)
     else:
         idx = np.asarray(i_plot_realization)
@@ -1486,7 +1549,10 @@ def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index',
         Additional plotting arguments passed to discrete/continuous plotting functions.
         Both model types support 'alpha' (float, 0.0-1.0) to apply uncertainty-based
         transparency to the main profile panel (median/mean for continuous, mode for discrete).
-        For the 'realization' panel, ``i_plot_realization`` (array of prior indices, one per
+        For the 'realization' panel, ``i_use_key`` (dataset with the prior indices, default
+        'i_use', e.g. 'i_use_3d') and ``i_realization`` (int: use that column for all
+        locations, i.e. one full realization; None: a random column per location) select
+        what is shown. Also ``i_plot_realization`` (array of prior indices, one per
         location), ``seed`` (int, reproducible random draw) and ``plot_prior`` (bool, draw
         from the prior instead of ``/i_use``) are supported.
         ``title`` (str) adds a figure title above all panels.
@@ -1529,6 +1595,10 @@ def plot_profile(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=0, xaxis='index',
     Plot one random posterior realization per location (reproducible with seed):
 
     >>> plot_profile(f_post_h5, im=1, panels=['realization', 'std', 'stats'], seed=1)
+
+    Plot 3D realization 0, stored in ``/i_use_3d`` (the same column for all locations):
+
+    >>> plot_profile(f_post_h5, im=2, panels=['realization'], i_use_key='i_use_3d', i_realization=0)
 
     Plot continuous model with partial transparency:
 
@@ -1639,11 +1709,18 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     alpha : float, optional
         Transparency scaling factor based on entropy (0.0=no transparency, default;
         1.0=full entropy-based transparency where high-uncertainty regions become transparent).
+    i_use_key : str, optional
+        Used with the 'realization' panel. Dataset in f_post_h5 with the prior indices of
+        the realizations, shape (nd, nr). Default is 'i_use' (1D posterior realizations);
+        use e.g. 'i_use_3d' for 3D realizations.
+    i_realization : int, optional
+        Used with the 'realization' panel. Column of ``i_use_key`` used for all locations,
+        i.e. one full realization (e.g. 3D realization 0 with ``i_use_key='i_use_3d'``).
+        If None (default), a random column is drawn for each location.
     i_plot_realization : array_like of int, optional
-        Used with the 'realization' panel. Prior row indices, one per location: length
-        ``len(ii)`` (locations in the profile) or ``nd`` (all soundings, subset by ``ii``),
-        e.g. ``f_post['/i_use'][:, 5]`` shows posterior realization #5 everywhere. If None
-        (default), a random entry of ``/i_use`` is drawn for each location.
+        Used with the 'realization' panel, instead of ``i_use_key``. Prior row indices, one
+        per location: length ``len(ii)`` (locations in the profile) or ``nd`` (all
+        soundings, subset by ``ii``).
     seed : int, optional
         Seed for the random draw of realizations (default None, non-reproducible).
     plot_prior : bool, optional
@@ -1660,7 +1737,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         Save plot as PNG file (default False).
     f_png : str, optional
         Output filename used when ``hardcopy=True``. If not given, a name is built from
-        ``f_post_h5``, the index range, model, panels and ``txt``.
+        ``f_post_h5``, the index range, model, panels and ``txt``. With ``i_realization``,
+        the 'realization' panel is named 'realization<i_realization>_<i_use_key>',
+        e.g. ``..._panels_realization0_i_use_3d.png``.
     txt : str, optional
         Additional text appended to the automatic filename (ignored if ``f_png`` is given).
     showInfo : int, optional
@@ -1768,6 +1847,8 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of entropy
     fontsize = kwargs.get('fontsize', None)
     i_plot_realization = kwargs.get('i_plot_realization', None)
+    i_use_key = kwargs.get('i_use_key', 'i_use')
+    i_realization = kwargs.get('i_realization', None)
     seed = kwargs.get('seed', None)
     plot_prior = kwargs.get('plot_prior', False)
     BHOLES = kwargs.get('BHOLES', None)
@@ -2092,8 +2173,11 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     if show_realization:
         real_data = _profile_realization(f_post_h5, f_prior_h5, Mstr, ii,
                                          i_plot_realization=i_plot_realization, seed=seed,
-                                         plot_prior=plot_prior)
+                                         plot_prior=plot_prior, i_use_key=i_use_key,
+                                         i_realization=i_realization)
         real_label = 'Prior realization' if plot_prior else 'Realization'
+        if i_realization is not None and i_plot_realization is None:
+            real_label += ' %d (%s)' % (i_realization, i_use_key)
         if gap_alpha is not None:
             real_data = np.ma.masked_where(gap_alpha == 0.0, real_data)
 
@@ -2272,6 +2356,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             # Add panel information to filename if panels were specified
             if panels is not None and panels != ['mode', 'entropy', 'stats']:
                 panel_str = '_panels_' + '-'.join(panels)
+                if i_realization is not None and i_plot_realization is None:
+                    # e.g. 'realization' -> 'realization0_i_use_3d'
+                    panel_str = panel_str.replace('realization', 'realization%d_%s' % (i_realization, i_use_key))
             else:
                 panel_str = ''
             f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)
@@ -2322,11 +2409,18 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         Accepted panel names: 'value', 'median', 'mean', 'harmonicmean', 'realization', 'std', 'uncertainty', 'stats', 'temperature', 't'
         Using a statistic name (``'median'``, ``'mean'``, ``'harmonicmean'``) as the panel name also
         selects that statistic as the plotted value, overriding the default ``key``.
+    i_use_key : str, optional
+        Used with the 'realization' panel. Dataset in f_post_h5 with the prior indices of
+        the realizations, shape (nd, nr). Default is 'i_use' (1D posterior realizations);
+        use e.g. 'i_use_3d' for 3D realizations.
+    i_realization : int, optional
+        Used with the 'realization' panel. Column of ``i_use_key`` used for all locations,
+        i.e. one full realization (e.g. 3D realization 0 with ``i_use_key='i_use_3d'``).
+        If None (default), a random column is drawn for each location.
     i_plot_realization : array_like of int, optional
-        Used with the 'realization' panel. Prior row indices, one per location: length
-        ``len(ii)`` (locations in the profile) or ``nd`` (all soundings, subset by ``ii``),
-        e.g. ``f_post['/i_use'][:, 5]`` shows posterior realization #5 everywhere. If None
-        (default), a random entry of ``/i_use`` is drawn for each location.
+        Used with the 'realization' panel, instead of ``i_use_key``. Prior row indices, one
+        per location: length ``len(ii)`` (locations in the profile) or ``nd`` (all
+        soundings, subset by ``ii``).
     seed : int, optional
         Seed for the random draw of realizations (default None, non-reproducible).
     plot_prior : bool, optional
@@ -2344,7 +2438,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         transparency, default; 1.0=full uncertainty-based transparency).
     f_png : str, optional
         Output filename used when ``hardcopy=True``. If not given, a name is built from
-        ``f_post_h5``, the index range, model, panels and ``txt``.
+        ``f_post_h5``, the index range, model, panels and ``txt``. With ``i_realization``,
+        the 'realization' panel is named 'realization<i_realization>_<i_use_key>',
+        e.g. ``..._panels_realization0_i_use_3d.png``.
     txt : str, optional
         Additional text appended to the automatic filename (ignored if ``f_png`` is given).
     showInfo : int, optional
@@ -2458,6 +2554,8 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
     plot_kl = kwargs.get('plot_kl', False)  # Plot KL divergence instead of Std
     fontsize = kwargs.get('fontsize', None)
     i_plot_realization = kwargs.get('i_plot_realization', None)
+    i_use_key = kwargs.get('i_use_key', 'i_use')
+    i_realization = kwargs.get('i_realization', None)
     seed = kwargs.get('seed', None)
     plot_prior = kwargs.get('plot_prior', False)
     BHOLES = kwargs.get('BHOLES', None)
@@ -2810,8 +2908,11 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
         # REALIZATION: one posterior realization per location
         real_data = _profile_realization(f_post_h5, f_prior_h5, Mstr, ii,
                                          i_plot_realization=i_plot_realization, seed=seed,
-                                         plot_prior=plot_prior)
+                                         plot_prior=plot_prior, i_use_key=i_use_key,
+                                         i_realization=i_realization)
         real_label = 'Prior realization' if plot_prior else 'Realization'
+        if i_realization is not None and i_plot_realization is None:
+            real_label += ' %d (%s)' % (i_realization, i_use_key)
         if gap_alpha is not None:
             real_data = np.ma.masked_where(gap_alpha == 0.0, real_data)
 
@@ -3042,6 +3143,9 @@ def plot_profile_continuous(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xax
             # Add panel information to filename if panels were specified
             if panels is not None and panels != ['value', 'std', 'stats']:
                 panel_str = '_panels_' + '-'.join(panels)
+                if i_realization is not None and i_plot_realization is None:
+                    # e.g. 'realization' -> 'realization0_i_use_3d'
+                    panel_str = panel_str.replace('realization', 'realization%d_%s' % (i_realization, i_use_key))
             else:
                 panel_str = ''
             f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)

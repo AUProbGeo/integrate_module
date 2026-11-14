@@ -5,8 +5,9 @@ Workflows
 An INTEGRATE inversion has five stages. Each stage reads and writes HDF5 files
 (layout in :doc:`format`).
 
-1. **Prior models** (``/M1``, ``/M2``, ...): generate layered realizations with
-   ``prior_model_layered``. See :doc:`gettingstarted`.
+1. **Prior models** (``/M1``, ``/M2``, ...): generate realizations with
+   ``prior_model_layered``, ``prior_model_smooth``, ``prior_model_blocky`` or
+   ``prior_model_sharp``. See :doc:`prior`.
 2. **Prior data** (``/D<id>``): forward-model the prior with ``prior_data_em``,
    or use identity or borehole data. See :doc:`prior_data`.
 3. **Observed data**: store the data and its uncertainty in ``DATA.h5``. See

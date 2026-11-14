@@ -56,6 +56,31 @@ drawn for each sounding. Use ``seed`` for a reproducible draw, or
     ig.plot_profile(f_post_h5, i1=1, i2=2000, im=1, panels=['realization'], seed=1)
     ig.plot_profile(f_post_h5, i1=1, i2=2000, im=1, panels=['realization'], seed=1, plot_prior=True)
 
+To plot one specific realization, use ``i_realization``: column
+``i_realization`` of the index dataset is then used for all soundings.
+``i_use_key`` selects the index dataset. The default is ``'i_use'`` (the 1D
+posterior realizations, independent from sounding to sounding). Any other
+dataset in POST.h5 with the same format ``[Np, Nr]`` can be used in the same
+way, e.g. ``'i_use_3d'`` holding 3D realizations.
+
+.. code-block:: python
+
+    # realization 0 of /i_use (1D) and of /i_use_3d (3D)
+    ig.plot_profile(f_post_h5, im=2, panels=['realization'], i_realization=0)
+    ig.plot_profile(f_post_h5, im=2, panels=['realization'], i_use_key='i_use_3d', i_realization=0)
+
+:func:`integrate.integrate_plot.plot_feature_2d` plots a map of the same
+realizations with ``key='realization'``, at a layer (``iz``) or an elevation:
+
+.. code-block:: python
+
+    ig.plot_feature_2d(f_post_h5, im=2, key='realization', elevation=20, i_realization=0)
+    ig.plot_feature_2d(f_post_h5, im=2, key='realization', elevation=20, i_use_key='i_use_3d', i_realization=0)
+
+With ``hardcopy=True`` the realization number and the index dataset are part
+of the file name (e.g. ``..._realization0_i_use_3d...``), and ``txt`` is
+appended to it (e.g. ``txt='_3D'``).
+
 Selecting data points
 ---------------------
 

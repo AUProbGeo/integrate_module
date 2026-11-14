@@ -473,13 +473,13 @@ def data_set(f_h5, id=1, **kwargs):
                 print('data_set: %s/%s = %r' % (Dstr, _k, kwargs[_k]))
 
 
-def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
+def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, i_use_key='i_use', **kwargs):
     """
     Compute posterior statistics for all model parameters in a POST HDF5 file.
 
-    Reads posterior sample indices (i_use) and the corresponding prior model
-    realizations, then computes per-location statistics and writes them back
-    into the same POST.h5 file.
+    Reads posterior sample indices (the dataset ``i_use_key``, by default
+    ``i_use``) and the corresponding prior model realizations, then computes
+    per-location statistics and writes them back into the same POST.h5 file.
 
     Parameters
     ----------
@@ -488,6 +488,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
     ip_range : array-like or None, optional
         Indices of data locations to process. If None, all locations are processed.
         Locations not in ip_range receive NaN values. Default is None.
+    i_use_key : str, optional
+        Name of the dataset in f_post_h5 holding the realization indices,
+        shape (Np, nr), indices into the prior. Default is 'i_use' (the 1D
+        posterior realizations). Use e.g. 'i_use_3d' to compute the statistics
+        from 3D realizations.
     **kwargs : dict
         showInfo : int, optional
             Verbosity level. 0 = silent, 1 = progress bars. Default is 0.
@@ -616,13 +621,11 @@ def integrate_posterior_stats(f_post_h5='POST.h5', ip_range=None, **kwargs):
                 if '/ELEVATION' not in f_post:
                     f_data.copy('/ELEVATION', f_post)
     
-    # Load 'i_use' data from the HDF5 file
-    try:
-        with h5py.File(f_post_h5, 'r') as f:
-            i_use = f['i_use'][:]
-    except KeyError:
-        print(f"Could not read 'i_use' from {f_post_h5}")
-        #return
+    # Load the realization indices (default: 'i_use') from the HDF5 file
+    with h5py.File(f_post_h5, 'r') as f:
+        if i_use_key not in f:
+            raise KeyError("'%s' not found in %s" % (i_use_key, f_post_h5))
+        i_use = f[i_use_key][:]
 
     if usePrior:
         with h5py.File(f_prior_h5, 'r') as f_prior:
@@ -1444,7 +1447,8 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
         lay_dist is 'chi2'. Default is 6.
     RHO_dist : str, optional
         Distribution of resistivity within each layer. Options are 'log-uniform',
-        'uniform', 'normal', and 'lognormal'. Default is 'log-uniform'.
+        'uniform', 'normal', and 'lognormal' (alias 'log-normal'; median
+        RHO_mean, log-std RHO_std/RHO_mean). Default is 'log-uniform'.
     RHO_min : float, optional
         Minimum resistivity value. Default is 0.1.
     RHO_max : float, optional
@@ -1510,6 +1514,8 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
         if len(f_prior_h5)<1:
             f_prior_h5 = 'PRIOR_CHI2_NF_%d_%s_N%d.h5' % (NLAY_deg, RHO_dist, N)
         NLAY_max = np.max(NLAY)
+    else:
+        raise ValueError("lay_dist must be 'uniform' or 'chi2', got %r" % lay_dist)
 
     # Setup depth discretization
     z_min = 0
@@ -1540,22 +1546,8 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
         i_boundaries_all = np.zeros((N, 0), dtype=int)
 
     # Generate all resistivity values at once
-    if RHO_dist == 'log-normal':
-        rho_all = np.random.lognormal(mean=np.log(RHO_mean), sigma=np.log(RHO_std), size=(N, NLAY_max))
-    elif RHO_dist == 'normal':
-        rho_all = np.random.normal(loc=RHO_mean, scale=RHO_std, size=(N, NLAY_max))
-    elif RHO_dist == 'log-uniform':
-        rho_all = np.exp(np.random.uniform(np.log(RHO_min), np.log(RHO_max), (N, NLAY_max)))
-    elif RHO_dist == 'uniform':
-        rho_all = np.random.uniform(RHO_min, RHO_max, (N, NLAY_max))
-
-    # Ensure physical resistivity values (must be positive)
-    # First clamp to threshold to handle zero/negative values
-    rho_all = np.maximum(rho_all, RHO_threshold)
-
-    # Then clip to user-specified bounds, ensuring RHO_min is at least threshold
-    effective_rho_min = max(RHO_min, RHO_threshold)
-    rho_all = np.clip(rho_all, effective_rho_min, RHO_max)
+    rho_all = _draw_rho(RHO_dist, (N, NLAY_max), RHO_min, RHO_max, RHO_mean, RHO_std)
+    rho_all = _clip_rho(rho_all, RHO_threshold, RHO_min, RHO_max)
 
     # Assign resistivity values to depth profiles
     if showInfo > 0:
@@ -1669,9 +1661,14 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
                           RHO_threshold=0.001, **kwargs):
     """
     Generate a prior model with increasingly thick layers.
-    
+
+    .. deprecated::
+        Use ``prior_model_smooth(corr_length=0, RHO_dist='log-uniform')``,
+        which gives the same i.i.d.-per-layer prior on a regular grid and
+        also stores /M2 and /M3.
+
     All models have the same number of layers! See also: prior_model_workbench.
- 
+
     Parameters
     ----------
     N : int, optional
@@ -1729,6 +1726,11 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
     f_prior_h5 = kwargs.get('f_prior_h5', '')
     progress_callback = kwargs.get('progress_callback', None)
 
+    import warnings
+    warnings.warn("prior_model_workbench_direct is deprecated; use "
+                  "prior_model_smooth(corr_length=0, RHO_dist='log-uniform')",
+                  DeprecationWarning, stacklevel=2)
+
     # Fully vectorized: only coarse phase updates are possible
     _report_progress(progress_callback, 0, 100,
                      'generating', 'Generating prior realizations')
@@ -1741,28 +1743,20 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
 
     nz = len(z)
 
-    if RHO_dist=='uniform':
-        M_rho = np.random.uniform(low=RHO_min, high = RHO_max, size=(N, nz))
-        if len(f_prior_h5)<1:
-            f_prior_h5 = '%s_R%g_%g.h5' % (f_prior_h5, RHO_min, RHO_max)
-    elif RHO_dist=='log-uniform':
-        M_rho = np.exp(np.random.uniform(low=np.log(RHO_min), high = np.log(RHO_max), size=(N, nz)))
-        if len(f_prior_h5)<1:
-            f_prior_h5 = '%s_R%g_%g.h5' % (f_prior_h5, RHO_min, RHO_max)
-    elif RHO_dist=='normal':
-        M_rho = np.random.normal(loc=RHO_mean, scale = RHO_std, size=(N, nz))
-        if len(f_prior_h5)<1:
-            f_prior_h5 = '%s_R%g_%g.h5' % (f_prior_h5, RHO_mean, RHO_std)
-    elif RHO_dist=='log-normal':
-        M_rho = np.random.lognormal(mean=np.log(RHO_mean), sigma = RHO_std/RHO_mean, size=(N, nz))
-        if len(f_prior_h5)<1:
-            f_prior_h5 = '%s_R%g_%g.h5' % (f_prior_h5, RHO_mean, RHO_std)
+    base = 'PRIOR_WB_DIRECT_%d_N%d_%s' % (nlayers, N, RHO_dist)
+    if RHO_dist in ('uniform', 'log-uniform'):
+        M_rho = _draw_rho(RHO_dist, (N, nz), RHO_min, RHO_max, RHO_mean, RHO_std)
+        tag = '_R%g_%g.h5' % (RHO_min, RHO_max)
+    elif RHO_dist in ('normal', 'log-normal', 'lognormal'):
+        M_rho = _draw_rho(RHO_dist, (N, nz), RHO_min, RHO_max, RHO_mean, RHO_std)
+        tag = '_R%g_%g.h5' % (RHO_mean, RHO_std)
     elif RHO_dist=='chi2':
         M_rho = np.random.chisquare(df = chi2_deg, size=(N, nz))
-        if len(f_prior_h5)<1:
-            f_prior_h5 = '%s_deg%d.h5' % (f_prior_h5,chi2_deg)
+        tag = '_deg%d.h5' % chi2_deg
     else:
         raise ValueError('RHO_dist=%s not supported' % RHO_dist)
+    if len(f_prior_h5)<1:
+        f_prior_h5 = base + tag
 
     # Ensure physical resistivity values (must be positive)
     # First clamp to threshold to handle zero/negative values
@@ -1809,7 +1803,12 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
                           RHO_threshold=0.001, **kwargs):
     """
     Generate a prior model with increasingly thick layers.
- 
+
+    .. deprecated::
+        Superseded by ``prior_model_smooth`` / ``prior_model_blocky`` /
+        ``prior_model_sharp`` (Workbench-style priors) and
+        ``prior_model_layered`` (variable number of layers).
+
     Parameters
     ----------
     N : int, optional
@@ -1876,6 +1875,15 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
     f_prior_h5 = kwargs.get('f_prior_h5', '')
     showInfo = kwargs.get('showInfo', 0)
     progress_callback = kwargs.get('progress_callback', None)
+
+    import warnings
+    warnings.warn("prior_model_workbench is deprecated; use prior_model_smooth/"
+                  "blocky/sharp or prior_model_layered",
+                  DeprecationWarning, stacklevel=2)
+
+    if RHO_dist not in ('uniform', 'log-uniform', 'normal', 'log-normal', 'lognormal', 'chi2'):
+        raise ValueError('RHO_dist=%s not supported' % RHO_dist)
+
     if nlayers>0:
         NLAY_min = nlayers
         NLAY_max = nlayers
@@ -1900,11 +1908,13 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
         if NLAY_min == NLAY_max:
             nlayers = NLAY_min
             if len(f_prior_h5)<1:
-                f_prior_h5 = 'PRIOR_WB_UNIFORM_%d_N%d_%s' % (nlayers,N,RHO_dist)
-        else:   
+                f_prior_h5 = 'PRIOR_WB_UNIFORM_%d_N%d_%s.h5' % (nlayers,N,RHO_dist)
+        else:
             if len(f_prior_h5)<1:
-                f_prior_h5 = 'PROPR_WB_UNIFORM_%d-%d_N%d_%s' % (NLAY_min,NLAY_max,N,RHO_dist)
-        
+                f_prior_h5 = 'PRIOR_WB_UNIFORM_%d-%d_N%d_%s.h5' % (NLAY_min,NLAY_max,N,RHO_dist)
+    else:
+        raise ValueError("lay_dist must be 'uniform' or 'chi2', got %r" % lay_dist)
+
 
 
     # Force NLAY to be a 2 dimensional numpy array (for when exporting to HDF5)
@@ -1946,11 +1956,8 @@ def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
             M_rho_single = np.random.normal(loc=RHO_mean, scale = RHO_std, size=(1, nlayers))
         elif RHO_dist=='log-normal' or RHO_dist=='lognormal':
             M_rho_single = np.random.lognormal(mean=np.log(RHO_mean), sigma = RHO_std/RHO_mean, size=(1, nlayers))
-        elif RHO_dist=='chi2':
+        else:  # 'chi2' (RHO_dist validated above)
             M_rho_single = np.random.chisquare(df = chi2_deg, size=(1, nlayers))
-        else:
-            # Default to log-uniform if RHO_dist is not recognized
-            M_rho_single = np.exp(np.random.uniform(low=np.log(RHO_min), high = np.log(RHO_max), size=(1, nlayers)))
 
         # Ensure physical resistivity values (must be positive)
         # First clamp to threshold to handle zero/negative values
@@ -2058,7 +2065,7 @@ def prior_model_smooth(N=100000, regularization='L2',
     Generate a prior model with a vertical regularization prior, reproducing the
     Aarhus Workbench Smooth / Blocky / Sharp 1D model types as sample ensembles.
 
-    Output layout matches ``prior_model_workbench``:
+    Output layout (shared with ``prior_model_layered``):
 
     - ``/M1`` ``Resistivity`` -- every realization resampled (piecewise
       constant) onto a **regular** fixed-thickness grid
@@ -2081,9 +2088,10 @@ def prior_model_smooth(N=100000, regularization='L2',
       swaps the per-layer marginal to a (log-)uniform on
       ``[RHO_min, RHO_max]`` via a Gaussian copula, keeping the vertical
       correlation structure.
-    - ``'L1'`` (Blocky): same ``nlayers`` geometric stack; native
-      log-resistivity is a cumulative sum of i.i.d. Laplace increments with
-      scale ``blocky_scale`` about ``log(RHO_ref)``.
+    - ``'L1'`` (Blocky): same ``nlayers`` geometric stack; the top layer is
+      drawn log-uniform on ``[RHO_min, RHO_max]`` and deeper layers follow a
+      cumulative sum of i.i.d. Laplace log-resistivity increments with scale
+      ``blocky_scale``.
     - ``'MGS'`` (Sharp): ``K ~ Poisson(n_jumps_mean)`` interfaces at depths
       drawn uniformly in ``[z1, z_max]``, ``K + 1`` resistivities drawn from
       ``RHO_dist`` -- a sparse, piecewise-constant native model.
@@ -2125,12 +2133,12 @@ def prior_model_smooth(N=100000, regularization='L2',
         each branch's native form: ``'lognormal'`` for L2 (correlated GP in log
         space about ``log(RHO_ref)``), ``'log-uniform'`` for MGS. Explicit
         values: L2 accepts ``'log-uniform'`` / ``'uniform'`` (Gaussian-copula,
-        marginal on ``[RHO_min, RHO_max]``) or ``'lognormal'`` / ``'normal'``;
+        marginal on ``[RHO_min, RHO_max]``) or ``'lognormal'``;
         MGS accepts ``'log-uniform'`` / ``'uniform'`` / ``'normal'`` /
         ``'lognormal'``. L1 (Blocky) ignores it.
     RHO_ref : float, optional
         Reference resistivity used as the process mean (in log space) for the
-        L2 and L1 priors. Default is 100.0.
+        L2 prior with ``RHO_dist='lognormal'``. Default is 100.0.
     RHO_min, RHO_max : float, optional
         Hard resistivity clip bounds in Ohm.m. Defaults are 1 and 300.
     RHO_mean, RHO_std : float, optional
@@ -2202,14 +2210,20 @@ def prior_model_smooth(N=100000, regularization='L2',
                     rho_native = RHO_min * (RHO_max / RHO_min) ** q
                 else:
                     rho_native = RHO_min + (RHO_max - RHO_min) * q
-            else:  # 'lognormal' / 'normal' / 'log-normal'  ->  GP in log space
+            elif _rd_l2 in ('lognormal', 'log-normal'):  # GP in log space
                 rho_native = np.exp(np.log(RHO_ref) + u)
+            else:
+                raise ValueError("RHO_dist=%r not supported for regularization='L2' "
+                                 "(use 'lognormal', 'log-uniform' or 'uniform')" % _rd_l2)
             if len(f_prior_h5) < 1:
                 f_prior_h5 = 'PRIOR_SMOOTH_L%g_S%g_N%d.h5' % (corr_length or 0, sigma_logrho, N)
         else:  # 'L1'
+            # Top layer drawn log-uniform on [RHO_min, RHO_max]; deeper layers
+            # follow a Laplace random walk in log-resistivity from there.
             incr = np.random.laplace(0.0, blocky_scale, size=(N, nlayers))
-            incr[:, 0] = 0.0
-            rho_native = np.exp(np.log(RHO_ref) + np.cumsum(incr, axis=1))
+            incr[:, 0] = np.log(_draw_rho('log-uniform', N, RHO_min, RHO_max,
+                                          RHO_mean, RHO_std))
+            rho_native = np.exp(np.cumsum(incr, axis=1))
             if len(f_prior_h5) < 1:
                 f_prior_h5 = 'PRIOR_BLOCKY_B%g_N%d.h5' % (blocky_scale, N)
 
@@ -3521,7 +3535,7 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0, forwa
                     #f_prior_h5 = ig.prior_model_layered(N=N,lay_dist='uniform', z_max = z_max, NLAY_min=1, NLAY_max=8, rho_dist='log-uniform', RHO_min=RHO_min, RHO_max=RHO_max)
                 else: 
                     ## N layer model with increasing thickness
-                    f_prior_h5 = ig.prior_model_workbench(N=N, z_max = 30, nlayers=20, rho_min = RHO_min, rho_max = RHO_max, showInfo=showInfo)
+                    f_prior_h5 = ig.prior_model_workbench(N=N, z_max = 30, nlayers=20, RHO_min = RHO_min, RHO_max = RHO_max, showInfo=showInfo)
                 #t_prior.append(time.time()-t0_prior)
                 T_prior[i,j] = time.time()-t0_prior
 

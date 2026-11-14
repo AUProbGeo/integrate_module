@@ -7,8 +7,9 @@ available in the INTEGRATE module. The script creates multiple prior models
 using different parameterizations and distributions:
 
 1. **prior_model_layered()** - Variable number of layers with uniform or chi2 distribution
-2. **prior_model_workbench()** - Workbench-style parameterization with variable layers  
-3. **prior_model_workbench_direct()** - Direct workbench with fixed number of layers
+2. **prior_model_smooth()** - Workbench Smooth (L2): vertically correlated resistivity
+3. **prior_model_blocky()** - Workbench Blocky (L1): Laplace random walk in log-resistivity
+4. **prior_model_sharp()** - Workbench Sharp (MGS): few sharp interfaces at random depths
 
 Each function demonstrates different resistivity distributions and layer configurations
 commonly used in electromagnetic geophysical inversions.
@@ -114,139 +115,18 @@ f_prior_layered_normal = ig.prior_model_layered(
     NLAY_min=4,                 # Minimum 4 layers
     NLAY_max=7,                 # Maximum 7 layers
     RHO_dist='normal',          # Normal resistivity distribution
-    RHO_MEAN=100,               # Mean resistivity
+    RHO_mean=100,               # Mean resistivity
     RHO_std=50,                 # Standard deviation
     f_prior_h5='PRIOR_layered_uniform_normal_N%d.h5' % N,
     showInfo=1
 )
 
 # %%
-# 2. prior_model_workbench() Examples
-# -----------------------------------
-#
-# Generate workbench-style parameterized models with increasingly thick layers
-
-# %%
-print(f"\n{'='*60}")
-print("2. PRIOR_MODEL_WORKBENCH() EXAMPLES")  
-print(f"{'='*60}")
-
-# %%
-print(f"\n2a. Workbench model: uniform layers (3-6), p=2 thickness increase")
-f_prior_workbench_uniform = ig.prior_model_workbench(
-    N=N,
-    z1=0,                       # Starting depth
-    z_max=z_max,
-    dz=dz,
-    lay_dist='uniform',         # Uniform distribution of layer numbers
-    NLAY_min=3,
-    NLAY_max=6,
-    RHO_dist='log-uniform',
-    RHO_min=RHO_min,
-    RHO_max=RHO_max,
-    f_prior_h5='PRIOR_workbench_uniform_p2_N%d.h5' % N,
-    showInfo=1
-)
-
-#  ### 2b. Workbench model with chi2 layer distribution and higher power
-print(f"\n2b. Workbench model: chi2 layers (2-5), p=3 thickness increase") 
-f_prior_workbench_chi2 = ig.prior_model_workbench(
-    N=N,
-    p=3,                        # Higher power for more rapid thickness increase
-    z1=0,
-    z_max=z_max,
-    dz=dz,
-    #lay_dist='uniform',         # Uniform distribution of layer numbers
-    lay_dist='chi2',            # Chi2 distribution of layer numbers
-    NLAY_deg=4,                 # Degrees of freedom
-    NLAY_min=2,
-    NLAY_max=5,
-    RHO_dist='log-uniform',
-    RHO_min=RHO_min,
-    RHO_max=RHO_max,
-    f_prior_h5='PRIOR_workbench_chi2_p3_N%d.h5' % N,
-    showInfo=1
-)
-
-# ### 2c. Workbench model with lognormal resistivity distribution
-print(f"\n2c. Workbench model: uniform layers (3-5), lognormal resistivity")
-f_prior_workbench_lognormal = ig.prior_model_workbench(
-    N=N,
-    p=2,
-    z1=0,
-    z_max=z_max,
-    dz=dz, 
-    lay_dist='uniform',
-    NLAY_min=3,
-    NLAY_max=5,
-    RHO_dist='lognormal',       # Lognormal resistivity distribution
-    RHO_mean=100,               # Mean for lognormal
-    RHO_std=60,                 # Standard deviation for lognormal
-    f_prior_h5='PRIOR_workbench_uniform_lognormal_N%d.h5' % N,
-    showInfo=1
-)
-
-# %%
-# 3. prior_model_workbench_direct() Examples
-# ------------------------------------------
-#
-# Generate workbench models with fixed number of layers
-
-# %%
-print(f"\n{'='*60}")
-print("3. PRIOR_MODEL_WORKBENCH_DIRECT() EXAMPLES")
-print(f"{'='*60}")
-
-# ### 3a. Direct workbench with fixed 4 layers
-print(f"\n3a. Direct workbench: fixed 4 layers, log-uniform resistivity")
-f_prior_direct_4lay = ig.prior_model_workbench_direct(
-    N=N,
-    nlayers=4,                  # Fixed number of layers
-    p=2,                        # Power parameter for thickness
-    z1=0,
-    z_max=z_max,
-    RHO_dist='log-uniform',
-    RHO_min=RHO_min,
-    RHO_max=RHO_max,
-    f_prior_h5='PRIOR_workbench_direct_4layers_N%d.h5' % N,
-    showInfo=1
-)
-
-# ### 3b. Direct workbench with fixed 6 layers and chi2 resistivity
-print(f"\n3b. Direct workbench: fixed 6 layers, chi2 resistivity")
-f_prior_direct_6lay_chi2 = ig.prior_model_workbench_direct(
-    N=N,
-    nlayers=6,                  # Fixed number of layers
-    p=2,
-    z1=0,
-    z_max=z_max,
-    RHO_dist='chi2',            # Chi2 resistivity distribution
-    chi2_deg=50,                # Degrees of freedom for chi2
-    f_prior_h5='PRIOR_workbench_direct_6layers_chi2_N%d.h5' % N,
-    showInfo=1
-)
-
-# ### 3c. Direct workbench with high-resolution layering
-print(f"\n3c. Direct workbench: fixed 10 layers, high resolution") 
-f_prior_direct_10lay = ig.prior_model_workbench_direct(
-    N=N,
-    nlayers=10,                 # High-resolution with 10 layers
-    p=1.5,                      # Lower power for more gradual thickness increase
-    z1=0,
-    z_max=z_max,
-    RHO_dist='log-uniform',
-    RHO_min=RHO_min,
-    RHO_max=RHO_max,
-    f_prior_h5='PRIOR_workbench_direct_10layers_N%d.h5' % N,
-    showInfo=1
-)
-
-# %%
-# 4. prior_model_smooth / blocky / sharp() Examples
+# 2. prior_model_smooth / blocky / sharp() Examples
 # -------------------------------------------------
 #
 # Aarhus Workbench Smooth (L2), Blocky (L1) and Sharp (MGS) 1D model types,
-# generated as sample ensembles. Like prior_model_workbench, each writes
+# generated as sample ensembles. Each writes
 # /M1 (realizations on a regular dz grid, used for forward modelling),
 # /M2 (realizations in the native formulation) and /M3 (native layer count).
 # Smooth/Blocky share a fixed geometric native stack and differ only in the
@@ -254,11 +134,11 @@ f_prior_direct_10lay = ig.prior_model_workbench_direct(
 
 # %%
 print(f"\n{'='*60}")
-print("4. WORKBENCH SMOOTH / BLOCKY / SHARP PRIORS")
+print("2. WORKBENCH SMOOTH / BLOCKY / SHARP PRIORS")
 print(f"{'='*60}")
 
-# ### 4a. Smooth (L2): correlated Gaussian process in depth
-print(f"\n4a. Smooth: L2 vertical constraint, corr_length=15 m")
+# ### 2a. Smooth (L2): correlated Gaussian process in depth
+print(f"\n2a. Smooth: L2 vertical constraint, corr_length=15 m")
 f_prior_smooth = ig.prior_model_smooth(
     N=N,
     nlayers=30,                 # native geometric layers
@@ -274,8 +154,8 @@ f_prior_smooth = ig.prior_model_smooth(
     showInfo=1
 )
 
-# ### 4b. Blocky (L1): cumulative Laplace increments -> sparse steps
-print(f"\n4b. Blocky: L1 vertical constraint, blocky_scale=0.3")
+# ### 2b. Blocky (L1): cumulative Laplace increments -> sparse steps
+print(f"\n2b. Blocky: L1 vertical constraint, blocky_scale=0.3")
 f_prior_blocky = ig.prior_model_blocky(
     N=N,
     nlayers=30,
@@ -283,15 +163,14 @@ f_prior_blocky = ig.prior_model_blocky(
     z_max=z_max,
     dz=dz,
     blocky_scale=0.3,
-    RHO_ref=100.0,
     RHO_min=RHO_min,
     RHO_max=RHO_max,
     f_prior_h5='PRIOR_blocky_N%d.h5' % N,
     showInfo=1
 )
 
-# ### 4c. Sharp (MGS): sparse sharp interfaces on the fixed grid
-print(f"\n4c. Sharp: ~3 sharp jumps, log-uniform inter-jump resistivity")
+# ### 2c. Sharp (MGS): sparse sharp interfaces on the fixed grid
+print(f"\n2c. Sharp: ~3 sharp jumps, log-uniform inter-jump resistivity")
 f_prior_sharp = ig.prior_model_sharp(
     N=N,
     z1=0,
@@ -306,14 +185,14 @@ f_prior_sharp = ig.prior_model_sharp(
 )
 
 # %%
-# 5. Summary and Visualization
+# 3. Summary and Visualization
 # ----------------------------
 #
 # Display summary information and create comparison plots
 
 # %%
 print(f"\n{'='*60}")
-print("5. SUMMARY OF GENERATED PRIOR MODELS")
+print("3. SUMMARY OF GENERATED PRIOR MODELS")
 print(f"{'='*60}")
 
 # List all generated prior files
@@ -321,12 +200,6 @@ prior_files = [
     f_prior_layered_uniform,
     f_prior_layered_chi2,
     f_prior_layered_normal,
-    f_prior_workbench_uniform,
-    f_prior_workbench_chi2,
-    f_prior_workbench_lognormal,
-    f_prior_direct_4lay,
-    f_prior_direct_6lay_chi2,
-    f_prior_direct_10lay,
     f_prior_smooth,
     f_prior_blocky,
     f_prior_sharp
@@ -341,22 +214,22 @@ for i, fname in enumerate(prior_files, 1):
         print(f"  {i:2d}. {fname} (FILE NOT FOUND)")
 
 # %%
-# 6. Plot Prior Statistics
+# 4. Plot Prior Statistics
 # ------------------------
 #
 # Generate comparison plots for selected prior models
 
 # %%
 print(f"\n{'='*60}")
-print("6. PLOTTING PRIOR STATISTICS")
+print("4. PLOTTING PRIOR STATISTICS")
 print(f"{'='*60}")
 
 # Plot statistics for a few representative examples
 example_priors = [
     (f_prior_layered_uniform, "Layered: Uniform layers, Log-uniform ρ"),
-    (f_prior_workbench_uniform, "Workbench: Uniform layers, p=2"),
-    (f_prior_direct_4lay, "Direct: 4 layers fixed"),
-    (f_prior_direct_10lay, "Direct: 10 layers fixed")
+    (f_prior_smooth, "Smooth (L2)"),
+    (f_prior_blocky, "Blocky (L1)"),
+    (f_prior_sharp, "Sharp (MGS)")
 ]
 
 for fname, title in example_priors:
@@ -376,8 +249,8 @@ print(f"\n{'='*60}")
 print("SCRIPT COMPLETED SUCCESSFULLY")
 print(f"{'='*60}")
 print(f"\nGenerated {len(prior_files)} INTEGRATE prior model files:")
-print("- Different layer parameterizations (layered, workbench, direct)")  
-print("- Various resistivity distributions (log-uniform, uniform, normal, lognormal, chi2)")
+print("- Different layer parameterizations (layered, smooth, blocky, sharp)")  
+print("- Various resistivity distributions (log-uniform, uniform, normal, lognormal)")
 print("- Different layer number distributions (uniform, chi2)")
 print("- Range of model complexities (2-10 layers)")
 print(f"\nAll files contain {N:,} realizations and are ready for:")

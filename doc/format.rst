@@ -418,6 +418,12 @@ POST.h5
 At the very minimum POST.h5 needs to contain the index (in PRIOR.h5) of realizations from the posterior.
 Statistics are written by :func:`integrate.integrate.integrate_posterior_stats`.
 
+By default the statistics are computed from ``/i_use``. POST.h5 can hold other
+index datasets with the same format ``[Np, Nr]`` (e.g. ``/i_use_3d`` with 3D
+realizations: column ``i`` is one realization of all data locations). Pass the
+name as ``i_use_key`` to compute the statistics from that dataset instead, e.g.
+``integrate_posterior_stats(f_post_h5, i_use_key='i_use_3d')``.
+
 ``Np``: Number of data locations.
 
 ``Nr``: Number of posterior realizations per location.
