@@ -26,7 +26,7 @@ dependencies = [
     "shapely",
     "ga-aem-forward-win; platform_system == 'Windows'",
     "simpeg>=0.25",
-    "anemone-core>=0.1.0",
+    "anemone-core>=0.1.1",
     "jupyter>=1.0.1",
     "jupytext",
     "ipykernel",
