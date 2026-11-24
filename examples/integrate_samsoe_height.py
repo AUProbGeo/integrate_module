@@ -101,7 +101,7 @@ rel_err = 0.03
 # interval +- dh_pad, also when it is not used as data.
 USE_HEIGHT_DATA = True
 #USE_HEIGHT_DATA = False
-height_std = 1.0
+height_std = 3.0
 
 # %% [markdown]
 # 0\. Load the data

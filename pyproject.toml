@@ -50,7 +50,7 @@ ui = [
     "integrate_ui",
 ]
 ml = [
-    "tensorflow",
+    "tensorflow[and-cuda]",
     "scikit-learn",
     "keras_tuner",
 ]
