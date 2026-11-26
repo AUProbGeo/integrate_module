@@ -1196,6 +1196,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
     import h5py
     import integrate as ig
     from integrate.integrate import _report_progress
+    t0_compute = time.time()   # stored as /D{id} attr compute_time
 
     if multiprocessing.current_process().name != "MainProcess":
         return None
@@ -1295,6 +1296,7 @@ def prior_data_anemone(f_prior_h5, file_gex=None, N=0, doMakePriorCopy=True,
         for name, rval in (cal.get("residual") or {}).items():
             a["calibration_residual_%s" % name] = float(rval)
 
+    ig.save_compute_time(f_prior_data_h5, Dname, time.time() - t0_compute, "prior_data_anemone", t0_compute)
     ig.integrate_update_prior_attributes(f_prior_data_h5)
     _report_progress(progress_callback, N, N, "completed",
                      "Forward data saved to %s" % f_prior_data_h5)

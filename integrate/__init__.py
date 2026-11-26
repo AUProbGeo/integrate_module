@@ -72,6 +72,8 @@ from integrate.integrate_io import load_prior_data
 from integrate.integrate_io import save_prior_data
 from integrate.integrate_io import load_prior_model
 from integrate.integrate_io import save_prior_model
+from integrate.integrate_io import save_compute_time
+from integrate.integrate_io import get_prior_timing
 from integrate.integrate_io import load_data
 from integrate.integrate_io import get_geometry
 from integrate.integrate_io import extract_feature_at_elevation
@@ -162,6 +164,7 @@ from integrate.integrate_query import query_test_llm
 from integrate.integrate_query import voronoi_graph
 from integrate.integrate_query import voronoi_cells_ordered
 from integrate.integrate_query import cells_to_polygon
+from integrate.integrate_query import touching_neighbors
 from integrate.integrate_query import flag_edge_cells
 from integrate.integrate_query import grow_connected_region
 from integrate.integrate_query import find_coherent_area

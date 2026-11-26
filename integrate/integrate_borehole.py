@@ -844,16 +844,24 @@ def prior_data_borehole(f_prior_h5, im_prior, BH, parallel=False, **kwargs):
     if showInfo > 0:
         print('prior_data_borehole: borehole=%s  method=%s' % (BH.get('name', '?'), method))
 
+    import time
+    t0_compute = time.time()   # stored as /D{id_prior} attr compute_time
     if method == 'mode_probability':
-        return prior_data_borehole_class_mode(
+        P_obs, id_prior = prior_data_borehole_class_mode(
             f_prior_h5, im_prior, BH, parallel=parallel, **kwargs)
     elif method == 'layer_probability':
-        return prior_data_borehole_class_layer(
+        P_obs, id_prior = prior_data_borehole_class_layer(
             f_prior_h5, im_prior, BH, **kwargs)
     elif method in ('class_exact', 'layer_probability_independent'):
         raise NotImplementedError("Method '%s' not implemented yet" % method)
     else:
         raise ValueError("Unknown method: %s" % method)
+
+    if id_prior is not None:
+        from integrate.integrate_io import save_compute_time
+        save_compute_time(f_prior_h5, '/D%d' % id_prior, time.time() - t0_compute,
+                          'prior_data_borehole[%s]' % BH.get('name', '?'), t0_compute)
+    return P_obs, id_prior
 
 
 def save_borehole_data(f_prior_h5, f_data_h5, BH, **kwargs):

@@ -912,6 +912,13 @@ def prior_describe(f_prior_h5):
             for cid, cname in zip(info['class_id'].flatten(), info['class_name'].flatten()):
                 print(f"          class {int(cid):>3} = {cname}")
 
+    from integrate.integrate_io import get_prior_timing
+    timing = get_prior_timing(f_prior_h5, showInfo=0)
+    if any(v['compute_time'] is not None for v in timing['datasets'].values()):
+        print(f"Computation time: models {timing['T_model']:.1f} s, "
+              f"data {timing['T_data']:.1f} s, total {timing['T_total']:.1f} s "
+              f"(ig.get_prior_timing for details)")
+
 
 def _build_llm_system_prompt(f_prior_h5):
     """
@@ -1678,12 +1685,70 @@ def voronoi_cells_ordered(X, Y, boundary):
     return cells
 
 
-def cells_to_polygon(cells, mask):
-    """Union of the masked Voronoi cells -> a single shapely Polygon (largest part)."""
+def touching_neighbors(neighbors, cells, min_shared=1e-6):
+    """Keep only neighbour pairs whose clipped Voronoi cells share an edge.
+
+    ``voronoi_graph`` links soundings by the *unclipped* Voronoi ridges. After
+    the cells are clipped to the survey outline, two linked cells may no longer
+    touch (e.g. across a gap between survey parts). Growing a region over such
+    links makes it jump across the gap, so its cells fall apart into several
+    pieces. This returns the adjacency restricted to cells that share a
+    boundary of length > ``min_shared`` [m].
+
+    Parameters
+    ----------
+    neighbors : list[list[int]]
+        Adjacency from :func:`voronoi_graph`.
+    cells : list
+        Clipped cell polygons (None/empty for cells outside the outline).
+    min_shared : float, optional
+        Minimum shared boundary length [m] (default 1e-6).
+
+    Returns
+    -------
+    list[list[int]]
+        Filtered adjacency, same format as ``neighbors``.
+    """
+    n = len(neighbors)
+    keep = [set() for _ in range(n)]
+    for i in range(n):
+        ci = cells[i]
+        if ci is None or ci.is_empty:
+            continue
+        for j in neighbors[i]:
+            if j <= i:
+                continue
+            cj = cells[j]
+            if cj is None or cj.is_empty:
+                continue
+            if ci.intersection(cj).length > min_shared:
+                keep[i].add(j)
+                keep[j].add(i)
+    return [sorted(s) for s in keep]
+
+
+def cells_to_polygon(cells, mask, seed=None):
+    """Union of the masked Voronoi cells -> a single shapely Polygon.
+
+    If the union falls apart into several parts, the part containing the cell
+    of ``seed`` is returned (the largest part if ``seed`` is None), and a
+    warning gives the area that is left out of the outline.
+    """
     poly = unary_union([c for i, c in enumerate(cells)
                         if c is not None and mask[i]]).buffer(0)
     if poly.geom_type == "MultiPolygon":
-        poly = max(poly.geoms, key=lambda g: g.area)
+        parts = list(poly.geoms)
+        chosen = None
+        if seed is not None and cells[seed] is not None and not cells[seed].is_empty:
+            pt = cells[seed].representative_point()
+            chosen = next((g for g in parts if g.buffer(1e-6).contains(pt)), None)
+        if chosen is None:
+            chosen = max(parts, key=lambda g: g.area)
+        dropped = poly.area - chosen.area
+        print("cells_to_polygon: region has %d separate parts; outline shows the %s part "
+              "(%.0f m^2 not in the outline)"
+              % (len(parts), 'seed' if seed is not None else 'largest', dropped))
+        poly = chosen
     return poly
 
 
@@ -1812,6 +1877,9 @@ def find_coherent_area(X, Y, P, p_min, X_center=None, Y_center=None, max_area_m2
     the sparse survey rim) are dropped -- they can neither seed a region nor be
     reached by growth.  A connected region is then grown with
     :func:`grow_connected_region` and its boundary returned as a polygon.
+    Two soundings are neighbours only if their clipped cells share an edge
+    (:func:`touching_neighbors`), so the region cannot jump across gaps in the
+    survey and its outline is one piece that contains the seed.
 
     Parameters
     ----------
@@ -1849,7 +1917,8 @@ def find_coherent_area(X, Y, P, p_min, X_center=None, Y_center=None, max_area_m2
         requested ``X_center``/``Y_center`` snapped to its nearest sounding, or
         the argmax-``P`` sounding if no center was given), plus the reusable
         Voronoi scaffold:
-        ``vor`` (scipy Voronoi), ``neighbors`` (list[list[int]] adjacency), ``cells``
+        ``vor`` (scipy Voronoi), ``neighbors`` (list[list[int]] adjacency of
+        clipped cells sharing an edge), ``cells``
         (per-sounding clipped cell polygons), ``cell_area`` ((N,) float),
         ``boundary`` (concave survey outline Polygon), ``good`` ((N,) bool
         edge-filter keep mask) and ``mask`` ((N,) bool) -- ``mask[i] = i in idx``.
@@ -1898,6 +1967,9 @@ def find_coherent_area(X, Y, P, p_min, X_center=None, Y_center=None, max_area_m2
     cells = voronoi_cells_ordered(X, Y, boundary)
     cell_area = np.array([c.area if (c is not None and not c.is_empty) else 0.0
                           for c in cells])
+    # Grow only through cells that still touch after clipping to the outline;
+    # otherwise a region can jump across survey gaps and fall apart.
+    neighbors = touching_neighbors(neighbors, cells)
 
     # Drop edge-affected soundings: they can neither seed nor join a region.
     good, _, _ = flag_edge_cells(X, Y, vor, cells, boundary,
@@ -1920,7 +1992,7 @@ def find_coherent_area(X, Y, P, p_min, X_center=None, Y_center=None, max_area_m2
                                           p_min=p_min, max_area_m2=max_area_m2, seed=seed)
     mask = np.zeros(len(P), dtype=bool)
     mask[idx] = True
-    polygon = cells_to_polygon(cells, mask)
+    polygon = cells_to_polygon(cells, mask, seed=seed)
 
     return {'idx': idx, 'polygon': polygon, 'seed': seed,
             'X_center': float(X[seed]), 'Y_center': float(Y[seed]),
