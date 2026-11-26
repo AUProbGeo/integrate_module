@@ -193,7 +193,7 @@ def resolve_material_classes(f_prior_h5, im=2,
     raw_ids, coarse_ids = [], []
     print("Lithology classes in %s (M%d):" % (f_prior_h5, im))
     for cid, name in zip(class_id, class_name):
-        tokens = str(name).lower().replace('-', ' ').split()
+        tokens = str(name).lower().replace('-', ' ').replace('/', ' ').split()
         is_raw = any(k in tokens for k in raw_keywords)
         is_coarse = any(k in tokens for k in coarse_keywords)
         if is_raw:

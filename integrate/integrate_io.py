@@ -3039,10 +3039,8 @@ def get_case_data(case='DAUGAARD', loadAll=False, loadType='', filelist=None, **
         filelist.append('20240911_eksterngps_AVG_export.xyz')      
         filelist.append('20241210_AVG_export.xyz')
         filelist.append('20241210_InternGPS_AVG_export.xyz')
-        #filelist.append('Sdr_Felding_prior_standard_N1000000_dmax90_20260417_0929.h5')
-        #filelist.append('Sdr_Felding_prior_240426_N1000000_dmax90_20260424_1521.h5')
         filelist.append('SdrFelding_boreholes.json')
-        filelist.append('Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616.h5')  
+        filelist.append('sdr_felding_rostof_201126.xlsx')
 
 
         

@@ -24,8 +24,8 @@ compares the resulting raw-material volumes -- this time with quantified
    there is nothing to sanity-check a generic-prior probabilistic
    inversion against here -- we go directly to the target-area prior.
 
-3. Load the *target-area* lithology prior, already built by GEUS with
-   ``geoprior1d`` from geological knowledge of the site.
+3. Build the *target-area* lithology prior with ``geoprior1d`` from the
+   geological specification of the site in ``sdr_felding_rostof_201126.xlsx``.
 
 4. Run the full probabilistic INTEGRATE inversion (jointly using tTEM and
    borehole data -- run from scratch here, since (unlike Daugaard) no
@@ -47,9 +47,10 @@ boreholes**, even where the tTEM inversion suggested raw material could
 extend deeper. The probabilistic estimate below is not capped this way, so
 a meaningfully larger estimate is expected here.
 
-Run this notebook from within the ``examples/`` directory (as with the other
-INTEGRATE examples) so that the case data downloads and the
-``integrate_rawmaterial_utils`` helper module are found correctly.
+Run this notebook from within the ``examples/gallery/85_rawmaterial``
+directory so that the case data downloads, the prior specification
+``sdr_felding_rostof_201126.xlsx`` and the ``integrate_rawmaterial_utils``
+helper module are found correctly.
 """
 # %%
 try:
@@ -69,6 +70,7 @@ import integrate as ig
 import integrate_rawmaterial_utils as rmu
 
 hardcopy = True
+reuse_h5 = True   # reuse an existing prior HDF5 file instead of regenerating it
 
 # %%
 # 1. Load the data
@@ -170,31 +172,41 @@ rmu.plot_polygons_over_points(X, Y, polygons, title='Sdr_Felding', hardcopy=hard
 # the target-area lithology prior below.
 
 # %%
-# 3. Target-area lithology prior (built by GEUS with ``geoprior1d``)
-# ------------------------------------------------------------------
+# 3. Target-area lithology prior (``geoprior1d``)
+# -----------------------------------------------
 #
-# As for Daugaard, the lithology prior used here was already built by GEUS
-# using ``geoprior1d`` (https://github.com/GEUSjesper/geoprior1d) from a
-# geological specification of the Sdr Felding site; it is consumed as-is,
-# not rebuilt in this notebook. For reference, such a prior is (re)built
-# with:
+# The lithology prior is built here with ``geoprior1d``
+# (https://github.com/GEUSjesper/geoprior1d) from the geological
+# specification of the Sdr Felding site in ``sdr_felding_rostof_201126.xlsx``:
 #
-# .. code-block:: python
+# * ``Geology1``: the 8 lithology classes (Organic rich, Meltwater clay,
+#   Tills/Clayey deposits, Fine sand, Coarse sand/Gravel/Stone, Miocene sand,
+#   Miocene clay, Paleogene clay) with min/max layer thickness.
+# * ``Geology2``: the stratigraphic units (top to bottom) and the class
+#   probabilities and layer counts within each unit.
+# * ``Resistivity``: saturated/unsaturated resistivity per class.
+# * ``Water table``: depth range of the water table.
 #
-#    from geoprior1d import geoprior1d
-#    f_prior_h5, flags = geoprior1d('Sdr_Felding_prior_standard.xlsx', Nreals=N,
-#
-#    ::
-#
-#                                    dz=1, dmax=90, output_file='Sdr_Felding_prior_N%d.h5' % N)
+# The resulting HDF5 file holds resistivity (``/M1``) and lithology
+# (``/M2``). ``N`` is a demo-scale prior size for a tractable runtime;
+# increase it for a production-quality run.
 
 # %%
-f_prior_h5 = 'Sdr_Felding_prior_210526_N1000000_dmax90_20260521_1616.h5'
-N = 1_000_000   # number of realizations in the downloaded prior
+f_prior_xlsx = 'sdr_felding_rostof_201126.xlsx'
+N = 200_000   # number of prior realizations; increase for a production-quality run
+
+f_prior_h5 = 'SDR_FELDING_PRIOR_ROSTOF_N%d.h5' % N
+if reuse_h5 and os.path.exists(f_prior_h5):
+    print("Using existing %s" % f_prior_h5)
+else:
+    from geoprior1d import geoprior1d
+    geoprior1d(f_prior_xlsx, Nreals=N, dz=1, dmax=90, output_file=f_prior_h5)
 
 ig.plot_prior_stats(f_prior_h5, hardcopy=hardcopy)
 ig.prior_describe(f_prior_h5)
 
+# Raw material = any sand/gravel class (Fine sand, Coarse sand/Gravel/Stone,
+# Miocene sand); coarser material = Coarse sand/Gravel/Stone.
 raw_classes, coarse_classes = rmu.resolve_material_classes(f_prior_h5, im=2)
 
 # %%
@@ -202,13 +214,10 @@ raw_classes, coarse_classes = rmu.resolve_material_classes(f_prior_h5, im=2)
 # -------------------------------------------
 #
 # No precomputed posterior is available for Sdr Felding, so this must be run
-# from scratch. ``N_use`` below is a demo-scale subset of the 1,000,000-member
-# prior for a tractable runtime; increase it for a production-quality run.
+# from scratch, using all ``N`` realizations of the prior built above.
 
 # %%
-N_use = 200_000   # demo-scale; increase (up to N) for a production-quality run
-
-f_prior_data_h5 = ig.prior_data_em(f_prior_h5, f_gex, N=N_use, doMakePriorCopy=True)
+f_prior_data_h5 = ig.prior_data_em(f_prior_h5, f_gex, doMakePriorCopy=True)
 
 # %%
 im_prior, r_data, r_dis = 2, 1, 1000   # radii tuned for many, sparsely-spaced boreholes
@@ -223,7 +232,7 @@ for BH in BHOLES:
 id_use = [1] + id_borehole_list   # tTEM (id 1) jointly with all borehole logs
 f_post_h5 = ig.integrate_rejection(
     f_prior_data_h5, f_data_h5, f_post_h5='POST_SDRFELDING.h5',
-    N_use=N_use, id_use=id_use, nr=1000, T_N_above=50, T_P_acc_level=0.2,
+    N_use=N, id_use=id_use, nr=1000, T_N_above=50, T_P_acc_level=0.2,
     autoT=1, showInfo=1, updatePostStat=True)
 
 ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
