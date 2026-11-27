@@ -3388,7 +3388,9 @@ def timing_compute(N_arr=[], Nproc_arr=[], backend='numpy', NcpuForward=0, forwa
         uses this many CPUs regardless of the current Nproc_arr entry. The inversion
         (rejection sampling) still varies over Nproc_arr. Default is 0 (use Nproc_arr value).
     forward : str, optional
-        EM forward backend: 'ga-aem' (default), 'anemone' or 'simpeg'.
+        EM forward backend: 'anemone' (default when installed), 'ga-aem' or
+        'simpeg'. If None, the first installed backend in the order anemone,
+        ga-aem, simpeg is used.
         Dispatched through :func:`prior_data_em`.
     device : str, optional
         Torch device for ``forward='anemone'`` (e.g. 'cpu', 'cuda'). If None,

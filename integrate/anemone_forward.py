@@ -17,7 +17,9 @@ from integrate.em_system import (_butter_rows, _polygon_area,  # shared helpers
 
 _IMPORT_HINT = (
     "anemone backend requires 'anemone' and 'torch': "
-    "pip install torch && pip install -e /home/tmeha/PROGRAMMING/anemone"
+    "pip install anemone-core "
+    "(https://pypi.org/project/anemone-core/, "
+    "https://github.com/hydrogeophysicsgroup/anemone)"
 )
 
 
@@ -178,6 +180,15 @@ class _DampedLowPass:
 
     def omega_filter(self, omega):
         return self(omega / (2.0 * np.pi))
+
+    def poles(self):
+        """Poles in rad/s (used by anemone's FilterChain.stepoff_response)."""
+        return 2.0 * np.pi * self.fcut * np.roots([1.0, 2.0 * self.damping, 1.0])
+
+    def stepoff_response(self, t):
+        """Step-off response at times ``t`` (used by a one-filter FilterChain)."""
+        from anemone.system import allpole_stepoff_response
+        return allpole_stepoff_response(self.poles(), t)
 
 
 # ---------------------------------------------------------------------------
@@ -1082,16 +1093,26 @@ def _rescaled_batch(fwr, M_b, T_b, dh_b, torch):
     Same evaluation as ``Forward.__call__`` (reflection coefficient, then the
     ``H2t`` matrix), except that each model's reflection coefficient is first
     multiplied by ``exp(-2*dh*lmb)``: Tx and Rx both move by ``dh``, so
-    ``sfield_dz`` grows by ``2*dh``.  Returns an (n_models, n_gates) tensor.
+    ``sfield_dz`` grows by ``2*dh``.  The primary field depends only on the
+    Tx-Rx offset, which does not change, so ``fwr.primary`` is added as is.
+    Returns an (n_models, n_gates) tensor.
+
+    Follows anemone-core >= 0.1.1: ``H2t`` already includes ``mu0``, and
+    ``Forward.__call__`` adds ``primary``.
     """
     from anemone.physics import rte_raiche1999 as rte
-    from anemone import constants as c, cdtype
+    from anemone import cdtype, rdtype
 
-    rho = ((M_b.T + 0j)[..., None, None]).to(cdtype)
-    thick = ((T_b.T + 0j)[..., None, None]).to(cdtype)
-    cRTE = rte(1. / rho, thick, fwr.omega, fwr.lmb).reshape(M_b.shape[0], -1)
-    cRTE = cRTE * torch.exp(-2. * dh_b[:, None] * fwr.lmb.real[None, :])
-    return torch.einsum('ik,nk->ni', fwr.H2t, cRTE).real * c.mu0
+    rho = ((M_b.T + 0j)[..., None, None]).to(cdtype())
+    thick = ((T_b.T + 0j)[..., None, None]).to(cdtype())
+    cRTE = rte(1. / rho, thick, fwr.omega, fwr.lamda).reshape(M_b.shape[0], -1)
+    cRTE = cRTE * torch.exp(-2. * dh_b[:, None] * fwr.lamda.real.reshape(1, -1))
+    if fwr.H2t.dtype == rdtype():  # no filter: anemone keeps a real H2t
+        cRTE = cRTE.real.to(rdtype())
+    D = torch.einsum('ik,nk->ni', fwr.H2t, cRTE).real.to(rdtype())
+    if torch.is_tensor(fwr.primary):
+        D = D + fwr.primary
+    return D
 
 
 def _forward_rescaled_height(system, M_c, T_c, tx_height, scale, device,

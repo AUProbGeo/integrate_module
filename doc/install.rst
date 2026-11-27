@@ -23,7 +23,7 @@ Optional extras
 - ``integrate_module[jax-cuda]``: JAX with CUDA 13 support, for GPU rejection sampling (see :doc:`rejection`).
 - ``integrate_module[ml]``, ``[examples]``, ``[dev]``, ``[docs]``: optional tooling; see ``pyproject.toml``.
 
-JAX and SimPEG are core dependencies and are installed by default. The anemone forward backend is not yet on PyPI, see below.
+JAX, SimPEG and anemone are core dependencies and are installed by default. anemone (PyPI package `anemone-core <https://pypi.org/project/anemone-core/>`_, source on `GitHub <https://github.com/hydrogeophysicsgroup/anemone>`_) is the default EM forward backend; ``pip install anemone-core`` installs it on its own.
 
 Using uv (recommended, from PyPI)
 ==================================
@@ -212,9 +212,10 @@ independently:
 
 - **Forward modelling** (:func:`integrate.integrate.prior_data_em`,
   :func:`integrate.integrate.forward_em`) with the ``anemone`` backend, which uses
-  PyTorch. anemone is not on PyPI yet: install it from a local checkout
-  with ``pip install -e path/to/anemone``, and install a CUDA build of
-  ``torch`` following https://pytorch.org.
+  PyTorch. anemone is installed with ``integrate_module`` (PyPI:
+  `anemone-core <https://pypi.org/project/anemone-core/>`_, GitHub:
+  https://github.com/hydrogeophysicsgroup/anemone); to use a GPU, install a
+  CUDA build of ``torch`` following https://pytorch.org.
 - **Rejection sampling** (:func:`integrate.integrate_rejection.integrate_rejection`) with the
   ``jax`` backend. Requires JAX with CUDA support, installed with
   ``pip install "integrate_module[jax-cuda]"``. See :doc:`rejection` for details on this
@@ -232,7 +233,7 @@ argument always overrides the environment variable.
      - Values
      - Effect
    * - ``EM_FORWARD_METHOD``
-     - ``ga-aem`` (default), ``anemone``, ``simpeg``
+     - ``anemone`` (default when installed), ``ga-aem``, ``simpeg``
      - Forward method used by ``prior_data_em()`` / ``forward_em()`` when
        ``method`` is not given.
    * - ``EM_FORWARD_DEVICE``

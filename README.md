@@ -168,17 +168,20 @@ First install Homebrew, then run:
 
 ## Alternative EM forward backends (anemone, SimPEG)
 
-GA-AEM is the default TDEM forward modeller. Two alternatives can be
-selected with `method=` in `ig.forward_em()` / `ig.prior_data_em()` (or via the
-`EM_FORWARD_METHOD` environment variable):
+**anemone** is the default TDEM forward modeller. If it is not installed, INTEGRATE falls
+back to GA-AEM and then SimPEG (preference: anemone, GA-AEM, SimPEG). Select a backend with
+`method=` in `ig.forward_em()` / `ig.prior_data_em()` (or via the `EM_FORWARD_METHOD`
+environment variable):
 
-    ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')    # default
+    ig.prior_data_em(f_prior_h5, file_gex=gex)                     # default: anemone
     ig.prior_data_em(f_prior_h5, file_gex=gex, method='anemone')   # PyTorch, GPU-capable
+    ig.prior_data_em(f_prior_h5, file_gex=gex, method='ga-aem')    # GA-AEM
     ig.prior_data_em(f_prior_h5, file_gex=gex, method='simpeg')    # SimPEG 1D layered TDEM
 
-* **anemone** (PyTorch, GPU-capable): not on PyPI yet. Install it from a local checkout
-  with `pip install -e path/to/anemone`, plus a `torch` build for your hardware. See the
-  install guide in `doc/install.rst`.
+* **anemone** (PyTorch, GPU-capable): installed with `integrate_module` (core dependency
+  `anemone-core`, imported as `anemone`). Source: https://github.com/hydrogeophysicsgroup/anemone,
+  PyPI: https://pypi.org/project/anemone-core/. For GPU use, install a CUDA build of `torch`
+  for your hardware (https://pytorch.org).
 * **SimPEG**: installed with `integrate_module` (core dependency, `simpeg>=0.25`).
   Use `ig.forward_simpeg()` / `ig.prior_data_simpeg()`. The `.gex` low-pass filters
   and gate integration are applied by INTEGRATE on top of SimPEG's

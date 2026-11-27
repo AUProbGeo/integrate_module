@@ -17,7 +17,7 @@ Prior modeling
 Forward modeling
    For each type of data considered a forward model must be available. 
 
-   For EM type data, forward modelling uses GA-AEM (https://github.com/GeoscienceAustralia/ga-aem), based on [FALK2025]_, or the anemone (PyTorch) and SimPEG backends. See :doc:`prior_data`.
+   For EM type data, forward modelling uses by default anemone (https://github.com/hydrogeophysicsgroup/anemone, `PyPI <https://pypi.org/project/anemone-core/>`_), with GA-AEM (https://github.com/GeoscienceAustralia/ga-aem, based on [FALK2025]_) and SimPEG as alternative backends. See :doc:`prior_data`.
 
   
 Probabilistic Inversion
