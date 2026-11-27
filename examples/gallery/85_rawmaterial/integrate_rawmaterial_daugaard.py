@@ -52,14 +52,14 @@ import os
 os.environ["XLA_FLAGS"] = "--xla_gpu_autotune_level=1 --xla_backend_optimization_level=1"
 
 # Choose the forward model (the default is ga-aem)
-os.environ["EM_FORWARD_METHOD"] = "anemone"
-os.environ["EM_FORWARD_DEVICE"] = "cuda"
+#os.environ["EM_FORWARD_METHOD"] = "anemone"
+#os.environ["EM_FORWARD_DEVICE"] = "cuda"
 #os.environ["EM_FORWARD_DEVICE"] = "cpu"
 #os.environ["EM_FORWARD_METHOD"] = "ga-aem"
 
 # Rejection-sampling backend used by ig.integrate_rejection: 'jax' or 'numpy'
 #os.environ["REJECTION_BACKEND"] = "numpy"
-os.environ["REJECTION_BACKEND"] = "jax"
+#os.environ["REJECTION_BACKEND"] = "jax"
 
 
 import time
@@ -164,26 +164,35 @@ print("Found %d soundings within %.0f m of the W-E profile" % (len(id_line), buf
 pl_data = [id_line[10], id_line[100]]
 
 DAUGAARD_AREA_ID_MAP = {
-    308812.2: 'Delområde 1',
-    106727.7: 'Delområde 2',
-    196598.0: 'Delområde 3',
+    308812.2: 'Area 1',
+    106727.7: 'Area 2',
+    196598.0: 'Area 3',
 }
 polygons = rmu.load_target_polygons('Fokusområder_polygon_daugaard.shp', area_id_map=DAUGAARD_AREA_ID_MAP)
 
 # %%
 fig, ax, sc = ig.plot_xy(ELEVATION, X=X, Y=Y, cmap='jet', colorbar_label='Elevation [m]',
                          title='Daugaard: data, boreholes, profile and target areas', s=3)
-ax.plot(X[id_line], Y[id_line], 'k.', ms=2, label='profile')
+# sort X[id_line], Y[id_line] by X to get a continuous profile line
+x_sorted_idx = np.argsort(X[id_line])
+ax.plot(X[id_line][x_sorted_idx], Y[id_line][x_sorted_idx], 'k-', lw=3, ms=8, label='profile')
+# Selected soundings (shown in detail later): large magenta stars drawn on top of everything
 for j, i in enumerate(pl_data):
-    ax.plot(X[i], Y[i], 'k*', ms=14, mfc='w')
-    ax.text(X[i] + 25, Y[i] + 25, 'd%d (%d)' % (j + 1, i), fontsize=14)
-ax.plot([bh['X'] for bh in BHOLES], [bh['Y'] for bh in BHOLES], 'rx', ms=8, mew=1.5, label='boreholes')
+    ax.plot(X[i], Y[i], '*', ms=24, mfc='magenta', mec='k', mew=1.5, zorder=10,        
+            label='selected soundings' if j == 0 else None)
+    ax.annotate('d%d (%d)' % (j + 1, i), (X[i], Y[i]), xytext=(10, 10), textcoords='offset points',
+                fontsize=12, fontweight='bold', zorder=11, rotation=30,
+                rotation_mode='anchor', ha='left', va='bottom',
+                bbox=dict(boxstyle='round,pad=0.2', fc='w', ec='k', alpha=0.8))
+ax.plot([bh['X'] for bh in BHOLES], [bh['Y'] for bh in BHOLES], 'ko', ms=12, mew=1.5, label='boreholes')
 for bh in BHOLES:
     ax.annotate(bh['name'], (bh['X'], bh['Y']), xytext=(4, 4), textcoords='offset points',
                 fontsize=7, color='r')
+# Plot the name on TOP of the polygon, not at the centroid, to avoid overlapping with the polygon boundary
 for name, polygon in polygons.items():
-    ax.plot(*polygon.exterior.xy, 'b-', lw=1.5)
-    ax.text(polygon.centroid.x, polygon.centroid.y, name, color='b', fontsize=9, ha='center')
+    ax.plot(*polygon.exterior.xy, 'k-', lw=1.5)
+    ax.annotate(name, (polygon.centroid.x, polygon.bounds[3]), xytext=(0, 3),
+                textcoords='offset points', color='k', fontsize=10, ha='center', va='bottom')
 ax.legend(loc='best')
 if hardcopy:
     fig.savefig('daugaard_data_map' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
@@ -211,8 +220,14 @@ if compute(f_prior_xls_h5):
     from geoprior1d import geoprior1d
     f_xlsx = ig.get_case_data(case=case, filelist=['rawmaterial/daugaard_rostof.xlsx'])[0]
 
-    geoprior1d(f_xlsx, Nreals=N, 
+    t0 = time.time()
+    geoprior1d(f_xlsx, Nreals=N,
                dz=1, dmax=90, output_file=f_prior_xls_h5)
+    # geoprior1d is not part of INTEGRATE, so store its computation time on
+    # the model arrays here (INTEGRATE's own generators do this themselves).
+    with h5py.File(f_prior_xls_h5, 'r') as f:
+        M_keys = ['/' + k for k in f.keys() if k[0] == 'M']
+    ig.save_compute_time(f_prior_xls_h5, M_keys, time.time() - t0, 'geoprior1d', t0)
 
 f_prior_h5_list = [f_prior_generic_h5, f_prior_xls_h5]
 
@@ -315,10 +330,13 @@ for label, f_prior_data_h5, id_use in inversions:
         t_inversion[label] = time.time() - t0
     f_post_h5_list.append(f_post_h5)
 
+for label, t in t_inversion.items():
+    print('Inversion %s: %.1f s' % (label, t))
+
 f_post = dict(zip([inv[0] for inv in inversions], f_post_h5_list))
 
 for f_post_h5 in f_post_h5_list:
-    ig.plot_T_EV(f_post_h5, pl='CHI2', hardcopy=hardcopy)
+    ig.plot_T_EV(f_post_h5, pl='CHI2', plotPoints=True, plotPoints_color='k', hardcopy=hardcopy)
 
 # %%
 # 7b. tTEM data fit
@@ -526,9 +544,11 @@ for label in xls_labels:
 # just the seed's own cell.
 
 # %%
-POS_CENTER = [(543039.3, 6175596.0),
-              (544500.0, 6175800.0)]
-P_MIN = 0.2          # keep growing while the next sounding has P_raw >= this
+POS_CENTER = [(543039.3, 6175796.0),
+              (543930.0, 6175738.0),
+              (544810.0, 6175500.0)]
+P_MIN = 0.05          # keep growing while the next sounding has P_raw >= this
+#P_MIN = 0.1          # keep growing while the next sounding has P_raw >= this
 MAX_AREA_M2 = None   # optional hard cap on the area [m^2]
 AREA_NAMES = ['Area %d' % i for i in range(len(POS_CENTER))]
 
@@ -548,22 +568,29 @@ for label in xls_labels:
         print("%-10s %-8s area = %.0f m^2, raw material PCT%s = %s m^3" % (
             label, name, AREA['area'], PCT, np.round(V_raw).astype(int)))
 
-    # Voronoi cells coloured by P_raw (grey hatch = edge-affected, dropped),
-    # with the grown areas (grey/black) and Mette's polygons (blue).
+    # Voronoi cells coloured by P_raw (grey hatch = edge-affected, dropped)
+    # with Mette's polygons (blue). Saved twice: BEFORE the grown areas are
+    # drawn (P_raw map only; does not depend on P_MIN), and AFTER, with the
+    # grown areas (black/dark grey outline, open circle = seed).
     fig, ax, mappable = ig.plot_voronoi_cells(AREA_LIST[label][0], P=P_raw[label], vmin=0, vmax=1)
-    for i, (name, AREA) in enumerate(zip(AREA_NAMES, AREA_LIST[label])):
-        shade = str(0.6 * i / max(len(AREA_LIST[label]) - 1, 1))
-        ax.plot(*AREA['polygon'].exterior.xy, color=shade, lw=3, label=name)
-        ax.plot(AREA['X_center'], AREA['Y_center'], 'o', color=shade, ms=12, mec='k')
     for name, polygon in polygons.items():
         ax.plot(*polygon.exterior.xy, 'b-', lw=1, label='Mette: %s' % name)
     ax.set_xlabel('UTM X (m)')
     ax.set_ylabel('UTM Y (m)')
-    ax.set_title("P_raw (%s): grown areas vs. Mette's polygons" % label)
+    ax.set_title("P_raw (%s) and Mette's polygons" % label)
     fig.colorbar(mappable, ax=ax, label='P_raw')
     ax.legend(fontsize=8, loc='best')
-    if hardcopy:
-        fig.savefig('daugaard_voronoi_areas_vs_mette_%s%s.png' % (label, SUFFIX), dpi=200, bbox_inches='tight')
+    if hardcopy:   # BEFORE
+        fig.savefig('daugaard_voronoi_P_raw_vs_mette_%s%s.png' % (label, SUFFIX), dpi=200, bbox_inches='tight')
+
+    for i, (name, AREA) in enumerate(zip(AREA_NAMES, AREA_LIST[label])):
+        shade = str(0.35 * i / max(len(AREA_LIST[label]) - 1, 1))   # 0 = black ... 0.35 = dark grey
+        ax.plot(*AREA['polygon'].exterior.xy, color=shade, lw=3, label=name)
+        ax.plot(AREA['X_center'], AREA['Y_center'], 'o', ms=12, mfc='none', mec=shade, mew=2.5)   # open circle
+    ax.set_title("P_raw (%s): grown areas (P_MIN = %g) vs. Mette's polygons" % (label, P_MIN))
+    ax.legend(fontsize=8, loc='best')
+    if hardcopy:   # AFTER
+        fig.savefig('daugaard_voronoi_areas_vs_mette_%s%s_Pmin%g.png' % (label, SUFFIX, P_MIN), dpi=200, bbox_inches='tight')
     plt.show()
 
 # %%
@@ -574,12 +601,12 @@ for label in xls_labels:
 # the probabilistic P5/P50/P95 estimates from the three XLS posteriors.
 
 # %%
-DAUGAARD_REFERENCE = {
+DAUGAARD_REFERENCE = {   # keys must match the polygon names in DAUGAARD_AREA_ID_MAP
     # 'coarser' (gravel only) is not compared: this workflow only separates
     # raw material (sand+gravel) from overburden.
-    'Delområde 1': {'overburden': 865_000, 'raw_material': 4_500_000, 'coarser': 1_700_000},
-    'Delområde 2': {'overburden': 566_000, 'raw_material': 1_700_000, 'coarser': 1_000_000},
-    'Delområde 3': {'overburden': 452_000, 'raw_material': 3_300_000, 'coarser': 2_200_000},
+    'Area 1': {'overburden': 865_000, 'raw_material': 4_500_000, 'coarser': 1_700_000},
+    'Area 2': {'overburden': 566_000, 'raw_material': 1_700_000, 'coarser': 1_000_000},
+    'Area 3': {'overburden': 452_000, 'raw_material': 3_300_000, 'coarser': 2_200_000},
 }
 
 for label in xls_labels:
@@ -617,7 +644,7 @@ ax.set_title('Raw-material volume  (bar = P50, whiskers = P5-P95)')
 ax.grid(True, axis='y', ls='--', alpha=0.4)
 ax.legend(fontsize=8)
 if hardcopy:
-    fig.savefig('daugaard_rawmat_volume' + SUFFIX + '.png', dpi=200, bbox_inches='tight')
+    fig.savefig('daugaard_rawmat_volume%s_Pmin%g.png' % (SUFFIX, P_MIN), dpi=200, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -653,6 +680,10 @@ if compute(f_post_h5_3D):
 # %%
 # 11d. Posterior statistics from the 1D and the 3D realizations, side by side.
 
+# %% Plot profiles of a) PRIOR relaization, b) 1D POSTERIOR realization, c) 3D POSTERIOR realization
+
+
+
 # %%
 for label, f_post_h5 in [('1D', f_post_h5_org), ('3D', f_post_h5_3D)]:
     ig.plot_profile(f_post_h5, im=1, panels=['harmonicmean', 'std'], txt=label, **profile_kw, **bhole_kw)
@@ -675,6 +706,209 @@ for i_real in range(5):
         plt.show()
 
 # %%
+# 11f. Resistivity along the profile: a) prior realization, b) 1D posterior
+# realization, c) 3D posterior realization, d) 1D posterior harmonic mean,
+# e) 3D posterior harmonic mean.
+
+# %% REALS/POST M1
+for i_real in range(5):   # realization number is in the PNG name, e.g. _a_prior_real2
+    ig.plot_profile(f_post_h5_3D, im=1, panels=['realization'], plot_prior=True, seed=i_real, txt='_a_prior_real%d' % i_real, **profile_kw)
+    ig.plot_profile(f_post_h5_3D, im=1, panels=['realization'], i_use_key='i_use', i_realization=i_real, txt='_b_post_real_1D_real%d' % i_real, **profile_kw)
+    ig.plot_profile(f_post_h5_3D, im=1, panels=['realization'], i_use_key=i_use_key, i_realization=i_real, txt='_c_post_real_3D_real%d' % i_real, **profile_kw)
+    plt.show()
+ig.plot_profile(f_post_h5_org, im=1, panels=['harmonicmean'], txt='_d_post_hmean_1D', **profile_kw)
+ig.plot_profile(f_post_h5_3D, im=1, panels=['harmonicmean'], txt='_e_post_hmean_3D', **profile_kw)
+plt.show()
+
+
+# %% REALS/POST M2
+for i_real in range(5):   # realization number is in the PNG name, e.g. _a_prior_real2
+    ig.plot_profile(f_post_h5_3D, im=2, panels=['realization'], plot_prior=True, seed=i_real, txt='_a_prior_real%d' % i_real, **profile_kw)
+    ig.plot_profile(f_post_h5_3D, im=2, panels=['realization'], i_use_key='i_use', i_realization=i_real, txt='_b_post_real_1D_real%d' % i_real, **profile_kw)
+    ig.plot_profile(f_post_h5_3D, im=2, panels=['realization'], i_use_key=i_use_key, i_realization=i_real, txt='_c_post_real_3D_real%d' % i_real, **profile_kw)
+    plt.show()
+ig.plot_profile(f_post_h5_org, im=2, panels=['Mode'], txt='_d_post_mode_1D', **profile_kw)
+ig.plot_profile(f_post_h5_3D, im=2, panels=['Mode'], txt='_e_post_mode_3D', **profile_kw)
+plt.show()
+
+# PROFILE OF PROB(LITHHOLOGY=RAW) ALONG THE PROFILE
+# P(class 5 = coarse sand/gravel/stone) along the W-E profile, for the three
+# XLS posteriors (panel 'prob' of ig.plot_profile; prob_class=[4, 5] would sum classes).
+
+# %% plot prob(raw) for different types of used data
+for label in xls_labels:
+    ig.plot_profile(f_post[label], im=2, panels=['prob', 'entropy'], prob_class=5,
+                    txt=label, **profile_kw, **bhole_kw)
+
+
+#%%  Same for the tTEM + borehole posterior from the 1D and the 3D realizations
+for label, f_post_h5 in [('1D', f_post_h5_org), ('3D', f_post_h5_3D)]:
+    ig.plot_profile(f_post_h5, im=2, panels=['prob', 'entropy'], prob_class=5,
+                    txt='_' + label, **profile_kw, **bhole_kw)
+
+
+
+# %%
+# 12. Raw-material volume from the 3D realizations
+# ------------------------------------------------
+#
+# For each of the ``N_SIM`` 3D realizations and each grown area from 9b
+# (XLS_EM_BH): start in the seed sounding at the centre of its thickest
+# raw-material run, and grow the connected 3D body of raw-material voxels
+# (vertical neighbours, and Voronoi neighbours at the same depth), limited to
+# the grown area. Its volume is one sample of the raw-material volume, so the
+# N_SIM volumes give the volume distribution directly. Seed without raw
+# material -> volume 0.
+
+# %%
+label_3d = 'XLS_EM_BH'   # the posterior that f_post_h5_3D is made from
+V_3d, bodies_3d = rmu.connected_volume_3d(f_post_h5_3D, AREA_LIST[label_3d], raw_classes=raw_classes,
+                                          i_use_key=i_use_key, return_bodies=True)   # V_3d: (n_area, N_SIM) [m^3]
+METTE_NAMES = ['Area %d' % (i + 1) for i in range(len(POS_CENTER))]   # seed i lies in Mette's 'Area i+1'
+
+# %%
+# Compare per area: Mette (single number), 1D probabilistic in Mette's polygon,
+# 1D probabilistic in the grown area, and the 3D realizations in the grown area
+# (P5/P50/P95; the 3D volumes are also shown one dot per realization).
+
+# %%
+print("\nRaw-material volume [1000 m^3], P5 / P50 / P95 (%s, P_MIN = %g)" % (label_3d, P_MIN))
+print("%-8s %10s %22s %22s %22s" % ('area', 'Mette', '1D Mette polygon', '1D grown area', '3D grown area'))
+for ia, name in enumerate(METTE_NAMES):
+    V_1d_pol = prob_results[label_3d][name]['raw_material'] / 1000
+    V_1d_area = V_area_raw_material[label_3d][ia] / 1000
+    V_3d_pct = np.percentile(V_3d[ia], PCT) / 1000
+    print("%-8s %10.0f %22s %22s %22s" % (name, DAUGAARD_REFERENCE[name]['raw_material'] / 1000,
+          '%.0f / %.0f / %.0f' % tuple(V_1d_pol), '%.0f / %.0f / %.0f' % tuple(V_1d_area),
+          '%.0f / %.0f / %.0f' % tuple(V_3d_pct)))
+
+fig, axs = plt.subplots(1, len(METTE_NAMES), figsize=(13, 4.5))
+methods = ['1D\nMette polygon', '1D\ngrown area', '3D\ngrown area']
+for ia, (ax, name) in enumerate(zip(axs, METTE_NAMES)):
+    V_all = [prob_results[label_3d][name]['raw_material'],
+             V_area_raw_material[label_3d][ia],
+             np.percentile(V_3d[ia], PCT)]
+    for k, V in enumerate(V_all):
+        ax.errorbar(k, V[1], yerr=[[V[1] - V[0]], [V[2] - V[1]]], fmt='o', ms=8, capsize=6,
+                    color='C%d' % k, lw=2)
+    ax.plot(2 + 0.15 * np.random.default_rng(ia).uniform(-1, 1, N_SIM), V_3d[ia], '.',
+            color='C2', alpha=0.4, label='3D realizations')
+    ax.axhline(DAUGAARD_REFERENCE[name]['raw_material'], color='k', ls='--', label='Mette (deterministic)')
+    ax.set_xticks(range(len(methods)))
+    ax.set_xticklabels(methods)
+    ax.set_xlim(-0.5, len(methods) - 0.5)
+    ax.set_title(name)
+    ax.grid(True, axis='y', ls='--', alpha=0.4)
+    ax.legend(fontsize=8)
+axs[0].set_ylabel('Raw-material volume (m$^3$)')
+fig.suptitle('Raw-material volume (%s): dot = P50, whiskers = P5-P95' % label_3d)
+fig.tight_layout()
+if hardcopy:
+    fig.savefig('daugaard_rawmat_volume_3D%s_Pmin%g.png' % (SUFFIX, P_MIN), dpi=200, bbox_inches='tight')
+plt.show()
+
+# %%
+# Total raw-material volume over all areas, per method: bars stacked by area
+# (P50), whiskers = P5-P95 of the total. For 3D the total is summed per
+# realization, so its P5-P95 is the true range of the total. For 1D the P5
+# (P95) values are simply added, as if all soundings were at P5 (P95) at once,
+# so that range is too wide.
+
+# %%
+V_tot = {'Mette': [DAUGAARD_REFERENCE[n]['raw_material'] * np.ones(3) for n in METTE_NAMES],
+         '1D\nMette polygon': [prob_results[label_3d][n]['raw_material'] for n in METTE_NAMES],
+         '1D\ngrown area': [V_area_raw_material[label_3d][ia] for ia in range(len(METTE_NAMES))],
+         '3D\ngrown area': [np.percentile(V_3d[ia], PCT) for ia in range(len(METTE_NAMES))]}
+fig, ax = plt.subplots(figsize=(8, 5))
+for k, (method, V) in enumerate(V_tot.items()):
+    V = np.vstack(V)   # (n_area, 3) = P5/P50/P95 per area
+    bottom = 0
+    for ia, name in enumerate(METTE_NAMES):
+        ax.bar(k, V[ia, 1], bottom=bottom, color='C%d' % ia, edgecolor='k', label=name if k == 0 else None)
+        bottom += V[ia, 1]
+    lo, hi = V[:, 0].sum(), V[:, 2].sum()
+    if method.startswith('3D'):
+        lo, hi = np.percentile(V_3d.sum(axis=0), [PCT[0], PCT[2]])   # total per realization
+    if method != 'Mette':
+        ax.errorbar(k, bottom, yerr=[[bottom - lo], [hi - bottom]], color='k', capsize=8, lw=2)
+    ax.text(k, max(hi, bottom), '%.1f M' % (bottom / 1e6), ha='center', va='bottom')
+    print("%-20s total raw material P50 = %.0f m^3, P5-P95 = %.0f - %.0f m^3" % (
+        method.replace('\n', ' '), bottom, lo, hi))
+ax.set_xticks(range(len(V_tot)))
+ax.set_xticklabels(list(V_tot))
+ax.set_ylabel('Total raw-material volume (m$^3$)')
+ax.set_title('Total raw material, Areas 1-3 (%s)' % label_3d)
+ax.grid(True, axis='y', ls='--', alpha=0.4)
+ax.legend()
+if hardcopy:
+    fig.savefig('daugaard_rawmat_volume_total%s_Pmin%g.png' % (SUFFIX, P_MIN), dpi=200, bbox_inches='tight')
+plt.show()
+
+# %%
+# 13. Movie of the 3D raw-material bodies
+# ---------------------------------------
+#
+# One frame per 3D realization: the connected raw-material bodies of the three
+# areas (from section 12), with the grown-area outlines drawn at the surface
+# elevation. Fixed
+# camera, so the frames differ only by the bodies. The frames are written to
+# ``movie_3d_bodies/frame_###.png`` and assembled into an MP4 afterwards
+# (e.g. in FilmCraft, 0.5 s per frame).
+
+# %%
+import pyvista as pv
+from matplotlib.colors import ListedColormap, to_hex
+from scipy.spatial import cKDTree
+
+# Terrain-following Voronoi prisms (1 m layers) for the soundings of the three
+# areas, down to the deepest body voxel; the colour comes from 'area_id' below.
+ii_body = np.unique(np.concatenate([b['idx'] for b in bodies_3d]))
+z_max = 1 + max(np.where(b['body'].any(axis=(0, 1)))[0].max() for b in bodies_3d)
+columns = ig.post_to_voronoi_columns(f_post_h5_3D, ii=ii_body, im=2, key='Mode', z_max=z_max, r_max=25)
+columns['values'] = np.zeros_like(columns['values'])   # keep all cells
+grid = ig.voronoi_columns_to_grid(columns)
+
+tree = cKDTree(np.column_stack((X, Y)))
+colors = [to_hex('C%d' % k) for k in range(len(METTE_NAMES))]   # same colours as the figures above
+
+os.makedirs('movie_3d_bodies', exist_ok=True)
+pl = pv.Plotter(off_screen=True, window_size=(1920, 1080))
+pl.set_background('white')
+pl.enable_depth_peeling()
+pl.set_scale(zscale=10)
+for k, area in enumerate(AREA_LIST[label_3d]):   # grown-area outlines, on the surface
+    xy = np.array(area['polygon'].exterior.coords)
+    pl.add_mesh(pv.lines_from_points(np.column_stack((xy, ELEVATION[tree.query(xy)[1]] + 1.0))),
+                color=colors[k], line_width=4)
+pl.add_legend([(n, c) for n, c in zip(METTE_NAMES, colors)], bcolor='white', size=(0.1, 0.12), loc='upper right')
+pl.add_text('Daugaard: connected raw-material bodies (class 5), %s, 3D realizations (vertical exaggeration 10x)'
+            % label_3d, position='upper_left', font_size=14, color='k')
+pl.view_vector((0.15, -1, 0.9), viewup=(0, 0, 1))   # from the south, obliquely down
+pl.reset_camera(bounds=grid.bounds)   # frame the three areas (same in all frames)
+pl.camera.zoom(1.3)
+cam = pl.camera_position
+
+for r in range(N_SIM):
+    # area_id per cell: 1/2/3 inside the body of Area 1/2/3 in realization r, else 0
+    nz_grid = grid.cell_data['iz'].max() + 1
+    lookup = np.zeros((len(X), nz_grid), dtype=np.int8)
+    for k, b in enumerate(bodies_3d):
+        L = lookup[b['idx']]
+        L[b['body'][r][:, :nz_grid]] = k + 1
+        lookup[b['idx']] = L
+    grid.cell_data['area_id'] = lookup[grid.cell_data['sounding'], grid.cell_data['iz']]
+    body = grid.extract_cells(grid.cell_data['area_id'] > 0).extract_surface(algorithm='dataset_surface')
+    pl.add_mesh(body, scalars='area_id', cmap=ListedColormap(colors), clim=[0.5, len(colors) + 0.5],
+                show_scalar_bar=False, name='bodies')
+    pl.add_text('Realization %2d / %d\n' % (r + 1, N_SIM) + '\n'.join(
+        '%s: %.2f million m³' % (n, V_3d[k, r] / 1e6) for k, n in enumerate(METTE_NAMES)),
+        position='lower_left', font_size=16, color='k', name='info')
+    pl.camera_position = cam
+    pl.screenshot('movie_3d_bodies/frame_%03d.png' % r)
+pl.close()
+print("Wrote %d frames to movie_3d_bodies/" % N_SIM)
+
+# %%
 # Discussion
 # ^^^^^^^^^^
 #
@@ -693,5 +927,12 @@ for i_real in range(5):
 # ``ig.prior_describe`` in step 4).
 
 # %%
+# Computation times: prior models and prior data (stored as attributes on each
+# /M and /D array), and the inversions (stored as ``inv_time`` in each posterior).
+for f_prior_data_h5 in f_prior_data_h5_list:
+    ig.get_prior_timing(f_prior_data_h5)
+for label, f_post_h5 in f_post.items():
+    with h5py.File(f_post_h5, 'r') as f:
+        print("Inversion %-10s: %.1f s" % (label, f.attrs.get('inv_time', np.nan)))
 print("Inversion times [s] (this run): %s" % {k: round(v, 1) for k, v in t_inversion.items()})
 print("Total running time: %.1f s" % (time.time() - t_start))

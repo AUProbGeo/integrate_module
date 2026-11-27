@@ -1316,6 +1316,7 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
     """
     import integrate as ig
     import time
+    t0_compute = time.time()   # stored as /D{id} attr compute_time
 
     type = 'identity'
     method = '--'
@@ -1384,7 +1385,8 @@ def prior_data_identity(f_prior_h5, id=0, im=1, N=0, doMakePriorCopy=False, **kw
         dataset.attrs['f5_forward'] = 'none'
         dataset.attrs['with_noise'] = 0
         #f_prior.close()
-    
+
+    ig.save_compute_time(f_prior_data_h5, Dname, time.time() - t0_compute, 'prior_data_identity', t0_compute)
     return f_prior_data_h5, id
 
 # %% PRIOR MODEL GENERATORS
@@ -1418,6 +1420,29 @@ def _resistivity_clim_cmap():
     return clim, cmap(np.linspace(0, 1, 256)).T
 
 
+def _timed_prior_model(func):
+    """Decorator for prior model generators: store the computation time on every
+    prior model array (/M1, /M2, ...) in the returned file (see
+    ``integrate_io.save_compute_time``). The generators write /M1 with
+    ``delete_if_exist=True``, so all /M arrays in the file come from this call."""
+    import functools
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        t0 = time.time()
+        f_prior_h5 = func(*args, **kwargs)
+        t_elapsed = time.time() - t0
+        if not isinstance(f_prior_h5, str) or not os.path.exists(f_prior_h5):
+            return f_prior_h5
+        from integrate.integrate_io import save_compute_time
+        with h5py.File(f_prior_h5, 'r') as f:
+            keys = ['/' + k for k in f.keys() if k[0] == 'M' and k[1:].isdigit()]
+        save_compute_time(f_prior_h5, keys, t_elapsed, func.__name__, t0)
+        return f_prior_h5
+    return wrapper
+
+
+@_timed_prior_model
 def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
                         NLAY_min=3, NLAY_max=6, NLAY_deg=6,
                         RHO_dist='log-uniform', RHO_min=0.1, RHO_max=5000, RHO_mean=100, RHO_std=80,
@@ -1655,6 +1680,7 @@ def prior_model_layered(lay_dist='uniform', dz = 1, z_max = 90,
 
     return f_prior_h5
 
+@_timed_prior_model
 def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 100,
                           nlayers=0, p=2, NLAY_min=3, NLAY_max=6,
                           RHO_min = 1, RHO_max= 300, RHO_mean=180, RHO_std=80, chi2_deg= 100,
@@ -1796,6 +1822,7 @@ def prior_model_workbench_direct(N=100000, RHO_dist='log-uniform', z1=0, z_max= 
     return f_prior_h5
 
 
+@_timed_prior_model
 def prior_model_workbench(N=100000, p=2, z1=0, z_max= 100, dz=1,
                           lay_dist='uniform', nlayers=0, NLAY_min=3, NLAY_max=6, NLAY_deg=5,
                           RHO_dist='log-uniform',
@@ -2054,6 +2081,7 @@ def _draw_rho(RHO_dist, size, RHO_min, RHO_max, RHO_mean, RHO_std):
     raise ValueError('RHO_dist=%s not supported' % RHO_dist)
 
 
+@_timed_prior_model
 def prior_model_smooth(N=100000, regularization='L2',
                        z1=0, z_max=100, dz=1, nlayers=0, p=2,
                        corr_length=15.0, sigma_logrho=0.25,

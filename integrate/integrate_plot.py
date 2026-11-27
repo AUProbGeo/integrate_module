@@ -1701,8 +1701,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         - ['entropy']: Only entropy (uncertainty)
         - ['stats']: Only temperature and log-likelihood
         - ['realization']: One posterior realization per location instead of mode (see ``i_plot_realization``, ``seed``, ``plot_prior``)
+        - ['prob']: Posterior probability of the class(es) in ``prob_class`` instead of mode
         - Any combination of the above (e.g., ['mode', 'stats'])
-        Accepted panel names: 'mode', 'realization', 'entropy', 'stats', 'temperature', 't'
+        Accepted panel names: 'mode', 'realization', 'prob', 'entropy', 'stats', 'temperature', 't'
 
         Note: The stats panel optionally shows the number of unique realizations
         when show_n_unique=True is passed in kwargs.
@@ -1727,6 +1728,10 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         Used with the 'realization' panel. If True, ``/i_use`` is replaced by random
         prior indices of the same shape, so the panel shows a prior (not posterior)
         realization per location (default False).
+    prob_class : int or list of int, optional
+        Used with the 'prob' panel: class id (as in the prior's ``class_id``) whose
+        posterior probability is shown, e.g. ``prob_class=5``. A list of ids shows the
+        summed probability, e.g. ``prob_class=[4, 5]``. Required for the 'prob' panel.
     entropy_min : float, optional
         Minimum entropy for transparency scaling; values below are fully opaque.
         Default is ``np.nanmin(Entropy)`` from the data.
@@ -1831,6 +1836,10 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
 
     >>> plot_profile_discrete(f_post_h5, alpha=0.8, entropy_min=0.1, entropy_max=0.7)
 
+    Probability of class 5 along the profile, with entropy and stats:
+
+    >>> plot_profile_discrete(f_post_h5, im=2, panels=['prob', 'entropy', 'stats'], prob_class=5)
+
     Overlay boreholes within 150 m of the profile:
 
     >>> plot_profile_discrete(f_post_h5, im=2, xaxis='x', BHOLES=BHOLES, bhole_max_dist=150)
@@ -1851,6 +1860,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     i_realization = kwargs.get('i_realization', None)
     seed = kwargs.get('seed', None)
     plot_prior = kwargs.get('plot_prior', False)
+    prob_class = kwargs.get('prob_class', None)   # class id(s) for the 'prob' panel
     BHOLES = kwargs.get('BHOLES', None)
     bhole_max_dist = kwargs.get('bhole_max_dist', 200)
     bhole_width = kwargs.get('bhole_width', 10)
@@ -1867,7 +1877,10 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
 
     # Determine which panels to show
     show_realization = 'realization' in panels
-    show_mode = 'mode' in panels and not show_realization
+    show_prob = 'prob' in panels and not show_realization
+    show_mode = 'mode' in panels and not show_realization and not show_prob
+    if show_prob and prob_class is None:
+        raise ValueError("panels=['prob'] needs prob_class: a class id, or a list of class ids (summed)")
     show_entropy = 'entropy' in panels
     show_stats = any(p in panels for p in ['stats', 't', 'temperature'])
 
@@ -2162,7 +2175,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
     fig, ax = plt.subplots(3,1,figsize=(20,10), gridspec_kw={'height_ratios': [3, 3, 1]})
 
     # Hide panels that are not requested
-    if not (show_mode or show_realization):
+    if not (show_mode or show_realization or show_prob):
         ax[0].axis('off')
     if not show_entropy:
         ax[1].axis('off')
@@ -2230,8 +2243,22 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
         cbar1.ax.invert_yaxis()
         ax[0].set_ylabel('Elevation (m)')
 
-    # BOREHOLE overlay on the mode/realization panel
-    if BHOLES is not None and (show_mode or show_realization):
+    # PROBABILITY panel (ax[0]) - P(class in prob_class), summed over the given classes
+    if show_prob:
+        ids = np.atleast_1d(prob_class)
+        ic = [int(np.where(class_id == c)[0][0]) for c in ids]
+        prob_data = P[ii][:, ic, :].sum(axis=1).T          # (nz, n_selected)
+        if gap_alpha is not None:
+            prob_data = np.ma.masked_where(gap_alpha == 0.0, prob_data)
+        im1 = ax[0].pcolormesh(DDc, ZZc, prob_data, cmap='hot_r', vmin=0, vmax=1, shading='auto')
+        names = [class_name[i] if i < len(class_name) else str(c) for i, c in zip(ic, ids)]
+        prob_label = 'P(%s)' % ' or '.join(names)
+        ax[0].set_title(prob_label)
+        fig.colorbar(im1, ax=ax[0], label=prob_label)
+        ax[0].set_ylabel('Elevation (m)')
+
+    # BOREHOLE overlay on the mode/realization/probability panel
+    if BHOLES is not None and (show_mode or show_realization or show_prob):
         Mstr_bh = Mstr if bhole_im is None else '/M%d' % bhole_im
         _overlay_boreholes_on_profile(ax[0], BHOLES, ii, X, Y, ELEVATION, x_axis_values,
                                       f_prior_h5, Mstr_bh, max_dist=bhole_max_dist,
@@ -2267,7 +2294,7 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
             fig.colorbar(im2, ax=ax[1], label='Entropy')
 
     ## Remove x-tick labels from non-bottom panels
-    if show_mode or show_realization:
+    if show_mode or show_realization or show_prob:
         ax[0].set_xticks([])
     if show_entropy:
         ax[1].set_xticks([])
@@ -2359,6 +2386,9 @@ def plot_profile_discrete(f_post_h5, i1=1, i2=1e+9, ii=np.array(()), im=1, xaxis
                 if i_realization is not None and i_plot_realization is None:
                     # e.g. 'realization' -> 'realization0_i_use_3d'
                     panel_str = panel_str.replace('realization', 'realization%d_%s' % (i_realization, i_use_key))
+                if show_prob:
+                    # e.g. 'prob' -> 'prob5' or 'prob4+5'
+                    panel_str = panel_str.replace('prob', 'prob' + '+'.join(str(int(c)) for c in np.atleast_1d(prob_class)))
             else:
                 panel_str = ''
             f_png = '%s__%d_%d_profile_%s%s%s.png' % (os.path.splitext(f_post_h5)[0],ii[0],ii[-1],Mstr[1:],panel_str,txt)

@@ -456,6 +456,7 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
     import integrate as ig
     from integrate.integrate import _report_progress
     import os
+    t0_compute = time.time()   # stored as /D{id} attr compute_time
     # Safety guard: if somehow called from a worker process, do nothing.
     if multiprocessing.current_process().name != 'MainProcess':
         return None
@@ -706,6 +707,7 @@ def prior_data_gaaem(f_prior_h5, file_gex=None, stmfiles=None, N=0, doMakePriorC
         f_prior[Dname].attrs['Nhank'] = Nhank
         f_prior[Dname].attrs['Nfreq'] = Nfreq
 
+    ig.save_compute_time(f_prior_data_h5, Dname, time.time() - t0_compute, "prior_data_gaaem", t0_compute)
     ig.integrate_update_prior_attributes(f_prior_data_h5)
 
     _report_progress(progress_callback, N, N,

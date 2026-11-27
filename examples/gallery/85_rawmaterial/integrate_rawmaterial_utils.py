@@ -433,7 +433,8 @@ def compare_to_reference(prob_results, reference, quantities=('overburden', 'raw
 
     Returns
     -------
-    None (prints the table; shows/saves the plot).
+    None (prints the table; shows one plot per quantity, saved as
+    ``<f_name>_<quantity>.png`` if hardcopy).
     """
     if quantity_labels is None:
         quantity_labels = {
@@ -443,6 +444,10 @@ def compare_to_reference(prob_results, reference, quantities=('overburden', 'raw
         }
 
     names = [n for n in prob_results if n in reference]
+    if not names:
+        print("compare_to_reference: no area names in common between the results %s and the "
+              "reference %s -- nothing to compare" % (sorted(prob_results), sorted(reference)))
+        return
 
     print("\n" + "=" * 100)
     print("Comparison: deterministic (old, sequential) vs. probabilistic (INTEGRATE)")
@@ -457,26 +462,141 @@ def compare_to_reference(prob_results, reference, quantities=('overburden', 'raw
                 name, "{:,.0f}".format(old_val),
                 "{:,.0f}".format(p5), "{:,.0f}".format(p50), "{:,.0f}".format(p95)))
 
-    fig, axes = plt.subplots(1, len(quantities), figsize=(6 * len(quantities), 5), squeeze=False)
-    axes = axes[0]
+    # One figure per quantity, saved as <f_name>_<quantity>.png
+    titles = {'overburden': 'Overburden volume: deterministic vs. probabilistic',
+              'raw_material': 'Raw-material volume: deterministic vs. probabilistic',
+              'coarser': 'Coarser-material volume: deterministic vs. probabilistic'}
     x = np.arange(len(names))
-    for ax, q in zip(axes, quantities):
+    width = 0.35
+    for q in quantities:
         old_vals = np.array([reference[n].get(q, np.nan) for n in names])
         p5 = np.array([prob_results[n][q][0] for n in names])
         p50 = np.array([prob_results[n][q][1] for n in names])
         p95 = np.array([prob_results[n][q][2] for n in names])
 
-        width = 0.35
+        fig, ax = plt.subplots(figsize=(7, 5))
         ax.bar(x - width / 2, old_vals, width, color='0.7', label='Old (deterministic)')
-        ax.bar(x + width / 2, p50, width, color='C0', label='New (probabilistic, P50)',
+        ax.bar(x + width / 2, p50, width, color='C0', label='New (probabilistic, P50, P5-P95)',
                yerr=[p50 - p5, p95 - p50], capsize=4, ecolor='k')
         ax.set_xticks(x)
         ax.set_xticklabels(names, rotation=20, ha='right')
         ax.set_ylabel(quantity_labels.get(q, q))
         ax.grid(True, axis='y', linestyle='--', alpha=0.4)
-    axes[0].legend(fontsize=8)
-    fig.suptitle('Deterministic vs. probabilistic raw-material volume estimates')
-    fig.tight_layout()
-    if hardcopy:
-        fig.savefig('%s.png' % f_name, dpi=200, bbox_inches='tight')
-    plt.show()
+        ax.legend(fontsize=9)
+        ax.set_title(titles.get(q, q))
+        fig.tight_layout()
+        if hardcopy:
+            fig.savefig('%s_%s.png' % (f_name, q), dpi=200, bbox_inches='tight')
+        plt.show()
+
+
+# ----------------------------------------------------------------------
+# 6. Volume of connected raw-material bodies in 3D realizations
+# ----------------------------------------------------------------------
+
+def connected_volume_3d(f_post_h5, areas, raw_classes=(5,), im=2, i_use_key='i_use_3d',
+                        chunk=200_000, return_bodies=False, showInfo=1):
+    """
+    Volume of the connected raw-material body around each area's seed, per 3D realization.
+
+    For each realization in ``/<i_use_key>`` (shape (Nsoundings, N_SIM), rows
+    of the prior ``/M<im>``) and each area:
+
+    1. In the seed sounding's column, take the thickest run of ``raw_classes``
+       and use its central depth cell as the start voxel. No raw material at
+       the seed -> volume 0.
+    2. Grow the connected body of raw-material voxels from the start voxel.
+       Voxels are connected vertically (same sounding, depth cell +-1) and
+       laterally (Voronoi neighbours, ``area['neighbors']``, same depth cell).
+       Growth is limited to the area's soundings (``area['mask']``).
+    3. Volume = sum over the body's voxels of ``cell_area * dz``.
+
+    Parameters
+    ----------
+    f_post_h5 : str
+        Posterior file holding ``/<i_use_key>``; the prior is ``attrs['f5_prior']``.
+    areas : list of dict
+        Areas from ``ig.find_coherent_area`` (need ``mask``, ``seed``,
+        ``neighbors``, ``cell_area``).
+    raw_classes : sequence of int
+        Lithology class ids counted as raw material.
+
+    return_bodies : bool
+        Also return the bodies (for plotting).
+
+    Returns
+    -------
+    V : ndarray (len(areas), N_SIM)
+        Volume [m^3] per area and realization.
+    bodies : list of dict, only if ``return_bodies``
+        One per area: ``idx`` (n,) sounding indices of the area, and ``body``
+        bool (N_SIM, n, nz), True for the body's voxels.
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    with h5py.File(f_post_h5, 'r') as f:
+        i_use = f[i_use_key][:]
+        f_prior_h5 = f.attrs['f5_prior']
+    n_sim = i_use.shape[1]
+
+    # Read only the prior rows that are used, block by block (fast, low memory)
+    u, inv = np.unique(i_use, return_inverse=True)
+    inv = inv.reshape(i_use.shape)
+    with h5py.File(f_prior_h5, 'r') as f:
+        M = f['/M%d' % im]
+        z = M.attrs['z'][:].flatten() if 'z' in M.attrs else M.attrs['x'][:].flatten()
+        Mu = np.empty((len(u), M.shape[1]), dtype=M.dtype)
+        for i0 in range(0, M.shape[0], chunk):
+            sel = (u >= i0) & (u < i0 + chunk)
+            if sel.any():
+                Mu[sel] = M[i0:min(i0 + chunk, M.shape[0])][u[sel] - i0]
+    dz = np.diff(z)
+    dz = np.append(dz, dz[-1])   # thickness of each depth cell
+    nz = len(z)
+
+    V = np.zeros((len(areas), n_sim))
+    bodies = []
+    for ia, area in enumerate(areas):
+        idx = np.where(area['mask'])[0]
+        loc = -np.ones(len(area['mask']), dtype=int)
+        loc[idx] = np.arange(len(idx))
+        # lateral neighbour pairs (local index) inside the area
+        pairs = np.array([(loc[i], loc[j]) for i in idx for j in area['neighbors'][i]
+                          if i < j and loc[j] >= 0], dtype=int).reshape(-1, 2)
+        s = loc[area['seed']]
+        vox_vol = area['cell_area'][idx][:, None] * dz[None, :]   # (n, nz) [m^3]
+        node = np.arange(len(idx) * nz).reshape(len(idx), nz)
+        B = np.zeros((n_sim, len(idx), nz), dtype=bool)
+        bodies.append({'idx': idx, 'body': B})
+
+        for r in range(n_sim):
+            raw = np.isin(Mu[inv[idx, r]], raw_classes)   # (n, nz)
+
+            # start voxel: centre of the thickest raw run in the seed column
+            col = np.concatenate(([0], raw[s].astype(int), [0]))
+            starts, ends = np.where(np.diff(col) == 1)[0], np.where(np.diff(col) == -1)[0]
+            if len(starts) == 0:
+                continue   # no raw material at the seed -> V = 0
+            k = np.argmax(ends - starts)
+            z_start = (starts[k] + ends[k] - 1) // 2
+
+            # voxel graph: vertical + lateral edges between raw voxels
+            v = raw[:, :-1] & raw[:, 1:]
+            e1 = np.column_stack((node[:, :-1][v], node[:, 1:][v]))
+            l = raw[pairs[:, 0]] & raw[pairs[:, 1]]
+            e2 = np.column_stack((node[pairs[:, 0]][l], node[pairs[:, 1]][l]))
+            e = np.vstack((e1, e2))
+            G = coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(node.size, node.size))
+            _, label = connected_components(G, directed=False)
+
+            body = label.reshape(raw.shape) == label[node[s, z_start]]
+            V[ia, r] = vox_vol[body].sum()
+            B[r] = body
+
+        if showInfo > 0:
+            print("Area %d: 3D connected volume P5/P50/P95 = %s m^3 (%d of %d realizations without raw material at seed)" % (
+                ia, np.round(np.percentile(V[ia], [5, 50, 95])).astype(int), np.sum(V[ia] == 0), n_sim))
+    if return_bodies:
+        return V, bodies
+    return V

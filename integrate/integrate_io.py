@@ -600,6 +600,133 @@ def save_prior_data(f_prior_h5, D_new, id=None, force_delete=False,
     return id
 
 
+def save_compute_time(f_h5, keys, t_elapsed, call, t_start=None):
+    """
+    Store the computation time of prior model/data arrays as dataset attributes.
+
+    Every prior model (``/M1``, ``/M2``, ...) and prior data (``/D1``, ``/D2``, ...)
+    array made by INTEGRATE records how long it took to make. Three attributes are
+    written on each dataset in ``keys``:
+
+    - ``compute_time`` : float, wall-clock time in seconds of the call that
+      created the dataset (including its own load/save I/O).
+    - ``compute_call`` : str, ``'<call>@<ISO start time>'``. Datasets made by the
+      same call (e.g. ``/M1``-``/M3`` from ``prior_model_layered``) share the same
+      ``compute_call`` and ``compute_time``, and are counted once in totals
+      (see :func:`get_prior_timing`).
+    - ``compute_date`` : str, ISO start time.
+
+    The attributes travel with the dataset when the file is copied
+    (``copy_hdf5_file``, ``doMakePriorCopy=True``).
+
+    Parameters
+    ----------
+    f_h5 : str
+        Prior (or prior data) HDF5 file.
+    keys : str or list of str
+        Dataset key(s), e.g. ``'/D1'`` or ``['/M1', '/M2', '/M3']``.
+    t_elapsed : float
+        Computation time in seconds.
+    call : str
+        Name of the function (or program) that created the datasets.
+    t_start : float, optional
+        Start time (``time.time()``). Default: ``now - t_elapsed``.
+
+    Examples
+    --------
+    Time a prior made outside INTEGRATE, e.g. with geoprior1d:
+
+    >>> t0 = time.time()
+    >>> geoprior1d(f_xlsx, Nreals=N, dz=1, dmax=90, output_file=f_prior_h5)
+    >>> ig.save_compute_time(f_prior_h5, ['/M1', '/M2', '/M3'], time.time() - t0, 'geoprior1d', t0)
+    """
+    import time
+    import datetime
+    if isinstance(keys, str):
+        keys = [keys]
+    if t_start is None:
+        t_start = time.time() - t_elapsed
+    date = datetime.datetime.fromtimestamp(t_start).isoformat(timespec='seconds')
+    with h5py.File(f_h5, 'a') as f:
+        for key in keys:
+            if key not in f:
+                print("save_compute_time: '%s' not in %s, skipped" % (key, f_h5))
+                continue
+            f[key].attrs['compute_time'] = float(t_elapsed)
+            f[key].attrs['compute_call'] = '%s@%s' % (call, date)
+            f[key].attrs['compute_date'] = date
+
+
+def get_prior_timing(f_prior_h5, showInfo=1):
+    """
+    Read the computation times stored on the prior model/data arrays.
+
+    See :func:`save_compute_time` for the attribute convention. Datasets made by
+    the same call are counted once in the totals.
+
+    Parameters
+    ----------
+    f_prior_h5 : str
+        Prior (or prior data) HDF5 file.
+    showInfo : int, optional
+        Print a table if > 0 (default 1).
+
+    Returns
+    -------
+    timing : dict
+        ``timing['datasets'][key] = {'compute_time', 'compute_call', 'compute_date'}``
+        (``compute_time`` is None for datasets without timing, e.g. old files),
+        and the totals ``timing['T_model']``, ``timing['T_data']``,
+        ``timing['T_total']`` in seconds (from datasets with timing only).
+    """
+    with h5py.File(f_prior_h5, 'r') as f:
+        timing = _collect_prior_timing(f)
+    if showInfo > 0:
+        print('Computation time: %s' % f_prior_h5)
+        _print_prior_timing(timing, print)
+    return timing
+
+
+def _collect_prior_timing(f):
+    """Timing dict (see get_prior_timing) from an open h5py.File."""
+    def _str(v):
+        return v.decode() if isinstance(v, bytes) else str(v)
+
+    datasets = {}
+    keys = [k for k in f.keys() if re.fullmatch(r'[MD]\d+', k)]
+    keys.sort(key=lambda k: (k[0] != 'M', int(k[1:])))
+    for k in keys:
+        a = f[k].attrs
+        datasets['/' + k] = {
+            'compute_time': float(a['compute_time']) if 'compute_time' in a else None,
+            'compute_call': _str(a['compute_call']) if 'compute_call' in a else '',
+            'compute_date': _str(a['compute_date']) if 'compute_date' in a else '',
+        }
+
+    def _total(prefix):
+        seen = {}   # one entry per call: datasets from the same call are counted once
+        for k, v in datasets.items():
+            if k[1] == prefix and v['compute_time'] is not None:
+                seen[v['compute_call'] or k] = v['compute_time']
+        return float(sum(seen.values()))
+
+    timing = {'datasets': datasets, 'T_model': _total('M'), 'T_data': _total('D')}
+    timing['T_total'] = timing['T_model'] + timing['T_data']
+    return timing
+
+
+def _print_prior_timing(timing, print_fn):
+    """Print a timing dict from _collect_prior_timing with print_fn(text)."""
+    for k, v in timing['datasets'].items():
+        t = '%10.2f s' % v['compute_time'] if v['compute_time'] is not None else '   unknown  '
+        print_fn('  %-5s %s  %s' % (k, t, v['compute_call'].split('@')[0]))
+    print_fn('  Prior models (M): %10.2f s' % timing['T_model'])
+    print_fn('  Prior data   (D): %10.2f s' % timing['T_data'])
+    print_fn('  Total           : %10.2f s' % timing['T_total'])
+    if any(v['compute_time'] is None for v in timing['datasets'].values()):
+        print_fn('  (datasets marked unknown carry no timing and are not in the totals)')
+
+
 def load_data(f_data_h5, id_arr=[], ii=None, **kwargs):
     """
     Load observational electromagnetic data from HDF5 file.
@@ -5498,6 +5625,12 @@ def _analyze_prior_file(f, print_line, load_data=False):
             data_max = np.max(dataset[...])
             print_line(f"  Data range: [{data_min:.4e}, {data_max:.4e}]", 1)
 
+        print_line()
+
+    timing = _collect_prior_timing(f)
+    if any(v['compute_time'] is not None for v in timing['datasets'].values()):
+        print_line("Computation time (attrs compute_time):", 0)
+        _print_prior_timing(timing, print_line)
         print_line()
 
 
