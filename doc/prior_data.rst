@@ -48,22 +48,19 @@ writing a file) uses exactly the same backend and device selection.
 Backends
 ^^^^^^^^
 
+* ``'anemone'`` -- **default.** PyTorch-based forward model with optional GPU
+  support, see :mod:`integrate.anemone_forward`. Installed with INTEGRATE
+  (PyPI: `anemone-core <https://pypi.org/project/anemone-core/>`_, source:
+  `GitHub <https://github.com/hydrogeophysicsgroup/anemone>`_).
 * ``'ga-aem'`` -- GA-AEM [GA-AEM]_ (``gatdaem1d``), see :mod:`integrate.gaaem_forward`.
-  **The only fully supported, production backend.**
-* ``'anemone'`` -- PyTorch-based forward model with optional GPU support, see
-  :mod:`integrate.anemone_forward`.
 * ``'simpeg'`` -- SimPEG [SimPEG]_ ``Simulation1DLayered``, see
   :mod:`integrate.simpeg_forward`. Its validation against GA-AEM/AarhusInv is
   described in ``SIMPEG_VS_GAAEM.md`` in the repository root.
 
-.. important::
+.. note::
 
-    ``method='anemone'`` is **integration in development**: it requires a
-    local, unpublished checkout of the ``anemone`` package
-    (``pip install -e /path/to/anemone``) and has not yet been validated to
-    the same standard as GA-AEM. ``method='simpeg'`` is likewise newer and
-    less battle-tested than ``ga-aem``. Do not rely on either for production
-    results yet.
+    ``method='simpeg'`` is newer and less battle-tested than ``anemone`` and
+    ``ga-aem``.
 
 Choosing the backend
 ^^^^^^^^^^^^^^^^^^^^
@@ -84,8 +81,7 @@ auto-selected one is reported as e.g.
 ``Using EM forward method: anemone (auto-selected)``.
 
 Because auto-selection prefers ``anemone`` whenever it is installed, pass
-``method='ga-aem'`` (or set ``EM_FORWARD_METHOD=ga-aem``) when you need the
-production backend.
+``method='ga-aem'`` (or set ``EM_FORWARD_METHOD=ga-aem``) to use GA-AEM instead.
 
 If the requested backend is not installed, the call does **not** stop. It
 issues a ``RuntimeWarning`` and uses the first installed backend in the
@@ -97,11 +93,9 @@ auto-selection order (see Errors below). Check the warning, or call with
     # Auto-selected backend (first installed of anemone, ga-aem, simpeg)
     ig.prior_data_em(f_prior_h5, file_gex='system.gex')
 
-    # GA-AEM -- recommended for production use
-    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='ga-aem')
-
-    # Experimental / in development -- do not use for production results
+    # Explicit backends
     ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='anemone')
+    ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='ga-aem')
     ig.prior_data_em(f_prior_h5, file_gex='system.gex', method='simpeg')
 
 .. code-block:: bash
