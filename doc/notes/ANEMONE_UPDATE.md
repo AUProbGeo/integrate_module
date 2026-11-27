@@ -1,9 +1,15 @@
 # When anemone-core is updated
 
-Status (2026-11-17): integrate uses `anemone-core>=0.1.1` from PyPI. 0.1.1 has
-one known bug that affects integrate, fixed in
+Status (2026-11-27): integrate requires `anemone-core>0.1.1`. 0.1.1 has one
+known bug that affects integrate, fixed in
 [hydrogeophysicsgroup/anemone#2](https://github.com/hydrogeophysicsgroup/anemone/pull/2)
-(not merged/released yet).
+(merged 2026-11-27, not yet released on PyPI). Until a release >0.1.1 is on
+PyPI, install anemone-core from its git main branch. The pin is raised and the
+boxcar xfail is removed (checklist steps 3-4 below); steps 2 and 5-7 remain.
+
+Checked against anemone-core main (60ad16a), DAUGAARD line 150 vs AarhusInv,
+median |rel diff|: `'boxcar'` 0.24 % (LM) / 0.20 % (HM), `'centre'` 0.77 % /
+0.89 %.
 
 ## The open bug (anemone#2)
 
