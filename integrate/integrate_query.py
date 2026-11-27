@@ -913,7 +913,36 @@ def prior_describe(f_prior_h5):
                 print(f"          class {int(cid):>3} = {cname}")
 
 
-def _build_llm_system_prompt(f_prior_h5):
+def _resolve_llm_context(context):
+    """Return user-supplied LLM context as a stripped string ('' if none).
+
+    ``context`` may be None, a string, or a path to a text/markdown file.
+    """
+    if context is None:
+        return ''
+    context = str(context)
+    if os.path.isfile(context):
+        with open(context, 'r', encoding='utf-8') as fh:
+            context = fh.read()
+    return context.strip()
+
+
+def _llm_context_section(context):
+    """Format user context as a system-prompt section ('' if empty)."""
+    if not context:
+        return ''
+    return (
+        "## Use-case context\n\n"
+        "The following context was provided by an expert user for this specific\n"
+        "problem. Use it to interpret vocabulary, default depth intervals, thresholds\n"
+        "and class groupings in the user's query. It refines, but does not override,\n"
+        "the schema: still use only the model indices (im) and class IDs listed under\n"
+        "Available Prior Models.\n\n"
+        f"{context}\n\n"
+    )
+
+
+def _build_llm_system_prompt(f_prior_h5, context=None):
     """
     Build a system prompt for the LLM that includes the query schema and prior model context.
 
@@ -921,6 +950,10 @@ def _build_llm_system_prompt(f_prior_h5):
     ----------
     f_prior_h5 : str
         Path to the prior HDF5 file.
+    context : str, optional
+        Additional use-case context (text, or path to a text/markdown file),
+        inserted as a "Use-case context" section after the list of available
+        prior models. Default None adds nothing.
 
     Returns
     -------
@@ -970,6 +1003,7 @@ def _build_llm_system_prompt(f_prior_h5):
         model_sections.append('\n'.join(lines))
 
     models_text = '\n'.join(model_sections)
+    context_text = _llm_context_section(_resolve_llm_context(context))
 
     prompt = f"""You are a geophysics query assistant for the INTEGRATE probabilistic inversion module.
 Your task is to translate a natural-language query about geological or geophysical properties
@@ -1056,7 +1090,7 @@ These store a single value per realization, not a depth profile. For scalar mode
 
 {models_text}
 
-## Examples
+{context_text}## Examples
 
 ## Metric fields (for percentile queries)
 
@@ -1274,7 +1308,7 @@ def _litellm_extra(model):
     return {}
 
 
-def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_key=None, max_tokens=4096, verbose=False, system_prompt=None):
+def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_key=None, max_tokens=4096, verbose=False, system_prompt=None, context=None):
     """
     Translate a natural-language query into a query dict using an LLM.
 
@@ -1303,6 +1337,13 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
         Custom system prompt overriding the default built from the prior file.
         Use to hand-tune the translation instructions (model list and schema
         context). The effective prompt is still returned for inspection.
+    context : str, optional
+        Additional use-case context from an expert user, as a string or a path
+        to a text/markdown file. Use it to define project vocabulary (e.g.
+        "clay" means classes 2 and 3 of im=2), default depth intervals, or
+        typical thresholds. It is added as a "Use-case context" section after
+        the list of available prior models. If ``system_prompt`` is also given,
+        the context section is appended to it. Default None: prompt unchanged.
 
     Returns
     -------
@@ -1338,6 +1379,12 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
     >>> print(interpretation)
     >>> P, meta = ig.query('posterior.h5', query_dict)
     >>> ig.query_plot(P, meta)
+
+    Add use-case context (string or path to a .md/.txt file):
+
+    >>> ctx = '"Clay" means classes 2 and 3 of im=2. "Shallow" means 0-20 m.'
+    >>> query_dict, interpretation, _ = ig.query_from_text(
+    ...     "Is there more than 5 m of shallow clay?", 'prior.h5', context=ctx)
     """
     try:
         import litellm
@@ -1347,7 +1394,12 @@ def query_from_text(text, f_prior_h5, model='anthropic/claude-sonnet-4-6', api_k
             "Install it with: pip install litellm"
         )
 
-    system_prompt = system_prompt if system_prompt is not None else _build_llm_system_prompt(f_prior_h5)
+    if system_prompt is None:
+        system_prompt = _build_llm_system_prompt(f_prior_h5, context=context)
+    else:
+        context_text = _llm_context_section(_resolve_llm_context(context))
+        if context_text:
+            system_prompt = system_prompt.rstrip() + "\n\n" + context_text.rstrip() + "\n"
 
     if verbose:
         print("=== SYSTEM PROMPT ===")
