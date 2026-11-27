@@ -1,11 +1,19 @@
 # When anemone-core is updated
 
-Status (2026-11-27): integrate requires `anemone-core>0.1.1`. 0.1.1 has one
+Status (2026-11-27): integrate requires `anemone-core>=0.1.1`. 0.1.1 has one
 known bug that affects integrate, fixed in
 [hydrogeophysicsgroup/anemone#2](https://github.com/hydrogeophysicsgroup/anemone/pull/2)
-(merged 2026-11-27, not yet released on PyPI). Until a release >0.1.1 is on
-PyPI, install anemone-core from its git main branch. The pin is raised and the
-boxcar xfail is removed (checklist steps 3-4 below); steps 2 and 5-7 remain.
+(merged 2026-11-27, not yet released on PyPI; GitHub main still says 0.1.1).
+
+Until a release with the fix is on PyPI, `[tool.uv.sources]` in
+`pyproject.toml` makes uv (`uv sync`, `uv run`, `uv lock`) install
+anemone-core from GitHub at the fix commit. pip, and anyone installing
+integrate-module from PyPI, still get the broken 0.1.1 from PyPI. The boxcar
+xfail is removed (checklist step 4), so
+`test_dual_moment_matches_single_moments[boxcar]` fails on those installs.
+
+When the release is out: remove the `[tool.uv.sources]` entry, raise the pin
+(step 3), then do steps 2 and 5-7.
 
 Checked against anemone-core main (60ad16a), DAUGAARD line 150 vs AarhusInv,
 median |rel diff|: `'boxcar'` 0.24 % (LM) / 0.20 % (HM), `'centre'` 0.77 % /

@@ -31,7 +31,7 @@ anemone = pytest.importorskip("anemone")
 import integrate as ig  # noqa: E402
 import integrate.anemone_forward as af  # noqa: E402
 
-MIN_VERSION_EXCL = (0, 1, 1)  # pyproject: anemone-core>0.1.1 (needs anemone#2)
+MIN_VERSION = (0, 1, 1)
 N_GATES = 40  # 14 LM + 26 HM used gates of the tTEM GEX below
 
 needs_cuda = pytest.mark.skipif(not torch.cuda.is_available(),
@@ -195,8 +195,8 @@ def _fwd(models, file_gex, **kw):
 def test_anemone_core_version():
     v = md.version("anemone-core")
     parts = tuple(int(p) for p in v.split(".")[:3])
-    assert parts > MIN_VERSION_EXCL, "anemone-core %s, need > %s" % (
-        v, ".".join(map(str, MIN_VERSION_EXCL)))
+    assert parts >= MIN_VERSION, "anemone-core %s < %s" % (
+        v, ".".join(map(str, MIN_VERSION)))
 
 
 def test_import_resolves_to_anemone_core():
@@ -305,7 +305,7 @@ def test_forward_runs(models, file_gex, rx_coil_filter, gate_integration):
 
 @pytest.mark.parametrize("gate_integration", [
     "centre",
-    "boxcar",  # broken in anemone-core 0.1.1, fixed by anemone#2
+    "boxcar",  # broken in anemone-core 0.1.1 from PyPI, fixed by anemone#2
 ])
 def test_dual_moment_matches_single_moments(file_gex, gate_integration):
     """The combined LM+HM Forward (Forward.__add__) must give the same data
